@@ -1,0 +1,401 @@
+<template>
+  <div class="space-y-4">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900">Draft Invoice</h1>
+        <p class="text-sm text-gray-500">Kelola dan terbitkan draft invoice yang diimpor dari Excel.</p>
+      </div>
+      <div class="flex items-center space-x-2">
+        <button
+          @click="generateAllInvoices"
+          :disabled="generatingAll"
+          class="h-9 px-3.5 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 disabled:opacity-50 transition cursor-pointer flex items-center space-x-1.5"
+          title="Terbitkan invoice untuk semua draft yang berstatus Ready"
+        >
+          <svg v-if="generatingAll" class="animate-spin -ml-0.5 mr-1.5 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>{{ generatingAll ? 'Menerbitkan Semua...' : 'Generate Semua Invoice' }}</span>
+        </button>
+        <button
+          @click="showImportModal = true"
+          class="h-9 px-3.5 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-md transition cursor-pointer"
+        >
+          + Import Excel
+        </button>
+      </div>
+    </div>
+
+    <!-- Toolbar Filters (Shadcn style) -->
+    <div class="flex flex-wrap items-center justify-between gap-3 py-1">
+      <div class="flex flex-wrap items-center gap-2">
+        <input
+          v-model="filters.search"
+          @input="debounceFetch"
+          type="text"
+          placeholder="Filter dealer, customer, CN..."
+          class="h-9 w-64 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
+        />
+        <select
+          v-model="filters.invoice_type"
+          @change="fetchDrafts(1)"
+          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-black"
+        >
+          <option value="">Semua Tipe</option>
+          <option value="DSA">DSA</option>
+          <option value="NPS FL">NPS FL</option>
+        </select>
+        <select
+          v-model="filters.status"
+          @change="fetchDrafts(1)"
+          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-black"
+        >
+          <option value="">Semua Status</option>
+          <option value="ready">Ready</option>
+          <option value="error">Error</option>
+          <option value="invoiced">Invoiced</option>
+        </select>
+        <Popover>
+          <PopoverTrigger as-child>
+            <button
+              :class="[
+                'h-9 px-3 inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-black transition',
+                !filters.date && 'text-gray-400'
+              ]"
+            >
+              <CalendarIcon class="h-4 w-4" />
+              {{ filters.date ? formatDateDisplay(filters.date) : 'Pilih tanggal' }}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent class="w-auto p-0">
+            <Calendar
+              :model-value="selectedCalendarDate"
+              :initial-focus="true"
+              @update:model-value="onDateSelect"
+            />
+          </PopoverContent>
+        </Popover>
+        <button
+          v-if="filters.search || filters.invoice_type || filters.status || filters.date"
+          @click="resetFilters"
+          class="h-9 px-3 text-sm text-gray-500 hover:text-black cursor-pointer"
+        >
+          Reset
+        </button>
+      </div>
+    </div>
+
+    <!-- Alert -->
+    <Alert v-if="alertMessage" :variant="alertSuccess ? 'default' : 'destructive'">
+      <CheckCircleIcon v-if="alertSuccess" class="h-4 w-4" />
+      <AlertCircleIcon v-else class="h-4 w-4" />
+      <AlertDescription class="flex items-center justify-between">
+        <span>{{ alertMessage }}</span>
+        <button @click="alertMessage = null" class="ml-4 text-sm opacity-60 hover:opacity-100 cursor-pointer">&times;</button>
+      </AlertDescription>
+    </Alert>
+
+    <!-- Official Shadcn-Vue Table Card (All uniform font) -->
+    <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead class="w-[110px]">Dealer Code</TableHead>
+            <TableHead>Dealer Name</TableHead>
+            <TableHead>Customer</TableHead>
+            <TableHead>Program</TableHead>
+            <TableHead class="w-[120px]">No CN</TableHead>
+            <TableHead class="w-[110px]">Tanggal</TableHead>
+            <TableHead class="w-[85px]">Type</TableHead>
+            <TableHead class="w-[95px]">Status</TableHead>
+            <TableHead class="text-right w-[140px]">Support</TableHead>
+            <TableHead class="text-right w-[140px]">Netpay</TableHead>
+            <TableHead class="text-right w-[130px]">Action</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableEmpty v-if="loading" :colspan="11">
+            Memuat data draft...
+          </TableEmpty>
+          <TableEmpty v-else-if="drafts.length === 0" :colspan="11">
+            Belum ada data draft. Silakan klik tombol <strong>+ Import Excel</strong>.
+          </TableEmpty>
+          <TableRow v-for="draft in drafts" :key="draft.id">
+            <TableCell>
+              {{ draft.dealer_code || '-' }}
+            </TableCell>
+            <TableCell class="max-w-[180px] truncate" :title="draft.dealer_name">
+              {{ draft.dealer_name || '-' }}
+            </TableCell>
+            <TableCell class="max-w-[160px] truncate" :title="draft.customer_name">
+              {{ draft.customer_name || '-' }}
+            </TableCell>
+            <TableCell class="max-w-[150px] truncate" :title="draft.program_name">
+              {{ draft.program_name || '-' }}
+            </TableCell>
+            <TableCell>
+              {{ draft.cn_number || '-' }}
+            </TableCell>
+            <TableCell class="whitespace-nowrap">
+              {{ draft.invoice_date || '-' }}
+            </TableCell>
+            <TableCell>
+              {{ draft.invoice_type || '-' }}
+            </TableCell>
+            <TableCell class="capitalize">
+              {{ draft.status }}
+            </TableCell>
+            <TableCell class="text-right">
+              {{ formatCurrency(draft.support_amount) }}
+            </TableCell>
+            <TableCell class="text-right">
+              {{ formatCurrency(draft.netpay) }}
+            </TableCell>
+            <TableCell class="text-right">
+              <div class="flex items-center justify-end space-x-2">
+                <router-link
+                  :to="`/drafts/${draft.id}`"
+                  class="text-sm text-gray-600 hover:text-black hover:underline"
+                >
+                  View
+                </router-link>
+
+                <button
+                  v-if="draft.status === 'ready'"
+                  @click="generateInvoice(draft.id)"
+                  :disabled="generatingId === draft.id"
+                  class="h-7 px-2.5 bg-black text-white text-xs font-medium rounded hover:bg-gray-800 disabled:opacity-50 cursor-pointer"
+                >
+                  {{ generatingId === draft.id ? '...' : 'Generate' }}
+                </button>
+
+                <button
+                  v-else-if="draft.status === 'error'"
+                  @click="validateDraft(draft.id)"
+                  class="h-7 px-2.5 border border-gray-300 text-xs font-medium rounded hover:bg-gray-50 cursor-pointer"
+                >
+                  Validate
+                </button>
+              </div>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+        <TableFooter v-if="drafts.length > 0">
+          <TableRow>
+            <TableCell :colspan="8">
+              Total
+            </TableCell>
+            <TableCell class="text-right">
+              {{ formatCurrency(totalSupport) }}
+            </TableCell>
+            <TableCell class="text-right">
+              {{ formatCurrency(totalNetpay) }}
+            </TableCell>
+            <TableCell></TableCell>
+          </TableRow>
+        </TableFooter>
+      </Table>
+    </div>
+
+    <!-- Pagination (Shadcn style) -->
+    <div class="flex items-center justify-between py-2 text-sm text-gray-500">
+      <div>
+        Menampilkan {{ pagination.total > 0 ? (pagination.current_page - 1) * pagination.per_page + 1 : 0 }} sampai {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} dari {{ pagination.total }} draft.
+      </div>
+      <div v-if="pagination.last_page > 1" class="flex items-center space-x-2">
+        <button
+          @click="fetchDrafts(pagination.current_page - 1)"
+          :disabled="pagination.current_page <= 1"
+          class="h-8 px-3 rounded-md border border-gray-200 text-sm font-medium hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+        >
+          Previous
+        </button>
+        <span class="text-sm font-medium text-gray-700">
+          {{ pagination.current_page }} / {{ pagination.last_page }}
+        </span>
+        <button
+          @click="fetchDrafts(pagination.current_page + 1)"
+          :disabled="pagination.current_page >= pagination.last_page"
+          class="h-8 px-3 rounded-md border border-gray-200 text-sm font-medium hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+
+    <!-- Import Modal -->
+    <ImportModal
+      :is-open="showImportModal"
+      @close="showImportModal = false"
+      @imported="fetchDrafts(1)"
+    />
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, computed, onMounted } from 'vue';
+import axios from 'axios';
+import { parseDate } from '@internationalized/date';
+import { CalendarIcon, CheckCircle as CheckCircleIcon, AlertCircle as AlertCircleIcon } from '@lucide/vue';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import ImportModal from '@/components/ImportModal.vue';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableFooter,
+  TableRow,
+  TableHead,
+  TableCell,
+  TableEmpty,
+} from '@/components/ui/table';
+
+const drafts = ref([]);
+const loading = ref(false);
+const showImportModal = ref(false);
+const generatingId = ref(null);
+const generatingAll = ref(false);
+const alertMessage = ref(null);
+const alertSuccess = ref(true);
+
+const filters = reactive({
+  search: '',
+  invoice_type: '',
+  status: '',
+  date: '',
+});
+
+const selectedCalendarDate = computed(() => {
+  if (!filters.date) return undefined;
+  try { return parseDate(filters.date); } catch { return undefined; }
+});
+
+const onDateSelect = (val) => {
+  if (!val) { filters.date = ''; fetchDrafts(1); return; }
+  filters.date = val.toString();
+  fetchDrafts(1);
+};
+
+const formatDateDisplay = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(dateStr));
+  } catch { return dateStr; }
+};
+
+const pagination = reactive({
+  current_page: 1,
+  last_page: 1,
+  per_page: 15,
+  total: 0,
+});
+
+const totalSupport = computed(() => {
+  return drafts.value.reduce((acc, d) => acc + (Number(d.support_amount) || 0), 0);
+});
+
+const totalNetpay = computed(() => {
+  return drafts.value.reduce((acc, d) => acc + (Number(d.netpay) || 0), 0);
+});
+
+let debounceTimeout = null;
+const debounceFetch = () => {
+  clearTimeout(debounceTimeout);
+  debounceTimeout = setTimeout(() => {
+    fetchDrafts(1);
+  }, 300);
+};
+
+const fetchDrafts = async (page = 1) => {
+  loading.value = true;
+  try {
+    const params = {
+      page,
+      ...filters,
+    };
+    const res = await axios.get('/api/drafts', { params });
+    drafts.value = res.data.data;
+    pagination.current_page = res.data.current_page;
+    pagination.last_page = res.data.last_page;
+    pagination.per_page = res.data.per_page;
+    pagination.total = res.data.total;
+  } catch (err) {
+    console.error('Error fetching drafts', err);
+  } finally {
+    loading.value = false;
+  }
+};
+
+const resetFilters = () => {
+  filters.search = '';
+  filters.invoice_type = '';
+  filters.status = '';
+  filters.date = '';
+  fetchDrafts(1);
+};
+
+const validateDraft = async (id) => {
+  try {
+    const res = await axios.post(`/api/drafts/${id}/validate`);
+    alertMessage.value = res.data.message;
+    alertSuccess.value = true;
+    fetchDrafts(pagination.current_page);
+  } catch (err) {
+    alertMessage.value = err.response?.data?.message || 'Gagal validasi draft.';
+    alertSuccess.value = false;
+  }
+};
+
+const generateInvoice = async (draftId) => {
+  if (!confirm('Apakah Anda yakin ingin menerbitkan Invoice dari Draft ini?')) return;
+
+  generatingId.value = draftId;
+  alertMessage.value = null;
+
+  try {
+    const res = await axios.post(`/api/invoices/generate/${draftId}`);
+    alertMessage.value = res.data.message;
+    alertSuccess.value = true;
+    fetchDrafts(pagination.current_page);
+  } catch (err) {
+    alertMessage.value = err.response?.data?.message || 'Gagal generate invoice.';
+    alertSuccess.value = false;
+  } finally {
+    generatingId.value = null;
+  }
+};
+
+const generateAllInvoices = async () => {
+  if (!confirm('Apakah Anda yakin ingin menerbitkan Invoice untuk SEMUA data draft dengan status Ready?')) {
+    return;
+  }
+
+  generatingAll.value = true;
+  alertMessage.value = null;
+
+  try {
+    const res = await axios.post('/api/invoices/generate-all');
+    alertMessage.value = res.data.message;
+    alertSuccess.value = res.data.success;
+    fetchDrafts(pagination.current_page);
+  } catch (err) {
+    alertMessage.value = err.response?.data?.message || 'Gagal menerbitkan semua invoice.';
+    alertSuccess.value = false;
+  } finally {
+    generatingAll.value = false;
+  }
+};
+
+const formatCurrency = (val) => {
+  const num = Math.round(Number(val) || 0);
+  return 'Rp ' + new Intl.NumberFormat('id-ID').format(num);
+};
+
+onMounted(() => {
+  fetchDrafts(1);
+});
+</script>
