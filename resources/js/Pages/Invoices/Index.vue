@@ -6,15 +6,58 @@
         <h1 class="text-2xl font-bold tracking-tight text-gray-900">Invoices</h1>
         <p class="text-sm text-gray-500">Daftar invoice resmi yang telah diterbitkan.</p>
       </div>
-      <div>
+      <div class="flex items-center gap-2.5">
+        <!-- Multi-select Send Button -->
+        <button
+          v-if="selectedIds.length > 0"
+          @click="askSendBatch"
+          :disabled="sendingBatch"
+          class="h-10 px-4 bg-[#1D70F5] hover:bg-blue-600 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition cursor-pointer flex items-center gap-2 shadow-xs"
+          :title="`Kirim ${selectedIds.length} invoice terpilih`"
+        >
+          <svg v-if="sendingBatch" class="animate-spin -ml-0.5 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <MailIcon v-else class="w-4 h-4 text-white" />
+          <span>{{ sendingBatch ? 'Mengirim...' : `Kirim (${selectedIds.length}) Email Terpilih` }}</span>
+        </button>
+
+        <!-- Send All Button (when nothing specifically selected) -->
+        <button
+          v-else
+          @click="askSendAll"
+          :disabled="sendingAll"
+          class="h-10 px-4 bg-[#1D70F5] hover:bg-blue-600 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition cursor-pointer flex items-center gap-2 shadow-xs"
+          title="Kirim semua invoice yang belum terkirim"
+        >
+          <svg v-if="sendingAll" class="animate-spin -ml-0.5 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <MailIcon v-else class="w-4 h-4 text-white" />
+          <span>{{ sendingAll ? 'Mengirim Semua...' : 'Kirim Semua Email' }}</span>
+        </button>
+
         <router-link
           to="/drafts"
-          class="h-9 px-3 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-md transition inline-flex items-center"
+          class="h-10 px-4 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-lg transition inline-flex items-center gap-2 shadow-xs"
         >
-          ← Kembali ke Draft
+          <ArrowLeftIcon class="w-4 h-4 text-gray-600" />
+          <span>Kembali ke Draft</span>
         </router-link>
       </div>
     </div>
+
+    <!-- Alert Notification -->
+    <Alert v-if="alertMessage" :variant="alertSuccess ? 'default' : 'destructive'">
+      <CheckCircleIcon v-if="alertSuccess" class="h-4 w-4" />
+      <AlertCircleIcon v-else class="h-4 w-4" />
+      <AlertDescription class="flex items-center justify-between">
+        <span>{{ alertMessage }}</span>
+        <button @click="alertMessage = null" class="ml-4 text-sm opacity-60 hover:opacity-100 cursor-pointer">&times;</button>
+      </AlertDescription>
+    </Alert>
 
     <!-- Toolbar Filters (Shadcn style) -->
     <div class="flex flex-wrap items-center justify-between gap-3 py-1">
@@ -23,7 +66,7 @@
           v-model="filters.search"
           @input="debounceFetch"
           type="text"
-          placeholder="Filter invoice, dealer, customer..."
+          placeholder="Filter invoice, dealer, customer, email..."
           class="h-9 w-64 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
         />
         <select
@@ -42,6 +85,7 @@
         >
           <option value="">Semua Status</option>
           <option value="generated">Generated</option>
+          <option value="sent">Sent (Terkirim)</option>
           <option value="paid">Paid</option>
           <option value="cancelled">Cancelled</option>
         </select>
@@ -80,32 +124,65 @@
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead class="w-[40px] text-center">
+              <input
+                type="checkbox"
+                :checked="isAllSelected"
+                :indeterminate="isIndeterminate"
+                @change="toggleSelectAll"
+                :disabled="selectableInvoices.length === 0"
+                class="h-4 w-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Pilih semua yang belum dikirim di halaman ini"
+              />
+            </TableHead>
             <TableHead class="w-[160px]">Invoice</TableHead>
-            <TableHead class="w-[100px]">Status</TableHead>
+            <TableHead class="w-[110px]">Status</TableHead>
             <TableHead class="w-[90px]">Method</TableHead>
             <TableHead>Dealer</TableHead>
             <TableHead>Customer</TableHead>
+            <TableHead>Email</TableHead>
             <TableHead>Program</TableHead>
             <TableHead class="w-[110px]">Tanggal</TableHead>
             <TableHead class="text-right w-[140px]">Amount</TableHead>
-            <TableHead class="text-right w-[140px]">Action</TableHead>
+            <TableHead class="text-right w-[270px]">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableEmpty v-if="loading" :colspan="9">
+          <TableEmpty v-if="loading" :colspan="11">
             Memuat data invoice...
           </TableEmpty>
-          <TableEmpty v-else-if="invoices.length === 0" :colspan="9">
+          <TableEmpty v-else-if="invoices.length === 0" :colspan="11">
             Belum ada invoice yang dibuat. Silakan generate invoice dari menu <strong>Draft</strong>.
           </TableEmpty>
           <TableRow v-for="inv in invoices" :key="inv.id">
+            <!-- Row Checkbox -->
+            <TableCell class="w-[40px] text-center">
+              <input
+                type="checkbox"
+                :value="inv.id"
+                v-model="selectedIds"
+                :disabled="isAlreadySent(inv) || !hasEmail(inv)"
+                class="h-4 w-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                :title="isAlreadySent(inv) ? 'Sudah dikirim' : (!hasEmail(inv) ? 'Tidak ada email' : 'Pilih invoice ini')"
+              />
+            </TableCell>
             <TableCell>
-              <router-link :to="`/invoices/${inv.id}`" class="hover:underline">
+              <router-link :to="`/invoices/${inv.id}`" class="hover:underline font-medium">
                 {{ inv.invoice_number }}
               </router-link>
             </TableCell>
-            <TableCell class="capitalize">
-              {{ inv.status }}
+            <!-- Status Badge -->
+            <TableCell>
+              <span
+                v-if="isAlreadySent(inv)"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+              >
+                <CheckCircleIcon class="h-3 w-3" />
+                Terkirim
+              </span>
+              <span v-else class="capitalize">
+                {{ inv.status }}
+              </span>
             </TableCell>
             <TableCell>
               {{ inv.invoice_type }}
@@ -116,50 +193,97 @@
             <TableCell class="max-w-[160px] truncate" :title="inv.customer_name">
               {{ inv.customer_name || '-' }}
             </TableCell>
+            <!-- Email (Uniform font) -->
+            <TableCell class="max-w-[160px] truncate" :title="inv.email || inv.draft?.email">
+              {{ inv.email || inv.draft?.email || '-' }}
+            </TableCell>
             <TableCell class="max-w-[150px] truncate" :title="inv.program_name">
               {{ inv.program_name || '-' }}
             </TableCell>
             <TableCell class="whitespace-nowrap">
               {{ inv.invoice_date || '-' }}
             </TableCell>
-            <TableCell class="text-right">
+            <TableCell class="text-right font-medium text-gray-900 whitespace-nowrap">
               {{ formatCurrency(inv.netpay) }}
             </TableCell>
-            <TableCell class="text-right">
-              <div class="flex items-center justify-end space-x-2">
+
+            <!-- Modern Action Buttons Matching Screenshot -->
+            <TableCell class="text-right w-[270px] whitespace-nowrap">
+              <div class="flex items-center justify-end gap-2">
+                <!-- 1. View / Detail Icon -->
                 <router-link
                   :to="`/invoices/${inv.id}`"
-                  class="text-sm text-gray-600 hover:text-black hover:underline"
+                  class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer shadow-2xs"
+                  title="Lihat Detail Invoice"
                 >
-                  View
+                  <EyeIcon class="w-4 h-4 text-gray-600" />
                 </router-link>
+
+                <!-- 2. Print / Preview Icon -->
                 <a
                   :href="`/invoices/${inv.id}/preview`"
                   target="_blank"
-                  class="text-sm text-gray-600 hover:text-black hover:underline"
+                  class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer shadow-2xs"
+                  title="Cetak / Preview Invoice"
                 >
-                  Print
+                  <PrinterIcon class="w-4 h-4 text-gray-600" />
                 </a>
-                <button
-                  @click="openEmailModal(inv)"
-                  class="h-7 px-2.5 border border-gray-200 bg-white text-gray-700 text-xs font-medium rounded hover:bg-gray-50 transition inline-flex items-center gap-1"
-                >
-                  <MailIcon class="h-3.5 w-3.5" />
-                  Email
-                </button>
+
+                <!-- 3. PDF Download Button -->
                 <a
                   :href="`/invoices/${inv.id}/pdf`"
-                  class="h-7 px-2.5 bg-black text-white text-xs font-medium rounded hover:bg-gray-800 transition inline-flex items-center"
+                  class="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition cursor-pointer shadow-2xs"
+                  title="Unduh PDF Invoice"
                 >
-                  PDF
+                  <svg class="w-4 h-4 text-red-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 2.5h7l5 5v13.5a1 1 0 01-1 1H7a1 1 0 01-1-1V3.5a1 1 0 011-1z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14 2.5v5h5" />
+                    <text x="7" y="16.5" font-size="6.5" font-family="sans-serif" font-weight="bold" fill="currentColor" stroke="none">PDF</text>
+                  </svg>
+                  <span class="text-xs font-bold text-red-500 tracking-wide">PDF</span>
                 </a>
+
+                <!-- 4. Email Action Button -->
+                <!-- Already Sent: Disabled status badge -->
+                <span
+                  v-if="isAlreadySent(inv)"
+                  class="h-9 px-3.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-default select-none shadow-2xs"
+                  title="Email invoice ini sudah terkirim"
+                >
+                  <CheckCircleIcon class="w-4 h-4 text-emerald-600" />
+                  <span>Terkirim</span>
+                </span>
+
+                <!-- Ready to send (has email): Clean Blue Kirim button -->
+                <button
+                  v-else-if="inv.email || inv.draft?.email"
+                  @click="askSendSingle(inv)"
+                  :disabled="sendingId === inv.id"
+                  class="h-9 px-3.5 bg-[#1D70F5] hover:bg-blue-600 text-white text-xs sm:text-sm font-medium rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                  :title="`Kirim ke ${inv.email || inv.draft?.email}`"
+                >
+                  <span v-if="sendingId === inv.id" class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                  <MailIcon v-else class="w-4 h-4 text-white" />
+                  <span>Kirim</span>
+                </button>
+
+                <!-- No email: Manual Input Button with Mail Icon -->
+                <button
+                  v-else
+                  @click="openEmailModal(inv)"
+                  class="h-9 px-3 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  title="Input email manual & kirim"
+                >
+                  <MailIcon class="w-4 h-4 text-gray-500" />
+                  <span>Manual</span>
+                </button>
               </div>
             </TableCell>
           </TableRow>
         </TableBody>
         <TableFooter v-if="invoices.length > 0">
           <TableRow>
-            <TableCell :colspan="7">
+            <TableCell :colspan="9">
               Total
             </TableCell>
             <TableCell class="text-right">
@@ -185,7 +309,7 @@
           Previous
         </button>
         <span class="text-sm font-medium text-gray-700">
-          {{ pagination.current_page }} / {{ pagination.last_page }}
+          Halaman {{ pagination.current_page }} dari {{ pagination.last_page }}
         </span>
         <button
           @click="fetchInvoices(pagination.current_page + 1)"
@@ -202,6 +326,18 @@
       v-model="showEmailModal"
       :invoice-id="selectedInvoice?.id"
       :invoice-number="selectedInvoice?.invoice_number"
+      :default-email="selectedInvoice?.email || selectedInvoice?.draft?.email"
+      @sent="onEmailSent"
+    />
+
+    <!-- Modern Confirmation Modal (Replacing native browser popup) -->
+    <ConfirmModal
+      v-model="confirmState.show"
+      :title="confirmState.title"
+      :message="confirmState.message"
+      :confirm-text="confirmState.confirmText"
+      :loading="confirmState.loading"
+      @confirm="onConfirmAction"
     />
   </div>
 </template>
@@ -210,10 +346,21 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { CalendarDate, parseDate } from '@internationalized/date';
-import { CalendarIcon, MailIcon } from '@lucide/vue';
+import {
+  CalendarIcon,
+  MailIcon,
+  Eye as EyeIcon,
+  Printer as PrinterIcon,
+  MailCheck as MailCheckIcon,
+  CheckCircle as CheckCircleIcon,
+  AlertCircle as AlertCircleIcon,
+  ArrowLeft as ArrowLeftIcon,
+} from '@lucide/vue';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import SendEmailModal from '@/components/SendEmailModal.vue';
+import ConfirmModal from '@/components/ConfirmModal.vue';
 import {
   Table,
   TableHeader,
@@ -229,10 +376,185 @@ const invoices = ref([]);
 const loading = ref(false);
 const showEmailModal = ref(false);
 const selectedInvoice = ref(null);
+const sendingId = ref(null);
+const sendingAll = ref(false);
+const sendingBatch = ref(false);
+const selectedIds = ref([]);
+const alertMessage = ref(null);
+const alertSuccess = ref(true);
+
+const confirmState = reactive({
+  show: false,
+  title: '',
+  message: '',
+  confirmText: 'Ya, Kirim Sekarang',
+  loading: false,
+  action: null,
+});
+
+const onConfirmAction = async () => {
+  if (confirmState.action) {
+    await confirmState.action();
+  }
+};
+
+const isAlreadySent = (inv) => {
+  return inv.status === 'sent' || !!inv.email_sent_at;
+};
+
+const hasEmail = (inv) => {
+  return !!(inv.email || inv.draft?.email);
+};
+
+const selectableInvoices = computed(() => {
+  return invoices.value.filter(inv => hasEmail(inv) && !isAlreadySent(inv));
+});
+
+const isAllSelected = computed(() => {
+  return selectableInvoices.value.length > 0 &&
+    selectableInvoices.value.every(inv => selectedIds.value.includes(inv.id));
+});
+
+const isIndeterminate = computed(() => {
+  const selectedCount = selectableInvoices.value.filter(inv => selectedIds.value.includes(inv.id)).length;
+  return selectedCount > 0 && selectedCount < selectableInvoices.value.length;
+});
+
+const toggleSelectAll = (e) => {
+  if (e.target.checked) {
+    const newIds = new Set([...selectedIds.value, ...selectableInvoices.value.map(i => i.id)]);
+    selectedIds.value = Array.from(newIds);
+  } else {
+    const selectableIdSet = new Set(selectableInvoices.value.map(i => i.id));
+    selectedIds.value = selectedIds.value.filter(id => !selectableIdSet.has(id));
+  }
+};
 
 const openEmailModal = (inv) => {
+  if (isAlreadySent(inv)) return;
   selectedInvoice.value = inv;
   showEmailModal.value = true;
+};
+
+const onEmailSent = (payload) => {
+  alertSuccess.value = true;
+  alertMessage.value = `Invoice berhasil dikirim ke ${payload.email}`;
+  const inv = invoices.value.find(i => i.id === payload.invoiceId);
+  if (inv) {
+    inv.status = 'sent';
+    inv.email_sent_at = new Date().toISOString();
+  }
+  selectedIds.value = selectedIds.value.filter(id => id !== payload.invoiceId);
+};
+
+const askSendSingle = (inv) => {
+  if (isAlreadySent(inv)) return;
+  const targetEmail = inv.email || inv.draft?.email;
+  confirmState.title = 'Kirim Invoice via Email';
+  confirmState.message = `Apakah Anda yakin ingin mengirim invoice ${inv.invoice_number} ke ${targetEmail}?`;
+  confirmState.confirmText = 'Ya, Kirim Sekarang';
+  confirmState.action = async () => {
+    confirmState.loading = true;
+    try {
+      await quickSendInvoice(inv);
+      confirmState.show = false;
+    } finally {
+      confirmState.loading = false;
+    }
+  };
+  confirmState.show = true;
+};
+
+const quickSendInvoice = async (inv) => {
+  if (sendingId.value || isAlreadySent(inv)) return;
+  sendingId.value = inv.id;
+  alertMessage.value = null;
+
+  try {
+    const res = await axios.post(`/api/invoices/${inv.id}/quick-send-email`);
+    alertSuccess.value = true;
+    alertMessage.value = res.data.message;
+    inv.status = 'sent';
+    inv.email_sent_at = new Date().toISOString();
+    selectedIds.value = selectedIds.value.filter(id => id !== inv.id);
+  } catch (err) {
+    alertSuccess.value = false;
+    alertMessage.value = err.response?.data?.message || 'Gagal mengirim email';
+  } finally {
+    sendingId.value = null;
+  }
+};
+
+const askSendBatch = () => {
+  if (selectedIds.value.length === 0 || sendingBatch.value) return;
+  confirmState.title = 'Kirim Batch Email';
+  confirmState.message = `Apakah Anda yakin ingin mengirim ${selectedIds.value.length} invoice terpilih ke masing-masing alamat email tujuan?`;
+  confirmState.confirmText = `Ya, Kirim (${selectedIds.value.length}) Invoice`;
+  confirmState.action = async () => {
+    confirmState.loading = true;
+    try {
+      await executeSendBatch();
+      confirmState.show = false;
+    } finally {
+      confirmState.loading = false;
+    }
+  };
+  confirmState.show = true;
+};
+
+const executeSendBatch = async () => {
+  sendingBatch.value = true;
+  alertMessage.value = null;
+
+  try {
+    const res = await axios.post('/api/invoices/send-batch', {
+      ids: selectedIds.value,
+    });
+    alertSuccess.value = true;
+    alertMessage.value = res.data.message;
+    selectedIds.value = [];
+    fetchInvoices(pagination.current_page);
+  } catch (err) {
+    alertSuccess.value = false;
+    alertMessage.value = err.response?.data?.message || 'Gagal memproses pengiriman batch.';
+  } finally {
+    sendingBatch.value = false;
+  }
+};
+
+const askSendAll = () => {
+  if (sendingAll.value) return;
+  confirmState.title = 'Kirim Semua Email Invoice';
+  confirmState.message = 'Apakah Anda yakin ingin mengirim semua invoice yang belum terkirim dan memiliki alamat email tujuan?';
+  confirmState.confirmText = 'Ya, Kirim Semua';
+  confirmState.action = async () => {
+    confirmState.loading = true;
+    try {
+      await executeSendAll();
+      confirmState.show = false;
+    } finally {
+      confirmState.loading = false;
+    }
+  };
+  confirmState.show = true;
+};
+
+const executeSendAll = async () => {
+  sendingAll.value = true;
+  alertMessage.value = null;
+
+  try {
+    const res = await axios.post('/api/invoices/quick-send-all');
+    alertSuccess.value = true;
+    alertMessage.value = res.data.message;
+    selectedIds.value = [];
+    fetchInvoices(pagination.current_page);
+  } catch (err) {
+    alertSuccess.value = false;
+    alertMessage.value = err.response?.data?.message || 'Gagal memproses pengiriman email massal';
+  } finally {
+    sendingAll.value = false;
+  }
 };
 
 const filters = reactive({

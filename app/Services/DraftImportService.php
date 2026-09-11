@@ -22,16 +22,16 @@ class DraftImportService
      * Standard positional mapping fallback (27 columns).
      */
     protected array $standardOrder = [
-        0 => 'no',
-        1 => 'region',
-        2 => 'rsm',
-        3 => 'dealer_code',
-        4 => 'kode_bt',
-        5 => 'customer_name',
-        6 => 'dealer_name',
-        7 => 'real_qty',
-        8 => 'npwp',
-        9 => 'npwp_name',
+        0  => 'no',
+        1  => 'region',
+        2  => 'rsm',
+        3  => 'dealer_code',
+        4  => 'kode_bt',
+        5  => 'customer_name',
+        6  => 'dealer_name',
+        7  => 'real_qty',
+        8  => 'npwp',
+        9  => 'npwp_name',
         10 => 'npwp_type',
         11 => 'pph_type',
         12 => 'support_amount',
@@ -43,12 +43,13 @@ class DraftImportService
         18 => 'item_code',
         19 => 'item_name',
         20 => 'address',
-        21 => 'program_name',
-        22 => 'program_period',
-        23 => 'cn_number',
-        24 => 'invoice_date',
-        25 => 'ref_note',
-        26 => 'invoice_type',
+        21 => 'email',
+        22 => 'program_name',
+        23 => 'program_period',
+        24 => 'cn_number',
+        25 => 'invoice_date',
+        26 => 'ref_note',
+        27 => 'invoice_type',
     ];
 
     /**
@@ -75,8 +76,9 @@ class DraftImportService
         'netpay' => ['netpay', 'net pay', 'net_pay', 'total netpay'],
         'item_code' => ['kode item', 'kode_item', 'kodeitem', 'item code', 'kd item'],
         'item_name' => ['nama item', 'nama_item', 'namaitem', 'item name', 'nama barang'],
-        'address' => ['alamat', 'address', 'alamat dealer', 'alamat customer'],
-        'program_name' => ['nama program', 'nama_program', 'program name', 'program'],
+        'address'        => ['alamat', 'address', 'alamat dealer', 'alamat customer'],
+        'email'          => ['email', 'email dealer', 'email address', 'alamat email', 'e-mail', 'email cust', 'email customer'],
+        'program_name'   => ['nama program', 'nama_program', 'program name', 'program'],
         'program_period' => ['periode program', 'periode_program', 'program period', 'periode'],
         'cn_number' => ['no cn', 'no_cn', 'cn number', 'nomor cn', 'cn'],
         'invoice_date' => ['tanggal inv', 'tanggal_inv', 'tgl inv', 'invoice date', 'tgl invoice', 'tanggal invoice', 'tanggal'],
@@ -369,7 +371,7 @@ class DraftImportService
         $stringFields = [
             'no', 'region', 'rsm', 'dealer_code', 'kode_bt', 'customer_name',
             'dealer_name', 'npwp', 'npwp_name', 'npwp_type', 'pph_type',
-            'item_code', 'item_name', 'address', 'program_name',
+            'item_code', 'item_name', 'address', 'email', 'program_name',
             'program_period', 'cn_number', 'ref_note', 'invoice_type'
         ];
 

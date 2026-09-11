@@ -6,10 +6,10 @@
     <title>Invoice {{ $invoice->invoice_number }}</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            font-size: 13px;
-            color: #000;
-            background: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            color: #1f2937;
+            background: #ffffff;
             margin: 0;
             padding: 24px;
         }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DraftController;
 use App\Http\Controllers\DraftImportController;
 use App\Http\Controllers\InvoiceController;
@@ -11,6 +12,11 @@ Route::get('/invoices/{id}/pdf', [InvoiceController::class, 'downloadPdf'])->nam
 
 // API Endpoints
 Route::prefix('api')->group(function () {
+    // Auth
+    Route::post('/login', [AuthController::class, 'login']);
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/user', [AuthController::class, 'user']);
+
     // Dashboard
     Route::get('/dashboard', [InvoiceController::class, 'dashboard']);
 
@@ -25,7 +31,10 @@ Route::prefix('api')->group(function () {
     Route::get('/invoices/{id}', [InvoiceController::class, 'show']);
     Route::post('/invoices/generate-all', [InvoiceController::class, 'generateAll']);
     Route::post('/invoices/generate/{draftId}', [InvoiceController::class, 'generate']);
+    Route::post('/invoices/quick-send-all', [InvoiceController::class, 'quickSendAll']);
+    Route::post('/invoices/send-batch', [InvoiceController::class, 'sendBatch']);
     Route::post('/invoices/{id}/send-email', [InvoiceController::class, 'sendEmail']);
+    Route::post('/invoices/{id}/quick-send-email', [InvoiceController::class, 'quickSendEmail']);
     Route::get('/email-logs', [InvoiceController::class, 'emailLogs']);
 });
 

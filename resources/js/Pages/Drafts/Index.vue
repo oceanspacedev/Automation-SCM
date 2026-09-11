@@ -10,7 +10,7 @@
         <button
           @click="generateAllInvoices"
           :disabled="generatingAll"
-          class="h-9 px-3.5 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 disabled:opacity-50 transition cursor-pointer flex items-center space-x-1.5"
+          class="h-9 px-3.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer flex items-center space-x-1.5 shadow-xs"
           title="Terbitkan invoice untuk semua draft yang berstatus Ready"
         >
           <svg v-if="generatingAll" class="animate-spin -ml-0.5 mr-1.5 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
@@ -21,9 +21,16 @@
         </button>
         <button
           @click="showImportModal = true"
-          class="h-9 px-3.5 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-md transition cursor-pointer"
+          class="h-9 px-3.5 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-lg transition cursor-pointer flex items-center gap-2 shadow-xs"
         >
-          + Import Excel
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" class="w-4 h-4 shrink-0">
+            <path fill="#166e40" d="M37 6H17a2 2 0 0 0-2 2v32a2 2 0 0 0 2 2h20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>
+            <path fill="#23a455" d="M37 6H24v36h13a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>
+            <path fill="#2ecc71" opacity=".35" d="M24 13h15v4H24zm0 7h15v4H24zm0 7h15v4H24zm0 7h15v4H24z"/>
+            <path fill="#107c41" d="M22 13H8a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V15a2 2 0 0 0-2-2z"/>
+            <path fill="#ffffff" d="M12.4 28.5l2.4-4.8 2.4 4.8h2.3l-3.5-6.5 3.3-6.5h-2.3l-2.2 4.7-2.2-4.7h-2.3l3.3 6.5-3.5 6.5h2.3z"/>
+          </svg>
+          <span>Import Excel</span>
         </button>
       </div>
     </div>
@@ -105,6 +112,7 @@
             <TableHead class="w-[110px]">Dealer Code</TableHead>
             <TableHead>Dealer Name</TableHead>
             <TableHead>Customer</TableHead>
+            <TableHead>Email</TableHead>
             <TableHead>Program</TableHead>
             <TableHead class="w-[120px]">No CN</TableHead>
             <TableHead class="w-[110px]">Tanggal</TableHead>
@@ -116,10 +124,10 @@
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableEmpty v-if="loading" :colspan="11">
+          <TableEmpty v-if="loading" :colspan="12">
             Memuat data draft...
           </TableEmpty>
-          <TableEmpty v-else-if="drafts.length === 0" :colspan="11">
+          <TableEmpty v-else-if="drafts.length === 0" :colspan="12">
             Belum ada data draft. Silakan klik tombol <strong>+ Import Excel</strong>.
           </TableEmpty>
           <TableRow v-for="draft in drafts" :key="draft.id">
@@ -131,6 +139,9 @@
             </TableCell>
             <TableCell class="max-w-[160px] truncate" :title="draft.customer_name">
               {{ draft.customer_name || '-' }}
+            </TableCell>
+            <TableCell class="max-w-[150px] truncate" :title="draft.email">
+              {{ draft.email || '-' }}
             </TableCell>
             <TableCell class="max-w-[150px] truncate" :title="draft.program_name">
               {{ draft.program_name || '-' }}
@@ -154,37 +165,56 @@
               {{ formatCurrency(draft.netpay) }}
             </TableCell>
             <TableCell class="text-right">
-              <div class="flex items-center justify-end space-x-2">
+              <div class="flex items-center justify-end space-x-1.5">
+                <!-- View Icon Button -->
                 <router-link
                   :to="`/drafts/${draft.id}`"
-                  class="text-sm text-gray-600 hover:text-black hover:underline"
+                  class="w-7 h-7 inline-flex items-center justify-center rounded-md border border-gray-200 bg-white text-gray-600 hover:text-black hover:bg-gray-100 transition cursor-pointer"
+                  title="Lihat Detail Draft"
                 >
-                  View
+                  <EyeIcon class="w-3.5 h-3.5" />
                 </router-link>
 
+                <!-- Generate Button (No Icon) -->
                 <button
                   v-if="draft.status === 'ready'"
                   @click="generateInvoice(draft.id)"
                   :disabled="generatingId === draft.id"
-                  class="h-7 px-2.5 bg-black text-white text-xs font-medium rounded hover:bg-gray-800 disabled:opacity-50 cursor-pointer"
+                  class="h-7 px-3 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer shadow-xs"
+                  title="Generate Invoice"
                 >
-                  {{ generatingId === draft.id ? '...' : 'Generate' }}
+                  <span v-if="generatingId === draft.id" class="inline-block w-3 h-3 mr-1 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                  <span>{{ generatingId === draft.id ? 'Membuat...' : 'Generate' }}</span>
                 </button>
 
+                <!-- Validate Icon Button -->
                 <button
                   v-else-if="draft.status === 'error'"
                   @click="validateDraft(draft.id)"
-                  class="h-7 px-2.5 border border-gray-300 text-xs font-medium rounded hover:bg-gray-50 cursor-pointer"
+                  class="h-7 px-2.5 border border-amber-300 bg-amber-50 text-amber-800 text-xs font-medium rounded-md hover:bg-amber-100 transition inline-flex items-center gap-1 cursor-pointer"
+                  title="Validasi Ulang Rumus Draft"
                 >
-                  Validate
+                  <CheckCircleIcon class="w-3.5 h-3.5 text-amber-600" />
+                  <span>Validasi</span>
                 </button>
+
+                <!-- Invoiced Status Link -->
+                <router-link
+                  v-else-if="draft.status === 'invoiced' && draft.invoice"
+                  :to="`/invoices/${draft.invoice.id}`"
+                  class="h-7 px-2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-md inline-flex items-center gap-1 hover:bg-emerald-100 transition"
+                  title="Lihat Invoice yang Sudah Dibuat"
+                >
+                  <CheckCircleIcon class="w-3 h-3 text-emerald-600" />
+                  <span>Invoice</span>
+                </router-link>
               </div>
             </TableCell>
           </TableRow>
         </TableBody>
         <TableFooter v-if="drafts.length > 0">
           <TableRow>
-            <TableCell :colspan="8">
+            <TableCell :colspan="9">
               Total
             </TableCell>
             <TableCell class="text-right">
@@ -238,7 +268,12 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { parseDate } from '@internationalized/date';
-import { CalendarIcon, CheckCircle as CheckCircleIcon, AlertCircle as AlertCircleIcon } from '@lucide/vue';
+import {
+  CalendarIcon,
+  CheckCircle as CheckCircleIcon,
+  AlertCircle as AlertCircleIcon,
+  Eye as EyeIcon,
+} from '@lucide/vue';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Alert, AlertDescription } from '@/components/ui/alert';

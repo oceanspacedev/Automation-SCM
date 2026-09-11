@@ -32,9 +32,14 @@
 
           <!-- Body -->
           <div class="px-6 py-5">
-            <label class="block text-sm font-medium text-gray-700 mb-1.5">
-              Alamat Email Tujuan
-            </label>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="block text-sm font-medium text-gray-700">
+                Alamat Email Tujuan
+              </label>
+              <span v-if="defaultEmail" class="text-[11px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                Otomatis dari Draft
+              </span>
+            </div>
             <input
               v-model="email"
               type="email"
@@ -74,7 +79,7 @@
             <button
               @click="send"
               :disabled="loading || !email || !!success"
-              class="h-9 px-5 rounded-lg bg-black text-white text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2"
+              class="h-9 px-5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2 shadow-sm"
             >
               <span v-if="loading" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               <SendIcon v-else class="w-4 h-4" />
@@ -97,21 +102,28 @@ const props = defineProps({
   modelValue: Boolean,
   invoiceId: [String, Number],
   invoiceNumber: String,
+  defaultEmail: String,
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(['update:modelValue', 'sent']);
 
 const email = ref('');
 const loading = ref(false);
 const error = ref('');
 const success = ref('');
 
-// Reset state when modal opens
+// Reset state and prefill when modal opens
 watch(() => props.modelValue, (val) => {
   if (val) {
-    email.value = '';
+    email.value = props.defaultEmail || '';
     error.value = '';
     success.value = '';
+  }
+});
+
+watch(() => props.defaultEmail, (val) => {
+  if (props.modelValue && val) {
+    email.value = val;
   }
 });
 
@@ -132,6 +144,7 @@ const send = async () => {
     });
 
     success.value = res.data.message;
+    emit('sent', { invoiceId: props.invoiceId, email: email.value });
   } catch (err) {
     if (err.response?.data?.errors?.email) {
       error.value = err.response.data.errors.email[0];

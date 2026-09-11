@@ -181,31 +181,48 @@ class InvoiceController extends Controller
      */
     public function sendEmail(Request $request, $id): JsonResponse
     {
-        $request->validate([
-            'email' => ['required', 'email'],
-        ]);
-
         $invoice = Invoice::with('draft')->findOrFail($id);
 
+        if ($invoice->email_sent_at || $invoice->status === 'sent') {
+            return response()->json([
+                'success' => false,
+                'message' => "Invoice {$invoice->invoice_number} sudah pernah dikirim pada {$invoice->email_sent_at?->format('d/m/Y H:i')}.",
+            ], 422);
+        }
+
+        $email = $request->input('email') ?: ($invoice->email ?? $invoice->draft?->email);
+
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Alamat email tidak valid atau belum tersedia.',
+            ], 422);
+        }
+
         try {
-            Mail::to($request->input('email'))->send(new InvoiceMail($invoice));
+            Mail::to($email)->send(new InvoiceMail($invoice));
+
+            $invoice->update([
+                'email_sent_at' => now(),
+                'status'        => 'sent',
+            ]);
 
             EmailLog::create([
                 'invoice_id'     => $invoice->id,
                 'invoice_number' => $invoice->invoice_number,
-                'recipient_email'=> $request->input('email'),
+                'recipient_email'=> $email,
                 'status'         => 'sent',
             ]);
 
             return response()->json([
                 'success' => true,
-                'message' => "Invoice {$invoice->invoice_number} berhasil dikirim ke {$request->input('email')}.",
+                'message' => "Invoice {$invoice->invoice_number} berhasil dikirim ke {$email}.",
             ]);
         } catch (Exception $e) {
             EmailLog::create([
                 'invoice_id'     => $invoice->id,
                 'invoice_number' => $invoice->invoice_number,
-                'recipient_email'=> $request->input('email'),
+                'recipient_email'=> $email,
                 'status'         => 'failed',
                 'error_message'  => $e->getMessage(),
             ]);
@@ -215,6 +232,155 @@ class InvoiceController extends Controller
                 'message' => 'Gagal mengirim email: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Quick-send invoice to the email stored in the invoice (from draft).
+     * No user input required.
+     */
+    public function quickSendEmail($id): JsonResponse
+    {
+        return $this->sendEmail(new Request(), $id);
+    }
+
+    /**
+     * Send multiple selected invoices via email.
+     */
+    public function sendBatch(Request $request): JsonResponse
+    {
+        $ids = $request->input('ids', []);
+        if (empty($ids) || !is_array($ids)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pilih setidaknya satu invoice untuk dikirim.',
+            ], 422);
+        }
+
+        $invoices = Invoice::with('draft')
+            ->whereIn('id', $ids)
+            ->whereNull('email_sent_at')
+            ->where('status', '!=', 'sent')
+            ->get();
+
+        if ($invoices->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Semua invoice yang dipilih sudah pernah dikirim sebelumnya.',
+            ], 422);
+        }
+
+        $successCount = 0;
+        $failedCount = 0;
+
+        foreach ($invoices as $invoice) {
+            $email = $invoice->email ?? $invoice->draft?->email;
+            if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $failedCount++;
+                continue;
+            }
+
+            try {
+                Mail::to($email)->send(new InvoiceMail($invoice));
+
+                $invoice->update([
+                    'email_sent_at' => now(),
+                    'status'        => 'sent',
+                ]);
+
+                EmailLog::create([
+                    'invoice_id'      => $invoice->id,
+                    'invoice_number'  => $invoice->invoice_number,
+                    'recipient_email' => $email,
+                    'status'          => 'sent',
+                ]);
+
+                $successCount++;
+            } catch (Exception $e) {
+                EmailLog::create([
+                    'invoice_id'      => $invoice->id,
+                    'invoice_number'  => $invoice->invoice_number,
+                    'recipient_email' => $email,
+                    'status'          => 'failed',
+                    'error_message'   => $e->getMessage(),
+                ]);
+
+                $failedCount++;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Pengiriman selesai: {$successCount} invoice berhasil dikirim" . ($failedCount > 0 ? ", {$failedCount} gagal." : "."),
+            'sent'    => $successCount,
+            'failed'  => $failedCount,
+        ]);
+    }
+
+    /**
+     * Batch send all unsent invoices that have an email.
+     */
+    public function quickSendAll(): JsonResponse
+    {
+        $invoices = Invoice::with('draft')
+            ->whereNull('email_sent_at')
+            ->where('status', '!=', 'sent')
+            ->where(function ($q) {
+                $q->whereNotNull('email')->where('email', '!=', '')
+                  ->orWhereHas('draft', fn ($sq) => $sq->whereNotNull('email')->where('email', '!=', ''));
+            })
+            ->get();
+
+        if ($invoices->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ada invoice yang belum dikirim dengan data email tersedia.',
+            ], 422);
+        }
+
+        $successCount = 0;
+        $failedCount = 0;
+
+        foreach ($invoices as $invoice) {
+            $email = $invoice->email ?? $invoice->draft?->email;
+            if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+
+            try {
+                Mail::to($email)->send(new InvoiceMail($invoice));
+
+                $invoice->update([
+                    'email_sent_at' => now(),
+                    'status'        => 'sent',
+                ]);
+
+                EmailLog::create([
+                    'invoice_id'      => $invoice->id,
+                    'invoice_number'  => $invoice->invoice_number,
+                    'recipient_email' => $email,
+                    'status'          => 'sent',
+                ]);
+
+                $successCount++;
+            } catch (Exception $e) {
+                EmailLog::create([
+                    'invoice_id'      => $invoice->id,
+                    'invoice_number'  => $invoice->invoice_number,
+                    'recipient_email' => $email,
+                    'status'          => 'failed',
+                    'error_message'   => $e->getMessage(),
+                ]);
+
+                $failedCount++;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Proses pengiriman selesai: {$successCount} terkirim, {$failedCount} gagal.",
+            'sent'    => $successCount,
+            'failed'  => $failedCount,
+        ]);
     }
 
     /**

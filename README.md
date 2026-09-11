@@ -1,58 +1,190 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# SCM
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Sistem otomasi pengolahan data Excel menjadi invoice resmi dan pengiriman email massal.
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Daftar Isi
+- [Alur Kerja Sistem](#alur-kerja-sistem)
+- [Akun Default](#akun-default)
+- [Fitur Utama](#fitur-utama)
+- [Panduan Penggunaan](#panduan-penggunaan)
+- [Instalasi dan Setup Lokal](#instalasi-dan-setup-lokal)
+- [Struktur Data](#struktur-data)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+---
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Alur Kerja Sistem
 
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```mermaid
+flowchart TD
+    A[File Excel DSA / NPS FL] -->|Upload| B[Parsing & Validasi Sistem]
+    B --> C{Pengecekan Data}
+    C -->|Data Tidak Lengkap| D[Status Draft: Error]
+    C -->|Data & Email Valid| E[Status Draft: Ready]
+    D -->|Perbaiki File Excel| B
+    E -->|Generate Invoice| F[Penerbitan Nomor Invoice Resmi]
+    F --> G[Daftar Invoice]
+    G --> H[Cetak & Unduh PDF]
+    G --> I[Pengiriman Email]
+    I -->|Checkbox Batch| J[Kirim Terpilih]
+    I -->|Kirim Semua| K[Kirim Seluruh Email]
+    I -->|Kirim Per Baris| L[Kirim Satuan]
+    J --> M[Proses SMTP]
+    K --> M
+    L --> M
+    M --> N[Status Terkunci: Terkirim]
+    M --> O[Tercatat di Riwayat Email]
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+---
 
-## Contributing
+## Akun Default
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Kredensial login bawaan aplikasi:
 
-## Code of Conduct
+| Field | Nilai |
+| :--- | :--- |
+| URL Login | `http://localhost:8000/login` |
+| Email | `admin@scm.com` |
+| Password | `password` |
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Tersedia tombol **Isi Otomatis Akun Default** pada halaman login untuk pengisian instan.
 
-## Security Vulnerabilities
+---
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Fitur Utama
 
-## License
+- **Autentikasi & Antarmuka Bersih**: Tampilan monokrom minimalis. Navigasi berbasis shadcn-vue tanpa dropdown bertingkat.
+- **Import Excel**: Mendukung format `.xlsx`, `.xls`, dan `.csv` untuk skema DSA (*Direct Sales Agent*) dan NPS FL (*National Program Scheme - Front Line*).
+- **Validasi Otomatis**: Pemeriksaan kelayakan data draft, format angka netpay, formula, dan ketersediaan alamat email penerima.
+- **Penerbitan Invoice**: Penomoran faktur resmi otomatis, template cetak standar perusahaan, dan download PDF langsung.
+- **Pengiriman Email Fleksibel**:
+  - Kirim batch via checkbox multi-pilih.
+  - Kirim semua invoice sekaligus.
+  - Kirim satuan per baris.
+  - Proteksi duplikasi: invoice yang telah terkirim otomatis dikunci agar tidak terkirim ulang.
+- **Audit Trail (Riwayat Email)**: Pencatatan log harian pengiriman email (waktu, penerima, status sukses/gagal, dan log error).
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+---
+
+## Panduan Penggunaan
+
+### 1. Login
+Buka `http://localhost:8000/login`, masukkan email `admin@scm.com` dan password `password`, lalu klik **Masuk**.
+
+### 2. Import Excel
+1. Masuk ke menu **Draft**.
+2. Klik tombol **Import Excel**.
+3. Pilih atau letakkan (*drag & drop*) file Excel DSA/NPS FL.
+4. Pilih *Tipe Invoice Default* jika kolom tipe pada file kosong.
+5. Klik **Upload & Import**.
+
+### 3. Tinjau & Validasi Draft
+- Data yang berhasil diimpor akan masuk ke tabel Draft.
+- Baris dengan status **Ready** siap diterbitkan menjadi invoice resmi.
+- Baris dengan status **Error** menandakan ada kolom wajib yang kosong pada file sumber.
+
+### 4. Menerbitkan Invoice
+- Klik **Generate Semua Invoice** untuk menerbitkan seluruh draft yang berstatus Ready.
+- Atau klik tombol generate pada masing-masing baris draft.
+- Data yang diterbitkan akan otomatis masuk ke menu **Invoice** dengan nomor faktur resmi.
+
+### 5. Cetak PDF & Kirim Email
+1. Buka menu **Invoice**.
+2. Kolom aksi menyediakan:
+   - **Detail**: Melihat rincian lengkap invoice.
+   - **Print**: Membuka halaman pratinjau cetak resmi.
+   - **PDF**: Mengunduh berkas PDF invoice.
+   - **Kirim**: Mengirim email faktur ke alamat tujuan.
+3. Untuk mengirim banyak email sekaligus:
+   - Centang checkbox pada baris invoice yang diinginkan, lalu klik **Kirim (X) Email Terpilih**.
+   - Atau klik **Kirim Semua Email** untuk memproses seluruh invoice yang belum terkirim.
+4. Invoice yang berhasil dikirim akan bertanda **Terkirim** dan checkbox-nya otomatis dinonaktifkan.
+
+### 6. Riwayat Email
+Buka menu **Riwayat Email** untuk melihat status pengiriman, timestamp, dan catatan log SMTP per tanggal.
+
+---
+
+## Instalasi dan Setup Lokal
+
+### Prasyarat
+- PHP >= 8.2
+- Composer
+- Node.js & NPM
+- Database MySQL atau SQLite
+
+### Langkah Instalasi
+
+1. **Clone repositori:**
+   ```bash
+   git clone https://github.com/oceanspacedev/Automation-SCM.git
+   cd Automation-SCM
+   ```
+
+2. **Install dependensi:**
+   ```bash
+   composer install
+   npm install
+   ```
+
+3. **Setup environment:**
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
+
+4. **Konfigurasi database dan mailer pada `.env`:**
+   ```env
+   DB_CONNECTION=mysql
+   DB_HOST=127.0.0.1
+   DB_PORT=3306
+   DB_DATABASE=scm_invoice
+   DB_USERNAME=root
+   DB_PASSWORD=
+
+   MAIL_MAILER=smtp
+   MAIL_HOST=smtp.gmail.com
+   MAIL_PORT=587
+   MAIL_USERNAME=email_anda@gmail.com
+   MAIL_PASSWORD=app_password_anda
+   MAIL_ENCRYPTION=tls
+   MAIL_FROM_ADDRESS="no-reply@scm.com"
+   MAIL_FROM_NAME="SCM"
+   ```
+
+5. **Jalankan migrasi dan seeder:**
+   ```bash
+   php artisan migrate --seed
+   ```
+
+6. **Jalankan server pengembangan:**
+   ```bash
+   # Terminal 1
+   php artisan serve
+
+   # Terminal 2
+   npm run dev
+   ```
+
+   Atau compile bundle frontend untuk produksi:
+   ```bash
+   npm run build
+   ```
+
+7. Akses aplikasi di `http://localhost:8000`.
+
+---
+
+## Struktur Data
+
+- `users`: Kredensial akun pengguna sistem.
+- `drafts`: Data mentah hasil impor Excel (dealer, customer, email, nominal, status validasi).
+- `invoices`: Faktur resmi (nomor seri invoice, tipe invoice, netpay, email, status pengiriman, timestamp `email_sent_at`).
+- `email_logs`: Log audit pengiriman email harian (invoice ID, waktu kirim, alamat email tujuan, status `success`/`failed`, response log).
+
+---
+
+## Lisensi
+Hak Cipta &copy; 2026 SCM. Dilindungi undang-undang.

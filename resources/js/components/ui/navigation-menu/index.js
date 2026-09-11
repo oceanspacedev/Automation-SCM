@@ -10,5 +10,5 @@ export { default as NavigationMenuTrigger } from "./NavigationMenuTrigger.vue";
 export { default as NavigationMenuViewport } from "./NavigationMenuViewport.vue";
 
 export const navigationMenuTriggerStyle = cva(
-  "group inline-flex h-10 w-max items-center justify-center rounded-md bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-accent/50 data-[state=open]:bg-accent/50",
+  "group inline-flex h-9 w-max items-center justify-center rounded-lg bg-transparent px-3.5 py-2 text-sm font-medium text-gray-700 font-sans transition-colors hover:bg-gray-100 hover:text-gray-900 focus:bg-gray-100 focus:text-gray-900 focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-gray-100 data-[active]:text-gray-900 data-[state=open]:bg-gray-100 data-[state=open]:text-gray-900 cursor-pointer select-none",
 );

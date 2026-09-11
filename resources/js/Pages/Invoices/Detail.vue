@@ -14,13 +14,40 @@
       </div>
 
       <div class="flex items-center space-x-2">
-        <button
-          @click="showEmailModal = true"
-          class="h-9 px-3.5 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5"
+        <!-- Already Sent Status Badge -->
+        <span
+          v-if="invoice.status === 'sent' || invoice.email_sent_at"
+          class="h-9 px-3.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          title="Invoice ini sudah pernah dikirim dan tidak dapat dikirim ulang"
         >
-          <MailIcon class="h-4 w-4" />
-          Kirim Email
+          <CheckCircleIcon class="h-4 w-4 text-emerald-600" />
+          <span>Email Sudah Terkirim</span>
+        </span>
+
+        <!-- 1-Click Send if email exists and not sent yet -->
+        <button
+          v-else-if="invoice.email || invoice.draft?.email"
+          @click="quickSend"
+          :disabled="quickSending"
+          class="h-9 px-3.5 bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
+          :title="`Kirim langsung ke ${invoice.email || invoice.draft?.email}`"
+        >
+          <span v-if="quickSending" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+          <MailIcon v-else class="h-4 w-4" />
+          <span>{{ quickSending ? 'Mengirim...' : `Kirim ke ${invoice.email || invoice.draft?.email}` }}</span>
         </button>
+
+        <!-- Manual or Change Email if not sent yet -->
+        <button
+          v-if="!invoice.status && !invoice.email_sent_at || (invoice.status !== 'sent' && !invoice.email_sent_at)"
+          @click="showEmailModal = true"
+          class="h-9 px-3 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5 cursor-pointer"
+          :title="(invoice.email || invoice.draft?.email) ? 'Kirim ke email lain' : 'Kirim Email'"
+        >
+          <MailIcon v-if="!invoice.email && !invoice.draft?.email" class="h-4 w-4" />
+          <span>{{ (invoice.email || invoice.draft?.email) ? 'Kirim ke Email Lain' : 'Kirim Email' }}</span>
+        </button>
+
         <a
           :href="`/invoices/${invoice.id}/preview`"
           target="_blank"
@@ -30,18 +57,30 @@
         </a>
         <a
           :href="`/invoices/${invoice.id}/pdf`"
-          class="h-9 px-4 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition inline-flex items-center"
+          class="h-9 px-4 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-md transition inline-flex items-center"
         >
           Download PDF
         </a>
       </div>
     </div>
 
+    <!-- Alert -->
+    <Alert v-if="alertMessage" :variant="alertSuccess ? 'default' : 'destructive'">
+      <CheckCircleIcon v-if="alertSuccess" class="h-4 w-4" />
+      <AlertCircleIcon v-else class="h-4 w-4" />
+      <AlertDescription class="flex items-center justify-between">
+        <span>{{ alertMessage }}</span>
+        <button @click="alertMessage = null" class="ml-4 text-sm opacity-60 hover:opacity-100 cursor-pointer">&times;</button>
+      </AlertDescription>
+    </Alert>
+
     <!-- Send Email Modal -->
     <SendEmailModal
       v-model="showEmailModal"
       :invoice-id="invoice.id"
       :invoice-number="invoice.invoice_number"
+      :default-email="invoice.email || invoice.draft?.email"
+      @sent="onEmailSent"
     />
 
     <div v-if="loading" class="py-8 text-center text-sm text-gray-500">
@@ -73,6 +112,10 @@
               <tr>
                 <td class="py-1 text-gray-500">Alamat</td>
                 <td class="py-1 text-gray-700">{{ invoice.address || '-' }}</td>
+              </tr>
+              <tr>
+                <td class="py-1 text-gray-500">Email</td>
+                <td class="py-1 text-gray-900 font-medium">{{ invoice.email || invoice.draft?.email || '-' }}</td>
               </tr>
             </tbody>
           </table>
@@ -197,7 +240,8 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
-import { MailIcon } from '@lucide/vue';
+import { MailIcon, CheckCircle as CheckCircleIcon, AlertCircle as AlertCircleIcon } from '@lucide/vue';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import SendEmailModal from '@/components/SendEmailModal.vue';
 import {
   Table,
@@ -213,6 +257,9 @@ const props = defineProps({
 const invoice = ref({});
 const loading = ref(true);
 const showEmailModal = ref(false);
+const quickSending = ref(false);
+const alertMessage = ref(null);
+const alertSuccess = ref(true);
 
 const fetchInvoice = async () => {
   loading.value = true;
@@ -223,6 +270,32 @@ const fetchInvoice = async () => {
     console.error('Error fetching invoice', err);
   } finally {
     loading.value = false;
+  }
+};
+
+const onEmailSent = (payload) => {
+  alertSuccess.value = true;
+  alertMessage.value = `Invoice berhasil dikirim ke ${payload.email}`;
+  invoice.value.status = 'sent';
+  invoice.value.email_sent_at = new Date().toISOString();
+};
+
+const quickSend = async () => {
+  if (quickSending.value || invoice.value.status === 'sent' || invoice.value.email_sent_at) return;
+  quickSending.value = true;
+  alertMessage.value = null;
+
+  try {
+    const res = await axios.post(`/api/invoices/${props.id}/quick-send-email`);
+    alertSuccess.value = true;
+    alertMessage.value = res.data.message;
+    invoice.value.status = 'sent';
+    invoice.value.email_sent_at = new Date().toISOString();
+  } catch (err) {
+    alertSuccess.value = false;
+    alertMessage.value = err.response?.data?.message || 'Gagal mengirim email';
+  } finally {
+    quickSending.value = false;
   }
 };
 

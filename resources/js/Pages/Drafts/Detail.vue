@@ -27,7 +27,7 @@
           v-if="draft.status === 'ready'"
           @click="generateInvoice"
           :disabled="generating"
-          class="h-9 px-4 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 disabled:opacity-50 transition cursor-pointer"
+          class="h-9 px-4 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer shadow-xs"
         >
           {{ generating ? 'Membuat Invoice...' : 'Generate Invoice' }}
         </button>
@@ -35,7 +35,7 @@
         <router-link
           v-if="draft.invoice"
           :to="`/invoices/${draft.invoice.id}`"
-          class="h-9 px-4 bg-black text-white text-sm font-medium rounded-md hover:bg-gray-800 transition inline-flex items-center"
+          class="h-9 px-4 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition inline-flex items-center shadow-xs"
         >
           Lihat Invoice ({{ draft.invoice.invoice_number }}) →
         </router-link>
@@ -85,6 +85,10 @@
               <tr>
                 <td class="py-1 text-gray-500">Alamat</td>
                 <td class="py-1 text-gray-700">{{ draft.address || '-' }}</td>
+              </tr>
+              <tr>
+                <td class="py-1 text-gray-500">Email</td>
+                <td class="py-1 text-gray-900 font-medium">{{ draft.email || '-' }}</td>
               </tr>
             </tbody>
           </table>
