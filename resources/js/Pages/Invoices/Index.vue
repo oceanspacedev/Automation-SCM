@@ -173,15 +173,49 @@
             </TableCell>
             <!-- Status Badge -->
             <TableCell>
+              <!-- Sent / Terkirim -->
               <span
                 v-if="isAlreadySent(inv)"
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs whitespace-nowrap"
               >
-                <CheckCircleIcon class="h-3 w-3" />
-                Terkirim
+                <CheckCircleIcon class="h-3 w-3 text-emerald-600 shrink-0" />
+                <span>Terkirim</span>
               </span>
-              <span v-else class="capitalize">
-                {{ inv.status }}
+
+              <!-- Generated -->
+              <span
+                v-else-if="inv.status === 'generated'"
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs whitespace-nowrap"
+              >
+                <span class="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                <span>Generated</span>
+              </span>
+
+              <!-- Paid -->
+              <span
+                v-else-if="inv.status === 'paid'"
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs whitespace-nowrap"
+              >
+                <span class="h-1.5 w-1.5 rounded-full bg-purple-500 shrink-0"></span>
+                <span>Paid</span>
+              </span>
+
+              <!-- Failed / Gagal -->
+              <span
+                v-else-if="inv.status === 'failed'"
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs whitespace-nowrap"
+              >
+                <AlertCircleIcon class="h-3 w-3 text-rose-500 shrink-0" />
+                <span>Gagal</span>
+              </span>
+
+              <!-- Fallback -->
+              <span
+                v-else
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 shadow-2xs capitalize whitespace-nowrap"
+              >
+                <span class="h-1.5 w-1.5 rounded-full bg-gray-400 shrink-0"></span>
+                <span>{{ inv.status }}</span>
               </span>
             </TableCell>
             <TableCell>
@@ -207,13 +241,13 @@
               {{ formatCurrency(inv.netpay) }}
             </TableCell>
 
-            <!-- Modern Action Buttons Matching Screenshot -->
+            <!-- Modern Action Buttons With Pixel-Perfect Alignment -->
             <TableCell class="text-right w-[270px] whitespace-nowrap">
               <div class="flex items-center justify-end gap-2">
                 <!-- 1. View / Detail Icon -->
                 <router-link
                   :to="`/invoices/${inv.id}`"
-                  class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer shadow-2xs"
+                  class="w-9 h-9 shrink-0 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer shadow-2xs"
                   title="Lihat Detail Invoice"
                 >
                   <EyeIcon class="w-4 h-4 text-gray-600" />
@@ -223,16 +257,16 @@
                 <a
                   :href="`/invoices/${inv.id}/preview`"
                   target="_blank"
-                  class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer shadow-2xs"
+                  class="w-9 h-9 shrink-0 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer shadow-2xs"
                   title="Cetak / Preview Invoice"
                 >
                   <PrinterIcon class="w-4 h-4 text-gray-600" />
                 </a>
 
-                <!-- 3. PDF Download Button -->
+                <!-- 3. PDF Download Button (Fixed Width) -->
                 <a
                   :href="`/invoices/${inv.id}/pdf`"
-                  class="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition cursor-pointer shadow-2xs"
+                  class="h-9 w-[74px] shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition cursor-pointer shadow-2xs"
                   title="Unduh PDF Invoice"
                 >
                   <svg class="w-4 h-4 text-red-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
@@ -243,14 +277,14 @@
                   <span class="text-xs font-bold text-red-500 tracking-wide">PDF</span>
                 </a>
 
-                <!-- 4. Email Action Button -->
+                <!-- 4. Email Action Button (Fixed Width 94px for 100% straight vertical column) -->
                 <!-- Already Sent: Disabled status badge -->
                 <span
                   v-if="isAlreadySent(inv)"
-                  class="h-9 px-3.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-default select-none shadow-2xs"
+                  class="h-9 w-[94px] shrink-0 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 cursor-default select-none shadow-2xs"
                   title="Email invoice ini sudah terkirim"
                 >
-                  <CheckCircleIcon class="w-4 h-4 text-emerald-600" />
+                  <CheckCircleIcon class="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>Terkirim</span>
                 </span>
 
@@ -259,11 +293,11 @@
                   v-else-if="inv.email || inv.draft?.email"
                   @click="askSendSingle(inv)"
                   :disabled="sendingId === inv.id"
-                  class="h-9 px-3.5 bg-[#1D70F5] hover:bg-blue-600 text-white text-xs sm:text-sm font-medium rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                  class="h-9 w-[94px] shrink-0 bg-[#1D70F5] hover:bg-blue-600 text-white text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
                   :title="`Kirim ke ${inv.email || inv.draft?.email}`"
                 >
                   <span v-if="sendingId === inv.id" class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                  <MailIcon v-else class="w-4 h-4 text-white" />
+                  <MailIcon v-else class="w-4 h-4 text-white shrink-0" />
                   <span>Kirim</span>
                 </button>
 
@@ -271,10 +305,10 @@
                 <button
                   v-else
                   @click="openEmailModal(inv)"
-                  class="h-9 px-3 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                  class="h-9 w-[94px] shrink-0 border border-gray-200 bg-white text-gray-700 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/50 text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                   title="Input email manual & kirim"
                 >
-                  <MailIcon class="w-4 h-4 text-gray-500" />
+                  <MailIcon class="w-4 h-4 text-gray-500 shrink-0" />
                   <span>Manual</span>
                 </button>
               </div>

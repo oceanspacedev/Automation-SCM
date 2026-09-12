@@ -85,7 +85,7 @@ class InvoiceGeneratorTest extends TestCase
 
         // Second generation must throw Exception
         $this->expectException(Exception::class);
-        $this->expectExceptionMessage("sudah pernah di-generate");
+        $this->expectExceptionMessage('sudah pernah di-generate');
 
         $this->generator->generate($draft->fresh());
     }
@@ -101,7 +101,7 @@ class InvoiceGeneratorTest extends TestCase
         ]);
 
         $this->expectException(Exception::class);
-        $this->expectExceptionMessage("Tipe invoice tidak valid");
+        $this->expectExceptionMessage('Tipe invoice tidak valid');
 
         $this->generator->generate($draft);
     }
@@ -194,5 +194,52 @@ class InvoiceGeneratorTest extends TestCase
         $this->assertEquals(2, Invoice::count());
         $this->assertEquals(2, Draft::where('status', 'invoiced')->count());
         $this->assertEquals(1, Draft::where('status', 'error')->count());
+    }
+
+    public function test_can_bulk_generate_invoices_for_selected_drafts_only(): void
+    {
+        $draft1 = Draft::create([
+            'dealer_code' => 'DLR020',
+            'dealer_name' => 'Dealer Selected 1',
+            'support_amount' => 1000000,
+            'pph_type' => 'BADAN',
+            'invoice_type' => 'DSA',
+            'status' => 'ready',
+        ]);
+
+        $draft2 = Draft::create([
+            'dealer_code' => 'DLR021',
+            'dealer_name' => 'Dealer Selected 2',
+            'support_amount' => 2000000,
+            'pph_type' => 'PRIBADI',
+            'invoice_type' => 'NPS FL',
+            'status' => 'ready',
+        ]);
+
+        $draft3 = Draft::create([
+            'dealer_code' => 'DLR022',
+            'dealer_name' => 'Dealer Not Selected',
+            'support_amount' => 1500000,
+            'pph_type' => 'BADAN',
+            'invoice_type' => 'DSA',
+            'status' => 'ready',
+        ]);
+
+        // Only generate for draft1 and draft2
+        $response = $this->postJson('/api/invoices/generate-batch', [
+            'ids' => [$draft1->id, $draft2->id],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'generated_count' => 2,
+        ]);
+
+        $this->assertEquals('invoiced', $draft1->fresh()->status);
+        $this->assertEquals('invoiced', $draft2->fresh()->status);
+        // draft3 must remain ready
+        $this->assertEquals('ready', $draft3->fresh()->status);
+        $this->assertEquals(2, Invoice::count());
     }
 }

@@ -7,8 +7,34 @@
         <p class="text-sm text-gray-500">Kelola dan terbitkan draft invoice yang diimpor dari Excel.</p>
       </div>
       <div class="flex items-center space-x-2">
+        <!-- Multi-select Generate Button -->
+        <template v-if="selectedIds.length > 0">
+          <button
+            @click="askGenerateSelected"
+            :disabled="generatingBatch"
+            class="h-9 px-3.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md disabled:opacity-50 transition cursor-pointer flex items-center space-x-1.5 shadow-xs"
+            :title="`Terbitkan ${selectedIds.length} draft terpilih menjadi invoice`"
+          >
+            <svg v-if="generatingBatch" class="animate-spin -ml-0.5 mr-1.5 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <CheckSquareIcon v-else class="w-4 h-4 text-white" />
+            <span>{{ generatingBatch ? 'Menerbitkan...' : `Generate (${selectedIds.length}) Invoice Terpilih` }}</span>
+          </button>
+          <button
+            @click="selectedIds = []"
+            class="h-9 px-3 border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 text-sm font-medium rounded-md transition cursor-pointer flex items-center gap-1 shadow-xs"
+            title="Batalkan pilihan"
+          >
+            <span>Batal Pilih</span>
+          </button>
+        </template>
+
+        <!-- Generate All Invoices (when none selected) -->
         <button
-          @click="generateAllInvoices"
+          v-else
+          @click="askGenerateAll"
           :disabled="generatingAll"
           class="h-9 px-3.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer flex items-center space-x-1.5 shadow-xs"
           title="Terbitkan invoice untuk semua draft yang berstatus Ready"
@@ -19,6 +45,7 @@
           </svg>
           <span>{{ generatingAll ? 'Menerbitkan Semua...' : 'Generate Semua Invoice' }}</span>
         </button>
+
         <button
           @click="showImportModal = true"
           class="h-9 px-3.5 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-lg transition cursor-pointer flex items-center gap-2 shadow-xs"
@@ -109,6 +136,17 @@
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead class="w-[40px] text-center">
+              <input
+                type="checkbox"
+                :checked="isAllSelected"
+                :indeterminate="isIndeterminate"
+                @change="toggleSelectAll"
+                :disabled="selectableDrafts.length === 0"
+                class="h-4 w-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Pilih semua draft Ready di halaman ini"
+              />
+            </TableHead>
             <TableHead class="w-[110px]">Dealer Code</TableHead>
             <TableHead>Dealer Name</TableHead>
             <TableHead>Customer</TableHead>
@@ -124,13 +162,28 @@
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableEmpty v-if="loading" :colspan="12">
+          <TableEmpty v-if="loading" :colspan="13">
             Memuat data draft...
           </TableEmpty>
-          <TableEmpty v-else-if="drafts.length === 0" :colspan="12">
+          <TableEmpty v-else-if="drafts.length === 0" :colspan="13">
             Belum ada data draft. Silakan klik tombol <strong>+ Import Excel</strong>.
           </TableEmpty>
-          <TableRow v-for="draft in drafts" :key="draft.id">
+          <TableRow
+            v-for="draft in drafts"
+            :key="draft.id"
+            :class="selectedIds.includes(draft.id) ? 'bg-blue-50/40 hover:bg-blue-50/60' : ''"
+          >
+            <!-- Checkbox Selection -->
+            <TableCell class="w-[40px] text-center">
+              <input
+                type="checkbox"
+                :value="draft.id"
+                v-model="selectedIds"
+                :disabled="draft.status !== 'ready'"
+                class="h-4 w-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                :title="draft.status === 'ready' ? 'Pilih draft ini untuk digenerate' : (draft.status === 'invoiced' ? 'Invoice sudah diterbitkan' : 'Draft error tidak dapat digenerate')"
+              />
+            </TableCell>
             <TableCell>
               {{ draft.dealer_code || '-' }}
             </TableCell>
@@ -155,8 +208,42 @@
             <TableCell>
               {{ draft.invoice_type || '-' }}
             </TableCell>
-            <TableCell class="capitalize">
-              {{ draft.status }}
+            <TableCell>
+              <!-- Ready -->
+              <span
+                v-if="draft.status === 'ready'"
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs whitespace-nowrap"
+              >
+                <span class="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                <span>Ready</span>
+              </span>
+
+              <!-- Invoiced -->
+              <span
+                v-else-if="draft.status === 'invoiced'"
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs whitespace-nowrap"
+              >
+                <CheckCircleIcon class="h-3 w-3 text-emerald-600 shrink-0" />
+                <span>Invoiced</span>
+              </span>
+
+              <!-- Error -->
+              <span
+                v-else-if="draft.status === 'error'"
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 shadow-2xs whitespace-nowrap"
+              >
+                <AlertCircleIcon class="h-3 w-3 text-amber-600 shrink-0" />
+                <span>Error</span>
+              </span>
+
+              <!-- Fallback -->
+              <span
+                v-else
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 shadow-2xs capitalize whitespace-nowrap"
+              >
+                <span class="h-1.5 w-1.5 rounded-full bg-gray-400 shrink-0"></span>
+                <span>{{ draft.status }}</span>
+              </span>
             </TableCell>
             <TableCell class="text-right">
               {{ formatCurrency(draft.support_amount) }}
@@ -178,7 +265,7 @@
                 <!-- Generate Button (No Icon) -->
                 <button
                   v-if="draft.status === 'ready'"
-                  @click="generateInvoice(draft.id)"
+                  @click="askGenerateSingle(draft)"
                   :disabled="generatingId === draft.id"
                   class="h-7 px-3 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer shadow-xs"
                   title="Generate Invoice"
@@ -214,7 +301,7 @@
         </TableBody>
         <TableFooter v-if="drafts.length > 0">
           <TableRow>
-            <TableCell :colspan="9">
+            <TableCell :colspan="10">
               Total
             </TableCell>
             <TableCell class="text-right">
@@ -261,6 +348,17 @@
       @close="showImportModal = false"
       @imported="fetchDrafts(1)"
     />
+
+    <!-- Confirmation Modal -->
+    <ConfirmModal
+      v-model="confirmState.show"
+      :title="confirmState.title"
+      :message="confirmState.message"
+      :confirm-text="confirmState.confirmText"
+      :loading="confirmState.loading"
+      icon="warning"
+      @confirm="onConfirmAction"
+    />
   </div>
 </template>
 
@@ -273,11 +371,13 @@ import {
   CheckCircle as CheckCircleIcon,
   AlertCircle as AlertCircleIcon,
   Eye as EyeIcon,
+  CheckSquare as CheckSquareIcon,
 } from '@lucide/vue';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import ImportModal from '@/components/ImportModal.vue';
+import ConfirmModal from '@/components/ConfirmModal.vue';
 import {
   Table,
   TableHeader,
@@ -292,10 +392,51 @@ import {
 const drafts = ref([]);
 const loading = ref(false);
 const showImportModal = ref(false);
+const selectedIds = ref([]);
 const generatingId = ref(null);
+const generatingBatch = ref(false);
 const generatingAll = ref(false);
 const alertMessage = ref(null);
 const alertSuccess = ref(true);
+
+const confirmState = reactive({
+  show: false,
+  title: '',
+  message: '',
+  confirmText: '',
+  loading: false,
+  action: null,
+});
+
+const onConfirmAction = async () => {
+  if (confirmState.action) {
+    await confirmState.action();
+  }
+};
+
+const selectableDrafts = computed(() => {
+  return drafts.value.filter(d => d.status === 'ready');
+});
+
+const isAllSelected = computed(() => {
+  return selectableDrafts.value.length > 0 &&
+    selectableDrafts.value.every(d => selectedIds.value.includes(d.id));
+});
+
+const isIndeterminate = computed(() => {
+  const selectedCount = selectableDrafts.value.filter(d => selectedIds.value.includes(d.id)).length;
+  return selectedCount > 0 && selectedCount < selectableDrafts.value.length;
+});
+
+const toggleSelectAll = (e) => {
+  if (e.target.checked) {
+    const newIds = new Set([...selectedIds.value, ...selectableDrafts.value.map(d => d.id)]);
+    selectedIds.value = Array.from(newIds);
+  } else {
+    const selectableIdSet = new Set(selectableDrafts.value.map(d => d.id));
+    selectedIds.value = selectedIds.value.filter(id => !selectableIdSet.has(id));
+  }
+};
 
 const filters = reactive({
   search: '',
@@ -385,9 +526,24 @@ const validateDraft = async (id) => {
   }
 };
 
-const generateInvoice = async (draftId) => {
-  if (!confirm('Apakah Anda yakin ingin menerbitkan Invoice dari Draft ini?')) return;
+const askGenerateSingle = (draft) => {
+  if (generatingId.value === draft.id) return;
+  confirmState.title = 'Terbitkan Invoice';
+  confirmState.message = `Apakah Anda yakin ingin menerbitkan Invoice untuk draft ${draft.dealer_name || draft.dealer_code}?`;
+  confirmState.confirmText = 'Ya, Terbitkan Invoice';
+  confirmState.action = async () => {
+    confirmState.loading = true;
+    try {
+      await executeGenerateSingle(draft.id);
+      confirmState.show = false;
+    } finally {
+      confirmState.loading = false;
+    }
+  };
+  confirmState.show = true;
+};
 
+const executeGenerateSingle = async (draftId) => {
   generatingId.value = draftId;
   alertMessage.value = null;
 
@@ -395,6 +551,7 @@ const generateInvoice = async (draftId) => {
     const res = await axios.post(`/api/invoices/generate/${draftId}`);
     alertMessage.value = res.data.message;
     alertSuccess.value = true;
+    selectedIds.value = selectedIds.value.filter(id => id !== draftId);
     fetchDrafts(pagination.current_page);
   } catch (err) {
     alertMessage.value = err.response?.data?.message || 'Gagal generate invoice.';
@@ -404,11 +561,61 @@ const generateInvoice = async (draftId) => {
   }
 };
 
-const generateAllInvoices = async () => {
-  if (!confirm('Apakah Anda yakin ingin menerbitkan Invoice untuk SEMUA data draft dengan status Ready?')) {
-    return;
-  }
+const askGenerateSelected = () => {
+  if (selectedIds.value.length === 0 || generatingBatch.value) return;
+  confirmState.title = 'Terbitkan Invoice Terpilih';
+  confirmState.message = `Apakah Anda yakin ingin menerbitkan ${selectedIds.value.length} invoice dari draft yang dipilih?`;
+  confirmState.confirmText = `Ya, Terbitkan (${selectedIds.value.length}) Invoice`;
+  confirmState.action = async () => {
+    confirmState.loading = true;
+    try {
+      await executeGenerateSelected();
+      confirmState.show = false;
+    } finally {
+      confirmState.loading = false;
+    }
+  };
+  confirmState.show = true;
+};
 
+const executeGenerateSelected = async () => {
+  generatingBatch.value = true;
+  alertMessage.value = null;
+
+  try {
+    const res = await axios.post('/api/invoices/generate-all', {
+      ids: selectedIds.value,
+    });
+    alertMessage.value = res.data.message;
+    alertSuccess.value = res.data.success;
+    selectedIds.value = [];
+    fetchDrafts(pagination.current_page);
+  } catch (err) {
+    alertMessage.value = err.response?.data?.message || 'Gagal menerbitkan invoice terpilih.';
+    alertSuccess.value = false;
+  } finally {
+    generatingBatch.value = false;
+  }
+};
+
+const askGenerateAll = () => {
+  if (generatingAll.value) return;
+  confirmState.title = 'Terbitkan Semua Invoice';
+  confirmState.message = 'Apakah Anda yakin ingin menerbitkan Invoice untuk SEMUA data draft dengan status Ready?';
+  confirmState.confirmText = 'Ya, Terbitkan Semua';
+  confirmState.action = async () => {
+    confirmState.loading = true;
+    try {
+      await executeGenerateAll();
+      confirmState.show = false;
+    } finally {
+      confirmState.loading = false;
+    }
+  };
+  confirmState.show = true;
+};
+
+const executeGenerateAll = async () => {
   generatingAll.value = true;
   alertMessage.value = null;
 
@@ -416,6 +623,7 @@ const generateAllInvoices = async () => {
     const res = await axios.post('/api/invoices/generate-all');
     alertMessage.value = res.data.message;
     alertSuccess.value = res.data.success;
+    selectedIds.value = [];
     fetchDrafts(pagination.current_page);
   } catch (err) {
     alertMessage.value = err.response?.data?.message || 'Gagal menerbitkan semua invoice.';

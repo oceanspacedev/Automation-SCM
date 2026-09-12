@@ -15,7 +15,7 @@ class DraftImportTest extends TestCase
 
     public function test_can_import_draft_excel_with_success_and_row_errors(): void
     {
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
 
         // 1. Headers matching required format
@@ -24,7 +24,7 @@ class DraftImportTest extends TestCase
             'Dealer Name', 'Realqty', 'NPWP', 'Nama NPWP', 'Jenis NPWP', 'Jenis Pph',
             'Support Amount', 'Dpp', 'Dpp Lain', 'Ppn', 'Pph', 'Netpay',
             'KODE ITEM', 'NAMA ITEM', 'Alamat', 'Nama Program', 'Periode Program',
-            'No CN', 'Tanggal Inv', 'REFNOTE', 'DSA/NPS FL'
+            'No CN', 'Tanggal Inv', 'REFNOTE', 'DSA/NPS FL',
         ];
         $sheet->fromArray([$headers], null, 'A1');
 
@@ -34,7 +34,7 @@ class DraftImportTest extends TestCase
             'PT Dealer A', 10, '01.234.567.8-901.000', 'PT Dealer A', 'BADAN', 'BADAN',
             10000000, 9009009, 8258258, 990991, 180180, 9819820,
             'ITM01', 'Barang Promo A', 'Jl. Merdeka No 1', 'Program Q1', 'Jan-Mar 2026',
-            'CN001', '2026-03-01', 'Ref Note 1', 'DSA'
+            'CN001', '2026-03-01', 'Ref Note 1', 'DSA',
         ];
 
         // 3. Row 2: Valid NPS FL (PRIBADI)
@@ -43,7 +43,7 @@ class DraftImportTest extends TestCase
             'Toko B', 5, '02.234.567.8-901.000', 'Toko B', 'PRIBADI', 'PRIBADI',
             5000000, 4504505, 0, 0, 112613, 4391892,
             'ITM02', 'Barang Promo B', 'Jl. Sudirman No 2', 'Program Q1', 'Jan-Mar 2026',
-            'CN002', '2026-03-02', 'Ref Note 2', 'NPS FL'
+            'CN002', '2026-03-02', 'Ref Note 2', 'NPS FL',
         ];
 
         // 4. Row 3: Invalid DSA/NPS FL (should be error status, but not crash import)
@@ -52,13 +52,13 @@ class DraftImportTest extends TestCase
             'Toko C', 2, '03.234.567.8-901.000', 'Toko C', 'BADAN', 'BADAN',
             2000000, 1801802, 1651652, 198198, 36036, 1963964,
             'ITM03', 'Barang Promo C', 'Jl. Thamrin No 3', 'Program Q1', 'Jan-Mar 2026',
-            'CN003', '2026-03-03', 'Ref Note 3', 'UNKNOWN' // Invalid type!
+            'CN003', '2026-03-03', 'Ref Note 3', 'UNKNOWN', // Invalid type!
         ];
 
         $sheet->fromArray([$row1, $row2, $row3], null, 'A2');
 
         // Save to temporary file
-        $tempPath = tempnam(sys_get_temp_dir(), 'test_draft_') . '.xlsx';
+        $tempPath = @tempnam(sys_get_temp_dir(), 'test_draft_').'.xlsx';
         $writer = new Xlsx($spreadsheet);
         $writer->save($tempPath);
 
@@ -99,7 +99,7 @@ class DraftImportTest extends TestCase
 
     public function test_can_import_excel_with_numbering_row_on_top_and_headers_on_row_2(): void
     {
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
 
         // Row 1: Numbers (like 1, 2, 3, 4, 5...) as shown in user screenshot
@@ -112,7 +112,7 @@ class DraftImportTest extends TestCase
             'Dealer Name', 'Realqty', 'NPWP', 'Nama NPWP', 'Jenis NPWP', 'Jenis Pph',
             'Support Amount', 'DPP', 'DPP Lain', 'PPN', 'PPh', 'Netpay',
             'KODE ITEM', 'NAMA ITEM', 'Alamat', 'Nama Program', 'Periode Program',
-            'No CN', 'Tanggal Inv', 'REFNOTE', 'DSA/NPS FL'
+            'No CN', 'Tanggal Inv', 'REFNOTE', 'DSA/NPS FL',
         ];
         $sheet->fromArray([$headers], null, 'A2');
 
@@ -122,11 +122,11 @@ class DraftImportTest extends TestCase
             'PT Dealer Offset', 10, '01.234.567.8-901.000', 'PT Dealer Offset', 'BADAN', 'BADAN',
             10000000, 9009009, 8258258, 990991, 180180, 9819820,
             'ITM01', 'Barang Promo A', 'Jl. Merdeka No 1', 'Program Q1', 'Jan-Mar 2026',
-            'CN001', '2026-03-01', 'Ref Note 1', 'DSA'
+            'CN001', '2026-03-01', 'Ref Note 1', 'DSA',
         ];
         $sheet->fromArray([$row1], null, 'A3');
 
-        $tempPath = tempnam(sys_get_temp_dir(), 'test_draft_offset_') . '.xlsx';
+        $tempPath = @tempnam(sys_get_temp_dir(), 'test_draft_offset_').'.xlsx';
         $writer = new Xlsx($spreadsheet);
         $writer->save($tempPath);
 

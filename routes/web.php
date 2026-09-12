@@ -30,6 +30,7 @@ Route::prefix('api')->group(function () {
     Route::get('/invoices', [InvoiceController::class, 'index']);
     Route::get('/invoices/{id}', [InvoiceController::class, 'show']);
     Route::post('/invoices/generate-all', [InvoiceController::class, 'generateAll']);
+    Route::post('/invoices/generate-batch', [InvoiceController::class, 'generateAll']);
     Route::post('/invoices/generate/{draftId}', [InvoiceController::class, 'generate']);
     Route::post('/invoices/quick-send-all', [InvoiceController::class, 'quickSendAll']);
     Route::post('/invoices/send-batch', [InvoiceController::class, 'sendBatch']);
