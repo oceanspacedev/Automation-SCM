@@ -77,6 +77,11 @@
             Untuk Dealer PKP, mohon bantu terbitkan Faktur Pajak sesuai tanggal berjalan apabila sudah lewat dari tanggal 5.
         </p>
 
+        <p>
+            Untuk semua dokumen Program Realme (agr, credit note/invoice dan faktur pajak) mohon dapat di upload melalui link google form berikut yah:<br>
+            <a href="https://bit.ly/ProgramRealmeJabar" target="_blank" style="color: #2563eb; text-decoration: underline;">https://bit.ly/ProgramRealmeJabar</a>
+        </p>
+
         <p>Terima kasih.</p>
 
         <hr>
