@@ -159,4 +159,52 @@ class DraftImportTest extends TestCase
 
         @unlink($tempPath);
     }
+
+    public function test_can_import_excel_with_regular_invoice_type(): void
+    {
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $headers = [
+            'NO', 'REGIONAL', 'RSM', 'DEALER CODE', 'KODE BT', 'CUSTOMER',
+            'NAMA DEALER', 'TOP', 'NPWP', 'NAMA NPWP', 'TIPE BADAN USAHA', 'NPWP/NON NPWP',
+            'SUPPORT CLAIM (INC)', 'DPP EXCL', 'DPP LAIN', 'PPN', 'PPH', 'NET PAY',
+            'ITEM NO', 'ITEM DESCRIPTION', 'ALAMAT DEALER', 'NAMA PROGRAM', 'PERIODE PROGRAM',
+            'No CN', 'Tanggal Inv', 'REFNOTE', 'DSA/NPS FL',
+        ];
+        $sheet->fromArray([$headers], null, 'A1');
+
+        $row1 = [
+            '1', 'JABO', 'RSM01', 'DLR-REG-01', 'BT01', 'Cust Regular',
+            'Toko Regular', 0, '01.234.567.8-901.000', 'Toko Regular', 'BADAN', 'BADAN',
+            10000000, 9009009, 8258258, 990991, 180180, 9819820,
+            'ITM01', 'Barang Promo Regular', 'Jl. Sudirman 1', 'Program Regular', 'Jan-Mar 2026',
+            'CN-REG-001', '2026-03-01', 'Ref Regular', 'REGULAR',
+        ];
+        $sheet->fromArray([$row1], null, 'A2');
+
+        $tempPath = @tempnam(sys_get_temp_dir(), 'test_regular_').'.xlsx';
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($tempPath);
+
+        $uploadedFile = new UploadedFile(
+            $tempPath,
+            'draft_regular.xlsx',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            null,
+            true
+        );
+
+        $response = $this->postJson('/api/drafts/import', [
+            'file' => $uploadedFile,
+        ]);
+
+        $response->assertStatus(200);
+        $draft = Draft::where('dealer_code', 'DLR-REG-01')->first();
+        $this->assertNotNull($draft);
+        $this->assertEquals('REGULAR', $draft->invoice_type);
+        $this->assertEquals('ready', $draft->status);
+
+        @unlink($tempPath);
+    }
 }

@@ -21,13 +21,11 @@ class InvoiceGenerator
     /**
      * Generate an Invoice from an eligible Draft.
      *
-     * @param Draft $draft
-     * @return Invoice
      * @throws Exception
      */
-    public function generate(Draft $draft): Invoice
+    public function generate(Draft $draft, ?string $billTo = null): Invoice
     {
-        return DB::transaction(function () use ($draft) {
+        return DB::transaction(function () use ($draft, $billTo) {
             // Lock draft row for update to prevent concurrent duplicate generation
             $lockedDraft = Draft::where('id', $draft->id)->lockForUpdate()->firstOrFail();
 
@@ -36,10 +34,13 @@ class InvoiceGenerator
                 throw new Exception("Draft #{$lockedDraft->id} sudah pernah di-generate menjadi invoice.");
             }
 
-            // 2. Validate invoice type (DSA / NPS FL)
+            // 2. Validate invoice type (DSA / NPS FL / REGULAR)
             $invoiceType = strtoupper(trim((string) $lockedDraft->invoice_type));
-            if ($invoiceType !== 'DSA' && $invoiceType !== 'NPS FL') {
-                throw new Exception("Tipe invoice tidak valid ('{$lockedDraft->invoice_type}'). Harus 'DSA' atau 'NPS FL'.");
+            if ($invoiceType === 'REGULER') {
+                $invoiceType = 'REGULAR';
+            }
+            if (! in_array($invoiceType, ['DSA', 'NPS FL', 'REGULAR'], true)) {
+                throw new Exception("Tipe invoice tidak valid ('{$lockedDraft->invoice_type}'). Harus 'DSA', 'NPS FL', atau 'REGULAR'.");
             }
 
             // 3. Calculate values using system business rules
@@ -55,20 +56,31 @@ class InvoiceGenerator
 
             // 4. Determine Invoice Number: prefer draft's cn_number if present and unique
             $candidateNumber = trim((string) $lockedDraft->cn_number);
-            if (!empty($candidateNumber) && !Invoice::where('invoice_number', $candidateNumber)->exists()) {
+            if (! empty($candidateNumber) && ! Invoice::where('invoice_number', $candidateNumber)->exists()) {
                 $invoiceNumber = $candidateNumber;
             } else {
                 $invoiceNumber = $this->generateNextInvoiceNumber();
             }
 
             // Customer lookup for Bill To information
-            $customerInfo = CustomerLookupService::lookup($lockedDraft->customer_name);
-            $customerAddress = !empty($customerInfo['address']) && $customerInfo['address'] !== '-'
-                ? $customerInfo['address']
-                : null;
-            $customerNpwp = !empty($customerInfo['npwp']) && $customerInfo['npwp'] !== '-'
-                ? $customerInfo['npwp']
-                : null;
+            if (! empty($billTo) && ($selectedBillTo = CustomerLookupService::getBillTo($billTo))) {
+                $customerName = $selectedBillTo['name'];
+                $customerAddress = ! empty($selectedBillTo['address']) && $selectedBillTo['address'] !== '-'
+                    ? $selectedBillTo['address']
+                    : null;
+                $customerNpwp = ! empty($selectedBillTo['npwp']) && $selectedBillTo['npwp'] !== '-'
+                    ? $selectedBillTo['npwp']
+                    : null;
+            } else {
+                $customerInfo = CustomerLookupService::lookup($lockedDraft->customer_name);
+                $customerName = $customerInfo['name'] ?? $lockedDraft->customer_name;
+                $customerAddress = ! empty($customerInfo['address']) && $customerInfo['address'] !== '-'
+                    ? $customerInfo['address']
+                    : null;
+                $customerNpwp = ! empty($customerInfo['npwp']) && $customerInfo['npwp'] !== '-'
+                    ? $customerInfo['npwp']
+                    : null;
+            }
 
             // 5. Create Invoice record
             $invoice = Invoice::create([
@@ -78,7 +90,7 @@ class InvoiceGenerator
                 'rsm' => $lockedDraft->rsm,
                 'dealer_code' => $lockedDraft->dealer_code,
                 'dealer_name' => $lockedDraft->dealer_name,
-                'customer_name' => $lockedDraft->customer_name,
+                'customer_name' => $customerName,
                 'customer_address' => $customerAddress,
                 'customer_npwp' => $customerNpwp,
                 'npwp' => $lockedDraft->npwp,
@@ -93,9 +105,10 @@ class InvoiceGenerator
                 'netpay' => $netpay,
                 'item_code' => $lockedDraft->item_code,
                 'item_name' => $lockedDraft->item_name,
-                'address'        => $lockedDraft->address,
-                'email'          => $lockedDraft->email,
-                'program_name'   => $lockedDraft->program_name,
+                'address' => $lockedDraft->address,
+                'email' => $lockedDraft->email,
+                'whatsapp' => $lockedDraft->whatsapp,
+                'program_name' => $lockedDraft->program_name,
                 'program_period' => $lockedDraft->program_period,
                 'cn_number' => $lockedDraft->cn_number,
                 'invoice_date' => $lockedDraft->invoice_date ?: date('d/m/Y'),
@@ -136,18 +149,21 @@ class InvoiceGenerator
             $nextSequence = 1;
         }
 
-        return $prefix . str_pad((string) $nextSequence, 6, '0', STR_PAD_LEFT);
+        return $prefix.str_pad((string) $nextSequence, 6, '0', STR_PAD_LEFT);
     }
 
     /**
      * Render and save PDF using DomPDF.
      *
-     * @param Invoice $invoice
      * @return string Relative storage path
      */
     public function renderAndSavePdf(Invoice $invoice): string
     {
-        $viewName = $invoice->invoice_type === 'DSA' ? 'invoices.dsa' : 'invoices.nps-fl';
+        $viewName = match ($invoice->invoice_type) {
+            'DSA' => 'invoices.dsa',
+            'REGULAR', 'REGULER' => 'invoices.regular',
+            default => 'invoices.nps-fl',
+        };
 
         $pdf = Pdf::loadView($viewName, ['invoice' => $invoice])
             ->setPaper('a4', 'portrait')

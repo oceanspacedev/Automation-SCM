@@ -19,8 +19,8 @@
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <MailIcon v-else class="w-4 h-4 text-white" />
-          <span>{{ sendingBatch ? 'Mengirim...' : `Kirim (${selectedIds.length}) Email Terpilih` }}</span>
+          <SendIcon v-else class="w-4 h-4 text-white" />
+          <span>{{ sendingBatch ? 'Mengirim...' : `Kirim (${selectedIds.length}) Notifikasi Terpilih` }}</span>
         </button>
 
         <!-- Send All Button (when nothing specifically selected) -->
@@ -29,14 +29,14 @@
           @click="askSendAll"
           :disabled="sendingAll"
           class="h-10 px-4 bg-[#1D70F5] hover:bg-blue-600 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition cursor-pointer flex items-center gap-2 shadow-xs"
-          title="Kirim semua invoice yang belum terkirim"
+          title="Kirim semua invoice yang belum terkirim via Email & WhatsApp"
         >
           <svg v-if="sendingAll" class="animate-spin -ml-0.5 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <MailIcon v-else class="w-4 h-4 text-white" />
-          <span>{{ sendingAll ? 'Mengirim Semua...' : 'Kirim Semua Email' }}</span>
+          <SendIcon v-else class="w-4 h-4 text-white" />
+          <span>{{ sendingAll ? 'Mengirim Semua...' : 'Kirim Semua Notifikasi' }}</span>
         </button>
 
         <router-link
@@ -77,6 +77,7 @@
           <option value="">Semua Tipe</option>
           <option value="DSA">DSA</option>
           <option value="NPS FL">NPS FL</option>
+          <option value="REGULAR">REGULAR</option>
         </select>
         <select
           v-model="filters.status"
@@ -141,6 +142,7 @@
             <TableHead>Dealer</TableHead>
             <TableHead>Customer</TableHead>
             <TableHead>Email</TableHead>
+            <TableHead>WhatsApp</TableHead>
             <TableHead>Program</TableHead>
             <TableHead class="w-[110px]">Tanggal</TableHead>
             <TableHead class="text-right w-[140px]">Amount</TableHead>
@@ -148,10 +150,10 @@
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableEmpty v-if="loading" :colspan="11">
+          <TableEmpty v-if="loading" :colspan="12">
             Memuat data invoice...
           </TableEmpty>
-          <TableEmpty v-else-if="invoices.length === 0" :colspan="11">
+          <TableEmpty v-else-if="invoices.length === 0" :colspan="12">
             Belum ada invoice yang dibuat. Silakan generate invoice dari menu <strong>Draft</strong>.
           </TableEmpty>
           <TableRow v-for="inv in invoices" :key="inv.id">
@@ -161,9 +163,9 @@
                 type="checkbox"
                 :value="inv.id"
                 v-model="selectedIds"
-                :disabled="isAlreadySent(inv) || !hasEmail(inv)"
+                :disabled="isAlreadySent(inv) || !hasDestination(inv)"
                 class="h-4 w-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-                :title="isAlreadySent(inv) ? 'Sudah dikirim' : (!hasEmail(inv) ? 'Tidak ada email' : 'Pilih invoice ini')"
+                :title="isAlreadySent(inv) ? 'Sudah dikirim' : (!hasDestination(inv) ? 'Tidak ada email atau nomor WhatsApp' : 'Pilih invoice ini')"
               />
             </TableCell>
             <TableCell>
@@ -173,9 +175,39 @@
             </TableCell>
             <!-- Status Badge -->
             <TableCell>
-              <!-- Sent / Terkirim -->
+              <!-- Fully Sent: Email & WhatsApp -->
               <span
-                v-if="isAlreadySent(inv)"
+                v-if="isFullySent(inv)"
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs whitespace-nowrap"
+                title="Email & WhatsApp sudah terkirim"
+              >
+                <CheckCircleIcon class="h-3 w-3 text-emerald-600 shrink-0" />
+                <span>Email & WA</span>
+              </span>
+
+              <!-- Email Sent Only -->
+              <span
+                v-else-if="inv.email_sent_at && !inv.whatsapp_sent_at"
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs whitespace-nowrap"
+                title="Email sudah terkirim"
+              >
+                <CheckCircleIcon class="h-3 w-3 text-emerald-600 shrink-0" />
+                <span>Email Sent</span>
+              </span>
+
+              <!-- WhatsApp Sent Only -->
+              <span
+                v-else-if="!inv.email_sent_at && inv.whatsapp_sent_at"
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs whitespace-nowrap"
+                title="WhatsApp sudah terkirim"
+              >
+                <CheckCircleIcon class="h-3 w-3 text-emerald-600 shrink-0" />
+                <span>WA Sent</span>
+              </span>
+
+              <!-- Sent / Terkirim Generic -->
+              <span
+                v-else-if="inv.status === 'sent'"
                 class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs whitespace-nowrap"
               >
                 <CheckCircleIcon class="h-3 w-3 text-emerald-600 shrink-0" />
@@ -227,9 +259,13 @@
             <TableCell class="max-w-[160px] truncate" :title="inv.customer_name">
               {{ inv.customer_name || '-' }}
             </TableCell>
-            <!-- Email (Uniform font) -->
-            <TableCell class="max-w-[160px] truncate" :title="inv.email || inv.draft?.email">
+            <!-- Email -->
+            <TableCell class="max-w-[150px] truncate" :title="inv.email || inv.draft?.email">
               {{ inv.email || inv.draft?.email || '-' }}
+            </TableCell>
+            <!-- WhatsApp -->
+            <TableCell class="max-w-[140px] truncate" :title="inv.whatsapp || inv.draft?.whatsapp">
+              {{ inv.whatsapp || inv.draft?.whatsapp || '-' }}
             </TableCell>
             <TableCell class="max-w-[150px] truncate" :title="inv.program_name">
               {{ inv.program_name || '-' }}
@@ -277,38 +313,38 @@
                   <span class="text-xs font-bold text-red-500 tracking-wide">PDF</span>
                 </a>
 
-                <!-- 4. Email Action Button (Fixed Width 94px for 100% straight vertical column) -->
-                <!-- Already Sent: Disabled status badge -->
+                <!-- 4. Email/WA Action Button (Fixed Width 94px for 100% straight vertical column) -->
+                <!-- Already Sent to both or completed -->
                 <span
                   v-if="isAlreadySent(inv)"
                   class="h-9 w-[94px] shrink-0 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 cursor-default select-none shadow-2xs"
-                  title="Email invoice ini sudah terkirim"
+                  title="Invoice ini sudah terkirim"
                 >
                   <CheckCircleIcon class="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>Terkirim</span>
                 </span>
 
-                <!-- Ready to send (has email): Clean Blue Kirim button -->
+                <!-- Ready to send (has email or whatsapp): Clean Blue Kirim button -->
                 <button
-                  v-else-if="inv.email || inv.draft?.email"
+                  v-else-if="hasDestination(inv)"
                   @click="askSendSingle(inv)"
                   :disabled="sendingId === inv.id"
                   class="h-9 w-[94px] shrink-0 bg-[#1D70F5] hover:bg-blue-600 text-white text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
-                  :title="`Kirim ke ${inv.email || inv.draft?.email}`"
+                  :title="`Kirim notifikasi ke ${inv.email || inv.draft?.email || ''} ${inv.whatsapp || inv.draft?.whatsapp ? '(' + (inv.whatsapp || inv.draft?.whatsapp) + ')' : ''}`"
                 >
                   <span v-if="sendingId === inv.id" class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                  <MailIcon v-else class="w-4 h-4 text-white shrink-0" />
+                  <SendIcon v-else class="w-4 h-4 text-white shrink-0" />
                   <span>Kirim</span>
                 </button>
 
-                <!-- No email: Manual Input Button with Mail Icon -->
+                <!-- No email/whatsapp: Manual Input Button -->
                 <button
                   v-else
                   @click="openEmailModal(inv)"
                   class="h-9 w-[94px] shrink-0 border border-gray-200 bg-white text-gray-700 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/50 text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-                  title="Input email manual & kirim"
+                  title="Input email / WhatsApp manual & kirim"
                 >
-                  <MailIcon class="w-4 h-4 text-gray-500 shrink-0" />
+                  <SendIcon class="w-4 h-4 text-gray-500 shrink-0" />
                   <span>Manual</span>
                 </button>
               </div>
@@ -317,7 +353,7 @@
         </TableBody>
         <TableFooter v-if="invoices.length > 0">
           <TableRow>
-            <TableCell :colspan="9">
+            <TableCell :colspan="10">
               Total
             </TableCell>
             <TableCell class="text-right">
@@ -361,6 +397,7 @@
       :invoice-id="selectedInvoice?.id"
       :invoice-number="selectedInvoice?.invoice_number"
       :default-email="selectedInvoice?.email || selectedInvoice?.draft?.email"
+      :default-whatsapp="selectedInvoice?.whatsapp || selectedInvoice?.draft?.whatsapp"
       @sent="onEmailSent"
     />
 
@@ -383,6 +420,7 @@ import { CalendarDate, parseDate } from '@internationalized/date';
 import {
   CalendarIcon,
   MailIcon,
+  Send as SendIcon,
   Eye as EyeIcon,
   Printer as PrinterIcon,
   MailCheck as MailCheckIcon,
@@ -432,16 +470,20 @@ const onConfirmAction = async () => {
   }
 };
 
-const isAlreadySent = (inv) => {
-  return inv.status === 'sent' || !!inv.email_sent_at;
+const isFullySent = (inv) => {
+  return !!(inv.email_sent_at && inv.whatsapp_sent_at);
 };
 
-const hasEmail = (inv) => {
-  return !!(inv.email || inv.draft?.email);
+const isAlreadySent = (inv) => {
+  return inv.status === 'sent' || (!!inv.email_sent_at && !!inv.whatsapp_sent_at);
+};
+
+const hasDestination = (inv) => {
+  return !!(inv.email || inv.draft?.email || inv.whatsapp || inv.draft?.whatsapp);
 };
 
 const selectableInvoices = computed(() => {
-  return invoices.value.filter(inv => hasEmail(inv) && !isAlreadySent(inv));
+  return invoices.value.filter(inv => hasDestination(inv) && !isAlreadySent(inv));
 });
 
 const isAllSelected = computed(() => {
@@ -472,11 +514,12 @@ const openEmailModal = (inv) => {
 
 const onEmailSent = (payload) => {
   alertSuccess.value = true;
-  alertMessage.value = `Invoice berhasil dikirim ke ${payload.email}`;
+  alertMessage.value = `Notifikasi invoice berhasil diproses dan dikirim.`;
   const inv = invoices.value.find(i => i.id === payload.invoiceId);
   if (inv) {
     inv.status = 'sent';
-    inv.email_sent_at = new Date().toISOString();
+    if (payload.email) inv.email_sent_at = new Date().toISOString();
+    if (payload.whatsapp) inv.whatsapp_sent_at = new Date().toISOString();
   }
   selectedIds.value = selectedIds.value.filter(id => id !== payload.invoiceId);
 };
@@ -484,8 +527,13 @@ const onEmailSent = (payload) => {
 const askSendSingle = (inv) => {
   if (isAlreadySent(inv)) return;
   const targetEmail = inv.email || inv.draft?.email;
-  confirmState.title = 'Kirim Invoice via Email';
-  confirmState.message = `Apakah Anda yakin ingin mengirim invoice ${inv.invoice_number} ke ${targetEmail}?`;
+  const targetWa = inv.whatsapp || inv.draft?.whatsapp;
+  const destinations = [];
+  if (targetEmail) destinations.push(`Email (${targetEmail})`);
+  if (targetWa) destinations.push(`WhatsApp (${targetWa})`);
+
+  confirmState.title = 'Kirim Notifikasi Invoice';
+  confirmState.message = `Apakah Anda yakin ingin mengirim invoice ${inv.invoice_number} ke ${destinations.join(' & ')}?`;
   confirmState.confirmText = 'Ya, Kirim Sekarang';
   confirmState.action = async () => {
     confirmState.loading = true;
@@ -509,11 +557,12 @@ const quickSendInvoice = async (inv) => {
     alertSuccess.value = true;
     alertMessage.value = res.data.message;
     inv.status = 'sent';
-    inv.email_sent_at = new Date().toISOString();
+    if (inv.email || inv.draft?.email) inv.email_sent_at = new Date().toISOString();
+    if (inv.whatsapp || inv.draft?.whatsapp) inv.whatsapp_sent_at = new Date().toISOString();
     selectedIds.value = selectedIds.value.filter(id => id !== inv.id);
   } catch (err) {
     alertSuccess.value = false;
-    alertMessage.value = err.response?.data?.message || 'Gagal mengirim email';
+    alertMessage.value = err.response?.data?.message || 'Gagal mengirim notifikasi invoice';
   } finally {
     sendingId.value = null;
   }
@@ -521,8 +570,8 @@ const quickSendInvoice = async (inv) => {
 
 const askSendBatch = () => {
   if (selectedIds.value.length === 0 || sendingBatch.value) return;
-  confirmState.title = 'Kirim Batch Email';
-  confirmState.message = `Apakah Anda yakin ingin mengirim ${selectedIds.value.length} invoice terpilih ke masing-masing alamat email tujuan?`;
+  confirmState.title = 'Kirim Batch Notifikasi (Email & WA)';
+  confirmState.message = `Apakah Anda yakin ingin mengirim ${selectedIds.value.length} invoice terpilih ke alamat Email dan WhatsApp tujuan masing-masing?`;
   confirmState.confirmText = `Ya, Kirim (${selectedIds.value.length}) Invoice`;
   confirmState.action = async () => {
     confirmState.loading = true;
@@ -558,8 +607,8 @@ const executeSendBatch = async () => {
 
 const askSendAll = () => {
   if (sendingAll.value) return;
-  confirmState.title = 'Kirim Semua Email Invoice';
-  confirmState.message = 'Apakah Anda yakin ingin mengirim semua invoice yang belum terkirim dan memiliki alamat email tujuan?';
+  confirmState.title = 'Kirim Semua Notifikasi Invoice';
+  confirmState.message = 'Apakah Anda yakin ingin mengirim semua invoice yang belum terkirim via Email dan WhatsApp?';
   confirmState.confirmText = 'Ya, Kirim Semua';
   confirmState.action = async () => {
     confirmState.loading = true;
@@ -585,7 +634,7 @@ const executeSendAll = async () => {
     fetchInvoices(pagination.current_page);
   } catch (err) {
     alertSuccess.value = false;
-    alertMessage.value = err.response?.data?.message || 'Gagal memproses pengiriman email massal';
+    alertMessage.value = err.response?.data?.message || 'Gagal memproses pengiriman massal';
   } finally {
     sendingAll.value = false;
   }

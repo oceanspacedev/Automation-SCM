@@ -169,16 +169,19 @@
             <td style="width: 45%;">
                 <table class="info-right-table">
                     <tr>
-                        <td style="text-align: right; padding-right: 8px;">Nomor Invoice :</td>
-                        <td style="text-align: left; min-width: 90px;">{{ $invoice->invoice_number }}</td>
+                        <td style="text-align: left; padding-right: 4px; white-space: nowrap;">Nomor Invoice</td>
+                        <td style="text-align: center; width: 14px; white-space: nowrap;">:</td>
+                        <td style="text-align: left; padding-left: 4px; min-width: 95px; white-space: nowrap;">{{ $invoice->invoice_number }}</td>
                     </tr>
                     <tr>
-                        <td style="text-align: right; padding-right: 8px;">Tanggal Invoice :</td>
-                        <td style="text-align: left;">{{ $invoice->invoice_date ?? date('d/m/Y') }}</td>
+                        <td style="text-align: left; padding-right: 4px; white-space: nowrap;">Tanggal Invoice</td>
+                        <td style="text-align: center; width: 14px; white-space: nowrap;">:</td>
+                        <td style="text-align: left; padding-left: 4px; white-space: nowrap;">{{ $invoice->invoice_date ?? date('d/m/Y') }}</td>
                     </tr>
                     <tr>
-                        <td style="text-align: right; padding-right: 8px;">Nama DSA :</td>
-                        <td style="text-align: left;">{{ $invoice->rsm ?? $invoice->draft?->rsm ?? '-' }}</td>
+                        <td style="text-align: left; padding-right: 4px; white-space: nowrap;">Nama DSA</td>
+                        <td style="text-align: center; width: 14px; white-space: nowrap;">:</td>
+                        <td style="text-align: left; padding-left: 4px; white-space: nowrap;">{{ $invoice->rsm ?? $invoice->draft?->rsm ?? '-' }}</td>
                     </tr>
                 </table>
             </td>

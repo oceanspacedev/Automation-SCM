@@ -80,6 +80,7 @@
           <option value="">Semua Tipe</option>
           <option value="DSA">DSA</option>
           <option value="NPS FL">NPS FL</option>
+          <option value="REGULAR">REGULAR</option>
         </select>
         <select
           v-model="filters.status"
@@ -151,6 +152,7 @@
             <TableHead>Dealer Name</TableHead>
             <TableHead>Customer</TableHead>
             <TableHead>Email</TableHead>
+            <TableHead>WhatsApp</TableHead>
             <TableHead>Program</TableHead>
             <TableHead class="w-[120px]">No CN</TableHead>
             <TableHead class="w-[110px]">Tanggal</TableHead>
@@ -162,10 +164,10 @@
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableEmpty v-if="loading" :colspan="13">
+          <TableEmpty v-if="loading" :colspan="14">
             Memuat data draft...
           </TableEmpty>
-          <TableEmpty v-else-if="drafts.length === 0" :colspan="13">
+          <TableEmpty v-else-if="drafts.length === 0" :colspan="14">
             Belum ada data draft. Silakan klik tombol <strong>+ Import Excel</strong>.
           </TableEmpty>
           <TableRow
@@ -195,6 +197,9 @@
             </TableCell>
             <TableCell class="max-w-[150px] truncate" :title="draft.email">
               {{ draft.email || '-' }}
+            </TableCell>
+            <TableCell class="max-w-[140px] truncate" :title="draft.whatsapp">
+              {{ draft.whatsapp || '-' }}
             </TableCell>
             <TableCell class="max-w-[150px] truncate" :title="draft.program_name">
               {{ draft.program_name || '-' }}
@@ -359,6 +364,17 @@
       icon="warning"
       @confirm="onConfirmAction"
     />
+
+    <!-- Generate Invoice Modal with Bill To Selection -->
+    <GenerateInvoiceModal
+      v-model="generateModalState.show"
+      :title="generateModalState.title"
+      :subtitle="generateModalState.subtitle"
+      :target-info="generateModalState.targetInfo"
+      :confirm-text="generateModalState.confirmText"
+      :loading="generateModalState.loading"
+      @confirm="onGenerateConfirm"
+    />
   </div>
 </template>
 
@@ -378,6 +394,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import ImportModal from '@/components/ImportModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
+import GenerateInvoiceModal from '@/components/GenerateInvoiceModal.vue';
 import {
   Table,
   TableHeader,
@@ -411,6 +428,22 @@ const confirmState = reactive({
 const onConfirmAction = async () => {
   if (confirmState.action) {
     await confirmState.action();
+  }
+};
+
+const generateModalState = reactive({
+  show: false,
+  title: 'Terbitkan Invoice',
+  subtitle: '',
+  targetInfo: '',
+  confirmText: 'Ya, Terbitkan Invoice',
+  loading: false,
+  action: null,
+});
+
+const onGenerateConfirm = async (billTo) => {
+  if (generateModalState.action) {
+    await generateModalState.action(billTo);
   }
 };
 
@@ -528,27 +561,30 @@ const validateDraft = async (id) => {
 
 const askGenerateSingle = (draft) => {
   if (generatingId.value === draft.id) return;
-  confirmState.title = 'Terbitkan Invoice';
-  confirmState.message = `Apakah Anda yakin ingin menerbitkan Invoice untuk draft ${draft.dealer_name || draft.dealer_code}?`;
-  confirmState.confirmText = 'Ya, Terbitkan Invoice';
-  confirmState.action = async () => {
-    confirmState.loading = true;
+  generateModalState.title = 'Terbitkan Invoice';
+  generateModalState.subtitle = 'Pilih pihak Bill To untuk dicantumkan pada lembar invoice:';
+  generateModalState.targetInfo = `${draft.dealer_name || draft.dealer_code} (${draft.invoice_type || 'Invoice'})`;
+  generateModalState.confirmText = 'Ya, Terbitkan Invoice';
+  generateModalState.action = async (billTo) => {
+    generateModalState.loading = true;
     try {
-      await executeGenerateSingle(draft.id);
-      confirmState.show = false;
+      await executeGenerateSingle(draft.id, billTo);
+      generateModalState.show = false;
     } finally {
-      confirmState.loading = false;
+      generateModalState.loading = false;
     }
   };
-  confirmState.show = true;
+  generateModalState.show = true;
 };
 
-const executeGenerateSingle = async (draftId) => {
+const executeGenerateSingle = async (draftId, billTo) => {
   generatingId.value = draftId;
   alertMessage.value = null;
 
   try {
-    const res = await axios.post(`/api/invoices/generate/${draftId}`);
+    const res = await axios.post(`/api/invoices/generate/${draftId}`, {
+      bill_to: billTo,
+    });
     alertMessage.value = res.data.message;
     alertSuccess.value = true;
     selectedIds.value = selectedIds.value.filter(id => id !== draftId);
@@ -563,28 +599,30 @@ const executeGenerateSingle = async (draftId) => {
 
 const askGenerateSelected = () => {
   if (selectedIds.value.length === 0 || generatingBatch.value) return;
-  confirmState.title = 'Terbitkan Invoice Terpilih';
-  confirmState.message = `Apakah Anda yakin ingin menerbitkan ${selectedIds.value.length} invoice dari draft yang dipilih?`;
-  confirmState.confirmText = `Ya, Terbitkan (${selectedIds.value.length}) Invoice`;
-  confirmState.action = async () => {
-    confirmState.loading = true;
+  generateModalState.title = 'Terbitkan Invoice Terpilih';
+  generateModalState.subtitle = `Pilih pihak Bill To untuk ${selectedIds.value.length} invoice terpilih:`;
+  generateModalState.targetInfo = `${selectedIds.value.length} Draft Terpilih`;
+  generateModalState.confirmText = `Ya, Terbitkan (${selectedIds.value.length}) Invoice`;
+  generateModalState.action = async (billTo) => {
+    generateModalState.loading = true;
     try {
-      await executeGenerateSelected();
-      confirmState.show = false;
+      await executeGenerateSelected(billTo);
+      generateModalState.show = false;
     } finally {
-      confirmState.loading = false;
+      generateModalState.loading = false;
     }
   };
-  confirmState.show = true;
+  generateModalState.show = true;
 };
 
-const executeGenerateSelected = async () => {
+const executeGenerateSelected = async (billTo) => {
   generatingBatch.value = true;
   alertMessage.value = null;
 
   try {
     const res = await axios.post('/api/invoices/generate-all', {
       ids: selectedIds.value,
+      bill_to: billTo,
     });
     alertMessage.value = res.data.message;
     alertSuccess.value = res.data.success;
@@ -600,27 +638,30 @@ const executeGenerateSelected = async () => {
 
 const askGenerateAll = () => {
   if (generatingAll.value) return;
-  confirmState.title = 'Terbitkan Semua Invoice';
-  confirmState.message = 'Apakah Anda yakin ingin menerbitkan Invoice untuk SEMUA data draft dengan status Ready?';
-  confirmState.confirmText = 'Ya, Terbitkan Semua';
-  confirmState.action = async () => {
-    confirmState.loading = true;
+  generateModalState.title = 'Terbitkan Semua Invoice';
+  generateModalState.subtitle = 'Pilih pihak Bill To untuk SEMUA draft dengan status Ready:';
+  generateModalState.targetInfo = 'Semua Draft (Status Ready)';
+  generateModalState.confirmText = 'Ya, Terbitkan Semua';
+  generateModalState.action = async (billTo) => {
+    generateModalState.loading = true;
     try {
-      await executeGenerateAll();
-      confirmState.show = false;
+      await executeGenerateAll(billTo);
+      generateModalState.show = false;
     } finally {
-      confirmState.loading = false;
+      generateModalState.loading = false;
     }
   };
-  confirmState.show = true;
+  generateModalState.show = true;
 };
 
-const executeGenerateAll = async () => {
+const executeGenerateAll = async (billTo) => {
   generatingAll.value = true;
   alertMessage.value = null;
 
   try {
-    const res = await axios.post('/api/invoices/generate-all');
+    const res = await axios.post('/api/invoices/generate-all', {
+      bill_to: billTo,
+    });
     alertMessage.value = res.data.message;
     alertSuccess.value = res.data.success;
     selectedIds.value = [];

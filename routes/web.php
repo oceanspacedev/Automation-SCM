@@ -27,6 +27,7 @@ Route::prefix('api')->group(function () {
     Route::post('/drafts/{id}/validate', [DraftController::class, 'validateDraft']);
 
     // Invoices
+    Route::get('/bill-to-options', [InvoiceController::class, 'billToOptions']);
     Route::get('/invoices', [InvoiceController::class, 'index']);
     Route::get('/invoices/{id}', [InvoiceController::class, 'show']);
     Route::post('/invoices/generate-all', [InvoiceController::class, 'generateAll']);
@@ -37,6 +38,7 @@ Route::prefix('api')->group(function () {
     Route::post('/invoices/{id}/send-email', [InvoiceController::class, 'sendEmail']);
     Route::post('/invoices/{id}/quick-send-email', [InvoiceController::class, 'quickSendEmail']);
     Route::get('/email-logs', [InvoiceController::class, 'emailLogs']);
+    Route::get('/whatsapp-logs', [InvoiceController::class, 'whatsAppLogs']);
 });
 
 // SPA catch-all

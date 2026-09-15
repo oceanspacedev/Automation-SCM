@@ -145,6 +145,7 @@
               >
                 <option value="NPS FL">NPS FL (National Program Scheme - Front Line)</option>
                 <option value="DSA">DSA (Direct Sales Agent)</option>
+                <option value="REGULAR">REGULAR</option>
               </select>
             </div>
 

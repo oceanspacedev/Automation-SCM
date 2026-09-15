@@ -123,7 +123,7 @@ class InvoiceGeneratorTest extends TestCase
         $response = $this->get("/invoices/{$invoice->id}/preview");
         $response->assertStatus(200);
         $response->assertSee('INVOICE');
-        $response->assertSee('Nama DSA :');
+        $response->assertSee('Nama DSA');
         $response->assertSee($invoice->invoice_number);
     }
 
@@ -241,5 +241,162 @@ class InvoiceGeneratorTest extends TestCase
         // draft3 must remain ready
         $this->assertEquals('ready', $draft3->fresh()->status);
         $this->assertEquals(2, Invoice::count());
+    }
+
+    public function test_can_generate_invoice_with_cv_top_bill_to(): void
+    {
+        $draft = Draft::create([
+            'dealer_code' => 'DLR030',
+            'dealer_name' => 'Toko Pelanggan',
+            'customer_name' => 'CV OKEY MEGAH PERKASA', // Originally customer is toko
+            'support_amount' => 5000000,
+            'pph_type' => 'BADAN',
+            'invoice_type' => 'DSA',
+            'status' => 'ready',
+        ]);
+
+        $invoice = $this->generator->generate($draft, 'CV TOP');
+
+        $this->assertEquals('CV TOP SELULAR', $invoice->customer_name);
+        $this->assertStringContainsString('Pekalipan', $invoice->customer_address);
+        $this->assertEquals('31.352.339.1-426.000', $invoice->customer_npwp);
+    }
+
+    public function test_can_generate_invoice_with_pt_rism_bill_to(): void
+    {
+        $draft = Draft::create([
+            'dealer_code' => 'DLR031',
+            'dealer_name' => 'Toko Pelanggan 2',
+            'customer_name' => 'CV OKEY MEGAH PERKASA',
+            'support_amount' => 5000000,
+            'pph_type' => 'BADAN',
+            'invoice_type' => 'DSA',
+            'status' => 'ready',
+        ]);
+
+        $invoice = $this->generator->generate($draft, 'PT RISM');
+
+        $this->assertEquals('PT RETAIL INDONESIA SELALU MAJU', $invoice->customer_name);
+        $this->assertStringContainsString('MANGGA DUA SQUARE', $invoice->customer_address);
+        $this->assertEquals('61.186.183.2-044.000', $invoice->customer_npwp);
+    }
+
+    public function test_can_generate_invoice_with_pt_msi_bill_to(): void
+    {
+        $draft = Draft::create([
+            'dealer_code' => 'DLR032',
+            'dealer_name' => 'Toko Pelanggan 3',
+            'customer_name' => 'CV OKEY MEGAH PERKASA',
+            'support_amount' => 5000000,
+            'pph_type' => 'BADAN',
+            'invoice_type' => 'DSA',
+            'status' => 'ready',
+        ]);
+
+        $invoice = $this->generator->generate($draft, 'PT MSI');
+
+        $this->assertEquals('PT MITRA TELEKOMUNIKASI SELULAR', $invoice->customer_name);
+        $this->assertStringContainsString('Telkom Landmark Tower', $invoice->customer_address);
+        $this->assertEquals('01.555.666.7-011.000', $invoice->customer_npwp);
+    }
+
+    public function test_api_generate_single_with_bill_to(): void
+    {
+        $draft = Draft::create([
+            'dealer_code' => 'DLR033',
+            'dealer_name' => 'Toko Pelanggan 4',
+            'customer_name' => 'Customer Biasa',
+            'support_amount' => 3000000,
+            'pph_type' => 'BADAN',
+            'invoice_type' => 'DSA',
+            'status' => 'ready',
+        ]);
+
+        $response = $this->postJson("/api/invoices/generate/{$draft->id}", [
+            'bill_to' => 'PT RISM',
+        ]);
+
+        $response->assertStatus(200);
+        $invoice = Invoice::where('draft_id', $draft->id)->first();
+        $this->assertNotNull($invoice);
+        $this->assertEquals('PT RETAIL INDONESIA SELALU MAJU', $invoice->customer_name);
+    }
+
+    public function test_api_generate_all_with_bill_to(): void
+    {
+        $draft = Draft::create([
+            'dealer_code' => 'DLR034',
+            'dealer_name' => 'Toko Pelanggan 5',
+            'customer_name' => 'Customer Biasa',
+            'support_amount' => 3000000,
+            'pph_type' => 'BADAN',
+            'invoice_type' => 'DSA',
+            'status' => 'ready',
+        ]);
+
+        $response = $this->postJson('/api/invoices/generate-all', [
+            'ids' => [$draft->id],
+            'bill_to' => 'CV TOP',
+        ]);
+
+        $response->assertStatus(200);
+        $invoice = Invoice::where('draft_id', $draft->id)->first();
+        $this->assertNotNull($invoice);
+        $this->assertEquals('CV TOP SELULAR', $invoice->customer_name);
+    }
+
+    public function test_bill_to_options_endpoint(): void
+    {
+        $response = $this->getJson('/api/bill-to-options');
+
+        $response->assertStatus(200);
+        $response->assertJsonFragment(['code' => 'CV TOP']);
+        $response->assertJsonFragment(['code' => 'PT RISM']);
+        $response->assertJsonFragment(['code' => 'PT MSI']);
+    }
+
+    public function test_can_generate_regular_invoice_from_draft(): void
+    {
+        $draft = Draft::create([
+            'dealer_code' => 'DLR035',
+            'dealer_name' => 'CV Sumber Rezeki',
+            'customer_name' => 'Pelanggan Regular',
+            'support_amount' => 6000000,
+            'pph_type' => 'BADAN',
+            'npwp_type' => 'BADAN',
+            'invoice_type' => 'REGULAR',
+            'status' => 'ready',
+        ]);
+
+        $invoice = $this->generator->generate($draft);
+
+        $this->assertInstanceOf(Invoice::class, $invoice);
+        $this->assertEquals('REGULAR', $invoice->invoice_type);
+        $this->assertEquals('invoiced', $draft->fresh()->status);
+    }
+
+    public function test_regular_invoice_preview_does_not_display_nama_dsa_or_nama_nps_fl(): void
+    {
+        $draft = Draft::create([
+            'dealer_code' => 'DLR036',
+            'dealer_name' => 'CV Sejahtera Abadi',
+            'customer_name' => 'Pelanggan Regular 2',
+            'support_amount' => 4500000,
+            'pph_type' => 'BADAN',
+            'npwp_type' => 'BADAN',
+            'invoice_type' => 'REGULAR',
+            'status' => 'ready',
+        ]);
+
+        $invoice = $this->generator->generate($draft);
+
+        $response = $this->get("/invoices/{$invoice->id}/preview");
+        $response->assertStatus(200);
+        $response->assertSee('INVOICE');
+        $response->assertSee('Nomor Invoice');
+        $response->assertSee('Tanggal Invoice');
+        $response->assertDontSee('Nama DSA');
+        $response->assertDontSee('Nama NPS FL');
+        $response->assertSee($invoice->invoice_number);
     }
 }

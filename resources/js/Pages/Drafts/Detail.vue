@@ -25,7 +25,7 @@
 
         <button
           v-if="draft.status === 'ready'"
-          @click="generateInvoice"
+          @click="showGenerateModal = true"
           :disabled="generating"
           class="h-9 px-4 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer shadow-xs"
         >
@@ -89,6 +89,10 @@
               <tr>
                 <td class="py-1 text-gray-500">Email</td>
                 <td class="py-1 text-gray-900 font-medium">{{ draft.email || '-' }}</td>
+              </tr>
+              <tr>
+                <td class="py-1 text-gray-500">WhatsApp</td>
+                <td class="py-1 text-gray-900 font-medium">{{ draft.whatsapp || '-' }}</td>
               </tr>
             </tbody>
           </table>
@@ -219,6 +223,17 @@
         </Table>
       </div>
     </div>
+
+    <!-- Generate Invoice Modal with Bill To Selection -->
+    <GenerateInvoiceModal
+      v-model="showGenerateModal"
+      title="Terbitkan Invoice"
+      subtitle="Pilih pihak Bill To untuk dicantumkan pada invoice draft ini:"
+      :target-info="`${draft.dealer_name || draft.dealer_code} (${draft.invoice_type || 'Invoice'})`"
+      confirm-text="Ya, Terbitkan Invoice"
+      :loading="generating"
+      @confirm="handleGenerateConfirm"
+    />
   </div>
 </template>
 
@@ -228,6 +243,7 @@ import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { CheckCircle as CheckCircleIcon, AlertCircle as AlertCircleIcon } from '@lucide/vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import GenerateInvoiceModal from '@/components/GenerateInvoiceModal.vue';
 import {
   Table,
   TableHeader,
@@ -247,6 +263,7 @@ const comparison = ref(null);
 const loading = ref(true);
 const validating = ref(false);
 const generating = ref(false);
+const showGenerateModal = ref(false);
 const alertMessage = ref(null);
 const alertSuccess = ref(true);
 
@@ -285,19 +302,21 @@ const validateDraft = async () => {
   }
 };
 
-const generateInvoice = async () => {
-  if (!confirm('Terbitkan Invoice dari Draft ini?')) return;
-
+const handleGenerateConfirm = async (billTo) => {
   generating.value = true;
   alertMessage.value = null;
   try {
-    const res = await axios.post(`/api/invoices/generate/${props.id}`);
+    const res = await axios.post(`/api/invoices/generate/${props.id}`, {
+      bill_to: billTo,
+    });
     alertMessage.value = res.data.message;
     alertSuccess.value = true;
+    showGenerateModal.value = false;
     router.push(`/invoices/${res.data.invoice.id}`);
   } catch (err) {
     alertMessage.value = err.response?.data?.message || 'Gagal generate invoice.';
     alertSuccess.value = false;
+  } finally {
     generating.value = false;
   }
 };

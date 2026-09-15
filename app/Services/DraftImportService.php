@@ -22,16 +22,16 @@ class DraftImportService
      * Standard positional mapping fallback (27 columns).
      */
     protected array $standardOrder = [
-        0  => 'no',
-        1  => 'region',
-        2  => 'rsm',
-        3  => 'dealer_code',
-        4  => 'kode_bt',
-        5  => 'customer_name',
-        6  => 'dealer_name',
-        7  => 'real_qty',
-        8  => 'npwp',
-        9  => 'npwp_name',
+        0 => 'no',
+        1 => 'region',
+        2 => 'rsm',
+        3 => 'dealer_code',
+        4 => 'kode_bt',
+        5 => 'customer_name',
+        6 => 'dealer_name',
+        7 => 'real_qty',
+        8 => 'npwp',
+        9 => 'npwp_name',
         10 => 'npwp_type',
         11 => 'pph_type',
         12 => 'support_amount',
@@ -44,12 +44,13 @@ class DraftImportService
         19 => 'item_name',
         20 => 'address',
         21 => 'email',
-        22 => 'program_name',
-        23 => 'program_period',
-        24 => 'cn_number',
-        25 => 'invoice_date',
-        26 => 'ref_note',
-        27 => 'invoice_type',
+        22 => 'whatsapp',
+        23 => 'program_name',
+        24 => 'program_period',
+        25 => 'cn_number',
+        26 => 'invoice_date',
+        27 => 'ref_note',
+        28 => 'invoice_type',
     ];
 
     /**
@@ -76,9 +77,10 @@ class DraftImportService
         'netpay' => ['netpay', 'net pay', 'net_pay', 'total netpay'],
         'item_code' => ['kode item', 'kode_item', 'kodeitem', 'item code', 'kd item'],
         'item_name' => ['nama item', 'nama_item', 'namaitem', 'item name', 'nama barang'],
-        'address'        => ['alamat', 'address', 'alamat dealer', 'alamat customer'],
-        'email'          => ['email', 'email dealer', 'email address', 'alamat email', 'e-mail', 'email cust', 'email customer'],
-        'program_name'   => ['nama program', 'nama_program', 'program name', 'program'],
+        'address' => ['alamat', 'address', 'alamat dealer', 'alamat customer'],
+        'email' => ['email', 'email dealer', 'email address', 'alamat email', 'e-mail', 'email cust', 'email customer'],
+        'whatsapp' => ['whatsapp', 'no whatsapp', 'no_whatsapp', 'nomor whatsapp', 'wa', 'no wa', 'nomor wa', 'telepon', 'no telp', 'no hp', 'phone', 'phone number', 'whatsapp dealer', 'wa dealer', 'wa customer', 'whatsapp customer', 'no telepon'],
+        'program_name' => ['nama program', 'nama_program', 'program name', 'program'],
         'program_period' => ['periode program', 'periode_program', 'program period', 'periode'],
         'cn_number' => ['no cn', 'no_cn', 'cn number', 'nomor cn', 'cn'],
         'invoice_date' => ['tanggal inv', 'tanggal_inv', 'tgl inv', 'invoice date', 'tgl invoice', 'tanggal invoice', 'tanggal'],
@@ -88,10 +90,6 @@ class DraftImportService
 
     /**
      * Import draft Excel file.
-     *
-     * @param UploadedFile|string $file
-     * @param string $defaultInvoiceType
-     * @return array
      */
     public function import(UploadedFile|string $file, string $defaultInvoiceType = 'NPS FL'): array
     {
@@ -113,7 +111,7 @@ class DraftImportService
                         'field' => 'File',
                         'value' => '',
                         'error' => 'File Excel kosong atau tidak memiliki baris data.',
-                    ]
+                    ],
                 ],
             ];
         }
@@ -144,7 +142,7 @@ class DraftImportService
                         'field' => 'Data',
                         'value' => '',
                         'error' => 'Tidak ada baris data setelah header.',
-                    ]
+                    ],
                 ],
             ];
         }
@@ -159,7 +157,7 @@ class DraftImportService
             $excelRowNumber = $headerRowIndex + 1 + $rowIndex + 1; // 1-indexed Excel row
 
             // Skip entirely empty rows
-            if (empty(array_filter($rowData, fn($v) => !is_null($v) && trim((string)$v) !== ''))) {
+            if (empty(array_filter($rowData, fn ($v) => ! is_null($v) && trim((string) $v) !== ''))) {
                 continue;
             }
 
@@ -178,35 +176,44 @@ class DraftImportService
             $cleanData = $this->sanitizeRowData($data);
 
             // Skip trailing template rows, grand totals, or rows without dealer / customer
-            $hasDealerIdentifier = !empty($cleanData['dealer_code']) || !empty($cleanData['dealer_name']) || !empty($cleanData['customer_name']);
-            if (!$hasDealerIdentifier) {
+            $hasDealerIdentifier = ! empty($cleanData['dealer_code']) || ! empty($cleanData['dealer_name']) || ! empty($cleanData['customer_name']);
+            if (! $hasDealerIdentifier) {
                 continue;
             }
 
             $totalRows++;
 
             // Clean item_code if it starts with numbering like "1. 38000016"
-            if (!empty($cleanData['item_code'])) {
+            if (! empty($cleanData['item_code'])) {
                 $cleanData['item_code'] = preg_replace('/^\d+\.\s*/', '', $cleanData['item_code']);
             }
 
-            // Validation & Fallback: DSA/NPS FL
+            // Validation & Fallback: DSA/NPS FL/REGULAR
             $rowErrors = [];
             $rawType = strtoupper(trim((string) ($cleanData['invoice_type'] ?? '')));
 
             if ($rawType === '' || is_null($cleanData['invoice_type'])) {
-                // Empty in Excel: gracefully fallback to default invoice type (e.g. NPS FL)
-                $cleanData['invoice_type'] = (!empty($defaultInvoiceType) && strtoupper(trim($defaultInvoiceType)) === 'DSA') ? 'DSA' : 'NPS FL';
+                // Empty in Excel: gracefully fallback to default invoice type
+                $normDefault = strtoupper(trim($defaultInvoiceType ?? ''));
+                if ($normDefault === 'DSA') {
+                    $cleanData['invoice_type'] = 'DSA';
+                } elseif (str_contains($normDefault, 'REGUL')) {
+                    $cleanData['invoice_type'] = 'REGULAR';
+                } else {
+                    $cleanData['invoice_type'] = 'NPS FL';
+                }
             } elseif (str_contains($rawType, 'DSA')) {
                 $cleanData['invoice_type'] = 'DSA';
+            } elseif (str_contains($rawType, 'REGUL')) {
+                $cleanData['invoice_type'] = 'REGULAR';
             } elseif (str_contains($rawType, 'NPS')) {
                 $cleanData['invoice_type'] = 'NPS FL';
             } else {
                 $rowErrors[] = [
                     'row' => $excelRowNumber,
-                    'field' => 'DSA/NPS FL',
+                    'field' => 'DSA/NPS FL/REGULAR',
                     'value' => (string) ($cleanData['invoice_type'] ?? ''),
-                    'error' => "Nilai DSA/NPS FL harus bernilai 'DSA' atau 'NPS FL'.",
+                    'error' => "Nilai tipe invoice harus bernilai 'DSA', 'NPS FL', atau 'REGULAR'.",
                 ];
             }
 
@@ -226,7 +233,7 @@ class DraftImportService
                 $diff = round(abs($excelVal - $systemVal), 2);
                 $isMatch = ($diff < 1.0);
 
-                if (!$isMatch && $excelVal > 0) {
+                if (! $isMatch && $excelVal > 0) {
                     $hasDiff = true;
                 }
 
@@ -243,7 +250,7 @@ class DraftImportService
             }
 
             // Determine status
-            if (!empty($rowErrors)) {
+            if (! empty($rowErrors)) {
                 $cleanData['status'] = 'error';
                 $failedCount++;
                 foreach ($rowErrors as $err) {
@@ -255,7 +262,7 @@ class DraftImportService
             }
 
             $cleanData['validation_notes'] = [
-                'is_matched' => !$hasDiff,
+                'is_matched' => ! $hasDiff,
                 'comparison' => $comparison,
                 'calculated' => $calcResult,
                 'errors' => $rowErrors,
@@ -273,7 +280,7 @@ class DraftImportService
                     'row' => $excelRowNumber,
                     'field' => 'Database',
                     'value' => '',
-                    'error' => 'Gagal menyimpan ke database: ' . $e->getMessage(),
+                    'error' => 'Gagal menyimpan ke database: '.$e->getMessage(),
                 ];
             }
         }
@@ -305,7 +312,9 @@ class DraftImportService
 
             foreach ($candidate as $colIndex => $cellValue) {
                 $normalized = $this->normalizeString((string) $cellValue);
-                if (empty($normalized)) continue;
+                if (empty($normalized)) {
+                    continue;
+                }
 
                 foreach ($this->aliases as $field => $aliasList) {
                     if (in_array($normalized, $aliasList, true)) {
@@ -335,12 +344,14 @@ class DraftImportService
      */
     protected function isNumberingRow(array $rowData): bool
     {
-        $nonEmpty = array_values(array_filter($rowData, fn($v) => !is_null($v) && trim((string)$v) !== ''));
-        if (count($nonEmpty) < 3) return false;
+        $nonEmpty = array_values(array_filter($rowData, fn ($v) => ! is_null($v) && trim((string) $v) !== ''));
+        if (count($nonEmpty) < 3) {
+            return false;
+        }
 
         $numericCount = 0;
         foreach ($nonEmpty as $val) {
-            if (is_numeric(trim((string)$val))) {
+            if (is_numeric(trim((string) $val))) {
                 $numericCount++;
             }
         }
@@ -357,6 +368,7 @@ class DraftImportService
         // Replace non-breaking spaces and line breaks with regular space
         $clean = str_replace(["\xc2\xa0", "\xa0", "\r\n", "\n", "\r", "\t"], ' ', $val);
         $clean = preg_replace('/\s+/', ' ', $clean);
+
         return strtolower(trim($clean));
     }
 
@@ -371,16 +383,20 @@ class DraftImportService
         $stringFields = [
             'no', 'region', 'rsm', 'dealer_code', 'kode_bt', 'customer_name',
             'dealer_name', 'npwp', 'npwp_name', 'npwp_type', 'pph_type',
-            'item_code', 'item_name', 'address', 'email', 'program_name',
-            'program_period', 'cn_number', 'ref_note', 'invoice_type'
+            'item_code', 'item_name', 'address', 'email', 'whatsapp', 'program_name',
+            'program_period', 'cn_number', 'ref_note', 'invoice_type',
         ];
 
         foreach ($stringFields as $f) {
             $val = $data[$f] ?? null;
-            if (!is_null($val)) {
+            if (! is_null($val)) {
                 $trimmed = trim((string) $val);
                 if (in_array(strtoupper($trimmed), ['#N/A', '#VALUE!', '#REF!', '#NAME?', 'NULL', 'N/A'])) {
                     $clean[$f] = null;
+                } elseif ($f === 'whatsapp') {
+                    // Clean phone number: remove spaces, dashes, parentheses
+                    $cleanedPhone = preg_replace('/[^\d+]/', '', $trimmed);
+                    $clean[$f] = ! empty($cleanedPhone) ? $cleanedPhone : null;
                 } else {
                     $clean[$f] = $trimmed;
                 }
@@ -391,7 +407,7 @@ class DraftImportService
 
         // Numeric fields
         $numericFields = [
-            'real_qty', 'support_amount', 'dpp', 'dpp_lain', 'ppn', 'pph', 'netpay'
+            'real_qty', 'support_amount', 'dpp', 'dpp_lain', 'ppn', 'pph', 'netpay',
         ];
 
         foreach ($numericFields as $f) {
@@ -404,7 +420,7 @@ class DraftImportService
 
         // Invoice Date handling
         $dateVal = $data['invoice_date'] ?? null;
-        if (!empty($dateVal)) {
+        if (! empty($dateVal)) {
             if (is_numeric($dateVal)) {
                 try {
                     $clean['invoice_date'] = Carbon::instance(ExcelDate::excelToDateTimeObject($dateVal))->format('Y-m-d');

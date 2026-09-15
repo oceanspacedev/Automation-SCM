@@ -27,10 +27,10 @@ class DraftController extends Controller
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('dealer_code', 'like', "%{$search}%")
-                  ->orWhere('dealer_name', 'like', "%{$search}%")
-                  ->orWhere('customer_name', 'like', "%{$search}%")
-                  ->orWhere('cn_number', 'like', "%{$search}%")
-                  ->orWhere('program_name', 'like', "%{$search}%");
+                    ->orWhere('dealer_name', 'like', "%{$search}%")
+                    ->orWhere('customer_name', 'like', "%{$search}%")
+                    ->orWhere('cn_number', 'like', "%{$search}%")
+                    ->orWhere('program_name', 'like', "%{$search}%");
             });
         }
 
@@ -48,7 +48,7 @@ class DraftController extends Controller
         if ($dealer = $request->input('dealer')) {
             $query->where(function ($q) use ($dealer) {
                 $q->where('dealer_code', $dealer)
-                  ->orWhere('dealer_name', 'like', "%{$dealer}%");
+                    ->orWhere('dealer_name', 'like', "%{$dealer}%");
             });
         }
 
@@ -107,7 +107,7 @@ class DraftController extends Controller
 
         // If invoice_type is invalid, keep error
         $invType = strtoupper(trim((string) $draft->invoice_type));
-        if ($invType !== 'DSA' && $invType !== 'NPS FL') {
+        if (! in_array($invType, ['DSA', 'NPS FL', 'REGULAR', 'REGULER'], true)) {
             $draft->status = 'error';
         } elseif ($draft->status !== 'invoiced') {
             $draft->status = 'ready';

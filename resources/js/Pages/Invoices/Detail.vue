@@ -16,36 +16,54 @@
       <div class="flex items-center space-x-2">
         <!-- Already Sent Status Badge -->
         <span
-          v-if="invoice.status === 'sent' || invoice.email_sent_at"
+          v-if="invoice.status === 'sent' && invoice.email_sent_at && invoice.whatsapp_sent_at"
           class="h-9 px-3.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
-          title="Invoice ini sudah pernah dikirim dan tidak dapat dikirim ulang"
+          title="Invoice ini sudah dikirim ke Email dan WhatsApp"
         >
           <CheckCircleIcon class="h-4 w-4 text-emerald-600" />
-          <span>Email Sudah Terkirim</span>
+          <span>Email & WA Terkirim</span>
         </span>
 
-        <!-- 1-Click Send if email exists and not sent yet -->
+        <span
+          v-else-if="invoice.email_sent_at && !invoice.whatsapp_sent_at"
+          class="h-9 px-3.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          title="Email sudah terkirim"
+        >
+          <CheckCircleIcon class="h-4 w-4 text-emerald-600" />
+          <span>Email Terkirim</span>
+        </span>
+
+        <span
+          v-else-if="!invoice.email_sent_at && invoice.whatsapp_sent_at"
+          class="h-9 px-3.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          title="WhatsApp sudah terkirim"
+        >
+          <CheckCircleIcon class="h-4 w-4 text-emerald-600" />
+          <span>WA Terkirim</span>
+        </span>
+
+        <!-- 1-Click Send if destination exists and not completely sent -->
         <button
-          v-else-if="invoice.email || invoice.draft?.email"
+          v-if="!(invoice.email_sent_at && invoice.whatsapp_sent_at) && (invoice.email || invoice.draft?.email || invoice.whatsapp || invoice.draft?.whatsapp)"
           @click="quickSend"
           :disabled="quickSending"
           class="h-9 px-3.5 bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
-          :title="`Kirim langsung ke ${invoice.email || invoice.draft?.email}`"
+          title="Kirim notifikasi langsung ke Email & WhatsApp yang tersedia"
         >
           <span v-if="quickSending" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-          <MailIcon v-else class="h-4 w-4" />
-          <span>{{ quickSending ? 'Mengirim...' : `Kirim ke ${invoice.email || invoice.draft?.email}` }}</span>
+          <SendIcon v-else class="w-4 h-4" />
+          <span>{{ quickSending ? 'Mengirim...' : 'Kirim Notifikasi' }}</span>
         </button>
 
-        <!-- Manual or Change Email if not sent yet -->
+        <!-- Manual or Customize Destination -->
         <button
-          v-if="!invoice.status && !invoice.email_sent_at || (invoice.status !== 'sent' && !invoice.email_sent_at)"
+          v-if="!(invoice.email_sent_at && invoice.whatsapp_sent_at)"
           @click="showEmailModal = true"
           class="h-9 px-3 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5 cursor-pointer"
-          :title="(invoice.email || invoice.draft?.email) ? 'Kirim ke email lain' : 'Kirim Email'"
+          title="Sesuaikan Email / Nomor WhatsApp dan kirim"
         >
-          <MailIcon v-if="!invoice.email && !invoice.draft?.email" class="h-4 w-4" />
-          <span>{{ (invoice.email || invoice.draft?.email) ? 'Kirim ke Email Lain' : 'Kirim Email' }}</span>
+          <SendIcon class="w-4 h-4" />
+          <span>{{ (invoice.email || invoice.draft?.email || invoice.whatsapp || invoice.draft?.whatsapp) ? 'Kirim ke Tujuan Lain' : 'Kirim Notifikasi' }}</span>
         </button>
 
         <a
@@ -74,12 +92,13 @@
       </AlertDescription>
     </Alert>
 
-    <!-- Send Email Modal -->
+    <!-- Send Email / WA Modal -->
     <SendEmailModal
       v-model="showEmailModal"
       :invoice-id="invoice.id"
       :invoice-number="invoice.invoice_number"
       :default-email="invoice.email || invoice.draft?.email"
+      :default-whatsapp="invoice.whatsapp || invoice.draft?.whatsapp"
       @sent="onEmailSent"
     />
 
@@ -116,6 +135,10 @@
               <tr>
                 <td class="py-1 text-gray-500">Email</td>
                 <td class="py-1 text-gray-900 font-medium">{{ invoice.email || invoice.draft?.email || '-' }}</td>
+              </tr>
+              <tr>
+                <td class="py-1 text-gray-500">WhatsApp</td>
+                <td class="py-1 text-gray-900 font-medium">{{ invoice.whatsapp || invoice.draft?.whatsapp || '-' }}</td>
               </tr>
             </tbody>
           </table>
@@ -240,7 +263,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import axios from 'axios';
-import { MailIcon, CheckCircle as CheckCircleIcon, AlertCircle as AlertCircleIcon } from '@lucide/vue';
+import { Send as SendIcon, CheckCircle as CheckCircleIcon, AlertCircle as AlertCircleIcon } from '@lucide/vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import SendEmailModal from '@/components/SendEmailModal.vue';
 import {
@@ -275,13 +298,14 @@ const fetchInvoice = async () => {
 
 const onEmailSent = (payload) => {
   alertSuccess.value = true;
-  alertMessage.value = `Invoice berhasil dikirim ke ${payload.email}`;
+  alertMessage.value = 'Notifikasi invoice berhasil dikirim!';
   invoice.value.status = 'sent';
-  invoice.value.email_sent_at = new Date().toISOString();
+  if (payload.email) invoice.value.email_sent_at = new Date().toISOString();
+  if (payload.whatsapp) invoice.value.whatsapp_sent_at = new Date().toISOString();
 };
 
 const quickSend = async () => {
-  if (quickSending.value || invoice.value.status === 'sent' || invoice.value.email_sent_at) return;
+  if (quickSending.value || (invoice.value.email_sent_at && invoice.value.whatsapp_sent_at)) return;
   quickSending.value = true;
   alertMessage.value = null;
 
@@ -290,10 +314,11 @@ const quickSend = async () => {
     alertSuccess.value = true;
     alertMessage.value = res.data.message;
     invoice.value.status = 'sent';
-    invoice.value.email_sent_at = new Date().toISOString();
+    if (invoice.value.email || invoice.value.draft?.email) invoice.value.email_sent_at = new Date().toISOString();
+    if (invoice.value.whatsapp || invoice.value.draft?.whatsapp) invoice.value.whatsapp_sent_at = new Date().toISOString();
   } catch (err) {
     alertSuccess.value = false;
-    alertMessage.value = err.response?.data?.message || 'Gagal mengirim email';
+    alertMessage.value = err.response?.data?.message || 'Gagal mengirim notifikasi invoice';
   } finally {
     quickSending.value = false;
   }

@@ -14,40 +14,71 @@
           <!-- Header -->
           <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <div class="flex items-center gap-3">
-              <div class="flex items-center justify-center w-9 h-9 rounded-full bg-gray-100">
-                <MailIcon class="w-4.5 h-4.5 text-gray-700" />
+              <div class="flex items-center justify-center w-9 h-9 rounded-full bg-blue-50 text-blue-600">
+                <SendIcon class="w-4.5 h-4.5" />
               </div>
               <div>
-                <h3 class="text-sm font-semibold text-gray-900">Kirim Invoice via Email</h3>
-                <p class="text-xs text-gray-500">{{ invoiceNumber }}</p>
+                <h3 class="text-sm font-semibold text-gray-900">Kirim Notifikasi Invoice</h3>
+                <p class="text-xs text-gray-500">{{ invoiceNumber }} (Email & WhatsApp)</p>
               </div>
             </div>
             <button
               @click="close"
-              class="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
+              class="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition cursor-pointer"
             >
               <XIcon class="w-4 h-4" />
             </button>
           </div>
 
           <!-- Body -->
-          <div class="px-6 py-5">
-            <div class="flex items-center justify-between mb-1.5">
-              <label class="block text-sm font-medium text-gray-700">
-                Alamat Email Tujuan
-              </label>
-              <span v-if="defaultEmail" class="text-[11px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                Otomatis dari Draft
-              </span>
+          <div class="px-6 py-5 space-y-4">
+            <!-- Email Input -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-gray-600">
+                  Alamat Email Tujuan
+                </label>
+                <span v-if="defaultEmail && email === defaultEmail" class="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                  Otomatis dari Draft
+                </span>
+              </div>
+              <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                  <MailIcon class="w-4 h-4" />
+                </div>
+                <input
+                  v-model="email"
+                  type="email"
+                  placeholder="contoh@dealer.com"
+                  :disabled="loading"
+                  class="w-full h-10 pl-9 pr-3 rounded-lg border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-gray-400 transition disabled:opacity-50 disabled:bg-gray-50"
+                />
+              </div>
             </div>
-            <input
-              v-model="email"
-              type="email"
-              placeholder="contoh@email.com"
-              :disabled="loading"
-              @keyup.enter="send"
-              class="w-full h-10 px-3 rounded-lg border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-gray-400 transition disabled:opacity-50 disabled:bg-gray-50"
-            />
+
+            <!-- WhatsApp Input -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="block text-xs font-semibold uppercase tracking-wider text-gray-600">
+                  Nomor WhatsApp Tujuan
+                </label>
+                <span v-if="defaultWhatsapp && whatsapp === defaultWhatsapp" class="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                  Otomatis dari Draft
+                </span>
+              </div>
+              <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-emerald-600 font-semibold text-xs">
+                  WA
+                </div>
+                <input
+                  v-model="whatsapp"
+                  type="text"
+                  placeholder="081234567890 / 6281234567890"
+                  :disabled="loading"
+                  class="w-full h-10 pl-9 pr-3 rounded-lg border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-black/10 focus:border-gray-400 transition disabled:opacity-50 disabled:bg-gray-50"
+                />
+              </div>
+            </div>
 
             <!-- Error -->
             <Alert v-if="error" variant="destructive" class="mt-2 py-2">
@@ -57,13 +88,13 @@
 
             <!-- Success -->
             <Alert v-if="success" class="mt-3">
-              <CheckCircleIcon class="h-4 w-4" />
-              <AlertDescription>{{ success }}</AlertDescription>
+              <CheckCircleIcon class="h-4 w-4 text-emerald-600" />
+              <AlertDescription class="text-emerald-700 font-medium">{{ success }}</AlertDescription>
             </Alert>
 
             <!-- Info hint -->
-            <p v-if="!success" class="mt-2.5 text-xs text-gray-400">
-              Invoice PDF akan dilampirkan secara otomatis di email.
+            <p v-if="!success" class="mt-2 text-xs text-gray-400 leading-relaxed">
+              Notifikasi akan dikirimkan ke Email dan WhatsApp sekaligus. PDF invoice terlampir pada email dan link unduh PDF disertakan pada pesan WhatsApp.
             </p>
           </div>
 
@@ -72,18 +103,19 @@
             <button
               @click="close"
               :disabled="loading"
-              class="h-9 px-4 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50"
+              class="h-9 px-4 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50 cursor-pointer"
             >
-              Batal
+              {{ success ? 'Tutup' : 'Batal' }}
             </button>
             <button
+              v-if="!success"
               @click="send"
-              :disabled="loading || !email || !!success"
-              class="h-9 px-5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2 shadow-sm"
+              :disabled="loading || (!email && !whatsapp)"
+              class="h-9 px-5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2 shadow-sm cursor-pointer"
             >
               <span v-if="loading" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               <SendIcon v-else class="w-4 h-4" />
-              {{ loading ? 'Mengirim...' : 'Kirim Email' }}
+              {{ loading ? 'Mengirim...' : 'Kirim Notifikasi' }}
             </button>
           </div>
         </div>
@@ -103,11 +135,13 @@ const props = defineProps({
   invoiceId: [String, Number],
   invoiceNumber: String,
   defaultEmail: String,
+  defaultWhatsapp: String,
 });
 
 const emit = defineEmits(['update:modelValue', 'sent']);
 
 const email = ref('');
+const whatsapp = ref('');
 const loading = ref(false);
 const error = ref('');
 const success = ref('');
@@ -116,6 +150,7 @@ const success = ref('');
 watch(() => props.modelValue, (val) => {
   if (val) {
     email.value = props.defaultEmail || '';
+    whatsapp.value = props.defaultWhatsapp || '';
     error.value = '';
     success.value = '';
   }
@@ -127,31 +162,44 @@ watch(() => props.defaultEmail, (val) => {
   }
 });
 
+watch(() => props.defaultWhatsapp, (val) => {
+  if (props.modelValue && val) {
+    whatsapp.value = val;
+  }
+});
+
 const close = () => {
   if (loading.value) return;
   emit('update:modelValue', false);
 };
 
 const send = async () => {
-  if (!email.value || loading.value || success.value) return;
+  if ((!email.value && !whatsapp.value) || loading.value || success.value) return;
 
   error.value = '';
   loading.value = true;
 
   try {
     const res = await axios.post(`/api/invoices/${props.invoiceId}/send-email`, {
-      email: email.value,
+      email: email.value || null,
+      whatsapp: whatsapp.value || null,
     });
 
     success.value = res.data.message;
-    emit('sent', { invoiceId: props.invoiceId, email: email.value });
+    emit('sent', {
+      invoiceId: props.invoiceId,
+      email: email.value,
+      whatsapp: whatsapp.value,
+    });
   } catch (err) {
     if (err.response?.data?.errors?.email) {
       error.value = err.response.data.errors.email[0];
+    } else if (err.response?.data?.errors?.whatsapp) {
+      error.value = err.response.data.errors.whatsapp[0];
     } else if (err.response?.data?.message) {
       error.value = err.response.data.message;
     } else {
-      error.value = 'Gagal mengirim email. Silakan coba lagi.';
+      error.value = 'Gagal mengirim notifikasi invoice. Silakan coba lagi.';
     }
   } finally {
     loading.value = false;

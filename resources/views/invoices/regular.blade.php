@@ -102,6 +102,9 @@
             text-align: right;
             width: 40%;
         }
+        .sum-bold td {
+            font-weight: bold;
+        }
         .terbilang-bar {
             font-style: italic;
             font-size: 10px;
@@ -174,11 +177,6 @@
                         <td style="text-align: left; padding-right: 4px; white-space: nowrap;">Tanggal Invoice</td>
                         <td style="text-align: center; width: 14px; white-space: nowrap;">:</td>
                         <td style="text-align: left; padding-left: 4px; white-space: nowrap;">{{ $invoice->invoice_date ?? date('d/m/Y') }}</td>
-                    </tr>
-                    <tr>
-                        <td style="text-align: left; padding-right: 4px; white-space: nowrap;">Nama NPS FL</td>
-                        <td style="text-align: center; width: 14px; white-space: nowrap;">:</td>
-                        <td style="text-align: left; padding-left: 4px; white-space: nowrap;">{{ $invoice->rsm ?? $invoice->draft?->rsm ?? '-' }}</td>
                     </tr>
                 </table>
             </td>

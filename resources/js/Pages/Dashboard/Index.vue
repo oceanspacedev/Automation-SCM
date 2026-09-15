@@ -46,6 +46,10 @@
               <td class="px-4 py-3 font-medium text-gray-600">Invoice Tipe NPS FL</td>
               <td class="px-4 py-3 text-gray-800">{{ metrics.invoice_nps_fl ?? 0 }}</td>
             </tr>
+            <tr>
+              <td class="px-4 py-3 font-medium text-gray-600">Invoice Tipe REGULAR</td>
+              <td class="px-4 py-3 text-gray-800">{{ metrics.invoice_regular ?? 0 }}</td>
+            </tr>
             <tr class="bg-gray-50 font-semibold">
               <td class="px-4 py-3 text-gray-900">Total Netpay Invoice</td>
               <td class="px-4 py-3 text-black text-base">
