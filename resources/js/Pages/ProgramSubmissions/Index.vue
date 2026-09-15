@@ -33,15 +33,6 @@
 
         <button
           type="button"
-          @click="showSetupModal = true"
-          class="h-9 px-3.5 inline-flex items-center justify-center rounded-md border border-gray-200 bg-white text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
-          title="Pengaturan Google Script & Webhook"
-        >
-          Pengaturan & Script
-        </button>
-
-        <button
-          type="button"
           @click="triggerSync"
           :disabled="isSyncing"
           class="h-9 px-3.5 inline-flex items-center justify-center rounded-md border border-gray-200 bg-white text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50 transition shadow-2xs cursor-pointer"
@@ -272,106 +263,6 @@
         </div>
       </div>
     </div>
-
-    <!-- Modal Panduan & Pengaturan Google Apps Script -->
-    <div
-      v-if="showSetupModal"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs"
-    >
-      <div class="bg-white rounded-xl border border-gray-200 shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
-        <!-- Modal Header -->
-        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-          <div>
-            <h2 class="text-base font-bold text-gray-900">Pengaturan Google Apps Script & Webhook</h2>
-            <p class="text-xs text-gray-500">
-              Menghubungkan data spreadsheet yang dibatasi (restricted) agar dapat terbaca di web aplikasi.
-            </p>
-          </div>
-          <button
-            @click="showSetupModal = false"
-            class="w-7 h-7 rounded-lg hover:bg-gray-200 flex items-center justify-center text-gray-400 hover:text-gray-700 transition cursor-pointer"
-          >
-            <XIcon class="w-4 h-4" />
-          </button>
-        </div>
-
-        <!-- Modal Body -->
-        <div class="p-6 overflow-y-auto space-y-4 text-xs text-gray-700">
-          <!-- Step 1: Input Web App URL -->
-          <div class="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-2.5">
-            <label class="block font-semibold text-gray-900">
-              1. URL Google Apps Script Web App:
-            </label>
-            <div class="flex gap-2">
-              <input
-                v-model="configUrlInput"
-                type="url"
-                placeholder="https://script.google.com/macros/s/.../exec"
-                class="h-9 flex-1 px-3 rounded-md border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:ring-1 focus:ring-black"
-              />
-              <button
-                type="button"
-                @click="saveConfigAndSync"
-                :disabled="isSavingConfig || !configUrlInput"
-                class="px-4 h-9 rounded-md bg-black text-white text-xs font-medium hover:bg-neutral-800 disabled:opacity-50 transition cursor-pointer"
-              >
-                {{ isSavingConfig ? 'Menyimpan...' : 'Simpan & Sinkronkan' }}
-              </button>
-            </div>
-            <p class="text-[11px] text-gray-500">
-              URL ini dihasilkan setelah Anda menerapkan (Deploy) script di bawah sebagai Web App di akun Google Anda.
-            </p>
-          </div>
-
-          <!-- Step 2: Panduan Script -->
-          <div class="space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="font-semibold text-gray-900">2. Kode Google Apps Script (Siap Salin):</span>
-              <button
-                type="button"
-                @click="copyScriptCode"
-                class="inline-flex items-center gap-1 text-[11px] font-medium text-blue-700 hover:text-blue-900 cursor-pointer"
-              >
-                <CheckIcon v-if="copied" class="w-3.5 h-3.5 text-emerald-600" />
-                <CopyIcon v-else class="w-3.5 h-3.5" />
-                <span>{{ copied ? 'Tersalin ke Clipboard!' : 'Salin Kode Script' }}</span>
-              </button>
-            </div>
-
-            <pre class="p-3 rounded-lg bg-gray-900 text-gray-100 font-mono text-[11px] overflow-x-auto leading-relaxed border border-gray-800 max-h-56"><code>{{ scriptCode }}</code></pre>
-          </div>
-
-          <!-- Step 3: Langkah Penerapan -->
-          <div class="space-y-1.5 text-gray-600">
-            <div class="font-semibold text-gray-900">3. Cara Pasang di Google Spreadsheet:</div>
-            <ol class="list-decimal list-inside space-y-1 pl-1">
-              <li>Buka spreadsheet Google Form Anda.</li>
-              <li>Klik menu <strong>Ekstensi (Extensions)</strong> > <strong>Apps Script</strong>.</li>
-              <li>Hapus teks di editor, lalu tempel kode script di atas.</li>
-              <li>Klik tombol biru <strong>Deploy (Terapkan)</strong> > <strong>New deployment (Deployment baru)</strong>.</li>
-              <li>Pilih jenis <strong>Web app (Aplikasi Web)</strong>:
-                <ul class="list-disc list-inside pl-4 mt-0.5 text-gray-500">
-                  <li><em>Execute as</em>: <strong>Me (Saya)</strong></li>
-                  <li><em>Who has access</em>: <strong>Anyone (Siapa saja)</strong></li>
-                </ul>
-              </li>
-              <li>Klik <strong>Deploy</strong>, lalu salin URL Web App yang muncul ke kotak input di atas.</li>
-            </ol>
-          </div>
-        </div>
-
-        <!-- Modal Footer -->
-        <div class="px-6 py-3 border-t border-gray-100 bg-gray-50/50 flex justify-end">
-          <button
-            type="button"
-            @click="showSetupModal = false"
-            class="px-4 py-2 rounded-md border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition cursor-pointer"
-          >
-            Tutup
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -382,13 +273,8 @@ import {
   Search as SearchIcon,
   RefreshCw as RefreshCwIcon,
   ExternalLink as ExternalLinkIcon,
-  Settings as SettingsIcon,
   AlertCircle as AlertCircleIcon,
   CheckCircle as CheckCircleIcon,
-  FileText as FileTextIcon,
-  Copy as CopyIcon,
-  Check as CheckIcon,
-  X as XIcon,
 } from 'lucide-vue-next';
 import {
   Table,
@@ -410,10 +296,8 @@ const syncMessage = ref('');
 const syncError = ref(false);
 const autoRefresh = ref(true);
 const lastUpdatedText = ref('');
-const showSetupModal = ref(false);
-const configUrlInput = ref('');
-const isSavingConfig = ref(false);
-const copied = ref(false);
+const DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxzjxTieMwGCiviO05imy29rgiWzeDvgW8Pq6hmzzqPEduWCiVrCn-7G5gyCn1n4-c3sQ/exec';
+const configUrlInput = ref(DEFAULT_WEBAPP_URL);
 
 const filters = reactive({
   search: '',
@@ -429,60 +313,6 @@ const pagination = reactive({
 
 let debounceTimer = null;
 let pollTimer = null;
-
-const scriptCode = `function doGet(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName("Form Responses 1") || ss.getActiveSheet();
-  var lastRow = sheet.getLastRow();
-  var lastCol = sheet.getLastColumn();
-  
-  if (lastRow < 2) {
-    return ContentService.createTextOutput(JSON.stringify({
-      success: true,
-      total: 0,
-      rows: []
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-  
-  var header = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  var limit = e && e.parameter && e.parameter.limit ? parseInt(e.parameter.limit) : 0;
-  
-  var dataRows;
-  // Jika diminta data terbaru (limit), ambil hanya baris paling akhir agar respon sangat cepat (< 1 detik)
-  if (limit > 0 && lastRow > 1) {
-    var startRow = Math.max(2, lastRow - limit + 1);
-    var numRows = lastRow - startRow + 1;
-    dataRows = sheet.getRange(startRow, 1, numRows, lastCol).getValues();
-  } else {
-    dataRows = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
-  }
-  
-  var allRows = [header].concat(dataRows);
-  
-  return ContentService.createTextOutput(JSON.stringify({
-    success: true,
-    total: lastRow - 1,
-    rows: allRows
-  })).setMimeType(ContentService.MimeType.JSON);
-}
-
-function onFormSubmit(e) {
-  // Masukkan domain web publik / tunnel Anda di sini untuk push instan
-  var webhookUrl = "${window.location.origin}/api/webhooks/form-program";
-  if (!webhookUrl || webhookUrl.indexOf("http") !== 0 || webhookUrl.indexOf("localhost") !== -1) return;
-  
-  var payload = {
-    values: e ? e.values : null,
-    namedValues: e ? e.namedValues : null
-  };
-  
-  UrlFetchApp.fetch(webhookUrl, {
-    method: "post",
-    contentType: "application/json",
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  });
-}`;
 
 const isValidUrl = (url) => {
   if (!url) return false;
@@ -575,7 +405,7 @@ const triggerSync = async () => {
   syncError.value = false;
   try {
     const res = await axios.post('/api/program-submissions/sync', {
-      url: configUrlInput.value,
+      url: configUrlInput.value || DEFAULT_WEBAPP_URL,
     });
     syncMessage.value = res.data.message || 'Sinkronisasi berhasil.';
     syncError.value = false;
@@ -586,31 +416,6 @@ const triggerSync = async () => {
   } finally {
     isSyncing.value = false;
   }
-};
-
-const saveConfigAndSync = async () => {
-  if (!configUrlInput.value) return;
-  isSavingConfig.value = true;
-  try {
-    await axios.post('/api/program-submissions/config', {
-      url: configUrlInput.value,
-    });
-    await triggerSync();
-    showSetupModal.value = false;
-  } catch (err) {
-    syncError.value = true;
-    syncMessage.value = err.response?.data?.message || 'Gagal menyimpan URL Google Apps Script.';
-  } finally {
-    isSavingConfig.value = false;
-  }
-};
-
-const copyScriptCode = () => {
-  navigator.clipboard.writeText(scriptCode);
-  copied.value = true;
-  setTimeout(() => {
-    copied.value = false;
-  }, 2500);
 };
 
 let isAutoSyncing = false;

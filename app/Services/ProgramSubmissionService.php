@@ -11,12 +11,20 @@ class ProgramSubmissionService
 {
     public const CACHE_KEY_WEBAPP_URL = 'google_sheet_webapp_url';
 
+    public const DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxzjxTieMwGCiviO05imy29rgiWzeDvgW8Pq6hmzzqPEduWCiVrCn-7G5gyCn1n4-c3sQ/exec';
+
     /**
      * Get configured Google Apps Script Web App URL.
      */
     public function getWebAppUrl(): string
     {
-        return (string) Cache::get(self::CACHE_KEY_WEBAPP_URL, env('GOOGLE_SHEET_WEBAPP_URL', ''));
+        $url = (string) Cache::get(self::CACHE_KEY_WEBAPP_URL, env('GOOGLE_SHEET_WEBAPP_URL', ''));
+
+        if (! empty($url)) {
+            return $url;
+        }
+
+        return self::DEFAULT_WEBAPP_URL;
     }
 
     /**
