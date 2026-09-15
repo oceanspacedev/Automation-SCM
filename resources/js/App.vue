@@ -8,16 +8,13 @@
       <div class="w-full mx-auto px-4 sm:px-6">
         <div class="flex justify-between items-center h-16">
           <div class="flex items-center space-x-6">
-            <!-- Brand with SCM Logo -->
-            <router-link to="/dashboard" class="flex items-center gap-2.5 group mr-2">
+            <!-- Brand with SCM Logo (Besar & Tanpa Teks SCM Tambahan) -->
+            <router-link to="/dashboard" class="flex items-center group mr-3" title="SCM - Supply Chain Management">
               <img
                 src="/images/scm-logo.png"
-                alt="SCM Logo"
-                class="h-9 w-9 rounded-lg object-contain shadow-2xs border border-gray-100 group-hover:scale-105 transition"
+                alt="SCM Supply Chain Management"
+                class="h-11 w-auto max-w-[130px] object-contain group-hover:scale-105 transition"
               />
-              <span class="font-bold text-lg tracking-tight text-gray-900">
-                SCM
-              </span>
             </router-link>
 
             <!-- Shadcn-Vue NavigationMenu (Direct Links without Sub-menu) -->
@@ -79,6 +76,21 @@
                       ]"
                     >
                       Riwayat Email
+                    </router-link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+
+                <!-- 5. Form Program -->
+                <NavigationMenuItem>
+                  <NavigationMenuLink as-child>
+                    <router-link
+                      to="/form-program"
+                      :class="[
+                        navigationMenuTriggerStyle(),
+                        isActive('/form-program') && 'bg-gray-100 text-gray-900 font-semibold'
+                      ]"
+                    >
+                      Form Program
                     </router-link>
                   </NavigationMenuLink>
                 </NavigationMenuItem>

@@ -85,7 +85,7 @@
               type="button"
               @click="handleConfirm"
               :disabled="loading || !selectedKey"
-              class="h-8.5 px-4 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 shadow-2xs"
+              class="h-8.5 px-4 rounded-lg bg-[#1D70F5] text-white text-xs font-medium hover:bg-blue-600 transition cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5 shadow-2xs"
             >
               <svg v-if="loading" class="animate-spin -ml-0.5 mr-1 h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

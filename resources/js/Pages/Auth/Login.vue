@@ -5,12 +5,9 @@
       <div class="text-center space-y-2">
         <img
           src="/images/scm-logo.png"
-          alt="SCM Logo"
-          class="h-12 w-12 mx-auto rounded-xl object-contain border border-neutral-200 shadow-2xs"
+          alt="SCM Supply Chain Management"
+          class="h-16 w-auto max-w-[160px] mx-auto object-contain"
         />
-        <div class="text-xs font-semibold tracking-widest text-neutral-400 uppercase">
-          SCM
-        </div>
         <h1 class="text-2xl font-bold tracking-tight text-neutral-900">
           Masuk ke Akun
         </h1>

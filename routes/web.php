@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DraftController;
 use App\Http\Controllers\DraftImportController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\ProgramSubmissionController;
 use Illuminate\Support\Facades\Route;
 
 // Invoice preview & PDF download
@@ -39,6 +40,12 @@ Route::prefix('api')->group(function () {
     Route::post('/invoices/{id}/quick-send-email', [InvoiceController::class, 'quickSendEmail']);
     Route::get('/email-logs', [InvoiceController::class, 'emailLogs']);
     Route::get('/whatsapp-logs', [InvoiceController::class, 'whatsAppLogs']);
+
+    // Program Submissions (Google Sheets / Form REALME)
+    Route::get('/program-submissions', [ProgramSubmissionController::class, 'index']);
+    Route::post('/program-submissions/sync', [ProgramSubmissionController::class, 'sync']);
+    Route::post('/program-submissions/config', [ProgramSubmissionController::class, 'saveConfig']);
+    Route::post('/webhooks/form-program', [ProgramSubmissionController::class, 'webhook']);
 });
 
 // SPA catch-all

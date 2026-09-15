@@ -43,10 +43,9 @@ class WhatsAppService
         }
 
         $uuid = Str::uuid()->toString();
-        $messageText = mb_substr($this->buildInvoiceMessage($invoice), 0, 950);
-
         $pdfUrl = $this->resolvePublicPdfUrl($invoice);
         $filename = "Invoice_{$invoice->invoice_number}.pdf";
+        $messageText = mb_substr($this->buildInvoiceMessage($invoice, $pdfUrl), 0, 950);
 
         $payload = [
             'idempotency_key' => $uuid,
@@ -175,13 +174,15 @@ class WhatsAppService
     /**
      * Build formatted Indonesian WhatsApp message for an invoice.
      */
-    public function buildInvoiceMessage(Invoice $invoice): string
+    public function buildInvoiceMessage(Invoice $invoice, ?string $pdfUrl = null): string
     {
         $recipientName = $invoice->customer_name ?: $invoice->dealer_name;
         $dppFormatted = number_format((float) $invoice->dpp, 0, '.', ',');
         $netpayFormatted = number_format((float) $invoice->netpay, 0, '.', ',');
-        $baseUrl = rtrim(config('services.wag.public_url', config('app.url')), '/');
-        $pdfUrl = $baseUrl."/invoices/{$invoice->id}/pdf";
+
+        if (empty($pdfUrl)) {
+            $pdfUrl = $this->resolvePublicPdfUrl($invoice);
+        }
 
         $lines = [
             '*INVOICE PEMBAYARAN - SCM*',
@@ -245,7 +246,7 @@ class WhatsAppService
             return rtrim($appUrl, '/')."/invoices/{$invoice->id}/pdf";
         }
 
-        // 3. For local development, mirror the PDF to a temporary public host so WAGHub can fetch it
+        // 3. For local development, mirror the PDF to a temporary public host so WAGHub can fetch the direct binary
         $mirrorUrl = $this->uploadToTemporaryPublicMirror($invoice);
         if (! empty($mirrorUrl)) {
             return $mirrorUrl;
@@ -273,16 +274,45 @@ class WhatsAppService
                 $pdfContent = $pdf->output();
             }
 
-            if (! empty($pdfContent)) {
-                $filename = "Invoice_{$invoice->invoice_number}.pdf";
+            if (empty($pdfContent)) {
+                return null;
+            }
+
+            $filename = "Invoice_{$invoice->invoice_number}.pdf";
+
+            // 1. Primary: Litterbox (Catbox.moe) - 72h retention, direct raw PDF binary stream
+            try {
+                $response = Http::withoutVerifying()
+                    ->timeout(15)
+                    ->attach('fileToUpload', $pdfContent, $filename)
+                    ->post('https://litterbox.catbox.moe/resources/internals/api.php', [
+                        'reqtype' => 'fileupload',
+                        'time' => '72h',
+                    ]);
+
+                $url = trim($response->body());
+                if ($response->successful() && str_starts_with($url, 'http')) {
+                    return $url;
+                }
+            } catch (Exception $e) {
+                Log::warning("Litterbox mirror gagal: {$e->getMessage()}");
+            }
+
+            // 2. Fallback: tmpfiles.org with regex-extracted direct download link
+            try {
                 $response = Http::withoutVerifying()
                     ->timeout(15)
                     ->attach('file', $pdfContent, $filename)
                     ->post('https://tmpfiles.org/api/v1/upload');
 
                 if ($response->successful() && $rawUrl = $response->json('data.url')) {
-                    return str_replace('tmpfiles.org/', 'tmpfiles.org/dl/', $rawUrl);
+                    $pageResponse = Http::withoutVerifying()->timeout(10)->get($rawUrl);
+                    if ($pageResponse->successful() && preg_match('/<a[^>]+href="([^"]*dl\/[^"]+)"/i', $pageResponse->body(), $matches)) {
+                        return $matches[1];
+                    }
                 }
+            } catch (Exception $e) {
+                Log::warning("tmpfiles fallback mirror gagal: {$e->getMessage()}");
             }
         } catch (Exception $e) {
             Log::warning("Gagal mirror PDF invoice ke host publik: {$e->getMessage()}");

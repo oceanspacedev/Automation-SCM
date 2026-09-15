@@ -12,14 +12,14 @@
           v-if="selectedIds.length > 0"
           @click="askSendBatch"
           :disabled="sendingBatch"
-          class="h-10 px-4 bg-[#1D70F5] hover:bg-blue-600 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition cursor-pointer flex items-center gap-2 shadow-xs"
+          class="h-9 px-4 bg-[#1D70F5] hover:bg-blue-600 text-white text-xs font-medium rounded-lg disabled:opacity-50 transition cursor-pointer flex items-center gap-2 shadow-2xs"
           :title="`Kirim ${selectedIds.length} invoice terpilih`"
         >
-          <svg v-if="sendingBatch" class="animate-spin -ml-0.5 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+          <svg v-if="sendingBatch" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <SendIcon v-else class="w-4 h-4 text-white" />
+          <SendIcon v-else class="w-3.5 h-3.5 text-white" />
           <span>{{ sendingBatch ? 'Mengirim...' : `Kirim (${selectedIds.length}) Notifikasi Terpilih` }}</span>
         </button>
 
@@ -28,14 +28,14 @@
           v-else
           @click="askSendAll"
           :disabled="sendingAll"
-          class="h-10 px-4 bg-[#1D70F5] hover:bg-blue-600 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition cursor-pointer flex items-center gap-2 shadow-xs"
+          class="h-9 px-4 bg-[#1D70F5] hover:bg-blue-600 text-white text-xs font-medium rounded-lg disabled:opacity-50 transition cursor-pointer flex items-center gap-2 shadow-2xs"
           title="Kirim semua invoice yang belum terkirim via Email & WhatsApp"
         >
-          <svg v-if="sendingAll" class="animate-spin -ml-0.5 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+          <svg v-if="sendingAll" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <SendIcon v-else class="w-4 h-4 text-white" />
+          <SendIcon v-else class="w-3.5 h-3.5 text-white" />
           <span>{{ sendingAll ? 'Mengirim Semua...' : 'Kirim Semua Notifikasi' }}</span>
         </button>
 
@@ -136,24 +136,22 @@
                 title="Pilih semua yang belum dikirim di halaman ini"
               />
             </TableHead>
-            <TableHead class="w-[160px]">Invoice</TableHead>
-            <TableHead class="w-[110px]">Status</TableHead>
-            <TableHead class="w-[90px]">Method</TableHead>
-            <TableHead>Dealer</TableHead>
-            <TableHead>Customer</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>WhatsApp</TableHead>
-            <TableHead>Program</TableHead>
-            <TableHead class="w-[110px]">Tanggal</TableHead>
-            <TableHead class="text-right w-[140px]">Amount</TableHead>
-            <TableHead class="text-right w-[270px]">Action</TableHead>
+            <TableHead class="w-[150px] whitespace-nowrap">Invoice</TableHead>
+            <TableHead class="w-[110px] whitespace-nowrap">Status</TableHead>
+            <TableHead class="min-w-[140px]">Dealer</TableHead>
+            <TableHead class="min-w-[130px]">Customer</TableHead>
+            <TableHead class="min-w-[130px]">Email</TableHead>
+            <TableHead class="w-[110px] whitespace-nowrap">WhatsApp</TableHead>
+            <TableHead class="w-[95px] whitespace-nowrap">Tanggal</TableHead>
+            <TableHead class="text-right w-[120px] whitespace-nowrap">Amount</TableHead>
+            <TableHead class="text-right w-[225px] whitespace-nowrap">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableEmpty v-if="loading" :colspan="12">
+          <TableEmpty v-if="loading" :colspan="10">
             Memuat data invoice...
           </TableEmpty>
-          <TableEmpty v-else-if="invoices.length === 0" :colspan="12">
+          <TableEmpty v-else-if="invoices.length === 0" :colspan="10">
             Belum ada invoice yang dibuat. Silakan generate invoice dari menu <strong>Draft</strong>.
           </TableEmpty>
           <TableRow v-for="inv in invoices" :key="inv.id">
@@ -214,12 +212,12 @@
                 <span>Terkirim</span>
               </span>
 
-              <!-- Generated -->
+              <!-- Generated (Neutral Slate) -->
               <span
                 v-else-if="inv.status === 'generated'"
-                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs whitespace-nowrap"
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 shadow-2xs whitespace-nowrap"
               >
-                <span class="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                <span class="h-1.5 w-1.5 rounded-full bg-gray-400 shrink-0"></span>
                 <span>Generated</span>
               </span>
 
@@ -250,90 +248,70 @@
                 <span>{{ inv.status }}</span>
               </span>
             </TableCell>
-            <TableCell>
-              {{ inv.invoice_type }}
-            </TableCell>
-            <TableCell class="max-w-[180px] truncate" :title="`${inv.dealer_code} - ${inv.dealer_name}`">
+            <TableCell class="max-w-[170px] truncate" :title="`${inv.dealer_code} - ${inv.dealer_name}`">
               {{ inv.dealer_code }} - {{ inv.dealer_name }}
             </TableCell>
-            <TableCell class="max-w-[160px] truncate" :title="inv.customer_name">
+            <TableCell class="max-w-[150px] truncate" :title="inv.customer_name">
               {{ inv.customer_name || '-' }}
             </TableCell>
             <!-- Email -->
-            <TableCell class="max-w-[150px] truncate" :title="inv.email || inv.draft?.email">
+            <TableCell class="max-w-[140px] truncate" :title="inv.email || inv.draft?.email">
               {{ inv.email || inv.draft?.email || '-' }}
             </TableCell>
             <!-- WhatsApp -->
-            <TableCell class="max-w-[140px] truncate" :title="inv.whatsapp || inv.draft?.whatsapp">
+            <TableCell class="whitespace-nowrap text-xs" :title="inv.whatsapp || inv.draft?.whatsapp">
               {{ inv.whatsapp || inv.draft?.whatsapp || '-' }}
             </TableCell>
-            <TableCell class="max-w-[150px] truncate" :title="inv.program_name">
-              {{ inv.program_name || '-' }}
-            </TableCell>
-            <TableCell class="whitespace-nowrap">
+            <TableCell class="whitespace-nowrap text-xs">
               {{ inv.invoice_date || '-' }}
             </TableCell>
-            <TableCell class="text-right font-medium text-gray-900 whitespace-nowrap">
+            <TableCell class="text-right font-medium text-gray-900 whitespace-nowrap text-xs">
               {{ formatCurrency(inv.netpay) }}
             </TableCell>
 
-            <!-- Modern Action Buttons With Pixel-Perfect Alignment -->
-            <TableCell class="text-right w-[270px] whitespace-nowrap">
-              <div class="flex items-center justify-end gap-2">
+            <!-- Modern Action Buttons With Pixel-Perfect Vertical Alignment -->
+            <TableCell class="text-right w-[225px] whitespace-nowrap">
+              <div class="flex items-center justify-end gap-1.5">
                 <!-- 1. View / Detail Icon -->
                 <router-link
                   :to="`/invoices/${inv.id}`"
-                  class="w-9 h-9 shrink-0 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer shadow-2xs"
+                  class="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer shadow-2xs"
                   title="Lihat Detail Invoice"
                 >
                   <EyeIcon class="w-4 h-4 text-gray-600" />
                 </router-link>
 
-                <!-- 2. Print / Preview Icon -->
-                <a
-                  :href="`/invoices/${inv.id}/preview`"
-                  target="_blank"
-                  class="w-9 h-9 shrink-0 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer shadow-2xs"
-                  title="Cetak / Preview Invoice"
-                >
-                  <PrinterIcon class="w-4 h-4 text-gray-600" />
-                </a>
-
-                <!-- 3. PDF Download Button (Fixed Width) -->
+                <!-- 2. PDF Download Button (Clean Monochrome Outline) -->
                 <a
                   :href="`/invoices/${inv.id}/pdf`"
-                  class="h-9 w-[74px] shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300 transition cursor-pointer shadow-2xs"
+                  class="h-8 w-[68px] shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer shadow-2xs"
                   title="Unduh PDF Invoice"
                 >
-                  <svg class="w-4 h-4 text-red-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 2.5h7l5 5v13.5a1 1 0 01-1 1H7a1 1 0 01-1-1V3.5a1 1 0 011-1z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M14 2.5v5h5" />
-                    <text x="7" y="16.5" font-size="6.5" font-family="sans-serif" font-weight="bold" fill="currentColor" stroke="none">PDF</text>
-                  </svg>
-                  <span class="text-xs font-bold text-red-500 tracking-wide">PDF</span>
+                  <FileTextIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                  <span class="text-xs font-medium text-gray-700">PDF</span>
                 </a>
 
-                <!-- 4. Email/WA Action Button (Fixed Width 94px for 100% straight vertical column) -->
-                <!-- Already Sent to both or completed -->
+                <!-- 3. Email/WA Action Button (Calm Neutral / Primary) -->
+                <!-- Already Sent: Subtle calm gray/emerald badge -->
                 <span
                   v-if="isAlreadySent(inv)"
-                  class="h-9 w-[94px] shrink-0 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 cursor-default select-none shadow-2xs"
+                  class="h-8 w-[88px] shrink-0 bg-gray-50 text-gray-600 border border-gray-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 cursor-default select-none shadow-2xs"
                   title="Invoice ini sudah terkirim"
                 >
-                  <CheckCircleIcon class="w-4 h-4 text-emerald-600 shrink-0" />
+                  <CheckCircleIcon class="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   <span>Terkirim</span>
                 </span>
 
-                <!-- Ready to send (has email or whatsapp): Clean Blue Kirim button -->
+                <!-- Ready to send: Blue Kirim button -->
                 <button
                   v-else-if="hasDestination(inv)"
                   @click="askSendSingle(inv)"
                   :disabled="sendingId === inv.id"
-                  class="h-9 w-[94px] shrink-0 bg-[#1D70F5] hover:bg-blue-600 text-white text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
+                  class="h-8 w-[88px] shrink-0 bg-[#1D70F5] hover:bg-blue-600 text-white text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
                   :title="`Kirim notifikasi ke ${inv.email || inv.draft?.email || ''} ${inv.whatsapp || inv.draft?.whatsapp ? '(' + (inv.whatsapp || inv.draft?.whatsapp) + ')' : ''}`"
                 >
-                  <span v-if="sendingId === inv.id" class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                  <SendIcon v-else class="w-4 h-4 text-white shrink-0" />
+                  <span v-if="sendingId === inv.id" class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                  <SendIcon v-else class="w-3.5 h-3.5 text-white shrink-0" />
                   <span>Kirim</span>
                 </button>
 
@@ -341,10 +319,10 @@
                 <button
                   v-else
                   @click="openEmailModal(inv)"
-                  class="h-9 w-[94px] shrink-0 border border-gray-200 bg-white text-gray-700 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/50 text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                  class="h-8 w-[88px] shrink-0 border border-gray-200 bg-white text-gray-700 hover:text-gray-900 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
                   title="Input email / WhatsApp manual & kirim"
                 >
-                  <SendIcon class="w-4 h-4 text-gray-500 shrink-0" />
+                  <SendIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
                   <span>Manual</span>
                 </button>
               </div>
@@ -353,10 +331,10 @@
         </TableBody>
         <TableFooter v-if="invoices.length > 0">
           <TableRow>
-            <TableCell :colspan="10">
+            <TableCell :colspan="8" class="font-medium text-xs">
               Total
             </TableCell>
-            <TableCell class="text-right">
+            <TableCell class="text-right whitespace-nowrap font-medium text-xs">
               {{ formatCurrency(totalNetpay) }}
             </TableCell>
             <TableCell></TableCell>
@@ -422,7 +400,7 @@ import {
   MailIcon,
   Send as SendIcon,
   Eye as EyeIcon,
-  Printer as PrinterIcon,
+  FileText as FileTextIcon,
   MailCheck as MailCheckIcon,
   CheckCircle as CheckCircleIcon,
   AlertCircle as AlertCircleIcon,

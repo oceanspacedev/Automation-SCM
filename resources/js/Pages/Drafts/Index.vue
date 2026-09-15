@@ -12,7 +12,7 @@
           <button
             @click="askGenerateSelected"
             :disabled="generatingBatch"
-            class="h-9 px-3.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md disabled:opacity-50 transition cursor-pointer flex items-center space-x-1.5 shadow-xs"
+            class="h-9 px-3.5 bg-[#1D70F5] hover:bg-blue-600 text-white text-sm font-medium rounded-md disabled:opacity-50 transition cursor-pointer flex items-center space-x-1.5 shadow-xs"
             :title="`Terbitkan ${selectedIds.length} draft terpilih menjadi invoice`"
           >
             <svg v-if="generatingBatch" class="animate-spin -ml-0.5 mr-1.5 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
@@ -36,7 +36,7 @@
           v-else
           @click="askGenerateAll"
           :disabled="generatingAll"
-          class="h-9 px-3.5 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer flex items-center space-x-1.5 shadow-xs"
+          class="h-9 px-3.5 bg-[#1D70F5] text-white text-sm font-medium rounded-md hover:bg-blue-600 disabled:opacity-50 transition cursor-pointer flex items-center space-x-1.5 shadow-xs"
           title="Terbitkan invoice untuk semua draft yang berstatus Ready"
         >
           <svg v-if="generatingAll" class="animate-spin -ml-0.5 mr-1.5 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
@@ -148,32 +148,29 @@
                 title="Pilih semua draft Ready di halaman ini"
               />
             </TableHead>
-            <TableHead class="w-[110px]">Dealer Code</TableHead>
-            <TableHead>Dealer Name</TableHead>
-            <TableHead>Customer</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>WhatsApp</TableHead>
-            <TableHead>Program</TableHead>
-            <TableHead class="w-[120px]">No CN</TableHead>
-            <TableHead class="w-[110px]">Tanggal</TableHead>
-            <TableHead class="w-[85px]">Type</TableHead>
-            <TableHead class="w-[95px]">Status</TableHead>
-            <TableHead class="text-right w-[140px]">Support</TableHead>
-            <TableHead class="text-right w-[140px]">Netpay</TableHead>
-            <TableHead class="text-right w-[130px]">Action</TableHead>
+            <TableHead class="w-[95px] whitespace-nowrap">Dealer Code</TableHead>
+            <TableHead class="min-w-[140px]">Dealer Name</TableHead>
+            <TableHead class="min-w-[130px]">Customer</TableHead>
+            <TableHead class="min-w-[130px]">Email</TableHead>
+            <TableHead class="w-[105px] whitespace-nowrap">WhatsApp</TableHead>
+            <TableHead class="w-[95px] whitespace-nowrap">Tanggal</TableHead>
+            <TableHead class="w-[85px] whitespace-nowrap">Status</TableHead>
+            <TableHead class="text-right w-[110px] whitespace-nowrap">Support</TableHead>
+            <TableHead class="text-right w-[110px] whitespace-nowrap">Netpay</TableHead>
+            <TableHead class="text-right w-[115px] whitespace-nowrap">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableEmpty v-if="loading" :colspan="14">
+          <TableEmpty v-if="loading" :colspan="11">
             Memuat data draft...
           </TableEmpty>
-          <TableEmpty v-else-if="drafts.length === 0" :colspan="14">
+          <TableEmpty v-else-if="drafts.length === 0" :colspan="11">
             Belum ada data draft. Silakan klik tombol <strong>+ Import Excel</strong>.
           </TableEmpty>
           <TableRow
             v-for="draft in drafts"
             :key="draft.id"
-            :class="selectedIds.includes(draft.id) ? 'bg-blue-50/40 hover:bg-blue-50/60' : ''"
+            :class="selectedIds.includes(draft.id) ? 'bg-gray-50 hover:bg-gray-100/70' : ''"
           >
             <!-- Checkbox Selection -->
             <TableCell class="w-[40px] text-center">
@@ -186,40 +183,31 @@
                 :title="draft.status === 'ready' ? 'Pilih draft ini untuk digenerate' : (draft.status === 'invoiced' ? 'Invoice sudah diterbitkan' : 'Draft error tidak dapat digenerate')"
               />
             </TableCell>
-            <TableCell>
+            <TableCell class="whitespace-nowrap text-xs font-medium text-gray-900">
               {{ draft.dealer_code || '-' }}
             </TableCell>
-            <TableCell class="max-w-[180px] truncate" :title="draft.dealer_name">
+            <TableCell class="max-w-[170px] truncate text-xs" :title="draft.dealer_name">
               {{ draft.dealer_name || '-' }}
             </TableCell>
-            <TableCell class="max-w-[160px] truncate" :title="draft.customer_name">
+            <TableCell class="max-w-[150px] truncate text-xs" :title="draft.customer_name">
               {{ draft.customer_name || '-' }}
             </TableCell>
-            <TableCell class="max-w-[150px] truncate" :title="draft.email">
+            <TableCell class="max-w-[140px] truncate text-xs" :title="draft.email">
               {{ draft.email || '-' }}
             </TableCell>
-            <TableCell class="max-w-[140px] truncate" :title="draft.whatsapp">
+            <TableCell class="whitespace-nowrap text-xs">
               {{ draft.whatsapp || '-' }}
             </TableCell>
-            <TableCell class="max-w-[150px] truncate" :title="draft.program_name">
-              {{ draft.program_name || '-' }}
-            </TableCell>
-            <TableCell>
-              {{ draft.cn_number || '-' }}
-            </TableCell>
-            <TableCell class="whitespace-nowrap">
+            <TableCell class="whitespace-nowrap text-xs">
               {{ draft.invoice_date || '-' }}
             </TableCell>
-            <TableCell>
-              {{ draft.invoice_type || '-' }}
-            </TableCell>
-            <TableCell>
-              <!-- Ready -->
+            <TableCell class="whitespace-nowrap">
+              <!-- Ready (Clean Neutral) -->
               <span
                 v-if="draft.status === 'ready'"
-                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 shadow-2xs whitespace-nowrap"
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 shadow-2xs whitespace-nowrap"
               >
-                <span class="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                <span class="h-1.5 w-1.5 rounded-full bg-gray-400 shrink-0"></span>
                 <span>Ready</span>
               </span>
 
@@ -250,10 +238,10 @@
                 <span>{{ draft.status }}</span>
               </span>
             </TableCell>
-            <TableCell class="text-right">
+            <TableCell class="text-right whitespace-nowrap text-xs">
               {{ formatCurrency(draft.support_amount) }}
             </TableCell>
-            <TableCell class="text-right">
+            <TableCell class="text-right whitespace-nowrap text-xs">
               {{ formatCurrency(draft.netpay) }}
             </TableCell>
             <TableCell class="text-right">
@@ -267,12 +255,12 @@
                   <EyeIcon class="w-3.5 h-3.5" />
                 </router-link>
 
-                <!-- Generate Button (No Icon) -->
+                <!-- Generate Button (No Icon, Brand Blue) -->
                 <button
                   v-if="draft.status === 'ready'"
                   @click="askGenerateSingle(draft)"
                   :disabled="generatingId === draft.id"
-                  class="h-7 px-3 bg-blue-600 text-white text-xs font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer shadow-xs"
+                  class="h-7 px-3 bg-[#1D70F5] text-white text-xs font-medium rounded-md hover:bg-blue-600 disabled:opacity-50 transition cursor-pointer shadow-xs"
                   title="Generate Invoice"
                 >
                   <span v-if="generatingId === draft.id" class="inline-block w-3 h-3 mr-1 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
@@ -306,13 +294,13 @@
         </TableBody>
         <TableFooter v-if="drafts.length > 0">
           <TableRow>
-            <TableCell :colspan="10">
+            <TableCell :colspan="8" class="font-medium text-xs">
               Total
             </TableCell>
-            <TableCell class="text-right">
+            <TableCell class="text-right whitespace-nowrap font-medium text-xs">
               {{ formatCurrency(totalSupport) }}
             </TableCell>
-            <TableCell class="text-right">
+            <TableCell class="text-right whitespace-nowrap font-medium text-xs">
               {{ formatCurrency(totalNetpay) }}
             </TableCell>
             <TableCell></TableCell>

@@ -14,7 +14,7 @@
           <!-- Header -->
           <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <div class="flex items-center gap-3">
-              <div class="flex items-center justify-center w-9 h-9 rounded-full bg-blue-50 text-blue-600">
+              <div class="flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 text-gray-700">
                 <SendIcon class="w-4.5 h-4.5" />
               </div>
               <div>
@@ -111,7 +111,7 @@
               v-if="!success"
               @click="send"
               :disabled="loading || (!email && !whatsapp)"
-              class="h-9 px-5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2 shadow-sm cursor-pointer"
+              class="h-9 px-5 rounded-lg bg-[#1D70F5] text-white text-sm font-medium hover:bg-blue-600 transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2 shadow-sm cursor-pointer"
             >
               <span v-if="loading" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               <SendIcon v-else class="w-4 h-4" />

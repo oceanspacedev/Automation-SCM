@@ -6,6 +6,7 @@ import DraftDetail from '../Pages/Drafts/Detail.vue';
 import InvoicesIndex from '../Pages/Invoices/Index.vue';
 import InvoiceDetail from '../Pages/Invoices/Detail.vue';
 import EmailLogsIndex from '../Pages/EmailLogs/Index.vue';
+import ProgramSubmissionsIndex from '../Pages/ProgramSubmissions/Index.vue';
 import { useAuth } from '../composables/useAuth';
 
 const routes = [
@@ -17,6 +18,7 @@ const routes = [
   { path: '/invoices', name: 'invoices.index', component: InvoicesIndex, meta: { requiresAuth: true } },
   { path: '/invoices/:id', name: 'invoices.detail', component: InvoiceDetail, props: true, meta: { requiresAuth: true } },
   { path: '/email-logs', name: 'email-logs.index', component: EmailLogsIndex, meta: { requiresAuth: true } },
+  { path: '/form-program', name: 'program-submissions.index', component: ProgramSubmissionsIndex, meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({

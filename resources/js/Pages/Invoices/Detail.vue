@@ -47,7 +47,7 @@
           v-if="!(invoice.email_sent_at && invoice.whatsapp_sent_at) && (invoice.email || invoice.draft?.email || invoice.whatsapp || invoice.draft?.whatsapp)"
           @click="quickSend"
           :disabled="quickSending"
-          class="h-9 px-3.5 bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
+          class="h-9 px-3.5 bg-[#1D70F5] text-white hover:bg-blue-600 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
           title="Kirim notifikasi langsung ke Email & WhatsApp yang tersedia"
         >
           <span v-if="quickSending" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>

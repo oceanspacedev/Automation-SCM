@@ -62,7 +62,7 @@
               type="button"
               @click="handleConfirm"
               :disabled="loading"
-              class="h-9 px-4 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition cursor-pointer disabled:opacity-50 inline-flex items-center gap-2 shadow-sm"
+              class="h-9 px-4 rounded-lg bg-[#1D70F5] text-white text-sm font-medium hover:bg-blue-600 transition cursor-pointer disabled:opacity-50 inline-flex items-center gap-2 shadow-sm"
             >
               <svg v-if="loading" class="animate-spin -ml-0.5 mr-1 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -94,7 +94,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'confirm', 'cancel']);
 
 const iconBgClass = computed(() => {
-  if (props.icon === 'mail') return 'bg-blue-50 border border-blue-100';
+  if (props.icon === 'mail') return 'bg-gray-100 border border-gray-200 text-gray-700';
   return 'bg-amber-50 border border-amber-100';
 });
 

@@ -27,7 +27,7 @@
           v-if="draft.status === 'ready'"
           @click="showGenerateModal = true"
           :disabled="generating"
-          class="h-9 px-4 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:opacity-50 transition cursor-pointer shadow-xs"
+          class="h-9 px-4 bg-[#1D70F5] text-white text-sm font-medium rounded-md hover:bg-blue-600 disabled:opacity-50 transition cursor-pointer shadow-xs"
         >
           {{ generating ? 'Membuat Invoice...' : 'Generate Invoice' }}
         </button>
@@ -35,7 +35,7 @@
         <router-link
           v-if="draft.invoice"
           :to="`/invoices/${draft.invoice.id}`"
-          class="h-9 px-4 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition inline-flex items-center shadow-xs"
+          class="h-9 px-4 bg-[#1D70F5] text-white text-sm font-medium rounded-md hover:bg-blue-600 transition inline-flex items-center shadow-xs"
         >
           Lihat Invoice ({{ draft.invoice.invoice_number }}) →
         </router-link>
