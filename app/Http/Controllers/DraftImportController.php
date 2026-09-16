@@ -22,7 +22,7 @@ class DraftImportController extends Controller
         if (isset($_FILES['file']) && $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
             $errCode = $_FILES['file']['error'];
             $phpUploadErrors = [
-                UPLOAD_ERR_INI_SIZE => 'Ukuran file melebihi batas upload PHP (' . ini_get('upload_max_filesize') . ').',
+                UPLOAD_ERR_INI_SIZE => 'Ukuran file melebihi batas upload PHP ('.ini_get('upload_max_filesize').').',
                 UPLOAD_ERR_FORM_SIZE => 'Ukuran file melebihi batas form HTML.',
                 UPLOAD_ERR_PARTIAL => 'File hanya terunggah sebagian. Silakan coba lagi.',
                 UPLOAD_ERR_NO_FILE => 'Tidak ada file yang diunggah.',
@@ -33,11 +33,11 @@ class DraftImportController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => $phpUploadErrors[$errCode] ?? 'Gagal mengunggah file (Kode error PHP: ' . $errCode . ').',
+                'message' => $phpUploadErrors[$errCode] ?? 'Gagal mengunggah file (Kode error PHP: '.$errCode.').',
             ], 422);
         }
 
-        if (!$request->hasFile('file')) {
+        if (! $request->hasFile('file')) {
             return response()->json([
                 'success' => false,
                 'message' => 'File tidak ditemukan atau belum dipilih.',
@@ -46,10 +46,10 @@ class DraftImportController extends Controller
 
         $file = $request->file('file');
         $ext = strtolower($file->getClientOriginalExtension());
-        if (!in_array($ext, ['xlsx', 'xls', 'csv'])) {
+        if (! in_array($ext, ['xlsx', 'xls', 'csv'])) {
             return response()->json([
                 'success' => false,
-                'message' => 'Format file .' . $ext . ' tidak didukung. File harus berformat .xlsx, .xls, atau .csv.',
+                'message' => 'Format file .'.$ext.' tidak didukung. File harus berformat .xlsx, .xls, atau .csv.',
             ], 422);
         }
 
@@ -65,7 +65,7 @@ class DraftImportController extends Controller
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan saat memproses import: ' . $e->getMessage(),
+                'message' => 'Terjadi kesalahan saat memproses import: '.$e->getMessage(),
             ], 500);
         }
     }

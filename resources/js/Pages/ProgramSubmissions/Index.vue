@@ -1,64 +1,124 @@
 <template>
   <div class="space-y-4">
-    <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <!-- Header Page -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <div class="flex items-center gap-2.5">
-          <h1 class="text-2xl font-bold tracking-tight text-gray-900">Form Program REALME Jabar</h1>
-          <span
-            v-if="autoRefresh"
-            class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
-            title="Pembaruan data otomatis aktif"
-          >
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            Realtime
-          </span>
-        </div>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-900">Form Program</h1>
         <p class="text-sm text-gray-500 mt-0.5">
-          Respon formulir program REALME dan dokumen bukti transaksi yang terhubung ke Google Sheets.
+          Sinkronisasi respon Google Spreadsheet program cashback, SO, dan kelayakan dokumen.
         </p>
       </div>
 
-      <!-- Action Buttons (Tanpa warna & tanpa icon) -->
-      <div class="flex items-center gap-2">
+      <!-- Action Buttons -->
+      <div class="flex flex-wrap items-center gap-2">
         <a
           :href="googleSheetUrl"
           target="_blank"
           rel="noopener noreferrer"
-          class="h-9 px-3.5 inline-flex items-center justify-center rounded-md border border-gray-200 bg-white text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
+          class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
           title="Buka file Google Spreadsheet"
         >
-          Buka Spreadsheet
+          <ExternalLinkIcon class="w-3.5 h-3.5 text-gray-400" />
+          <span>Buka Spreadsheet</span>
         </a>
+
+        <!-- Export Excel Button -->
+        <button
+          type="button"
+          @click="exportExcel"
+          :disabled="isExporting"
+          class="h-9 px-3.5 inline-flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer disabled:opacity-50"
+          title="Export data form program ke Excel (.xlsx)"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" class="w-4 h-4 shrink-0">
+            <path fill="#166e40" d="M37 6H17a2 2 0 0 0-2 2v32a2 2 0 0 0 2 2h20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>
+            <path fill="#23a455" d="M37 6H24v36h13a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>
+            <path fill="#2ecc71" opacity=".35" d="M24 13h15v4H24zm0 7h15v4H24zm0 7h15v4H24zm0 7h15v4H24z"/>
+            <path fill="#107c41" d="M22 13H8a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V15a2 2 0 0 0-2-2z"/>
+            <path fill="#ffffff" d="M12.4 28.5l2.4-4.8 2.4 4.8h2.3l-3.5-6.5 3.3-6.5h-2.3l-2.2 4.7-2.2-4.7h-2.3l3.3 6.5-3.5 6.5h2.3z"/>
+          </svg>
+          <span>{{ isExporting ? 'Mengekspor...' : 'Export Excel' }}</span>
+        </button>
+
+        <!-- Dropdown Fitur AI -->
+        <div class="relative" ref="aiDropdownRef">
+          <button
+            type="button"
+            @click="showAiDropdown = !showAiDropdown"
+            class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
+          >
+            <BotIcon class="w-3.5 h-3.5 text-gray-500" />
+            <span>Fitur AI</span>
+            <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 ml-0.5 transition-transform duration-150" :class="showAiDropdown && 'rotate-180'" />
+          </button>
+
+          <!-- Dropdown Menu -->
+          <div
+            v-if="showAiDropdown"
+            class="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-30 font-sans"
+          >
+            <button
+              type="button"
+              @click="handleOpenModelAiModal"
+              class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 flex items-center gap-2 cursor-pointer"
+            >
+              <BotIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
+              <span>Model AI</span>
+            </button>
+
+            <button
+              type="button"
+              @click="handleTriggerBgAi"
+              :disabled="isTriggeringBgAi"
+              class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCwIcon v-if="isTriggeringBgAi" class="w-3.5 h-3.5 animate-spin text-gray-500 shrink-0" />
+              <BotIcon v-else class="w-3.5 h-3.5 text-gray-500 shrink-0" />
+              <span>{{ isTriggeringBgAi ? 'Menjalankan AI...' : 'Jalankan AI di Belakang Layar' }}</span>
+            </button>
+
+            <button
+              type="button"
+              @click="handleOpenBatchAiModal"
+              :disabled="isAnalyzingBatch"
+              class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCwIcon v-if="isAnalyzingBatch" class="w-3.5 h-3.5 animate-spin text-gray-500 shrink-0" />
+              <BotIcon v-else class="w-3.5 h-3.5 text-gray-500 shrink-0" />
+              <span>{{ isAnalyzingBatch ? 'Menganalisis...' : 'Analisis AI Semua' }}</span>
+            </button>
+          </div>
+        </div>
 
         <button
           type="button"
           @click="triggerSync"
           :disabled="isSyncing"
-          class="h-9 px-3.5 inline-flex items-center justify-center rounded-md border border-gray-200 bg-white text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50 transition shadow-2xs cursor-pointer"
+          class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50 transition shadow-2xs cursor-pointer"
         >
-          {{ isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Sekarang' }}
+          <RefreshCwIcon :class="['w-3.5 h-3.5 text-gray-500', isSyncing && 'animate-spin']" />
+          <span>{{ isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Sekarang' }}</span>
         </button>
       </div>
     </div>
 
-    <!-- Alert Status Sinkronisasi -->
+    <!-- Alert Status Sinkronisasi / Update -->
     <div
       v-if="syncMessage"
       :class="[
         'p-3 rounded-lg border text-xs flex items-center justify-between transition',
         syncError
-          ? 'bg-rose-50 border-rose-200 text-rose-700'
-          : 'bg-emerald-50 border-emerald-200 text-emerald-800'
+          ? 'bg-white border-rose-200 text-rose-700'
+          : 'bg-white border-gray-200 text-gray-800'
       ]"
     >
       <div class="flex items-center gap-2">
-        <AlertCircleIcon v-if="syncError" class="w-4 h-4 shrink-0" />
-        <CheckCircleIcon v-else class="w-4 h-4 shrink-0" />
+        <AlertCircleIcon v-if="syncError" class="w-4 h-4 shrink-0 text-rose-500" />
+        <CheckCircleIcon v-else class="w-4 h-4 shrink-0 text-emerald-600" />
         <span>{{ syncMessage }}</span>
       </div>
-      <button @click="syncMessage = ''" class="text-xs font-medium hover:underline ml-4 cursor-pointer">
-        Tutup
+      <button @click="syncMessage = ''" class="text-xs font-medium text-gray-400 hover:text-gray-700 ml-4 cursor-pointer">
+        &times;
       </button>
     </div>
 
@@ -71,15 +131,16 @@
             v-model="filters.search"
             @input="debounceFetch"
             type="text"
-            placeholder="Cari dealer, ID Real, program, sales..."
-            class="h-9 w-72 pl-9 pr-3 rounded-md border border-gray-200 bg-white text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
+            placeholder="Cari dealer, ID Real, program, sales, No PO/SJ, TRX..."
+            class="h-9 w-64 sm:w-80 pl-9 pr-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
           />
         </div>
 
+        <!-- Filter Region -->
         <select
           v-model="filters.region"
           @change="fetchSubmissions(1)"
-          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
+          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
         >
           <option value="">Semua Region</option>
           <option v-for="reg in regionOptions" :key="reg" :value="reg">
@@ -87,8 +148,20 @@
           </option>
         </select>
 
+        <!-- Filter Status Purchase -->
+        <select
+          v-model="filters.status_purchase"
+          @change="fetchSubmissions(1)"
+          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
+        >
+          <option value="">Semua Status Purchase</option>
+          <option v-for="opt in statusPurchaseOptions" :key="opt" :value="opt">
+            {{ opt }}
+          </option>
+        </select>
+
         <button
-          v-if="filters.search || filters.region"
+          v-if="filters.search || filters.region || filters.status_purchase"
           type="button"
           @click="resetFilters"
           class="h-9 px-2.5 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-md transition cursor-pointer"
@@ -97,15 +170,15 @@
         </button>
       </div>
 
-      <!-- Realtime Auto-Refresh Toggle -->
-      <div class="flex items-center gap-3">
+      <!-- Realtime Auto-Refresh & Status -->
+      <div class="flex flex-wrap items-center gap-3">
         <label class="inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
           <input
             type="checkbox"
             v-model="autoRefresh"
             class="rounded border-gray-300 text-black focus:ring-black cursor-pointer"
           />
-          <span>Auto-Refresh (15d)</span>
+          <span>Auto-Refresh (30d)</span>
         </label>
 
         <span v-if="lastUpdatedText" class="text-xs text-gray-400">
@@ -114,133 +187,287 @@
       </div>
     </div>
 
-    <!-- Official Shadcn Table Card -->
-    <div class="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-2xs">
-      <Table>
-        <TableHeader>
-          <TableRow class="bg-gray-50/80 border-b border-gray-200 uppercase tracking-wider text-[11px] font-semibold hover:bg-gray-50/80">
-            <TableHead class="w-[44px] text-center font-semibold text-gray-600">No</TableHead>
-            <TableHead class="whitespace-nowrap font-semibold text-gray-600">Waktu</TableHead>
-            <TableHead class="whitespace-nowrap font-semibold text-gray-600">Region</TableHead>
-            <TableHead class="whitespace-nowrap font-semibold text-gray-600">ID Real</TableHead>
-            <TableHead class="min-w-[170px] font-semibold text-gray-600">Nama Dealer</TableHead>
-            <TableHead class="min-w-[220px] font-semibold text-gray-600">Nama Program</TableHead>
-            <TableHead class="whitespace-nowrap font-semibold text-gray-600">Nama Sales</TableHead>
-            <TableHead class="w-[60px] text-center font-semibold text-gray-600">CN</TableHead>
-            <TableHead class="w-[60px] text-center font-semibold text-gray-600">Agr</TableHead>
-            <TableHead class="w-[70px] text-center font-semibold text-gray-600">Faktur</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <!-- Loading State -->
-          <TableEmpty v-if="loading && submissions.length === 0" :colspan="10">
-            <div class="inline-flex items-center gap-2 text-gray-500 py-6">
-              <RefreshCwIcon class="w-4 h-4 animate-spin text-gray-400" />
-              <span>Memuat data form program...</span>
-            </div>
-          </TableEmpty>
+    <!-- Official Shadcn Table Card (Horizontal Scrollable) -->
+    <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
+      <div class="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow class="border-b border-gray-200 text-xs hover:bg-transparent">
+              <TableHead class="w-[44px] text-center font-medium text-gray-500">No</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500">Waktu</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500">Region</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500">ID Real</TableHead>
+              <TableHead class="min-w-[170px] font-medium text-gray-500">Nama Dealer</TableHead>
+              <TableHead class="min-w-[200px] font-medium text-gray-500">Nama Program</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500">Nama Sales</TableHead>
+              <TableHead class="w-[48px] text-center font-medium text-gray-500">CN</TableHead>
+              <TableHead class="w-[48px] text-center font-medium text-gray-500">Agr</TableHead>
+              <TableHead class="w-[54px] text-center font-medium text-gray-500">Faktur</TableHead>
 
-          <!-- Empty State -->
-          <TableEmpty v-else-if="submissions.length === 0" :colspan="10">
-            <div class="max-w-md mx-auto py-6 space-y-1.5 text-gray-500">
-              <p class="font-medium text-gray-800">Belum ada data form program yang tersimpan.</p>
-              <p class="text-xs text-gray-500">
-                Klik tombol <strong>"Sinkronkan Sekarang"</strong> di atas untuk memuat data dari spreadsheet Anda.
-              </p>
-            </div>
-          </TableEmpty>
+              <!-- Kolom Tracking Manual & Status Potong -->
+              <TableHead class="whitespace-nowrap font-medium text-gray-500">No PO/SJ</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500">No Transaksi</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl Input</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl Share CN</TableHead>
+              <TableHead class="w-[80px] text-center font-medium text-gray-500">Pending</TableHead>
+              <TableHead class="min-w-[150px] font-medium text-gray-500">Keterangan</TableHead>
+              <TableHead class="min-w-[150px] font-medium text-gray-500">Cek Dokumen</TableHead>
+              <TableHead class="min-w-[190px] font-medium text-gray-500">Status Potong Purchase</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500">Status AR</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl Potong/TF</TableHead>
+              <TableHead class="w-[88px] text-center font-medium text-gray-500 sticky right-0 bg-white border-b border-gray-200">Aksi</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <!-- Loading State -->
+            <TableEmpty v-if="loading && submissions.length === 0" :colspan="21">
+              <div class="inline-flex items-center gap-2 text-gray-500 py-8">
+                <RefreshCwIcon class="w-4 h-4 animate-spin text-gray-400" />
+                <span>Memuat data form program...</span>
+              </div>
+            </TableEmpty>
 
-          <!-- Data Rows -->
-          <TableRow
-            v-else
-            v-for="(row, idx) in submissions"
-            :key="row.id"
-            class="hover:bg-gray-50/80 transition"
-          >
-            <TableCell class="text-center text-gray-500 text-xs py-2.5">
-              {{ (pagination.current_page - 1) * pagination.per_page + idx + 1 }}
-            </TableCell>
-            <TableCell class="whitespace-nowrap text-gray-700 text-xs py-2.5 leading-tight">
-              <div>{{ formatTimestamp(row.submission_timestamp).date }}</div>
-              <div class="text-[11px] text-gray-400">{{ formatTimestamp(row.submission_timestamp).time }}</div>
-            </TableCell>
-            <TableCell class="whitespace-nowrap text-gray-700 text-xs py-2.5">
-              {{ row.region || '-' }}
-            </TableCell>
-            <TableCell class="whitespace-nowrap text-gray-700 text-xs py-2.5">
-              {{ row.id_real || '-' }}
-            </TableCell>
-            <TableCell class="text-gray-700 text-xs py-2.5 leading-snug">
-              <div class="line-clamp-2" :title="row.dealer_name">{{ row.dealer_name || '-' }}</div>
-            </TableCell>
-            <TableCell class="text-gray-700 text-xs py-2.5 leading-snug">
-              <div class="line-clamp-2" :title="row.program_name">{{ row.program_name || '-' }}</div>
-            </TableCell>
-            <TableCell class="whitespace-nowrap text-gray-700 text-xs py-2.5">
-              {{ row.sales_name || '-' }}
-            </TableCell>
+            <!-- Empty State -->
+            <TableEmpty v-else-if="submissions.length === 0" :colspan="21">
+              <div class="max-w-md mx-auto py-8 space-y-1.5 text-center text-gray-500">
+                <p class="font-medium text-gray-800">Belum ada data form program yang tersimpan.</p>
+                <p class="text-xs text-gray-500">
+                  Klik tombol <strong>"Sinkronkan Sekarang"</strong> di atas untuk memuat data dari spreadsheet Anda.
+                </p>
+              </div>
+            </TableEmpty>
 
-            <!-- Dokumen Credit Note -->
-            <TableCell class="text-center py-2.5 whitespace-nowrap">
-              <a
-                v-if="isValidUrl(row.credit_note_url)"
-                :href="row.credit_note_url"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs transition cursor-pointer"
-                title="Buka Dokumen Credit Note di Google Drive"
-              >
-                <FileTextIcon class="w-3 h-3 text-blue-600 shrink-0" />
-                <span>CN</span>
-              </a>
-              <span v-else class="text-gray-300 text-xs">-</span>
-            </TableCell>
+            <!-- Data Rows -->
+            <TableRow
+              v-else
+              v-for="(row, idx) in submissions"
+              :key="row.id"
+              class="hover:bg-gray-50/80 transition text-xs"
+            >
+              <!-- No -->
+              <TableCell class="text-center text-gray-500 py-2.5">
+                {{ (pagination.current_page - 1) * pagination.per_page + idx + 1 }}
+              </TableCell>
 
-            <!-- Agreement -->
-            <TableCell class="text-center py-2.5 whitespace-nowrap">
-              <a
-                v-if="isValidUrl(row.agreement_url)"
-                :href="row.agreement_url"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs transition cursor-pointer"
-                title="Buka Dokumen Agreement di Google Drive"
-              >
-                <FileTextIcon class="w-3 h-3 text-indigo-600 shrink-0" />
-                <span>Agr</span>
-              </a>
-              <span v-else class="text-gray-300 text-xs">-</span>
-            </TableCell>
+              <!-- Waktu -->
+              <TableCell class="whitespace-nowrap text-gray-700 py-2.5 leading-tight">
+                <div>{{ formatTimestamp(row.submission_timestamp).date }}</div>
+                <div class="text-[11px] text-gray-400">{{ formatTimestamp(row.submission_timestamp).time }}</div>
+              </TableCell>
 
-            <!-- Faktur Pajak -->
-            <TableCell class="text-center py-2.5 whitespace-nowrap">
-              <a
-                v-if="isValidUrl(row.tax_invoice_url)"
-                :href="row.tax_invoice_url"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs transition cursor-pointer"
-                title="Buka Faktur Pajak di Google Drive"
-              >
-                <FileTextIcon class="w-3 h-3 text-emerald-600 shrink-0" />
-                <span>Faktur</span>
-              </a>
-              <span v-else class="text-gray-300 text-xs">-</span>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
+              <!-- Region -->
+              <TableCell class="whitespace-nowrap text-gray-700 py-2.5">
+                {{ row.region || '-' }}
+              </TableCell>
+
+              <!-- ID Real -->
+              <TableCell class="whitespace-nowrap font-mono text-gray-700 py-2.5">
+                {{ row.id_real || '-' }}
+              </TableCell>
+
+              <!-- Nama Dealer -->
+              <TableCell class="text-gray-700 py-2.5 leading-snug">
+                <div class="line-clamp-2 font-medium text-gray-900" :title="row.dealer_name">{{ row.dealer_name || '-' }}</div>
+              </TableCell>
+
+              <!-- Nama Program -->
+              <TableCell class="text-gray-700 py-2.5 leading-snug">
+                <div class="line-clamp-2" :title="row.program_name">{{ row.program_name || '-' }}</div>
+              </TableCell>
+
+              <!-- Nama Sales -->
+              <TableCell class="whitespace-nowrap text-gray-700 py-2.5">
+                {{ row.sales_name || '-' }}
+              </TableCell>
+
+              <!-- Dokumen Credit Note -->
+              <TableCell class="text-center py-2.5 whitespace-nowrap">
+                <a
+                  v-if="isValidUrl(row.credit_note_url)"
+                  :href="row.credit_note_url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer"
+                  title="Buka Dokumen Credit Note di Google Drive"
+                >
+                  <FileTextIcon class="w-3 h-3 text-gray-500 shrink-0" />
+                  <span>CN</span>
+                </a>
+                <span v-else class="text-gray-300 text-xs">-</span>
+              </TableCell>
+
+              <!-- Agreement -->
+              <TableCell class="text-center py-2.5 whitespace-nowrap">
+                <a
+                  v-if="isValidUrl(row.agreement_url)"
+                  :href="row.agreement_url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer"
+                  title="Buka Dokumen Agreement di Google Drive"
+                >
+                  <FileTextIcon class="w-3 h-3 text-gray-500 shrink-0" />
+                  <span>Agr</span>
+                </a>
+                <span v-else class="text-gray-300 text-xs">-</span>
+              </TableCell>
+
+              <!-- Faktur Pajak -->
+              <TableCell class="text-center py-2.5 whitespace-nowrap">
+                <a
+                  v-if="isValidUrl(row.tax_invoice_url)"
+                  :href="row.tax_invoice_url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer"
+                  title="Buka Faktur Pajak di Google Drive"
+                >
+                  <FileTextIcon class="w-3 h-3 text-gray-500 shrink-0" />
+                  <span>Faktur</span>
+                </a>
+                <span v-else class="text-gray-300 text-xs">-</span>
+              </TableCell>
+
+              <!-- Kolom: No PO/SJ -->
+              <TableCell class="whitespace-nowrap font-mono text-gray-700 py-2.5">
+                {{ row.no_po_sj || '-' }}
+              </TableCell>
+
+              <!-- Kolom: No Transaksi -->
+              <TableCell class="whitespace-nowrap font-mono text-gray-700 py-2.5">
+                {{ row.no_transaksi || '-' }}
+              </TableCell>
+
+              <!-- Kolom: Tgl Input -->
+              <TableCell class="whitespace-nowrap text-gray-700 py-2.5">
+                {{ row.tgl_input || '-' }}
+              </TableCell>
+
+              <!-- Kolom: Tgl Share CN -->
+              <TableCell class="whitespace-nowrap text-gray-700 py-2.5">
+                {{ row.tgl_share_cn || '-' }}
+              </TableCell>
+
+              <!-- Kolom: Lama Pending -->
+              <TableCell class="text-center text-gray-700 py-2.5 whitespace-nowrap">
+                <span v-if="row.lama_pending" class="px-1.5 py-0.5 rounded bg-white border border-gray-200 font-mono text-xs text-gray-700">
+                  {{ row.lama_pending }}
+                </span>
+                <span v-else class="text-gray-300">-</span>
+              </TableCell>
+
+              <!-- Kolom: Keterangan -->
+              <TableCell class="text-gray-700 py-2.5 leading-snug">
+                <div class="line-clamp-2 max-w-[160px]" :title="row.keterangan">{{ row.keterangan || '-' }}</div>
+              </TableCell>
+
+              <!-- Kolom: Cek Dokumen -->
+              <TableCell class="text-gray-700 py-2.5 leading-snug">
+                <div
+                  :class="[
+                    'line-clamp-2 max-w-[160px] font-medium text-xs px-1.5 py-0.5 rounded inline-block',
+                    row.cek_dokumen === 'LENGKAP'
+                      ? 'bg-teal-50 text-teal-700 font-semibold border border-teal-200'
+                      : row.cek_dokumen
+                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                      : 'text-gray-400'
+                  ]"
+                  :title="row.cek_dokumen"
+                >
+                  {{ row.cek_dokumen || '-' }}
+                </div>
+              </TableCell>
+
+              <!-- Kolom: Status Potong by Purchase (Dropdown Cepat Langsung di Baris) -->
+              <TableCell class="py-2.5 whitespace-nowrap">
+                <select
+                  :value="row.status_potong_purchase || ''"
+                  @change="quickUpdateStatus(row, $event.target.value)"
+                  :class="[
+                    'h-7 px-2 rounded-md text-xs font-semibold border focus:outline-none focus:ring-1 focus:ring-black cursor-pointer transition',
+                    row.status_potong_purchase === 'BISA DI POTONG'
+                      ? 'bg-teal-50 text-teal-700 border-teal-300'
+                      : row.status_potong_purchase === 'SUDAH POTONG'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                      : row.status_potong_purchase === 'DONE TRANSFER'
+                      ? 'bg-blue-50 text-blue-700 border-blue-300'
+                      : row.status_potong_purchase === 'BELUM BISA POTONG'
+                      ? 'bg-rose-50 text-rose-700 border-rose-300'
+                      : 'bg-gray-50 text-gray-500 border-gray-200'
+                  ]"
+                >
+                  <option value="">- Pilih Status -</option>
+                  <option value="BELUM BISA POTONG">BELUM BISA POTONG</option>
+                  <option value="BISA DI POTONG">BISA DI POTONG</option>
+                  <option value="SUDAH POTONG">SUDAH POTONG</option>
+                  <option value="DONE TRANSFER">DONE TRANSFER</option>
+                </select>
+              </TableCell>
+
+              <!-- Kolom: Status Potong by AR -->
+              <TableCell class="whitespace-nowrap text-gray-700 py-2.5">
+                <span v-if="row.status_potong_ar" class="px-1.5 py-0.5 rounded bg-white border border-gray-200 text-gray-700 text-xs">
+                  {{ row.status_potong_ar }}
+                </span>
+                <span v-else class="text-gray-300">-</span>
+              </TableCell>
+
+              <!-- Kolom: Tgl Potong/TF -->
+              <TableCell class="whitespace-nowrap text-gray-700 py-2.5">
+                {{ row.tgl_potong_tf || '-' }}
+              </TableCell>
+
+              <!-- Aksi: Tombol Edit Row Modal -->
+              <TableCell class="text-center py-2.5 whitespace-nowrap sticky right-0 bg-white">
+                <button
+                  type="button"
+                  @click="openEditModal(row)"
+                  class="inline-flex items-center justify-center p-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition shadow-2xs cursor-pointer"
+                  title="Edit Data Tracking & Status Potong"
+                >
+                  <PencilIcon class="w-3.5 h-3.5" />
+                </button>
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
 
       <!-- Pagination Footer -->
       <div
         v-if="pagination.total > 0"
-        class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-gray-200 bg-gray-50/50 text-xs text-gray-500"
+        class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-gray-200 bg-white text-xs text-gray-500"
       >
-        <div>
-          Menampilkan <span class="font-semibold text-gray-900">{{ submissions.length }}</span> dari
-          <span class="font-semibold text-gray-900">{{ pagination.total }}</span> total respon
+        <div class="flex items-center gap-3">
+          <div>
+            Menampilkan <span class="font-semibold text-gray-900">{{ submissions.length }}</span> dari
+            <span class="font-semibold text-gray-900">{{ Number(pagination.total).toLocaleString('id-ID') }}</span> total respon
+          </div>
+          <div class="flex items-center gap-1.5 ml-2 pl-3 border-l border-gray-200">
+            <span>Per halaman:</span>
+            <select
+              v-model="pagination.per_page"
+              @change="changePerPage"
+              class="h-7 px-1.5 rounded border border-gray-200 bg-white text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
+            >
+              <option :value="15">15</option>
+              <option :value="25">25</option>
+              <option :value="50">50</option>
+              <option :value="100">100</option>
+            </select>
+          </div>
         </div>
+
         <div class="flex items-center gap-1.5">
+          <button
+            type="button"
+            :disabled="pagination.current_page <= 1 || loading"
+            @click="fetchSubmissions(1)"
+            class="px-2 py-1.5 rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            title="Halaman Pertama"
+          >
+            &laquo; Pertama
+          </button>
           <button
             type="button"
             :disabled="pagination.current_page <= 1 || loading"
@@ -249,9 +476,22 @@
           >
             Sebelumnya
           </button>
-          <span class="px-2 py-1 font-medium text-gray-700">
-            Halaman {{ pagination.current_page }} dari {{ pagination.last_page || 1 }}
-          </span>
+
+          <div class="flex items-center gap-1 px-1">
+            <span>Halaman</span>
+            <input
+              type="number"
+              min="1"
+              :max="pagination.last_page"
+              :value="pagination.current_page"
+              @keydown.enter="onPageInputEnter($event)"
+              @blur="onPageInputBlur($event)"
+              class="w-14 h-7 text-center rounded border border-gray-200 bg-white text-xs font-semibold text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+              title="Ketik nomor halaman lalu tekan Enter"
+            />
+            <span>dari {{ pagination.last_page || 1 }}</span>
+          </div>
+
           <button
             type="button"
             :disabled="pagination.current_page >= pagination.last_page || loading"
@@ -260,14 +500,449 @@
           >
             Selanjutnya
           </button>
+          <button
+            type="button"
+            :disabled="pagination.current_page >= pagination.last_page || loading"
+            @click="fetchSubmissions(pagination.last_page)"
+            class="px-2 py-1.5 rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            title="Halaman Terakhir"
+          >
+            Terakhir &raquo;
+          </button>
+
+          <RefreshCwIcon v-if="loading" class="w-3.5 h-3.5 text-gray-400 animate-spin ml-1.5" />
         </div>
       </div>
     </div>
+
+    <!-- Edit Tracking & Status Potong Modal -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div
+          v-if="showEditModal"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
+          @click.self="showEditModal = false"
+        >
+          <div class="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden font-sans">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <div>
+                <h3 class="text-base font-bold text-gray-900">Edit Data Tracking & Status Potong</h3>
+                <p class="text-xs text-gray-500 mt-0.5">
+                  Dealer: <strong class="text-gray-800">{{ editingSubmission?.dealer_name || '-' }}</strong> 
+                  <span v-if="editingSubmission?.id_real">({{ editingSubmission?.id_real }})</span>
+                  &bull; {{ editingSubmission?.program_name }}
+                </p>
+              </div>
+              <button
+                type="button"
+                @click="showEditModal = false"
+                class="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition cursor-pointer"
+              >
+                <XIcon class="w-4 h-4" />
+              </button>
+            </div>
+
+            <!-- Modal Form Body -->
+            <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- No PO/SJ -->
+                <div>
+                  <label class="block font-semibold text-gray-700 mb-1">NO PO / SJ:</label>
+                  <input
+                    v-model="editForm.no_po_sj"
+                    type="text"
+                    placeholder="Contoh: PO/2026/09/123"
+                    class="h-9 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                  />
+                </div>
+
+                <!-- No Transaksi -->
+                <div>
+                  <label class="block font-semibold text-gray-700 mb-1">NO TRANSAKSI:</label>
+                  <input
+                    v-model="editForm.no_transaksi"
+                    type="text"
+                    placeholder="Contoh: TRX-998822"
+                    class="h-9 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                  />
+                </div>
+
+                <!-- Tgl Input -->
+                <div>
+                  <label class="block font-semibold text-gray-700 mb-1">Tgl Input:</label>
+                  <DatePicker
+                    v-model="editForm.tgl_input"
+                    placeholder="Pilih Tgl Input"
+                    format="DD/MM/YYYY"
+                  />
+                </div>
+
+                <!-- Tgl Share CN -->
+                <div>
+                  <label class="block font-semibold text-gray-700 mb-1">Tgl Share CN:</label>
+                  <DatePicker
+                    v-model="editForm.tgl_share_cn"
+                    placeholder="Pilih Tgl Share CN"
+                    format="DD/MM/YYYY"
+                  />
+                </div>
+
+                <!-- Lama Pending -->
+                <div>
+                  <label class="block font-semibold text-gray-700 mb-1">Lama Pending:</label>
+                  <input
+                    v-model="editForm.lama_pending"
+                    type="text"
+                    placeholder="Contoh: 1 Hari / Kurang dari 30 Hari"
+                    class="h-9 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                  />
+                </div>
+
+                <!-- Tanggal Potong/TF -->
+                <div>
+                  <label class="block font-semibold text-gray-700 mb-1">TANGGAL POTONG/TF:</label>
+                  <DatePicker
+                    v-model="editForm.tgl_potong_tf"
+                    placeholder="Pilih Tgl Potong/TF"
+                    format="DD/MM/YYYY"
+                  />
+                </div>
+
+                <!-- STATUS POTONG BY PURCHASE -->
+                <div>
+                  <label class="block font-semibold text-gray-700 mb-1">STATUS POTONG BY PURCHASE:</label>
+                  <select
+                    v-model="editForm.status_potong_purchase"
+                    class="h-9 w-full px-3 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-900 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
+                  >
+                    <option value="">- Belum Ditentukan -</option>
+                    <option value="BELUM BISA POTONG">BELUM BISA POTONG</option>
+                    <option value="BISA DI POTONG">BISA DI POTONG</option>
+                    <option value="SUDAH POTONG">SUDAH POTONG</option>
+                    <option value="DONE TRANSFER">DONE TRANSFER</option>
+                  </select>
+                </div>
+
+                <!-- STATUS POTONG BY AR -->
+                <div>
+                  <label class="block font-semibold text-gray-700 mb-1">STATUS POTONG BY AR:</label>
+                  <input
+                    v-model="editForm.status_potong_ar"
+                    type="text"
+                    placeholder="Contoh: DONE / PENDING"
+                    class="h-9 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                  />
+                </div>
+              </div>
+
+              <!-- CEK DOKUMEN -->
+              <div>
+                <label class="block font-semibold text-gray-700 mb-1">CEK DOKUMEN:</label>
+                <input
+                  v-model="editForm.cek_dokumen"
+                  type="text"
+                  placeholder="Contoh: LENGKAP, AGR BELUM ADA, FP KURANG..."
+                  class="h-9 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                />
+              </div>
+
+              <!-- Keterangan -->
+              <div>
+                <label class="block font-semibold text-gray-700 mb-1">Keterangan:</label>
+                <textarea
+                  v-model="editForm.keterangan"
+                  rows="2"
+                  placeholder="Catatan tambahan hasil analisis..."
+                  class="w-full p-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                ></textarea>
+              </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                @click="showEditModal = false"
+                :disabled="isSaving"
+                class="px-3.5 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-xs text-gray-700 transition cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                @click="saveEditModal"
+                :disabled="isSaving"
+                class="px-4 py-1.5 rounded-md border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              >
+                <RefreshCwIcon v-if="isSaving" class="w-3.5 h-3.5 animate-spin text-gray-500" />
+                <span>{{ isSaving ? 'Menyimpan...' : 'Simpan Perubahan' }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Modal Model AI -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div
+          v-if="showModelAiModal"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
+          @click.self="showModelAiModal = false"
+        >
+          <div class="relative w-full max-w-xl bg-white rounded-xl shadow-xl border border-gray-200 font-sans">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between rounded-t-xl">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-gray-100 text-gray-700 flex items-center justify-center shrink-0 border border-gray-200">
+                  <BotIcon class="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 class="text-sm font-semibold text-gray-900 leading-tight">Model AI</h3>
+                  <p class="text-xs text-gray-500 mt-0.5">Pilih model AI untuk evaluasi kelayakan dokumen (CN, Agr, Faktur).</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                @click="showModelAiModal = false"
+                class="w-8 h-8 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition cursor-pointer"
+              >
+                <XIcon class="w-4 h-4" />
+              </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6 space-y-4 text-xs">
+              <!-- Active Model Highlight Banner -->
+              <div class="p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-between gap-2 text-xs">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                  <span class="text-gray-600 shrink-0">Model Aktif:</span>
+                  <span class="font-mono text-[11px] font-semibold text-gray-900 bg-white px-2 py-0.5 rounded border border-gray-300 truncate">
+                    {{ selectedModel }}
+                  </span>
+                </div>
+                <span class="text-[11px] text-gray-500 font-medium shrink-0">Total {{ aiAvailableModels.length }} Model</span>
+              </div>
+
+              <!-- Custom Searchable Model Dropdown (Opens DOWNWARDS) -->
+              <div class="relative" ref="modelDropdownRef">
+                <label class="block font-medium text-gray-700 text-xs mb-1.5">Pilih Model AI (Semua Router):</label>
+
+                <!-- Trigger Button -->
+                <button
+                  type="button"
+                  @click="showModelDropdown = !showModelDropdown"
+                  class="w-full h-9 px-3 bg-white border border-gray-300 rounded-md text-xs text-gray-900 flex items-center justify-between hover:border-gray-400 focus:outline-none focus:border-gray-900 transition cursor-pointer shadow-2xs"
+                >
+                  <div class="flex items-center gap-2 min-w-0 truncate">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                    <span class="font-mono text-[11px] truncate text-gray-800">{{ selectedModel }}</span>
+                  </div>
+                  <ChevronDownIcon
+                    class="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-150"
+                    :class="showModelDropdown && 'rotate-180'"
+                  />
+                </button>
+
+                <!-- Dropdown Menu (Opens DOWNWARDS with top-full mt-1.5) -->
+                <div
+                  v-if="showModelDropdown"
+                  class="absolute top-full left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden text-xs"
+                >
+                  <!-- Search Input -->
+                  <div class="p-2 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
+                    <SearchIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                    <input
+                      v-model="modelSearchQuery"
+                      type="text"
+                      placeholder="Cari model AI... (contoh: gemini, gpt, deepseek, claude)"
+                      class="w-full bg-transparent border-none text-xs text-gray-900 placeholder-gray-400 focus:outline-none"
+                      @click.stop
+                    />
+                    <button
+                      v-if="modelSearchQuery"
+                      @click.stop="modelSearchQuery = ''"
+                      type="button"
+                      class="text-gray-400 hover:text-gray-600 cursor-pointer"
+                    >
+                      <XIcon class="w-3 h-3" />
+                    </button>
+                  </div>
+
+                  <!-- Model List Items -->
+                  <div class="max-h-48 overflow-y-auto py-1 divide-y divide-gray-50">
+                    <div
+                      v-if="filteredAiModels.length === 0"
+                      class="px-3 py-4 text-center text-gray-400 text-xs"
+                    >
+                      Tidak ada model yang cocok
+                    </div>
+                    <button
+                      v-for="m in filteredAiModels"
+                      :key="m"
+                      type="button"
+                      @click="selectModel(m)"
+                      class="w-full text-left px-3 py-2 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer"
+                      :class="selectedModel === m ? 'bg-gray-50 font-medium text-gray-900' : 'text-gray-700'"
+                    >
+                      <div class="flex items-center gap-2 min-w-0">
+                        <span
+                          class="w-1.5 h-1.5 rounded-full shrink-0"
+                          :class="selectedModel === m ? 'bg-emerald-500' : 'bg-transparent'"
+                        ></span>
+                        <span class="font-mono text-[11px] truncate">{{ m }}</span>
+                      </div>
+                      <CheckIcon v-if="selectedModel === m" class="w-3.5 h-3.5 text-gray-900 shrink-0" />
+                    </button>
+                  </div>
+
+                  <!-- Footer count -->
+                  <div class="px-3 py-1.5 bg-gray-50 border-t border-gray-100 text-[10px] text-gray-500 flex justify-between items-center">
+                    <span>{{ filteredAiModels.length }} model tersedia</span>
+                    <span class="text-gray-400">Pilih untuk mengaktifkan</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Quick Picks (Pilihan Model Unggulan) -->
+              <div class="pt-1">
+                <label class="block font-medium text-gray-700 text-xs mb-2">Pilihan Cepat Model Unggulan:</label>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div
+                    v-for="item in recommendedModels"
+                    :key="item.id"
+                    @click="selectModel(item.id)"
+                    :class="[
+                      'p-2.5 rounded-lg border transition cursor-pointer flex items-center justify-between text-left select-none',
+                      selectedModel === item.id
+                        ? 'bg-white border-gray-900 ring-1 ring-gray-900 shadow-xs'
+                        : 'bg-white border-gray-200 hover:border-gray-400 hover:bg-gray-50/50'
+                    ]"
+                  >
+                    <div class="min-w-0 pr-2">
+                      <div class="font-medium text-xs text-gray-900 flex items-center gap-1.5">
+                        <span class="truncate">{{ item.name }}</span>
+                        <span v-if="item.badge" class="px-1.5 py-0.2 rounded text-[10px] font-normal bg-gray-100 text-gray-600 border border-gray-200 shrink-0">
+                          {{ item.badge }}
+                        </span>
+                      </div>
+                      <div class="text-[10px] text-gray-400 font-mono mt-0.5 truncate">{{ item.id }}</div>
+                    </div>
+                    <div
+                      :class="[
+                        'w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition',
+                        selectedModel === item.id ? 'border-gray-900 bg-gray-900 text-white' : 'border-gray-300 bg-white'
+                      ]"
+                    >
+                      <CheckIcon v-if="selectedModel === item.id" class="w-2.5 h-2.5 stroke-[3]" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-2 rounded-b-xl">
+              <button
+                type="button"
+                @click="showModelAiModal = false"
+                class="px-3.5 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-xs text-gray-700 transition cursor-pointer"
+              >
+                Tutup
+              </button>
+              <button
+                type="button"
+                @click="saveSelectedModel"
+                :disabled="isSavingModel"
+                class="px-4 py-1.5 rounded-md border border-gray-300 bg-white hover:bg-gray-50 text-gray-800 text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              >
+                <RefreshCwIcon v-if="isSavingModel" class="w-3.5 h-3.5 animate-spin text-gray-500" />
+                <span>{{ isSavingModel ? 'Menyimpan...' : 'Simpan Model Terpilih' }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Modal Analisis AI Batch -->
+    <Teleport to="body">
+      <Transition name="modal-fade">
+        <div
+          v-if="showBatchAiModal"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
+          @click.self="showBatchAiModal = false"
+        >
+          <div class="relative w-full max-w-md bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden font-sans">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <BotIcon class="w-4 h-4 text-gray-700" />
+                <h3 class="text-sm font-semibold text-gray-900">Analisis AI Dokumen Batch</h3>
+              </div>
+              <button
+                type="button"
+                @click="showBatchAiModal = false"
+                :disabled="isAnalyzingBatch"
+                class="w-8 h-8 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition cursor-pointer"
+              >
+                <XIcon class="w-4 h-4" />
+              </button>
+            </div>
+
+            <div class="p-6 space-y-3 text-xs">
+              <p class="text-gray-600 leading-relaxed">
+                Fitur ini akan menganalisis kelengkapan dokumen <strong>Credit Note (CN)</strong>, <strong>Agreement (Agr)</strong>, dan <strong>Faktur Pajak</strong> secara otomatis untuk baris program yang belum dicek.
+              </p>
+
+              <div class="p-3 bg-gray-50 rounded-lg border border-gray-200 text-gray-800 space-y-1">
+                <div class="font-medium flex items-center gap-1.5 text-gray-900">
+                  <BotIcon class="w-4 h-4 text-gray-600" />
+                  <span>Aturan Evaluasi AI:</span>
+                </div>
+                <ul class="list-disc list-inside text-[11px] space-y-0.5 text-gray-600">
+                  <li>Ketiga dokumen lengkap &rarr; <strong>BISA DI POTONG</strong> & status LENGKAP</li>
+                  <li>Ada dokumen kurang &rarr; <strong>BELUM BISA POTONG</strong> & rincian dokumen yang belum diunggah</li>
+                </ul>
+              </div>
+
+              <!-- Batch Result summary if completed -->
+              <div v-if="batchResultSummary" class="p-3 bg-gray-50 rounded-lg border border-gray-200 text-gray-800 text-xs">
+                {{ batchResultSummary }}
+              </div>
+            </div>
+
+            <div class="px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                @click="showBatchAiModal = false"
+                :disabled="isAnalyzingBatch"
+                class="px-3.5 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-xs text-gray-700 transition cursor-pointer"
+              >
+                Tutup
+              </button>
+              <button
+                type="button"
+                @click="runBatchAiAnalysis"
+                :disabled="isAnalyzingBatch"
+                class="px-4 py-1.5 rounded-md border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              >
+                <RefreshCwIcon v-if="isAnalyzingBatch" class="w-3.5 h-3.5 animate-spin text-gray-500" />
+                <BotIcon v-else class="w-3.5 h-3.5 text-gray-600" />
+                <span>{{ isAnalyzingBatch ? 'Sedang Menganalisis...' : 'Mulai Analisis Sekarang' }}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import {
   Search as SearchIcon,
@@ -275,6 +950,16 @@ import {
   ExternalLink as ExternalLinkIcon,
   AlertCircle as AlertCircleIcon,
   CheckCircle as CheckCircleIcon,
+  Check as CheckIcon,
+  FileText as FileTextIcon,
+  Pencil as PencilIcon,
+  X as XIcon,
+  Sparkles as SparklesIcon,
+  Settings as SettingsIcon,
+  Eye as EyeIcon,
+  EyeOff as EyeOffIcon,
+  Bot as BotIcon,
+  ChevronDown as ChevronDownIcon,
 } from 'lucide-vue-next';
 import {
   Table,
@@ -285,23 +970,148 @@ import {
   TableCell,
   TableEmpty,
 } from '@/components/ui/table';
+import DatePicker from '@/components/ui/DatePicker.vue';
 
-const googleSheetUrl = 'https://docs.google.com/spreadsheets/d/1jf_i5r4Nn3q0RE6n_gIyCFn1XPlAWjYdqQOvWXewfXs/edit?resourcekey=&gid=2012509458#gid=2012509458';
+const googleSheetUrl = 'https://docs.google.com/spreadsheets/d/1jf_i5r4Nn3q0RE6n_gIyCFn1XPlAWjYdqQOvWXewfXs/edit#gid=2012509458';
 
 const submissions = ref([]);
 const regionOptions = ref([]);
+const statusPurchaseOptions = ref(['BELUM BISA POTONG', 'BISA DI POTONG', 'SUDAH POTONG', 'DONE TRANSFER']);
 const loading = ref(false);
 const isSyncing = ref(false);
+const isExporting = ref(false);
 const syncMessage = ref('');
 const syncError = ref(false);
 const autoRefresh = ref(true);
 const lastUpdatedText = ref('');
-const DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxzjxTieMwGCiviO05imy29rgiWzeDvgW8Pq6hmzzqPEduWCiVrCn-7G5gyCn1n4-c3sQ/exec';
-const configUrlInput = ref(DEFAULT_WEBAPP_URL);
+
+// AI state
+const analyzingRowId = ref(null);
+const isAnalyzingCurrent = ref(false);
+const isAnalyzingBatch = ref(false);
+const showBatchAiModal = ref(false);
+const batchResultSummary = ref('');
+
+// Dropdown Fitur AI state
+const showAiDropdown = ref(false);
+const aiDropdownRef = ref(null);
+
+const handleClickOutsideAiDropdown = (e) => {
+  if (aiDropdownRef.value && !aiDropdownRef.value.contains(e.target)) {
+    showAiDropdown.value = false;
+  }
+};
+
+const handleOpenModelAiModal = () => {
+  showAiDropdown.value = false;
+  openModelAiModal();
+};
+
+const handleTriggerBgAi = () => {
+  showAiDropdown.value = false;
+  triggerBackgroundAi();
+};
+
+const handleOpenBatchAiModal = () => {
+  showAiDropdown.value = false;
+  openBatchAiModal();
+};
+
+// Model AI modal & selection state
+const showModelAiModal = ref(false);
+const isSavingModel = ref(false);
+const isTriggeringBgAi = ref(false);
+const selectedModel = ref('ag/gemini-3-flash');
+const aiAvailableModels = ref([]);
+const showModelDropdown = ref(false);
+const modelSearchQuery = ref('');
+const modelDropdownRef = ref(null);
+
+const filteredAiModels = computed(() => {
+  if (!modelSearchQuery.value.trim()) {
+    return aiAvailableModels.value;
+  }
+  const q = modelSearchQuery.value.toLowerCase().trim();
+  return aiAvailableModels.value.filter((m) => m.toLowerCase().includes(q));
+});
+
+const selectModel = (modelId) => {
+  selectedModel.value = modelId;
+  showModelDropdown.value = false;
+  modelSearchQuery.value = '';
+};
+
+const handleClickOutsideModelDropdown = (e) => {
+  if (modelDropdownRef.value && !modelDropdownRef.value.contains(e.target)) {
+    showModelDropdown.value = false;
+  }
+};
+
+const aiStats = reactive({
+  total_2026: 0,
+  analyzed_2026: 0,
+  unanalyzed_2026: 0,
+  bisa_potong_count: 0,
+  belum_bisa_potong_count: 0,
+});
+
+const recommendedModels = [
+  {
+    id: 'ag/gemini-3-flash',
+    name: 'Gemini 3 Flash',
+    badge: 'Rekomendasi',
+    speed: '~1 detik',
+    tag: 'Sangat Cepat & Patuh JSON',
+    description: 'Model utama berkecepatan tinggi, konsisten menganalisis kelengkapan dokumen dengan akurat.',
+  },
+  {
+    id: 'cx/gpt-5.4-mini',
+    name: 'GPT 5.4 Mini',
+    badge: 'Ringan',
+    speed: '~1-2 detik',
+    tag: 'Efisien & Cepat',
+    description: 'Model ringkas dan cepat, sangat cocok untuk pemrosesan dokumen dalam jumlah besar.',
+  },
+  {
+    id: 'ag/gemini-3.7-flash-high',
+    name: 'Gemini 3.7 Flash',
+    badge: 'Akurasi Tinggi',
+    speed: '~2-3 detik',
+    tag: 'Akurasi Ekstra',
+    description: 'Model dengan penalaran lebih tinggi untuk verifikasi link dokumen yang kompleks.',
+  },
+  {
+    id: 'ag/claude-sonnet-4-6',
+    name: 'Claude Sonnet 4.6',
+    badge: 'Penalaran',
+    speed: '~3-4 detik',
+    tag: 'Penalaran Tinggi',
+    description: 'Model canggih dari Anthropic dengan pemahaman konteks mendalam dan ketat.',
+  },
+];
+
+// Edit Modal state
+const showEditModal = ref(false);
+const editingSubmission = ref(null);
+const isSaving = ref(false);
+
+const editForm = reactive({
+  no_po_sj: '',
+  no_transaksi: '',
+  tgl_input: '',
+  tgl_share_cn: '',
+  lama_pending: '',
+  keterangan: '',
+  cek_dokumen: '',
+  status_potong_purchase: '',
+  status_potong_ar: '',
+  tgl_potong_tf: '',
+});
 
 const filters = reactive({
   search: '',
   region: '',
+  status_purchase: '',
 });
 
 const pagination = reactive({
@@ -313,6 +1123,9 @@ const pagination = reactive({
 
 let debounceTimer = null;
 let pollTimer = null;
+let autoSyncTimer = null;
+let isAutoSyncing = false;
+let currentAbortController = null;
 
 const isValidUrl = (url) => {
   if (!url) return false;
@@ -328,98 +1141,157 @@ const formatTimestamp = (ts) => {
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const year = d.getFullYear();
       const hours = String(d.getHours()).padStart(2, '0');
-      const minutes = String(d.getMinutes()).padStart(2, '0');
+      const mins = String(d.getMinutes()).padStart(2, '0');
       return {
         date: `${day}/${month}/${year}`,
-        time: `${hours}:${minutes}`,
+        time: `${hours}:${mins}`,
       };
     }
   } catch (e) {
-    // fallback
+    // ignore
   }
+  return { date: ts, time: '' };
+};
 
-  if (typeof ts === 'string') {
-    if (ts.includes('T')) {
-      const parts = ts.split('T');
-      const timePart = parts[1] ? parts[1].slice(0, 5) : '';
-      return { date: parts[0], time: timePart };
+const changePerPage = () => {
+  fetchSubmissions(1);
+};
+
+const onPageInputEnter = (event) => {
+  const targetVal = parseInt(event.target.value, 10);
+  if (!isNaN(targetVal) && targetVal >= 1 && targetVal <= pagination.last_page) {
+    fetchSubmissions(targetVal);
+  } else {
+    event.target.value = pagination.current_page;
+  }
+};
+
+const onPageInputBlur = (event) => {
+  const targetVal = parseInt(event.target.value, 10);
+  if (!isNaN(targetVal) && targetVal >= 1 && targetVal <= pagination.last_page && targetVal !== pagination.current_page) {
+    fetchSubmissions(targetVal);
+  } else {
+    event.target.value = pagination.current_page;
+  }
+};
+
+const fetchSubmissions = async (page = 1, silent = false) => {
+  // Abort any prior pending request to avoid lag or queued stale requests
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
+  currentAbortController = new AbortController();
+
+  if (!silent) {
+    loading.value = true;
+  }
+  try {
+    const params = {
+      page,
+      per_page: pagination.per_page,
+    };
+    if (filters.search) params.search = filters.search;
+    if (filters.region) params.region = filters.region;
+    if (filters.status_purchase) params.status_purchase = filters.status_purchase;
+
+    const res = await axios.get('/api/program-submissions', {
+      params,
+      signal: currentAbortController.signal,
+    });
+    const data = res.data;
+
+    submissions.value = data.submissions.data || [];
+    pagination.current_page = data.submissions.current_page || 1;
+    pagination.last_page = data.submissions.last_page || 1;
+    pagination.total = data.submissions.total || 0;
+
+    if (data.regions && Array.isArray(data.regions)) {
+      regionOptions.value = data.regions;
     }
-    if (ts.includes(' ')) {
-      const parts = ts.split(' ');
-      const timePart = parts[1] ? parts[1].slice(0, 5) : '';
-      return { date: parts[0], time: timePart };
+    if (data.status_purchase_options && Array.isArray(data.status_purchase_options)) {
+      statusPurchaseOptions.value = data.status_purchase_options;
+    }
+
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const mins = String(now.getMinutes()).padStart(2, '0');
+    const secs = String(now.getSeconds()).padStart(2, '0');
+    lastUpdatedText.value = `${hours}:${mins}:${secs}`;
+  } catch (err) {
+    if (axios.isCancel(err) || err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
+      return;
+    }
+    if (!silent) {
+      syncMessage.value = 'Gagal memuat data: ' + (err.response?.data?.message || err.message);
+      syncError.value = true;
+    }
+  } finally {
+    if (!silent) {
+      loading.value = false;
     }
   }
-
-  return { date: String(ts), time: '' };
 };
 
 const debounceFetch = () => {
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
     fetchSubmissions(1);
-  }, 300);
+  }, 400);
 };
 
 const resetFilters = () => {
   filters.search = '';
   filters.region = '';
+  filters.status_purchase = '';
   fetchSubmissions(1);
 };
 
-const fetchSubmissions = async (page = 1, silent = false) => {
-  if (!silent) loading.value = true;
-  try {
-    const res = await axios.get('/api/program-submissions', {
-      params: {
-        page,
-        search: filters.search,
-        region: filters.region,
-      },
-    });
-
-    const data = res.data;
-    submissions.value = data.submissions.data || [];
-    pagination.current_page = data.submissions.current_page;
-    pagination.last_page = data.submissions.last_page;
-    pagination.per_page = data.submissions.per_page;
-    pagination.total = data.submissions.total;
-    regionOptions.value = data.regions || [];
-
-    if (data.configured_webapp_url && !configUrlInput.value) {
-      configUrlInput.value = data.configured_webapp_url;
-    }
-
-    const now = new Date();
-    lastUpdatedText.value = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  } catch (err) {
-    console.error('Gagal mengambil data submissions', err);
-  } finally {
-    if (!silent) loading.value = false;
-  }
-};
-
+// Trigger manual Google Sheet sync
 const triggerSync = async () => {
+  if (isSyncing.value) return;
   isSyncing.value = true;
   syncMessage.value = '';
   syncError.value = false;
+
   try {
     const res = await axios.post('/api/program-submissions/sync', {
-      url: configUrlInput.value || DEFAULT_WEBAPP_URL,
+      limit: 100,
     });
-    syncMessage.value = res.data.message || 'Sinkronisasi berhasil.';
+    syncMessage.value = res.data.message || 'Sinkronisasi berhasil diselesaikan.';
     syncError.value = false;
-    await fetchSubmissions(pagination.current_page, true);
+    await fetchSubmissions(1);
   } catch (err) {
+    syncMessage.value = 'Sinkronisasi gagal: ' + (err.response?.data?.message || err.message);
     syncError.value = true;
-    syncMessage.value = err.response?.data?.message || 'Gagal sinkronisasi data dari Google Apps Script.';
   } finally {
     isSyncing.value = false;
   }
 };
 
-let isAutoSyncing = false;
-let autoSyncTimer = null;
+const exportExcel = () => {
+  if (isExporting.value) return;
+  isExporting.value = true;
+
+  const params = new URLSearchParams();
+  if (filters.search) params.append('search', filters.search);
+  if (filters.region) params.append('region', filters.region);
+  if (filters.program) params.append('program', filters.program);
+  if (filters.status_purchase) params.append('status_purchase', filters.status_purchase);
+
+  const qs = params.toString();
+  const url = `/api/program-submissions/export${qs ? '?' + qs : ''}`;
+
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', '');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  setTimeout(() => {
+    isExporting.value = false;
+  }, 2000);
+};
 
 const runAutoSync = async () => {
   if (isAutoSyncing || isSyncing.value || !autoRefresh.value) return;
@@ -434,35 +1306,239 @@ const runAutoSync = async () => {
       await fetchSubmissions(pagination.current_page, true);
     }
   } catch (err) {
-    // Silent fail in background so user experience is smooth
+    // Silent fail in background
   } finally {
     isAutoSyncing = false;
   }
 };
 
+// Quick status change from row select
+const quickUpdateStatus = async (row, newStatus) => {
+  const previousStatus = row.status_potong_purchase;
+  row.status_potong_purchase = newStatus;
+
+  try {
+    await axios.patch(`/api/program-submissions/${row.id}`, {
+      status_potong_purchase: newStatus,
+    });
+    syncMessage.value = `Status potong purchase "${row.dealer_name || row.id_real}" berhasil diubah menjadi: ${newStatus || 'Belum Ditentukan'}`;
+    syncError.value = false;
+  } catch (err) {
+    row.status_potong_purchase = previousStatus;
+    syncMessage.value = 'Gagal memperbarui status potong: ' + (err.response?.data?.message || err.message);
+    syncError.value = true;
+  }
+};
+
+// AI: Analyze Single Row directly
+const analyzeRowWithAi = async (row) => {
+  analyzingRowId.value = row.id;
+  try {
+    const res = await axios.post(`/api/program-submissions/${row.id}/analyze-ai`);
+    const data = res.data.data;
+
+    // Update locally
+    row.cek_dokumen = data.cek_dokumen;
+    row.status_potong_purchase = data.status_potong_purchase;
+    row.keterangan = data.keterangan;
+
+    syncMessage.value = `Analisis AI untuk "${row.dealer_name || row.id_real}": ${data.cek_dokumen} → ${data.status_potong_purchase}`;
+    syncError.value = false;
+  } catch (err) {
+    syncMessage.value = 'Gagal menganalisis dengan AI: ' + (err.response?.data?.message || err.message);
+    syncError.value = true;
+  } finally {
+    analyzingRowId.value = null;
+  }
+};
+
+// AI: Analyze Current Row inside Edit Modal
+const analyzeCurrentRowWithAi = async () => {
+  if (!editingSubmission.value) return;
+  isAnalyzingCurrent.value = true;
+
+  try {
+    const res = await axios.post(`/api/program-submissions/${editingSubmission.value.id}/analyze-ai`);
+    const data = res.data.data;
+
+    // Update edit form fields
+    editForm.cek_dokumen = data.cek_dokumen;
+    editForm.status_potong_purchase = data.status_potong_purchase;
+    editForm.keterangan = data.keterangan;
+
+    // Also update parent submission object
+    editingSubmission.value.cek_dokumen = data.cek_dokumen;
+    editingSubmission.value.status_potong_purchase = data.status_potong_purchase;
+    editingSubmission.value.keterangan = data.keterangan;
+  } catch (err) {
+    alert('Gagal menganalisis dokumen: ' + (err.response?.data?.message || err.message));
+  } finally {
+    isAnalyzingCurrent.value = false;
+  }
+};
+
+// AI: Batch modal & execution
+const openBatchAiModal = () => {
+  batchResultSummary.value = '';
+  showBatchAiModal.value = true;
+};
+
+const runBatchAiAnalysis = async () => {
+  if (isAnalyzingBatch.value) return;
+  isAnalyzingBatch.value = true;
+  batchResultSummary.value = '';
+
+  try {
+    const res = await axios.post('/api/program-submissions/analyze-ai-batch');
+    const data = res.data.data;
+    batchResultSummary.value = `Analisis selesai! Total: ${data.total}, Berhasil: ${data.success_count}, Gagal: ${data.error_count}.`;
+    await fetchSubmissions(pagination.current_page, true);
+    syncMessage.value = res.data.message;
+    syncError.value = false;
+  } catch (err) {
+    batchResultSummary.value = 'Gagal menjalankan analisis batch: ' + (err.response?.data?.message || err.message);
+  } finally {
+    isAnalyzingBatch.value = false;
+  }
+};
+
+// Model AI Modal logic
+const openModelAiModal = async () => {
+  showModelAiModal.value = true;
+  showModelDropdown.value = false;
+  modelSearchQuery.value = '';
+  await fetchAiConfigAndStats();
+};
+
+const fetchAiConfigAndStats = async () => {
+  try {
+    const [configRes, statsRes] = await Promise.all([
+      axios.get('/api/program-submissions/ai-config'),
+      axios.get('/api/program-submissions/ai-status'),
+    ]);
+
+    if (configRes.data?.config?.model) {
+      selectedModel.value = configRes.data.config.model;
+    }
+    if (configRes.data?.models && Array.isArray(configRes.data.models)) {
+      aiAvailableModels.value = configRes.data.models;
+    }
+    if (statsRes.data) {
+      Object.assign(aiStats, statsRes.data);
+    }
+  } catch (err) {
+    // ignore
+  }
+};
+
+const saveSelectedModel = async () => {
+  isSavingModel.value = true;
+  try {
+    const res = await axios.post('/api/program-submissions/ai-config', {
+      model: selectedModel.value,
+    });
+    syncMessage.value = res.data.message || `Model AI berhasil diubah ke: ${selectedModel.value}`;
+    syncError.value = false;
+    showModelAiModal.value = false;
+  } catch (err) {
+    alert('Gagal menyimpan model AI: ' + (err.response?.data?.message || err.message));
+  } finally {
+    isSavingModel.value = false;
+  }
+};
+
+const triggerBackgroundAi = async () => {
+  if (isTriggeringBgAi.value) return;
+  isTriggeringBgAi.value = true;
+
+  try {
+    const res = await axios.post('/api/program-submissions/ai-run-background', {
+      year: '2026',
+      limit: 50,
+    });
+    syncMessage.value = `${res.data.message} Halaman tetap cepat dan data akan otomatis terupdate.`;
+    syncError.value = false;
+
+    // Refresh stats after launching
+    setTimeout(fetchAiConfigAndStats, 3000);
+  } catch (err) {
+    syncMessage.value = 'Gagal menjalankan AI di latar belakang: ' + (err.response?.data?.message || err.message);
+    syncError.value = true;
+  } finally {
+    isTriggeringBgAi.value = false;
+  }
+};
+
+// Edit Modal logic
+const openEditModal = (row) => {
+  editingSubmission.value = row;
+  editForm.no_po_sj = row.no_po_sj || '';
+  editForm.no_transaksi = row.no_transaksi || '';
+  editForm.tgl_input = row.tgl_input || '';
+  editForm.tgl_share_cn = row.tgl_share_cn || '';
+  editForm.lama_pending = row.lama_pending || '';
+  editForm.keterangan = row.keterangan || '';
+  editForm.cek_dokumen = row.cek_dokumen || '';
+  editForm.status_potong_purchase = row.status_potong_purchase || '';
+  editForm.status_potong_ar = row.status_potong_ar || '';
+  editForm.tgl_potong_tf = row.tgl_potong_tf || '';
+  showEditModal.value = true;
+};
+
+const saveEditModal = async () => {
+  if (!editingSubmission.value) return;
+  isSaving.value = true;
+
+  try {
+    const res = await axios.patch(`/api/program-submissions/${editingSubmission.value.id}`, { ...editForm });
+
+    // Update row locally
+    Object.assign(editingSubmission.value, res.data.submission || editForm);
+
+    syncMessage.value = `Data tracking "${editingSubmission.value.dealer_name || editingSubmission.value.id_real}" berhasil disimpan.`;
+    syncError.value = false;
+    showEditModal.value = false;
+  } catch (err) {
+    alert('Gagal menyimpan data tracking: ' + (err.response?.data?.message || err.message));
+  } finally {
+    isSaving.value = false;
+  }
+};
+
 onMounted(() => {
   fetchSubmissions(1);
-  // Auto-sync di background saat halaman pertama kali dibuka
-  runAutoSync();
+  fetchAiConfigAndStats();
+  document.addEventListener('click', handleClickOutsideAiDropdown);
+  document.addEventListener('click', handleClickOutsideModelDropdown);
 
-  // Refresh tampilan data setiap 15 detik
+  // Refresh tampilan data setiap 30 detik jika autoRefresh aktif
   pollTimer = setInterval(() => {
-    if (autoRefresh.value) {
+    if (autoRefresh.value && !loading.value) {
       fetchSubmissions(pagination.current_page, true);
-    }
-  }, 15000);
-
-  // Auto-sync berkala dari Google Sheets setiap 30 detik
-  autoSyncTimer = setInterval(() => {
-    if (autoRefresh.value) {
-      runAutoSync();
     }
   }, 30000);
 });
 
 onUnmounted(() => {
-  clearInterval(pollTimer);
-  clearInterval(autoSyncTimer);
+  document.removeEventListener('click', handleClickOutsideAiDropdown);
+  document.removeEventListener('click', handleClickOutsideModelDropdown);
+  if (pollTimer) clearInterval(pollTimer);
+  if (autoSyncTimer) clearInterval(autoSyncTimer);
   clearTimeout(debounceTimer);
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
 });
 </script>
+
+<style scoped>
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+</style>

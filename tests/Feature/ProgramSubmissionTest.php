@@ -6,6 +6,7 @@ use App\Models\ProgramSubmission;
 use App\Models\User;
 use App\Services\ProgramSubmissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class ProgramSubmissionTest extends TestCase
@@ -120,5 +121,214 @@ class ProgramSubmissionTest extends TestCase
 
         $service = app(ProgramSubmissionService::class);
         $this->assertEquals('https://script.google.com/macros/s/test_token/exec', $service->getWebAppUrl());
+    }
+
+    public function test_can_update_manual_tracking_columns_and_status_potong(): void
+    {
+        $user = User::factory()->create();
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:32:55',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME00652',
+            'dealer_name' => 'Abadi Cell',
+            'program_name' => 'Program SO C11 2021 Series',
+            'sales_name' => 'M RISWAN',
+            'row_hash' => 'hash_test_update',
+        ]);
+
+        $payload = [
+            'no_po_sj' => 'PO/2026/09/001',
+            'no_transaksi' => 'TRX-998822',
+            'tgl_input' => '16/09/2026',
+            'tgl_share_cn' => '16/09/2026',
+            'lama_pending' => '2',
+            'keterangan' => 'Menunggu faktur pajak',
+            'cek_dokumen' => 'AGR SUDAH ADA',
+            'status_potong_purchase' => 'SUDAH POTONG',
+            'status_potong_ar' => 'DONE',
+            'tgl_potong_tf' => '16/09/2026',
+        ];
+
+        $response = $this->actingAs($user)->patchJson("/api/program-submissions/{$submission->id}", $payload);
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('program_submissions', [
+            'id' => $submission->id,
+            'no_po_sj' => 'PO/2026/09/001',
+            'no_transaksi' => 'TRX-998822',
+            'status_potong_purchase' => 'SUDAH POTONG',
+            'cek_dokumen' => 'AGR SUDAH ADA',
+        ]);
+    }
+
+    public function test_can_filter_by_status_purchase(): void
+    {
+        $user = User::factory()->create();
+
+        ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:32:55',
+            'region' => 'BIG KARAWANG',
+            'dealer_name' => 'Toko 1',
+            'status_potong_purchase' => 'BELUM BISA POTONG',
+            'row_hash' => 'hash_f_1',
+        ]);
+
+        ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:32:55',
+            'region' => 'BIG KARAWANG',
+            'dealer_name' => 'Toko 2',
+            'status_potong_purchase' => 'SUDAH POTONG',
+            'row_hash' => 'hash_f_2',
+        ]);
+
+        $response = $this->actingAs($user)->getJson('/api/program-submissions?status_purchase=SUDAH+POTONG');
+        $response->assertStatus(200);
+        $this->assertCount(1, $response->json('submissions.data'));
+        $this->assertEquals('Toko 2', $response->json('submissions.data.0.dealer_name'));
+    }
+
+    public function test_can_analyze_submission_with_ai(): void
+    {
+        $user = User::factory()->create();
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:32:55',
+            'region' => 'BIG KARAWANG',
+            'dealer_name' => 'Complete Dealer Cell',
+            'credit_note_url' => 'https://drive.google.com/cn1',
+            'agreement_url' => 'https://drive.google.com/agr1',
+            'tax_invoice_url' => 'https://drive.google.com/faktur1',
+            'row_hash' => 'hash_complete_test',
+        ]);
+
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'id' => 'chatcmpl-test-123',
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'is_complete' => true,
+                                'cek_dokumen' => 'LENGKAP',
+                                'status_potong_purchase' => 'BISA DI POTONG',
+                                'keterangan' => 'Semua dokumen (Credit Note, Agreement, dan Faktur Pajak) lengkap dan siap diproses potong.',
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/api/program-submissions/{$submission->id}/analyze-ai");
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'data' => [
+                'cek_dokumen' => 'LENGKAP',
+                'status_potong_purchase' => 'BISA DI POTONG',
+            ],
+        ]);
+
+        $this->assertDatabaseHas('program_submissions', [
+            'id' => $submission->id,
+            'cek_dokumen' => 'LENGKAP',
+            'status_potong_purchase' => 'BISA DI POTONG',
+        ]);
+    }
+
+    public function test_can_analyze_submission_with_missing_docs_ai(): void
+    {
+        $user = User::factory()->create();
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:32:55',
+            'region' => 'BIG KARAWANG',
+            'dealer_name' => 'Incomplete Dealer Cell',
+            'credit_note_url' => 'https://drive.google.com/cn1',
+            'agreement_url' => '',
+            'tax_invoice_url' => '',
+            'row_hash' => 'hash_incomplete_test',
+        ]);
+
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'id' => 'chatcmpl-test-456',
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'is_complete' => false,
+                                'cek_dokumen' => 'AGR & FAKTUR BELUM ADA',
+                                'status_potong_purchase' => 'BELUM BISA POTONG',
+                                'keterangan' => 'Dokumen Agreement dan Faktur Pajak belum diunggah.',
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/api/program-submissions/{$submission->id}/analyze-ai");
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'data' => [
+                'cek_dokumen' => 'AGR & FAKTUR BELUM ADA',
+                'status_potong_purchase' => 'BELUM BISA POTONG',
+            ],
+        ]);
+
+        $this->assertDatabaseHas('program_submissions', [
+            'id' => $submission->id,
+            'cek_dokumen' => 'AGR & FAKTUR BELUM ADA',
+            'status_potong_purchase' => 'BELUM BISA POTONG',
+        ]);
+    }
+
+    public function test_can_get_and_save_ai_config(): void
+    {
+        $user = User::factory()->create();
+
+        $saveResponse = $this->actingAs($user)->postJson('/api/program-submissions/ai-config', [
+            'base_url' => 'https://router.rizqis.com/v1',
+            'api_key' => 'sk-test-key-1234567890',
+            'model' => 'ag/gemini-3-flash',
+        ]);
+
+        $saveResponse->assertStatus(200);
+        $saveResponse->assertJson(['success' => true]);
+
+        $getResponse = $this->actingAs($user)->getJson('/api/program-submissions/ai-config');
+        $getResponse->assertStatus(200);
+        $getResponse->assertJson([
+            'config' => [
+                'base_url' => 'https://router.rizqis.com/v1',
+                'model' => 'ag/gemini-3-flash',
+                'has_key' => true,
+            ],
+        ]);
+    }
+
+    public function test_can_export_program_submissions_to_excel(): void
+    {
+        $user = User::factory()->create();
+
+        ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:32:55',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME00652',
+            'dealer_name' => 'Abadi Cell',
+            'program_name' => 'Program SO C11 2021 Series',
+            'sales_name' => 'M RISWAN',
+            'row_hash' => 'hash_test_export_1',
+        ]);
+
+        $response = $this->actingAs($user)->get('/api/program-submissions/export');
+
+        $response->assertStatus(200);
+        $this->assertStringContainsString('spreadsheetml.sheet', (string) $response->headers->get('content-type'));
+        $this->assertStringContainsString('attachment; filename="form_program_', (string) $response->headers->get('content-disposition'));
     }
 }

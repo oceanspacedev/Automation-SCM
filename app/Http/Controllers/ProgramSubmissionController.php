@@ -3,15 +3,24 @@
 namespace App\Http\Controllers;
 
 use App\Models\ProgramSubmission;
+use App\Services\DocumentAnalysisService;
 use App\Services\ProgramSubmissionService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Process;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProgramSubmissionController extends Controller
 {
     public function __construct(
-        protected ProgramSubmissionService $service
+        protected ProgramSubmissionService $service,
+        protected DocumentAnalysisService $aiService,
     ) {}
 
     /**
@@ -26,7 +35,9 @@ class ProgramSubmissionController extends Controller
                 $q->where('dealer_name', 'like', "%{$search}%")
                     ->orWhere('id_real', 'like', "%{$search}%")
                     ->orWhere('sales_name', 'like', "%{$search}%")
-                    ->orWhere('program_name', 'like', "%{$search}%");
+                    ->orWhere('program_name', 'like', "%{$search}%")
+                    ->orWhere('no_po_sj', 'like', "%{$search}%")
+                    ->orWhere('no_transaksi', 'like', "%{$search}%");
             });
         }
 
@@ -38,23 +49,204 @@ class ProgramSubmissionController extends Controller
             $query->where('program_name', $program);
         }
 
+        if ($statusPurchase = trim((string) $request->input('status_purchase'))) {
+            $query->where('status_potong_purchase', $statusPurchase);
+        }
+
+        $cols = [
+            'id', 'submission_timestamp', 'region', 'id_real', 'dealer_name',
+            'program_name', 'sales_name', 'credit_note_url', 'agreement_url',
+            'tax_invoice_url', 'no_po_sj', 'no_transaksi', 'tgl_input',
+            'tgl_share_cn', 'lama_pending', 'keterangan', 'cek_dokumen',
+            'status_potong_purchase', 'status_potong_ar', 'tgl_potong_tf', 'updated_at',
+        ];
+
         $perPage = min((int) $request->input('per_page', 15), 100);
-        $submissions = $query->orderByDesc('id')->paginate($perPage);
+        $submissions = $query->select($cols)->orderByDesc('id')->paginate($perPage);
 
-        $regions = ProgramSubmission::whereNotNull('region')
-            ->where('region', '!=', '')
-            ->distinct()
-            ->orderBy('region')
-            ->pluck('region');
+        // Cache regions dropdown so it doesn't scan 20,850 rows on every pagination click
+        $regions = Cache::remember('program_submissions_regions_list', 300, function () {
+            return ProgramSubmission::whereNotNull('region')
+                ->where('region', '!=', '')
+                ->distinct()
+                ->orderBy('region')
+                ->pluck('region');
+        });
 
-        $latestSubmission = ProgramSubmission::latest('updated_at')->first();
+        // Fast lookup for latest sync timestamp using indexed ID
+        $lastSyncedAt = Cache::remember('program_submissions_latest_time', 30, function () {
+            return ProgramSubmission::orderByDesc('id')->value('updated_at')?->toIso8601String();
+        });
+
+        $totalSubmissions = Cache::remember('program_submissions_total_count', 30, function () {
+            return ProgramSubmission::count();
+        });
 
         return response()->json([
             'submissions' => $submissions,
             'regions' => $regions,
-            'total_submissions' => ProgramSubmission::count(),
+            'status_purchase_options' => ProgramSubmission::STATUS_PURCHASE_OPTIONS,
+            'total_submissions' => $totalSubmissions,
             'configured_webapp_url' => $this->service->getWebAppUrl(),
-            'last_synced_at' => $latestSubmission?->updated_at?->toIso8601String(),
+            'last_synced_at' => $lastSyncedAt,
+        ]);
+    }
+
+    /**
+     * Export program submissions to an Excel (.xlsx) file.
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        $query = ProgramSubmission::query();
+
+        if ($search = trim((string) $request->input('search'))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('dealer_name', 'like', "%{$search}%")
+                    ->orWhere('id_real', 'like', "%{$search}%")
+                    ->orWhere('sales_name', 'like', "%{$search}%")
+                    ->orWhere('program_name', 'like', "%{$search}%")
+                    ->orWhere('no_po_sj', 'like', "%{$search}%")
+                    ->orWhere('no_transaksi', 'like', "%{$search}%");
+            });
+        }
+
+        if ($region = trim((string) $request->input('region'))) {
+            $query->where('region', $region);
+        }
+
+        if ($program = trim((string) $request->input('program'))) {
+            $query->where('program_name', $program);
+        }
+
+        if ($statusPurchase = trim((string) $request->input('status_purchase'))) {
+            $query->where('status_potong_purchase', $statusPurchase);
+        }
+
+        $cols = [
+            'id', 'submission_timestamp', 'region', 'id_real', 'dealer_name',
+            'program_name', 'sales_name', 'credit_note_url', 'agreement_url',
+            'tax_invoice_url', 'no_po_sj', 'no_transaksi', 'tgl_input',
+            'tgl_share_cn', 'lama_pending', 'keterangan', 'cek_dokumen',
+            'status_potong_purchase', 'status_potong_ar', 'tgl_potong_tf',
+        ];
+
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+        $sheet->setTitle('Form Program');
+
+        $headers = [
+            'No',
+            'Waktu Submission',
+            'Region',
+            'ID Real',
+            'Nama Dealer',
+            'Nama Program',
+            'Nama Sales',
+            'Link CN',
+            'Link Agreement',
+            'Link Faktur Pajak',
+            'No PO / SJ',
+            'No Transaksi',
+            'Tgl Input',
+            'Tgl Share CN',
+            'Lama Pending',
+            'Keterangan',
+            'Cek Dokumen',
+            'Status Potong Purchase',
+            'Status Potong AR',
+            'Tgl Potong / TF',
+        ];
+
+        $sheet->fromArray([$headers], null, 'A1');
+
+        $sheet->getStyle('A1:T1')->getFont()->setBold(true)->setSize(10);
+        $sheet->getStyle('A1:T1')->getFill()
+            ->setFillType(Fill::FILL_SOLID)
+            ->getStartColor()->setARGB('FFF3F4F6');
+        $sheet->getStyle('A1:T1')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getRowDimension(1)->setRowHeight(26);
+
+        $dataRows = [];
+        $no = 1;
+        $query->select($cols)->orderByDesc('id')->chunk(1000, function ($items) use (&$dataRows, &$no) {
+            foreach ($items as $item) {
+                $dataRows[] = [
+                    $no++,
+                    $item->submission_timestamp ?? '',
+                    $item->region ?? '',
+                    $item->id_real ?? '',
+                    $item->dealer_name ?? '',
+                    $item->program_name ?? '',
+                    $item->sales_name ?? '',
+                    $item->credit_note_url ?? '',
+                    $item->agreement_url ?? '',
+                    $item->tax_invoice_url ?? '',
+                    $item->no_po_sj ?? '',
+                    $item->no_transaksi ?? '',
+                    $item->tgl_input ?? '',
+                    $item->tgl_share_cn ?? '',
+                    $item->lama_pending ?? '',
+                    $item->keterangan ?? '',
+                    $item->cek_dokumen ?? '',
+                    $item->status_potong_purchase ?? '',
+                    $item->status_potong_ar ?? '',
+                    $item->tgl_potong_tf ?? '',
+                ];
+            }
+        });
+
+        if (! empty($dataRows)) {
+            $sheet->fromArray($dataRows, null, 'A2');
+        }
+
+        foreach (range('A', 'T') as $col) {
+            $sheet->getColumnDimension($col)->setAutoSize(true);
+        }
+
+        $sheet->freezePane('A2');
+
+        $filename = 'form_program_'.date('Ymd_His').'.xlsx';
+        $writer = new Xlsx($spreadsheet);
+
+        return new StreamedResponse(
+            function () use ($writer) {
+                $writer->save('php://output');
+            },
+            200,
+            [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+                'Cache-Control' => 'max-age=0',
+            ]
+        );
+    }
+
+    /**
+     * Update manual tracking & status potong for a program submission.
+     */
+    public function update(Request $request, int|string $id): JsonResponse
+    {
+        $submission = ProgramSubmission::findOrFail($id);
+
+        $validated = $request->validate([
+            'no_po_sj' => 'nullable|string|max:255',
+            'no_transaksi' => 'nullable|string|max:255',
+            'tgl_input' => 'nullable|string|max:255',
+            'tgl_share_cn' => 'nullable|string|max:255',
+            'lama_pending' => 'nullable|string|max:255',
+            'keterangan' => 'nullable|string',
+            'cek_dokumen' => 'nullable|string',
+            'status_potong_purchase' => 'nullable|string|max:255',
+            'status_potong_ar' => 'nullable|string|max:255',
+            'tgl_potong_tf' => 'nullable|string|max:255',
+        ]);
+
+        $submission->update($validated);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data tracking program berhasil diperbarui.',
+            'submission' => $submission,
         ]);
     }
 
@@ -101,6 +293,214 @@ class ProgramSubmissionController extends Controller
             'message' => 'URL Google Apps Script Web App berhasil disimpan.',
             'configured_webapp_url' => $this->service->getWebAppUrl(),
         ]);
+    }
+
+    /**
+     * Analyze a single submission with AI Router.
+     */
+    public function analyzeAi(int|string $id): JsonResponse
+    {
+        $submission = ProgramSubmission::findOrFail($id);
+
+        try {
+            $result = $this->aiService->analyzeSubmission($submission);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Analisis AI berhasil diproses.',
+                'data' => $result,
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menganalisis dokumen dengan AI: '.$e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Analyze multiple submissions in batch with AI Router.
+     */
+    public function analyzeAiBatch(Request $request): JsonResponse
+    {
+        $ids = $request->input('ids');
+        $year = $request->input('year', '2026');
+        $limit = min(50, max(1, (int) $request->input('limit', 10)));
+
+        if (! is_array($ids) || empty($ids)) {
+            $query = ProgramSubmission::query();
+            if ($year) {
+                $query->where('submission_timestamp', 'like', "{$year}%");
+            }
+
+            $ids = $query->where(function ($q) {
+                $q->whereNull('cek_dokumen')
+                    ->orWhere('cek_dokumen', '')
+                    ->orWhereNull('status_potong_purchase')
+                    ->orWhere('status_potong_purchase', '');
+            })
+                ->orderByRaw("
+                (CASE WHEN credit_note_url != '' AND credit_note_url IS NOT NULL THEN 1 ELSE 0 END
+                 + CASE WHEN agreement_url != '' AND agreement_url IS NOT NULL THEN 1 ELSE 0 END
+                 + CASE WHEN tax_invoice_url != '' AND tax_invoice_url IS NOT NULL THEN 1 ELSE 0 END) DESC, id DESC
+            ")
+                ->limit($limit)
+                ->pluck('id')
+                ->all();
+        }
+
+        if (empty($ids)) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Tidak ada data program yang perlu dianalisis.',
+                'data' => [
+                    'total' => 0,
+                    'success_count' => 0,
+                    'error_count' => 0,
+                    'results' => [],
+                ],
+            ]);
+        }
+
+        try {
+            $result = $this->aiService->analyzeBatch($ids);
+
+            return response()->json([
+                'success' => true,
+                'message' => "Analisis AI selesai. {$result['success_count']} berhasil, {$result['error_count']} gagal.",
+                'data' => $result,
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memproses analisis AI batch: '.$e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Get current AI Router config and available models.
+     */
+    public function getAiConfig(): JsonResponse
+    {
+        $config = $this->aiService->getConfig();
+        $models = $this->aiService->getAvailableModels();
+
+        return response()->json([
+            'config' => [
+                'base_url' => $config['base_url'],
+                'api_key_masked' => ! empty($config['api_key'])
+                    ? substr($config['api_key'], 0, 8).'••••••••'.substr($config['api_key'], -4)
+                    : '',
+                'model' => $config['model'],
+                'has_key' => ! empty($config['api_key']),
+            ],
+            'models' => $models,
+        ]);
+    }
+
+    /**
+     * Save AI Router configuration / selected model.
+     */
+    public function saveAiConfig(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'base_url' => 'nullable|url',
+            'api_key' => 'nullable|string',
+            'model' => 'required|string',
+        ]);
+
+        $current = $this->aiService->getConfig();
+        $baseUrl = ! empty($validated['base_url']) ? $validated['base_url'] : $current['base_url'];
+        $apiKey = ! empty($validated['api_key']) ? $validated['api_key'] : $current['api_key'];
+
+        $this->aiService->saveConfig($baseUrl, $apiKey, $validated['model']);
+
+        return response()->json([
+            'success' => true,
+            'message' => "Model AI berhasil diubah ke: {$validated['model']}",
+            'config' => [
+                'base_url' => $baseUrl,
+                'model' => $validated['model'],
+                'has_key' => ! empty($apiKey),
+            ],
+        ]);
+    }
+
+    /**
+     * Get real-time AI status statistics for 2026 submissions.
+     */
+    public function getAiStatus(): JsonResponse
+    {
+        $config = $this->aiService->getConfig();
+
+        $total2026 = ProgramSubmission::where('submission_timestamp', 'like', '2026%')->count();
+        $analyzed2026 = ProgramSubmission::where('submission_timestamp', 'like', '2026%')
+            ->whereNotNull('status_potong_purchase')
+            ->where('status_potong_purchase', '!=', '')
+            ->count();
+        $unanalyzed2026 = max(0, $total2026 - $analyzed2026);
+
+        $bisaPotong = ProgramSubmission::where('submission_timestamp', 'like', '2026%')
+            ->where('status_potong_purchase', 'BISA DI POTONG')
+            ->count();
+        $belumBisaPotong = ProgramSubmission::where('submission_timestamp', 'like', '2026%')
+            ->where('status_potong_purchase', 'BELUM BISA POTONG')
+            ->count();
+
+        return response()->json([
+            'current_model' => $config['model'],
+            'total_2026' => $total2026,
+            'analyzed_2026' => $analyzed2026,
+            'unanalyzed_2026' => $unanalyzed2026,
+            'bisa_potong_count' => $bisaPotong,
+            'belum_bisa_potong_count' => $belumBisaPotong,
+        ]);
+    }
+
+    /**
+     * Run AI analysis in the background without blocking the web server.
+     */
+    public function runAiInBackground(Request $request): JsonResponse
+    {
+        $year = (string) $request->input('year', '2026');
+        $limit = min(100, max(5, (int) $request->input('limit', 25)));
+
+        Process::path(base_path())
+            ->start([
+                PHP_BINARY,
+                base_path('artisan'),
+                'program:auto-analyze-ai',
+                "--year={$year}",
+                "--limit={$limit}",
+                '--sleep=0.1',
+            ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "AI di latar belakang berhasil dijalankan untuk {$limit} data tahun {$year}.",
+        ]);
+    }
+
+    /**
+     * Test connection to AI Router.
+     */
+    public function testAiConnection(Request $request): JsonResponse
+    {
+        try {
+            $res = $this->aiService->testConnection(
+                $request->input('base_url'),
+                $request->input('api_key'),
+                $request->input('model'),
+            );
+
+            return response()->json($res);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 
     /**

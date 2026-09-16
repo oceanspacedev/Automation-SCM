@@ -12,7 +12,7 @@ class InvoiceCalculatorTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->calculator = new InvoiceCalculator();
+        $this->calculator = new InvoiceCalculator;
     }
 
     public function test_calculate_badan_pph_2_percent(): void

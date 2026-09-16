@@ -67,12 +67,12 @@
           @input="debounceFetch"
           type="text"
           placeholder="Filter invoice, dealer, customer, email..."
-          class="h-9 w-64 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
+          class="h-9 w-64 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
         />
         <select
           v-model="filters.invoice_type"
           @change="fetchInvoices(1)"
-          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-black"
+          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
         >
           <option value="">Semua Tipe</option>
           <option value="DSA">DSA</option>
@@ -82,7 +82,7 @@
         <select
           v-model="filters.status"
           @change="fetchInvoices(1)"
-          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-black"
+          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
         >
           <option value="">Semua Status</option>
           <option value="generated">Generated</option>
@@ -94,11 +94,11 @@
           <PopoverTrigger as-child>
             <button
               :class="[
-                'h-9 px-3 inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-black transition',
+                'h-9 px-3 inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white text-xs text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-black transition cursor-pointer',
                 !filters.date && 'text-gray-400'
               ]"
             >
-              <CalendarIcon class="h-4 w-4" />
+              <CalendarIcon class="h-3.5 w-3.5" />
               {{ filters.date ? formatDateDisplay(filters.date) : 'Pilih tanggal' }}
             </button>
           </PopoverTrigger>
@@ -113,7 +113,7 @@
         <button
           v-if="filters.search || filters.invoice_type || filters.status || filters.date"
           @click="resetFilters"
-          class="h-9 px-3 text-sm text-gray-500 hover:text-black cursor-pointer"
+          class="h-9 px-3 text-xs text-gray-500 hover:text-black cursor-pointer"
         >
           Reset
         </button>
@@ -136,15 +136,15 @@
                 title="Pilih semua yang belum dikirim di halaman ini"
               />
             </TableHead>
-            <TableHead class="w-[150px] whitespace-nowrap">Invoice</TableHead>
-            <TableHead class="w-[110px] whitespace-nowrap">Status</TableHead>
-            <TableHead class="min-w-[140px]">Dealer</TableHead>
-            <TableHead class="min-w-[130px]">Customer</TableHead>
-            <TableHead class="min-w-[130px]">Email</TableHead>
-            <TableHead class="w-[110px] whitespace-nowrap">WhatsApp</TableHead>
-            <TableHead class="w-[95px] whitespace-nowrap">Tanggal</TableHead>
-            <TableHead class="text-right w-[120px] whitespace-nowrap">Amount</TableHead>
-            <TableHead class="text-right w-[225px] whitespace-nowrap">Action</TableHead>
+            <TableHead class="w-[150px] whitespace-nowrap text-xs">Invoice</TableHead>
+            <TableHead class="w-[110px] whitespace-nowrap text-xs">Status</TableHead>
+            <TableHead class="min-w-[140px] text-xs">Dealer</TableHead>
+            <TableHead class="min-w-[130px] text-xs">Customer</TableHead>
+            <TableHead class="min-w-[130px] text-xs">Email</TableHead>
+            <TableHead class="w-[110px] whitespace-nowrap text-xs">WhatsApp</TableHead>
+            <TableHead class="w-[95px] whitespace-nowrap text-xs">Tanggal</TableHead>
+            <TableHead class="text-right w-[120px] whitespace-nowrap text-xs">Amount</TableHead>
+            <TableHead class="text-right w-[225px] whitespace-nowrap text-xs">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -166,96 +166,96 @@
                 :title="isAlreadySent(inv) ? 'Sudah dikirim' : (!hasDestination(inv) ? 'Tidak ada email atau nomor WhatsApp' : 'Pilih invoice ini')"
               />
             </TableCell>
-            <TableCell>
-              <router-link :to="`/invoices/${inv.id}`" class="hover:underline font-medium">
+            <TableCell class="text-xs">
+              <router-link :to="`/invoices/${inv.id}`" class="hover:underline font-medium text-xs">
                 {{ inv.invoice_number }}
               </router-link>
             </TableCell>
             <!-- Status Badge -->
-            <TableCell>
+            <TableCell class="text-xs">
               <!-- Fully Sent: Email & WhatsApp -->
               <span
                 v-if="isFullySent(inv)"
-                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs whitespace-nowrap"
+                class="inline-flex items-center gap-1.5 text-xs text-gray-700 whitespace-nowrap"
                 title="Email & WhatsApp sudah terkirim"
               >
-                <CheckCircleIcon class="h-3 w-3 text-emerald-600 shrink-0" />
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
                 <span>Email & WA</span>
               </span>
 
               <!-- Email Sent Only -->
               <span
                 v-else-if="inv.email_sent_at && !inv.whatsapp_sent_at"
-                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs whitespace-nowrap"
+                class="inline-flex items-center gap-1.5 text-xs text-gray-700 whitespace-nowrap"
                 title="Email sudah terkirim"
               >
-                <CheckCircleIcon class="h-3 w-3 text-emerald-600 shrink-0" />
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
                 <span>Email Sent</span>
               </span>
 
               <!-- WhatsApp Sent Only -->
               <span
                 v-else-if="!inv.email_sent_at && inv.whatsapp_sent_at"
-                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs whitespace-nowrap"
+                class="inline-flex items-center gap-1.5 text-xs text-gray-700 whitespace-nowrap"
                 title="WhatsApp sudah terkirim"
               >
-                <CheckCircleIcon class="h-3 w-3 text-emerald-600 shrink-0" />
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
                 <span>WA Sent</span>
               </span>
 
               <!-- Sent / Terkirim Generic -->
               <span
                 v-else-if="inv.status === 'sent'"
-                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs whitespace-nowrap"
+                class="inline-flex items-center gap-1.5 text-xs text-gray-700 whitespace-nowrap"
               >
-                <CheckCircleIcon class="h-3 w-3 text-emerald-600 shrink-0" />
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
                 <span>Terkirim</span>
               </span>
 
-              <!-- Generated (Neutral Slate) -->
+              <!-- Generated -->
               <span
                 v-else-if="inv.status === 'generated'"
-                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 shadow-2xs whitespace-nowrap"
+                class="inline-flex items-center gap-1.5 text-xs text-gray-500 whitespace-nowrap"
               >
-                <span class="h-1.5 w-1.5 rounded-full bg-gray-400 shrink-0"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0"></span>
                 <span>Generated</span>
               </span>
 
               <!-- Paid -->
               <span
                 v-else-if="inv.status === 'paid'"
-                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs whitespace-nowrap"
+                class="inline-flex items-center gap-1.5 text-xs text-gray-700 whitespace-nowrap"
               >
-                <span class="h-1.5 w-1.5 rounded-full bg-purple-500 shrink-0"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
                 <span>Paid</span>
               </span>
 
               <!-- Failed / Gagal -->
               <span
                 v-else-if="inv.status === 'failed'"
-                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs whitespace-nowrap"
+                class="inline-flex items-center gap-1.5 text-xs text-rose-600 whitespace-nowrap"
               >
-                <AlertCircleIcon class="h-3 w-3 text-rose-500 shrink-0" />
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
                 <span>Gagal</span>
               </span>
 
               <!-- Fallback -->
               <span
                 v-else
-                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 shadow-2xs capitalize whitespace-nowrap"
+                class="inline-flex items-center gap-1.5 text-xs text-gray-700 capitalize whitespace-nowrap"
               >
-                <span class="h-1.5 w-1.5 rounded-full bg-gray-400 shrink-0"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0"></span>
                 <span>{{ inv.status }}</span>
               </span>
             </TableCell>
-            <TableCell class="max-w-[170px] truncate" :title="`${inv.dealer_code} - ${inv.dealer_name}`">
+            <TableCell class="max-w-[170px] truncate text-xs" :title="`${inv.dealer_code} - ${inv.dealer_name}`">
               {{ inv.dealer_code }} - {{ inv.dealer_name }}
             </TableCell>
-            <TableCell class="max-w-[150px] truncate" :title="inv.customer_name">
+            <TableCell class="max-w-[150px] truncate text-xs" :title="inv.customer_name">
               {{ inv.customer_name || '-' }}
             </TableCell>
             <!-- Email -->
-            <TableCell class="max-w-[140px] truncate" :title="inv.email || inv.draft?.email">
+            <TableCell class="max-w-[140px] truncate text-xs" :title="inv.email || inv.draft?.email">
               {{ inv.email || inv.draft?.email || '-' }}
             </TableCell>
             <!-- WhatsApp -->
@@ -270,7 +270,7 @@
             </TableCell>
 
             <!-- Modern Action Buttons With Pixel-Perfect Vertical Alignment -->
-            <TableCell class="text-right w-[225px] whitespace-nowrap">
+            <TableCell class="text-right w-[225px] whitespace-nowrap text-xs">
               <div class="flex items-center justify-end gap-1.5">
                 <!-- 1. View / Detail Icon -->
                 <router-link
@@ -344,7 +344,7 @@
     </div>
 
     <!-- Pagination (Shadcn style) -->
-    <div class="flex items-center justify-between py-2 text-sm text-gray-500">
+    <div class="flex items-center justify-between py-2 text-xs text-gray-500">
       <div>
         Menampilkan {{ pagination.total > 0 ? (pagination.current_page - 1) * pagination.per_page + 1 : 0 }} sampai {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} dari {{ pagination.total }} invoice.
       </div>
@@ -352,17 +352,17 @@
         <button
           @click="fetchInvoices(pagination.current_page - 1)"
           :disabled="pagination.current_page <= 1"
-          class="h-8 px-3 rounded-md border border-gray-200 text-sm font-medium hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+          class="h-8 px-3 rounded-md border border-gray-200 text-xs font-medium hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
         >
           Previous
         </button>
-        <span class="text-sm font-medium text-gray-700">
+        <span class="text-xs font-medium text-gray-700">
           Halaman {{ pagination.current_page }} dari {{ pagination.last_page }}
         </span>
         <button
           @click="fetchInvoices(pagination.current_page + 1)"
           :disabled="pagination.current_page >= pagination.last_page"
-          class="h-8 px-3 rounded-md border border-gray-200 text-sm font-medium hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+          class="h-8 px-3 rounded-md border border-gray-200 text-xs font-medium hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
         >
           Next
         </button>

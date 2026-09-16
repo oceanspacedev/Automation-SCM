@@ -8,11 +8,6 @@ class InvoiceCalculator
 {
     /**
      * Calculate tax and payments based on Excel formulas.
-     *
-     * @param float $supportAmount
-     * @param string|null $pphType
-     * @param string|null $npwpType
-     * @return array
      */
     public function calculateFromValues(float $supportAmount, ?string $pphType, ?string $npwpType = null): array
     {
@@ -55,9 +50,6 @@ class InvoiceCalculator
 
     /**
      * Calculate based on a Draft model.
-     *
-     * @param Draft $draft
-     * @return array
      */
     public function calculate(Draft $draft): array
     {
@@ -86,9 +78,15 @@ class InvoiceCalculator
             if ($val > 0 && $val < 1) {
                 return $val;
             }
-            if ($val == 2) return 0.02;
-            if ($val == 15) return 0.15;
-            if ($val == 2.5) return 0.025;
+            if ($val == 2) {
+                return 0.02;
+            }
+            if ($val == 15) {
+                return 0.15;
+            }
+            if ($val == 2.5) {
+                return 0.025;
+            }
         }
 
         return match ($type) {
@@ -135,7 +133,7 @@ class InvoiceCalculator
             $diff = round(abs($excelVal - $systemVal), 2);
             $isMatch = ($diff < 1.0); // allow fractional rounding tolerance < 1
 
-            if (!$isMatch) {
+            if (! $isMatch) {
                 $allMatch = false;
             }
 

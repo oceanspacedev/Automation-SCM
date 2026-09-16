@@ -201,40 +201,40 @@
             <TableCell class="whitespace-nowrap text-xs">
               {{ draft.invoice_date || '-' }}
             </TableCell>
-            <TableCell class="whitespace-nowrap">
-              <!-- Ready (Clean Neutral) -->
+            <TableCell class="whitespace-nowrap text-xs">
+              <!-- Ready -->
               <span
                 v-if="draft.status === 'ready'"
-                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 shadow-2xs whitespace-nowrap"
+                class="inline-flex items-center gap-1.5 text-xs text-gray-500 whitespace-nowrap"
               >
-                <span class="h-1.5 w-1.5 rounded-full bg-gray-400 shrink-0"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0"></span>
                 <span>Ready</span>
               </span>
 
               <!-- Invoiced -->
               <span
                 v-else-if="draft.status === 'invoiced'"
-                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs whitespace-nowrap"
+                class="inline-flex items-center gap-1.5 text-xs text-gray-700 whitespace-nowrap"
               >
-                <CheckCircleIcon class="h-3 w-3 text-emerald-600 shrink-0" />
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
                 <span>Invoiced</span>
               </span>
 
               <!-- Error -->
               <span
                 v-else-if="draft.status === 'error'"
-                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 shadow-2xs whitespace-nowrap"
+                class="inline-flex items-center gap-1.5 text-xs text-rose-600 whitespace-nowrap"
               >
-                <AlertCircleIcon class="h-3 w-3 text-amber-600 shrink-0" />
+                <span class="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
                 <span>Error</span>
               </span>
 
               <!-- Fallback -->
               <span
                 v-else
-                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 shadow-2xs capitalize whitespace-nowrap"
+                class="inline-flex items-center gap-1.5 text-xs text-gray-700 capitalize whitespace-nowrap"
               >
-                <span class="h-1.5 w-1.5 rounded-full bg-gray-400 shrink-0"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0"></span>
                 <span>{{ draft.status }}</span>
               </span>
             </TableCell>

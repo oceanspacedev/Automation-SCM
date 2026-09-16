@@ -43,8 +43,17 @@ Route::prefix('api')->group(function () {
 
     // Program Submissions (Google Sheets / Form REALME)
     Route::get('/program-submissions', [ProgramSubmissionController::class, 'index']);
+    Route::get('/program-submissions/export', [ProgramSubmissionController::class, 'export']);
+    Route::patch('/program-submissions/{id}', [ProgramSubmissionController::class, 'update']);
     Route::post('/program-submissions/sync', [ProgramSubmissionController::class, 'sync']);
     Route::post('/program-submissions/config', [ProgramSubmissionController::class, 'saveConfig']);
+    Route::post('/program-submissions/{id}/analyze-ai', [ProgramSubmissionController::class, 'analyzeAi']);
+    Route::post('/program-submissions/analyze-ai-batch', [ProgramSubmissionController::class, 'analyzeAiBatch']);
+    Route::get('/program-submissions/ai-config', [ProgramSubmissionController::class, 'getAiConfig']);
+    Route::post('/program-submissions/ai-config', [ProgramSubmissionController::class, 'saveAiConfig']);
+    Route::get('/program-submissions/ai-status', [ProgramSubmissionController::class, 'getAiStatus']);
+    Route::post('/program-submissions/ai-run-background', [ProgramSubmissionController::class, 'runAiInBackground']);
+    Route::post('/program-submissions/ai-test', [ProgramSubmissionController::class, 'testAiConnection']);
     Route::post('/webhooks/form-program', [ProgramSubmissionController::class, 'webhook']);
 });
 
