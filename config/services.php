@@ -40,6 +40,7 @@ return [
         'token' => env('WAG_TOKEN'),
         'verify_ssl' => env('WAG_VERIFY_SSL', false),
         'public_url' => env('WAG_PUBLIC_URL', env('APP_URL')),
+        'ar_phone' => env('AR_DEFAULT_PHONE', '081224290502'),
     ],
 
     'openai_compatible' => [

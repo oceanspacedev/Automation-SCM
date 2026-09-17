@@ -4,12 +4,16 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DraftController;
 use App\Http\Controllers\DraftImportController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\ProgramClaimConfirmationController;
 use App\Http\Controllers\ProgramSubmissionController;
 use Illuminate\Support\Facades\Route;
 
 // Invoice preview & PDF download
 Route::get('/invoices/{id}/preview', [InvoiceController::class, 'preview'])->name('invoices.preview');
 Route::get('/invoices/{id}/pdf', [InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
+
+// Program Claim Confirmation 1-Click Action Link
+Route::get('/p/confirm/{id}', [ProgramClaimConfirmationController::class, 'confirm'])->name('program-submissions.confirm');
 
 // API Endpoints
 Route::prefix('api')->group(function () {
@@ -54,10 +58,11 @@ Route::prefix('api')->group(function () {
     Route::get('/program-submissions/ai-status', [ProgramSubmissionController::class, 'getAiStatus']);
     Route::post('/program-submissions/ai-run-background', [ProgramSubmissionController::class, 'runAiInBackground']);
     Route::post('/program-submissions/ai-test', [ProgramSubmissionController::class, 'testAiConnection']);
+    Route::post('/program-submissions/{id}/send-wa-ar', [ProgramSubmissionController::class, 'sendWaToAr']);
     Route::post('/webhooks/form-program', [ProgramSubmissionController::class, 'webhook']);
 });
 
 // SPA catch-all
 Route::get('/{any?}', function () {
     return view('app');
-})->where('any', '^(?!api|invoices\/[0-9]+\/(preview|pdf)|storage).*$');
+})->where('any', '^(?!api|p\/confirm|invoices\/[0-9]+\/(preview|pdf)|storage).*$');

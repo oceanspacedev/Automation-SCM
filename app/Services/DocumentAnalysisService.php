@@ -187,18 +187,18 @@ class DocumentAnalysisService
         $cekDokumen = trim((string) ($parsed['cek_dokumen'] ?? ''));
         $keterangan = trim((string) ($parsed['keterangan'] ?? ''));
 
-        // Automatically update the submission
+        // Automatically update the submission (preserve keterangan for pending/aging 30 days status)
         $submission->update([
             'cek_dokumen' => $cekDokumen,
             'status_potong_purchase' => $statusPurchase,
-            'keterangan' => $keterangan,
         ]);
 
         return [
             'submission' => $submission->fresh(),
             'cek_dokumen' => $cekDokumen,
             'status_potong_purchase' => $statusPurchase,
-            'keterangan' => $keterangan,
+            'keterangan' => $submission->keterangan,
+            'ai_keterangan' => $keterangan,
             'raw_analysis' => $parsed,
         ];
     }

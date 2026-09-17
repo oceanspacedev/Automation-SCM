@@ -3,12 +3,14 @@
 namespace App\Services;
 
 use App\Models\Invoice;
+use App\Models\ProgramSubmission;
 use App\Models\WhatsAppLog;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Exception;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 
 class WhatsAppService
@@ -319,5 +321,152 @@ class WhatsAppService
         }
 
         return null;
+    }
+
+    /**
+     * Send program claim notification message to AR with 1-click action links.
+     *
+     * @return array{success: bool, message: string, provider_id: ?string}
+     */
+    public function sendProgramClaimNotificationToAr(ProgramSubmission $submission, ?string $overridePhone = null): array
+    {
+        $phone = $overridePhone ?: config('services.wag.ar_phone', '081224290502');
+        $cleanPhone = $this->formatPhone($phone);
+
+        if (empty($cleanPhone)) {
+            return [
+                'success' => false,
+                'message' => 'Nomor WhatsApp AR tidak valid atau belum disetel.',
+                'provider_id' => null,
+            ];
+        }
+
+        $apiUrl = rtrim(config('services.wag.url', 'https://waghub.mekayastudio.com'), '/').'/api/v1/messages';
+        $token = config('services.wag.token');
+
+        if (empty($token)) {
+            return [
+                'success' => false,
+                'message' => 'WAG_TOKEN belum dikonfigurasi pada sistem.',
+                'provider_id' => null,
+            ];
+        }
+
+        if ($customBase = config('services.wag.public_url')) {
+            URL::forceRootUrl(rtrim($customBase, '/'));
+        }
+
+        // Generate signed URLs valid for 30 days
+        $potongUrl = URL::temporarySignedRoute(
+            'program-submissions.confirm',
+            now()->addDays(30),
+            ['id' => $submission->id, 'action' => 'potong']
+        );
+
+        $tundaUrl = URL::temporarySignedRoute(
+            'program-submissions.confirm',
+            now()->addDays(30),
+            ['id' => $submission->id, 'action' => 'tunda']
+        );
+
+        $messageText = $this->buildProgramClaimMessage($submission, $potongUrl, $tundaUrl);
+        $uuid = Str::uuid()->toString();
+
+        $payload = [
+            'idempotency_key' => $uuid,
+            'recipient' => [
+                'type' => 'phone',
+                'value' => $cleanPhone,
+            ],
+            'message' => [
+                'type' => 'text',
+                'text' => $messageText,
+            ],
+            'purpose' => 'transactional',
+            'mode' => 'async',
+            'route_key' => 'default',
+            'client_reference' => "PROGRAM-CLAIM-{$submission->id}",
+        ];
+
+        try {
+            $client = Http::withHeaders([
+                'Authorization' => 'Bearer '.$token,
+                'Accept' => 'application/json',
+                'Content-Type' => 'application/json',
+                'Idempotency-Key' => $uuid,
+            ])->timeout(20);
+
+            if (! config('services.wag.verify_ssl', false)) {
+                $client = $client->withoutVerifying();
+            }
+
+            $response = $client->post($apiUrl, $payload);
+            $data = $response->json();
+            $providerMessageId = $data['data']['provider_message_id'] ?? ($data['data']['id'] ?? null);
+
+            if ($response->successful() && ($response->status() === 200 || $response->status() === 201)) {
+                return [
+                    'success' => true,
+                    'message' => "Notifikasi klaim program {$submission->dealer_name} berhasil dikirim ke WhatsApp AR ({$cleanPhone}).",
+                    'provider_id' => $providerMessageId,
+                ];
+            }
+
+            $errorMessage = $data['message'] ?? ('HTTP Error '.$response->status());
+            if (! empty($data['errors'])) {
+                $errorMessage .= ' ('.json_encode($data['errors']).')';
+            }
+
+            return [
+                'success' => false,
+                'message' => 'Gagal mengirim pesan WhatsApp ke AR: '.$errorMessage,
+                'provider_id' => null,
+            ];
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Exception pengiriman WhatsApp ke AR: '.$e->getMessage(),
+                'provider_id' => null,
+            ];
+        }
+    }
+
+    /**
+     * Build formatted Indonesian WhatsApp message for AR program claim confirmation.
+     */
+    public function buildProgramClaimMessage(ProgramSubmission $submission, string $potongUrl, string $tundaUrl): string
+    {
+        $dealerName = $submission->dealer_name ?: '-';
+        $idReal = $submission->id_real ?: '-';
+        $programName = $submission->program_name ?: '-';
+        $region = $submission->region ?: '-';
+        $salesName = $submission->sales_name ?: '-';
+        $cekDokumen = $submission->cek_dokumen ?: 'LENGKAP';
+
+        $lines = [
+            '*PEMBERITAHUAN KLAIM BISA DIPOTONG*',
+            '',
+            'Halo Tim AR, dokumen klaim program berikut telah lengkap dan siap diproses potong:',
+            '',
+            "*ID Real:* {$idReal}",
+            "*Dealer:* {$dealerName}",
+            "*Region:* {$region}",
+            "*Program:* {$programName}",
+            "*Sales:* {$salesName}",
+            "*Status Dokumen:* {$cekDokumen}",
+            '*Status Purchase:* BISA DI POTONG',
+            '',
+            'Silakan tawarkan ke dealer/customer. Jika sudah disetujui, silakan konfirmasi melalui tautan berikut:',
+            '',
+            '*Konfirmasi Sudah Dipotong:*',
+            $potongUrl,
+            '',
+            '*Konfirmasi Tunda:*',
+            $tundaUrl,
+            '',
+            '_SCM Automation - Realme_',
+        ];
+
+        return implode("\n", $lines);
     }
 }

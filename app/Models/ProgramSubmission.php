@@ -13,6 +13,11 @@ class ProgramSubmission extends Model
         'DONE TRANSFER',
     ];
 
+    public const KETERANGAN_OPTIONS = [
+        'LEBIH DARI 30 HARI',
+        'KURANG DARI 30 HARI',
+    ];
+
     protected $guarded = ['id'];
 
     protected $casts = [

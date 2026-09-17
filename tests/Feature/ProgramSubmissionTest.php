@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\ProgramSubmissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class ProgramSubmissionTest extends TestCase
@@ -189,6 +190,33 @@ class ProgramSubmissionTest extends TestCase
         $this->assertEquals('Toko 2', $response->json('submissions.data.0.dealer_name'));
     }
 
+    public function test_can_filter_by_keterangan(): void
+    {
+        $user = User::factory()->create();
+
+        ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:32:55',
+            'region' => 'BIG KARAWANG',
+            'dealer_name' => 'Toko 30 Plus',
+            'keterangan' => 'LEBIH DARI 30 HARI',
+            'row_hash' => 'hash_k_1',
+        ]);
+
+        ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:32:55',
+            'region' => 'BIG KARAWANG',
+            'dealer_name' => 'Toko 30 Minus',
+            'keterangan' => 'KURANG DARI 30 HARI',
+            'row_hash' => 'hash_k_2',
+        ]);
+
+        $response = $this->actingAs($user)->getJson('/api/program-submissions?keterangan=LEBIH+DARI+30+HARI');
+        $response->assertStatus(200);
+        $this->assertCount(1, $response->json('submissions.data'));
+        $this->assertEquals('Toko 30 Plus', $response->json('submissions.data.0.dealer_name'));
+        $this->assertContains('LEBIH DARI 30 HARI', $response->json('keterangan_options'));
+    }
+
     public function test_can_analyze_submission_with_ai(): void
     {
         $user = User::factory()->create();
@@ -330,5 +358,89 @@ class ProgramSubmissionTest extends TestCase
         $response->assertStatus(200);
         $this->assertStringContainsString('spreadsheetml.sheet', (string) $response->headers->get('content-type'));
         $this->assertStringContainsString('attachment; filename="form_program_', (string) $response->headers->get('content-disposition'));
+    }
+
+    public function test_can_send_wa_notification_to_ar(): void
+    {
+        $user = User::factory()->create();
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:32:55',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME00652',
+            'dealer_name' => 'Abadi Cell',
+            'program_name' => 'Program SO C11 2021 Series',
+            'sales_name' => 'M RISWAN',
+            'status_potong_purchase' => 'BISA DI POTONG',
+            'row_hash' => 'hash_test_wa_ar',
+        ]);
+
+        Http::fake([
+            '*/api/v1/messages' => Http::response([
+                'status' => 'success',
+                'data' => [
+                    'id' => 'msg-12345',
+                    'provider_message_id' => 'wamid-12345',
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/api/program-submissions/{$submission->id}/send-wa-ar");
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/api/v1/messages') &&
+                $request['recipient']['value'] === '6281224290502' &&
+                str_contains($request['message']['text'], 'BISA DI POTONG') &&
+                str_contains($request['message']['text'], '/p/confirm/');
+        });
+    }
+
+    public function test_ar_can_confirm_potong_via_signed_url(): void
+    {
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:32:55',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME00652',
+            'dealer_name' => 'Abadi Cell',
+            'program_name' => 'Program SO C11 2021 Series',
+            'status_potong_purchase' => 'BISA DI POTONG',
+            'row_hash' => 'hash_test_confirm_1',
+        ]);
+
+        $signedUrl = URL::temporarySignedRoute(
+            'program-submissions.confirm',
+            now()->addHours(1),
+            ['id' => $submission->id, 'action' => 'potong']
+        );
+
+        $response = $this->get($signedUrl);
+        $response->assertStatus(200);
+        $response->assertSee('Konfirmasi Berhasil!');
+        $response->assertSee('STATUS: SUDAH POTONG');
+
+        $this->assertDatabaseHas('program_submissions', [
+            'id' => $submission->id,
+            'status_potong_purchase' => 'SUDAH POTONG',
+            'status_potong_ar' => 'DONE',
+            'tgl_potong_tf' => date('d/m/Y'),
+        ]);
+    }
+
+    public function test_cannot_confirm_with_invalid_signature(): void
+    {
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:32:55',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME00652',
+            'dealer_name' => 'Abadi Cell',
+            'status_potong_purchase' => 'BISA DI POTONG',
+            'row_hash' => 'hash_test_invalid_sig',
+        ]);
+
+        // Access without valid signature
+        $response = $this->get("/p/confirm/{$submission->id}?action=potong&signature=invalid_hash");
+        $response->assertStatus(403);
     }
 }

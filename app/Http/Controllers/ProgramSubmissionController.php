@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ProgramSubmission;
 use App\Services\DocumentAnalysisService;
 use App\Services\ProgramSubmissionService;
+use App\Services\WhatsAppService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ class ProgramSubmissionController extends Controller
     public function __construct(
         protected ProgramSubmissionService $service,
         protected DocumentAnalysisService $aiService,
+        protected WhatsAppService $waService,
     ) {}
 
     /**
@@ -51,6 +53,10 @@ class ProgramSubmissionController extends Controller
 
         if ($statusPurchase = trim((string) $request->input('status_purchase'))) {
             $query->where('status_potong_purchase', $statusPurchase);
+        }
+
+        if ($keterangan = trim((string) $request->input('keterangan'))) {
+            $query->where('keterangan', $keterangan);
         }
 
         $cols = [
@@ -86,6 +92,7 @@ class ProgramSubmissionController extends Controller
             'submissions' => $submissions,
             'regions' => $regions,
             'status_purchase_options' => ProgramSubmission::STATUS_PURCHASE_OPTIONS,
+            'keterangan_options' => ProgramSubmission::KETERANGAN_OPTIONS,
             'total_submissions' => $totalSubmissions,
             'configured_webapp_url' => $this->service->getWebAppUrl(),
             'last_synced_at' => $lastSyncedAt,
@@ -120,6 +127,10 @@ class ProgramSubmissionController extends Controller
 
         if ($statusPurchase = trim((string) $request->input('status_purchase'))) {
             $query->where('status_potong_purchase', $statusPurchase);
+        }
+
+        if ($keterangan = trim((string) $request->input('keterangan'))) {
+            $query->where('keterangan', $keterangan);
         }
 
         $cols = [
@@ -527,5 +538,29 @@ class ProgramSubmissionController extends Controller
                 'message' => 'Gagal memproses webhook: '.$e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Send WhatsApp notification to AR for program claim potong confirmation.
+     */
+    public function sendWaToAr(Request $request, int|string $id): JsonResponse
+    {
+        $submission = ProgramSubmission::findOrFail($id);
+        $phone = $request->input('phone');
+
+        $result = $this->waService->sendProgramClaimNotificationToAr($submission, $phone);
+
+        if (! $result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+            'provider_id' => $result['provider_id'] ?? null,
+        ]);
     }
 }

@@ -160,8 +160,20 @@
           </option>
         </select>
 
+        <!-- Filter Keterangan -->
+        <select
+          v-model="filters.keterangan"
+          @change="fetchSubmissions(1)"
+          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
+        >
+          <option value="">Semua Keterangan</option>
+          <option v-for="opt in keteranganOptions" :key="opt" :value="opt">
+            {{ opt }}
+          </option>
+        </select>
+
         <button
-          v-if="filters.search || filters.region || filters.status_purchase"
+          v-if="filters.search || filters.region || filters.status_purchase || filters.keterangan"
           type="button"
           @click="resetFilters"
           class="h-9 px-2.5 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-md transition cursor-pointer"
@@ -215,7 +227,7 @@
               <TableHead class="min-w-[190px] font-medium text-gray-500">Status Potong Purchase</TableHead>
               <TableHead class="whitespace-nowrap font-medium text-gray-500">Status AR</TableHead>
               <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl Potong/TF</TableHead>
-              <TableHead class="w-[88px] text-center font-medium text-gray-500 sticky right-0 bg-white border-b border-gray-200">Aksi</TableHead>
+              <TableHead class="w-[96px] text-center font-medium text-gray-500 sticky right-0 bg-white border-b border-gray-200">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -356,9 +368,18 @@
                 <span v-else class="text-gray-300">-</span>
               </TableCell>
 
-              <!-- Kolom: Keterangan -->
-              <TableCell class="text-gray-700 py-2.5 leading-snug">
-                <div class="line-clamp-2 max-w-[160px]" :title="row.keterangan">{{ row.keterangan || '-' }}</div>
+              <!-- Kolom: Keterangan (Dropdown Polos Putih) -->
+              <TableCell class="py-2.5 whitespace-nowrap">
+                <select
+                  :value="row.keterangan || ''"
+                  @change="quickUpdateKeterangan(row, $event.target.value)"
+                  class="h-7 px-2 rounded-md text-xs bg-white text-gray-800 border border-gray-200 hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer font-normal"
+                >
+                  <option value="">- Pilih Keterangan -</option>
+                  <option v-for="opt in keteranganOptions" :key="opt" :value="opt">
+                    {{ opt }}
+                  </option>
+                </select>
               </TableCell>
 
               <!-- Kolom: Cek Dokumen -->
@@ -417,16 +438,30 @@
                 {{ row.tgl_potong_tf || '-' }}
               </TableCell>
 
-              <!-- Aksi: Tombol Edit Row Modal -->
+              <!-- Aksi: Tombol Edit Row Modal & Kirim WA AR -->
               <TableCell class="text-center py-2.5 whitespace-nowrap sticky right-0 bg-white">
-                <button
-                  type="button"
-                  @click="openEditModal(row)"
-                  class="inline-flex items-center justify-center p-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition shadow-2xs cursor-pointer"
-                  title="Edit Data Tracking & Status Potong"
-                >
-                  <PencilIcon class="w-3.5 h-3.5" />
-                </button>
+                <div class="inline-flex items-center gap-1.5">
+                  <button
+                    v-if="row.status_potong_purchase === 'BISA DI POTONG'"
+                    type="button"
+                    @click="sendWaToAr(row)"
+                    :disabled="sendingWaId === row.id"
+                    class="inline-flex items-center justify-center p-1.5 rounded-md border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition shadow-2xs cursor-pointer disabled:opacity-50"
+                    title="Kirim Notifikasi Klaim ke WhatsApp AR (081224290502)"
+                  >
+                    <RefreshCwIcon v-if="sendingWaId === row.id" class="w-3.5 h-3.5 animate-spin" />
+                    <SendIcon v-else class="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    @click="openEditModal(row)"
+                    class="inline-flex items-center justify-center p-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition shadow-2xs cursor-pointer"
+                    title="Edit Data Tracking & Status Potong"
+                  >
+                    <PencilIcon class="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </TableCell>
             </TableRow>
           </TableBody>
@@ -647,37 +682,56 @@
                 />
               </div>
 
-              <!-- Keterangan -->
+              <!-- Keterangan (Dropdown Polos Putih) -->
               <div>
                 <label class="block font-semibold text-gray-700 mb-1">Keterangan:</label>
-                <textarea
+                <select
                   v-model="editForm.keterangan"
-                  rows="2"
-                  placeholder="Catatan tambahan hasil analisis..."
-                  class="w-full p-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
-                ></textarea>
+                  class="h-9 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
+                >
+                  <option value="">- Pilih Keterangan -</option>
+                  <option v-for="opt in keteranganOptions" :key="opt" :value="opt">
+                    {{ opt }}
+                  </option>
+                </select>
               </div>
             </div>
 
             <!-- Modal Footer -->
-            <div class="px-6 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-end gap-2">
+            <div class="px-6 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between gap-2">
               <button
+                v-if="editingSubmission && editForm.status_potong_purchase === 'BISA DI POTONG'"
                 type="button"
-                @click="showEditModal = false"
-                :disabled="isSaving"
-                class="px-3.5 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-xs text-gray-700 transition cursor-pointer"
+                @click="sendWaToAr(editingSubmission)"
+                :disabled="isSendingWaModal"
+                class="px-3 py-1.5 rounded-md border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
+                title="Kirim notifikasi klaim ini langsung ke WhatsApp AR"
               >
-                Batal
+                <RefreshCwIcon v-if="isSendingWaModal" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                <SendIcon v-else class="w-3.5 h-3.5 text-emerald-600" />
+                <span>{{ isSendingWaModal ? 'Mengirim ke AR...' : 'Kirim WA ke AR' }}</span>
               </button>
-              <button
-                type="button"
-                @click="saveEditModal"
-                :disabled="isSaving"
-                class="px-4 py-1.5 rounded-md border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
-              >
-                <RefreshCwIcon v-if="isSaving" class="w-3.5 h-3.5 animate-spin text-gray-500" />
-                <span>{{ isSaving ? 'Menyimpan...' : 'Simpan Perubahan' }}</span>
-              </button>
+              <div v-else></div>
+
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  @click="showEditModal = false"
+                  :disabled="isSaving"
+                  class="px-3.5 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-xs text-gray-700 transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  @click="saveEditModal"
+                  :disabled="isSaving"
+                  class="px-4 py-1.5 rounded-md border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                >
+                  <RefreshCwIcon v-if="isSaving" class="w-3.5 h-3.5 animate-spin text-gray-500" />
+                  <span>{{ isSaving ? 'Menyimpan...' : 'Simpan Perubahan' }}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -942,7 +996,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import {
   Search as SearchIcon,
@@ -960,6 +1014,7 @@ import {
   EyeOff as EyeOffIcon,
   Bot as BotIcon,
   ChevronDown as ChevronDownIcon,
+  Send as SendIcon,
 } from 'lucide-vue-next';
 import {
   Table,
@@ -977,6 +1032,7 @@ const googleSheetUrl = 'https://docs.google.com/spreadsheets/d/1jf_i5r4Nn3q0RE6n
 const submissions = ref([]);
 const regionOptions = ref([]);
 const statusPurchaseOptions = ref(['BELUM BISA POTONG', 'BISA DI POTONG', 'SUDAH POTONG', 'DONE TRANSFER']);
+const keteranganOptions = ref(['LEBIH DARI 30 HARI', 'KURANG DARI 30 HARI']);
 const loading = ref(false);
 const isSyncing = ref(false);
 const isExporting = ref(false);
@@ -984,6 +1040,8 @@ const syncMessage = ref('');
 const syncError = ref(false);
 const autoRefresh = ref(true);
 const lastUpdatedText = ref('');
+const sendingWaId = ref(null);
+const isSendingWaModal = ref(false);
 
 // AI state
 const analyzingRowId = ref(null);
@@ -1112,6 +1170,7 @@ const filters = reactive({
   search: '',
   region: '',
   status_purchase: '',
+  keterangan: '',
 });
 
 const pagination = reactive({
@@ -1193,6 +1252,7 @@ const fetchSubmissions = async (page = 1, silent = false) => {
     if (filters.search) params.search = filters.search;
     if (filters.region) params.region = filters.region;
     if (filters.status_purchase) params.status_purchase = filters.status_purchase;
+    if (filters.keterangan) params.keterangan = filters.keterangan;
 
     const res = await axios.get('/api/program-submissions', {
       params,
@@ -1210,6 +1270,9 @@ const fetchSubmissions = async (page = 1, silent = false) => {
     }
     if (data.status_purchase_options && Array.isArray(data.status_purchase_options)) {
       statusPurchaseOptions.value = data.status_purchase_options;
+    }
+    if (data.keterangan_options && Array.isArray(data.keterangan_options)) {
+      keteranganOptions.value = data.keterangan_options;
     }
 
     const now = new Date();
@@ -1243,6 +1306,7 @@ const resetFilters = () => {
   filters.search = '';
   filters.region = '';
   filters.status_purchase = '';
+  filters.keterangan = '';
   fetchSubmissions(1);
 };
 
@@ -1255,7 +1319,7 @@ const triggerSync = async () => {
 
   try {
     const res = await axios.post('/api/program-submissions/sync', {
-      limit: 100,
+      limit: 200,
     });
     syncMessage.value = res.data.message || 'Sinkronisasi berhasil diselesaikan.';
     syncError.value = false;
@@ -1277,6 +1341,7 @@ const exportExcel = () => {
   if (filters.region) params.append('region', filters.region);
   if (filters.program) params.append('program', filters.program);
   if (filters.status_purchase) params.append('status_purchase', filters.status_purchase);
+  if (filters.keterangan) params.append('keterangan', filters.keterangan);
 
   const qs = params.toString();
   const url = `/api/program-submissions/export${qs ? '?' + qs : ''}`;
@@ -1298,10 +1363,10 @@ const runAutoSync = async () => {
   isAutoSyncing = true;
   try {
     const res = await axios.post('/api/program-submissions/sync', {
-      limit: 50,
+      limit: 100,
     });
     if (res.data?.data?.new_count > 0) {
-      syncMessage.value = `Otomatis menarik ${res.data.data.new_count} respon baru dari spreadsheet.`;
+      syncMessage.value = `Otomatis menarik ${res.data.data.new_count} data baru dari Google Spreadsheet.`;
       syncError.value = false;
       await fetchSubmissions(pagination.current_page, true);
     }
@@ -1329,6 +1394,82 @@ const quickUpdateStatus = async (row, newStatus) => {
     syncError.value = true;
   }
 };
+
+// Quick keterangan change from row select
+const quickUpdateKeterangan = async (row, newKeterangan) => {
+  const previousKeterangan = row.keterangan;
+  row.keterangan = newKeterangan;
+
+  try {
+    await axios.patch(`/api/program-submissions/${row.id}`, {
+      keterangan: newKeterangan,
+    });
+    syncMessage.value = `Keterangan "${row.dealer_name || row.id_real}" berhasil diubah menjadi: ${newKeterangan || 'Belum Ditentukan'}`;
+    syncError.value = false;
+  } catch (err) {
+    row.keterangan = previousKeterangan;
+    syncMessage.value = 'Gagal memperbarui keterangan: ' + (err.response?.data?.message || err.message);
+    syncError.value = true;
+  }
+};
+
+// Send WhatsApp notification to AR
+const sendWaToAr = async (row) => {
+  if (!row) return;
+  sendingWaId.value = row.id;
+  isSendingWaModal.value = true;
+
+  try {
+    const res = await axios.post(`/api/program-submissions/${row.id}/send-wa-ar`);
+    syncMessage.value = res.data.message || `Notifikasi klaim "${row.dealer_name || row.id_real}" berhasil dikirim ke WhatsApp AR!`;
+    syncError.value = false;
+  } catch (err) {
+    syncMessage.value = 'Gagal mengirim WhatsApp ke AR: ' + (err.response?.data?.message || err.message);
+    syncError.value = true;
+  } finally {
+    sendingWaId.value = null;
+    isSendingWaModal.value = false;
+  }
+};
+
+// Auto-select Keterangan based on lama_pending or tgl_share_cn in edit modal
+watch(
+  () => editForm.lama_pending,
+  (newVal) => {
+    if (!newVal) return;
+    const num = parseInt(newVal, 10);
+    if (!isNaN(num)) {
+      if (num > 30) {
+        editForm.keterangan = 'LEBIH DARI 30 HARI';
+      } else if (num >= 0) {
+        editForm.keterangan = 'KURANG DARI 30 HARI';
+      }
+    }
+  }
+);
+
+watch(
+  () => editForm.tgl_share_cn,
+  (newVal) => {
+    if (!newVal) return;
+    let dateObj = null;
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(newVal)) {
+      const [d, m, y] = newVal.split('/');
+      dateObj = new Date(`${y}-${m}-${d}`);
+    } else {
+      dateObj = new Date(newVal);
+    }
+    if (!isNaN(dateObj.getTime())) {
+      const now = new Date();
+      const diffTime = now.getTime() - dateObj.getTime();
+      const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+      if (!editForm.lama_pending) {
+        editForm.lama_pending = `${diffDays} Hari`;
+      }
+      editForm.keterangan = diffDays > 30 ? 'LEBIH DARI 30 HARI' : 'KURANG DARI 30 HARI';
+    }
+  }
+);
 
 // AI: Analyze Single Row directly
 const analyzeRowWithAi = async (row) => {
@@ -1510,6 +1651,16 @@ onMounted(() => {
   fetchAiConfigAndStats();
   document.addEventListener('click', handleClickOutsideAiDropdown);
   document.addEventListener('click', handleClickOutsideModelDropdown);
+
+  // Otomatis sinkronkan dari spreadsheet saat halaman dibuka
+  runAutoSync();
+
+  // Sinkronkan data baru dari spreadsheet di latar belakang setiap 30 detik
+  autoSyncTimer = setInterval(() => {
+    if (autoRefresh.value) {
+      runAutoSync();
+    }
+  }, 30000);
 
   // Refresh tampilan data setiap 30 detik jika autoRefresh aktif
   pollTimer = setInterval(() => {
