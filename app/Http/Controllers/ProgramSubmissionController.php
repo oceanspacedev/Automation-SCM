@@ -343,48 +343,50 @@ class ProgramSubmissionController extends Controller
     {
         $ids = $request->input('ids');
         $year = $request->input('year', '2026');
-        $all = $request->boolean('all', true);
-        $limit = $all ? 0 : max(0, (int) $request->input('limit', 0));
+        $batchSize = min(30, max(5, (int) $request->input('batch_size', $request->input('limit', 20))));
 
-        if (! is_array($ids) || empty($ids)) {
-            $query = ProgramSubmission::query();
-            if ($year) {
-                $query->where('submission_timestamp', 'like', "{$year}%");
-            }
-
-            $query->where(function ($q) {
-                $q->whereNull('cek_dokumen')
-                    ->orWhere('cek_dokumen', '')
-                    ->orWhereNull('status_potong_purchase')
-                    ->orWhere('status_potong_purchase', '');
-            })->orderByDesc('id');
-
-            if ($limit > 0) {
-                $query->limit($limit);
-            }
-
-            $ids = $query->pluck('id')->all();
+        $query = ProgramSubmission::query();
+        if ($year) {
+            $query->where('submission_timestamp', 'like', "{$year}%");
         }
 
-        if (empty($ids)) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Semua data program tahun '.$year.' sudah selesai dianalisis.',
-                'data' => [
-                    'total' => 0,
-                    'success_count' => 0,
-                    'error_count' => 0,
-                    'results' => [],
-                ],
-            ]);
+        $query->where(function ($q) {
+            $q->whereNull('cek_dokumen')
+                ->orWhere('cek_dokumen', '')
+                ->orWhereNull('status_potong_purchase')
+                ->orWhere('status_potong_purchase', '');
+        })->orderByDesc('id');
+
+        $totalRemaining = (clone $query)->count();
+
+        if (! is_array($ids) || empty($ids)) {
+            if ($totalRemaining === 0) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Semua data program tahun '.$year.' sudah selesai dianalisis.',
+                    'remaining' => 0,
+                    'data' => [
+                        'total' => 0,
+                        'success_count' => 0,
+                        'error_count' => 0,
+                        'results' => [],
+                    ],
+                ]);
+            }
+
+            // Always take safe batch size (max 30) per request so Nginx NEVER hits 504 Gateway Timeout
+            $ids = $query->limit($batchSize)->pluck('id')->all();
         }
 
         try {
             $result = $this->aiService->analyzeBatch($ids);
+            $remaining = max(0, $totalRemaining - count($ids));
 
             return response()->json([
                 'success' => true,
-                'message' => "Analisis AI selesai. {$result['success_count']} data berhasil dianalisis.",
+                'message' => "Batch berhasil dianalisis ({$result['success_count']} data). Sisa: {$remaining} data.",
+                'remaining' => $remaining,
+                'total_remaining_before' => $totalRemaining,
                 'data' => $result,
             ]);
         } catch (Exception $e) {
@@ -516,24 +518,48 @@ class ProgramSubmissionController extends Controller
     protected function dispatchBackgroundAi(int $limit = 25, string $year = '2026', bool $all = false): void
     {
         try {
-            $cmd = [
-                PHP_BINARY,
-                base_path('artisan'),
-                'program:auto-analyze-ai',
-                "--year={$year}",
-                '--sleep=0.05',
-            ];
+            $phpBinary = $this->getPhpCliBinary();
+            $artisan = escapeshellarg(base_path('artisan'));
+            $yearArg = escapeshellarg("--year={$year}");
+            $limitArg = ($all || $limit <= 0) ? '--all' : '--limit='.(int) $limit;
+            $sleepArg = '--sleep=0.05';
 
-            if ($all || $limit <= 0) {
-                $cmd[] = '--all';
+            if (PHP_OS_FAMILY === 'Windows') {
+                $cmd = "start /B {$phpBinary} {$artisan} program:auto-analyze-ai {$yearArg} {$limitArg} {$sleepArg}";
+                pclose(popen($cmd, 'r'));
             } else {
-                $cmd[] = "--limit={$limit}";
+                $cmd = "nohup {$phpBinary} {$artisan} program:auto-analyze-ai {$yearArg} {$limitArg} {$sleepArg} > /dev/null 2>&1 &";
+                exec($cmd);
             }
-
-            Process::path(base_path())->start($cmd);
         } catch (\Throwable $e) {
             Log::warning('Gagal memulai background AI process: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Find the appropriate PHP CLI executable binary.
+     */
+    protected function getPhpCliBinary(): string
+    {
+        $binary = PHP_BINARY;
+
+        if (str_contains($binary, 'fpm') || str_contains($binary, 'cgi')) {
+            $possiblePaths = [
+                PHP_BINDIR.'/php',
+                '/usr/bin/php',
+                '/usr/local/bin/php',
+                'php',
+            ];
+            foreach ($possiblePaths as $path) {
+                if (@is_executable($path)) {
+                    return escapeshellarg($path);
+                }
+            }
+
+            return 'php';
+        }
+
+        return escapeshellarg($binary);
     }
 
     /**

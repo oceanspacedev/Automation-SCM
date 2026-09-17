@@ -232,23 +232,46 @@ class WhatsAppService
     }
 
     /**
+     * Resolve the base URL dynamically prioritizing customBase, public APP_URL, or incoming request host.
+     */
+    public function resolveBaseUrl(): string
+    {
+        $customBase = config('services.wag.public_url');
+        if (! empty($customBase) && ! str_contains($customBase, 'localhost') && ! str_contains($customBase, '127.0.0.1')) {
+            return rtrim($customBase, '/');
+        }
+
+        $appUrl = config('app.url');
+        if (! empty($appUrl) && ! str_contains($appUrl, 'localhost') && ! str_contains($appUrl, '127.0.0.1')) {
+            return rtrim($appUrl, '/');
+        }
+
+        try {
+            if (function_exists('request') && request() && request()->hasHeader('Host')) {
+                $reqHost = request()->getHttpHost();
+                if (! empty($reqHost) && ! str_contains($reqHost, 'localhost') && ! str_contains($reqHost, '127.0.0.1')) {
+                    return request()->getScheme().'://'.$reqHost;
+                }
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
+        return rtrim($customBase ?: ($appUrl ?: url('/')), '/');
+    }
+
+    /**
      * Resolve publicly accessible URL for the invoice PDF document.
      */
     public function resolvePublicPdfUrl(Invoice $invoice): string
     {
-        // 1. If explicit public base URL is configured (e.g. production domain, tunnel), use it
-        $customBase = config('services.wag.public_url');
-        if (! empty($customBase) && ! str_contains($customBase, 'localhost') && ! str_contains($customBase, '127.0.0.1')) {
-            return rtrim($customBase, '/')."/invoices/{$invoice->id}/pdf";
+        // 1. If base URL is public (e.g. staging IP, domain, tunnel), use it
+        $baseUrl = $this->resolveBaseUrl();
+        if (! empty($baseUrl) && ! str_contains($baseUrl, 'localhost') && ! str_contains($baseUrl, '127.0.0.1')) {
+            return "{$baseUrl}/invoices/{$invoice->id}/pdf";
         }
 
-        // 2. If APP_URL is already public (not localhost)
-        $appUrl = config('app.url');
-        if (! empty($appUrl) && ! str_contains($appUrl, 'localhost') && ! str_contains($appUrl, '127.0.0.1')) {
-            return rtrim($appUrl, '/')."/invoices/{$invoice->id}/pdf";
-        }
-
-        // 3. For local development, mirror the PDF to a temporary public host so WAGHub can fetch the direct binary
+        // 2. For local development, mirror the PDF to a temporary public host so WAGHub can fetch the direct binary
         $mirrorUrl = $this->uploadToTemporaryPublicMirror($invoice);
         if (! empty($mirrorUrl)) {
             return $mirrorUrl;
@@ -352,8 +375,9 @@ class WhatsAppService
             ];
         }
 
-        if ($customBase = config('services.wag.public_url')) {
-            URL::forceRootUrl(rtrim($customBase, '/'));
+        $baseUrl = $this->resolveBaseUrl();
+        if (! empty($baseUrl)) {
+            URL::forceRootUrl($baseUrl);
         }
 
         // Generate signed URLs valid for 30 days
@@ -456,15 +480,15 @@ class WhatsAppService
             "*Status Dokumen:* {$cekDokumen}",
             '*Status Purchase:* BISA DI POTONG',
             '',
-            'Silakan tawarkan ke dealer/customer. Jika sudah disetujui, silakan konfirmasi melalui tautan berikut:',
+            'Silakan tawarkan ke dealer/customer. Jika sudah disetujui, silakan klik salah satu aksi di bawah:',
             '',
-            '*Konfirmasi Sudah Dipotong:*',
+            '👉 *[ KLIK: SUDAH DIPOTONG ]*',
             $potongUrl,
             '',
-            '*Konfirmasi Tunda:*',
+            '⏳ *[ KLIK: TUNDA / BELUM MAU ]*',
             $tundaUrl,
             '',
-            '_SCM Automation - Realme_',
+            '_Pesan otomatis dari Sistem SCM Invoice & Program Realme_',
         ];
 
         return implode("\n", $lines);

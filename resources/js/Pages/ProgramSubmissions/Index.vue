@@ -979,13 +979,23 @@
               </button>
               <button
                 type="button"
+                @click="runBackgroundFromModal"
+                :disabled="isAnalyzingBatch"
+                class="px-3.5 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                title="Jalankan di latar belakang agar bebas berpindah halaman"
+              >
+                <SparklesIcon class="w-3.5 h-3.5 text-gray-500" />
+                <span>Jalankan di Background</span>
+              </button>
+              <button
+                type="button"
                 @click="runBatchAiAnalysis"
                 :disabled="isAnalyzingBatch"
                 class="px-4 py-1.5 rounded-md border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
               >
                 <RefreshCwIcon v-if="isAnalyzingBatch" class="w-3.5 h-3.5 animate-spin text-gray-500" />
                 <BotIcon v-else class="w-3.5 h-3.5 text-gray-600" />
-                <span>{{ isAnalyzingBatch ? 'Sedang Menganalisis Semua...' : 'Mulai Analisis Semua Sekarang' }}</span>
+                <span>{{ isAnalyzingBatch ? 'Sedang Menganalisis...' : 'Mulai Analisis Langsung' }}</span>
               </button>
             </div>
           </div>
@@ -1532,20 +1542,54 @@ const openBatchAiModal = () => {
   showBatchAiModal.value = true;
 };
 
+const runBackgroundFromModal = async () => {
+  showBatchAiModal.value = false;
+  await triggerBackgroundAi(true);
+};
+
 const runBatchAiAnalysis = async () => {
   if (isAnalyzingBatch.value) return;
   isAnalyzingBatch.value = true;
-  batchResultSummary.value = '';
+  batchResultSummary.value = 'Memulai analisis AI bertahap...';
+
+  let totalProcessed = 0;
+  let totalSuccess = 0;
+  let totalError = 0;
 
   try {
-    const res = await axios.post('/api/program-submissions/analyze-ai-batch', {
-      all: true,
-      year: '2026',
-    });
-    const data = res.data.data;
-    batchResultSummary.value = `Analisis selesai! Total: ${data.total} data berhasil dianalisis (Berhasil: ${data.success_count}, Gagal: ${data.error_count}).`;
-    await fetchSubmissions(pagination.current_page, true);
-    syncMessage.value = res.data.message;
+    while (isAnalyzingBatch.value) {
+      const res = await axios.post('/api/program-submissions/analyze-ai-batch', {
+        batch_size: 20,
+        year: '2026',
+      });
+
+      const resData = res.data;
+      const batchData = resData.data;
+
+      if (!batchData || batchData.total === 0) {
+        batchResultSummary.value = totalProcessed > 0
+          ? `🎉 Seluruh data tahun 2026 telah selesai dianalisis! (Total: ${totalProcessed}, Berhasil: ${totalSuccess}, Gagal: ${totalError})`
+          : 'Semua data tahun 2026 sudah selesai dianalisis sebelumnya.';
+        break;
+      }
+
+      totalProcessed += batchData.total;
+      totalSuccess += batchData.success_count;
+      totalError += batchData.error_count;
+
+      const sisa = resData.remaining ?? 0;
+      batchResultSummary.value = `Sedang memproses... Selesai: ${totalProcessed} data (Sisa: ${sisa} data).`;
+
+      // Live update table on current page so user sees changes in real time
+      fetchSubmissions(pagination.current_page, true);
+
+      if (sisa <= 0) {
+        batchResultSummary.value = `🎉 Analisis selesai! Seluruh ${totalProcessed} data berhasil dianalisis (Berhasil: ${totalSuccess}, Gagal: ${totalError}).`;
+        break;
+      }
+    }
+
+    syncMessage.value = 'Analisis batch AI berhasil diselesaikan.';
     syncError.value = false;
     setTimeout(fetchAiConfigAndStats, 1000);
   } catch (err) {
@@ -1600,20 +1644,21 @@ const saveSelectedModel = async () => {
   }
 };
 
-const triggerBackgroundAi = async () => {
+const triggerBackgroundAi = async (all = false) => {
   if (isTriggeringBgAi.value) return;
   isTriggeringBgAi.value = true;
 
   try {
     const res = await axios.post('/api/program-submissions/ai-run-background', {
       year: '2026',
-      limit: 50,
+      all: all,
+      limit: all ? 0 : 50,
     });
     syncMessage.value = `${res.data.message} Halaman tetap cepat dan data akan otomatis terupdate.`;
     syncError.value = false;
 
     // Refresh stats after launching
-    setTimeout(fetchAiConfigAndStats, 3000);
+    setTimeout(fetchAiConfigAndStats, 2000);
   } catch (err) {
     syncMessage.value = 'Gagal menjalankan AI di latar belakang: ' + (err.response?.data?.message || err.message);
     syncError.value = true;
