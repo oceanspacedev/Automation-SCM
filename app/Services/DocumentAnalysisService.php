@@ -126,6 +126,53 @@ class DocumentAnalysisService
     }
 
     /**
+     * Evaluate document completeness using business rules.
+     *
+     * @return array{is_complete: bool, cek_dokumen: string, status_potong_purchase: string, keterangan: string}
+     */
+    public function evaluateCompleteness(ProgramSubmission $submission): array
+    {
+        $hasCn = ! empty($submission->credit_note_url) && str_starts_with(trim((string) $submission->credit_note_url), 'http');
+        $hasAgr = ! empty($submission->agreement_url) && str_starts_with(trim((string) $submission->agreement_url), 'http');
+        $hasFaktur = ! empty($submission->tax_invoice_url) && str_starts_with(trim((string) $submission->tax_invoice_url), 'http');
+
+        if ($hasCn && $hasAgr && $hasFaktur) {
+            return [
+                'is_complete' => true,
+                'cek_dokumen' => 'LENGKAP',
+                'status_potong_purchase' => 'BISA DI POTONG',
+                'keterangan' => 'Semua dokumen (Credit Note, Agreement, dan Faktur Pajak) lengkap dan siap diproses potong.',
+            ];
+        }
+
+        $missing = [];
+        if (! $hasCn) {
+            $missing[] = 'CN';
+        }
+        if (! $hasAgr) {
+            $missing[] = 'AGR';
+        }
+        if (! $hasFaktur) {
+            $missing[] = 'FAKTUR';
+        }
+
+        if (count($missing) === 3) {
+            $cek = 'SEMUA DOKUMEN BELUM ADA';
+        } elseif (count($missing) === 2) {
+            $cek = implode(' & ', $missing).' BELUM ADA';
+        } else {
+            $cek = $missing[0].' BELUM ADA';
+        }
+
+        return [
+            'is_complete' => false,
+            'cek_dokumen' => $cek,
+            'status_potong_purchase' => 'BELUM BISA POTONG',
+            'keterangan' => 'Dokumen belum lengkap ('.$cek.'). Harap lengkapi dokumen sebelum diproses potong.',
+        ];
+    }
+
+    /**
      * Analyze a single ProgramSubmission row with AI and update tracking columns.
      *
      * @return array{
@@ -139,53 +186,59 @@ class DocumentAnalysisService
     public function analyzeSubmission(ProgramSubmission $submission): array
     {
         $config = $this->getConfig();
+        $fallback = $this->evaluateCompleteness($submission);
+        $parsed = null;
 
-        if (empty($config['api_key'])) {
-            throw new Exception('API Key AI Router belum diatur. Silakan masukkan API Key di Pengaturan AI.');
+        if (! empty($config['api_key'])) {
+            try {
+                $payload = [
+                    'model' => $config['model'] ?: 'ag/gemini-3-flash',
+                    'messages' => [
+                        [
+                            'role' => 'system',
+                            'content' => $this->getSystemPrompt(),
+                        ],
+                        [
+                            'role' => 'user',
+                            'content' => $this->buildUserPrompt($submission),
+                        ],
+                    ],
+                    'stream' => false,
+                    'temperature' => 0.1,
+                ];
+
+                $response = Http::withoutVerifying()
+                    ->withToken($config['api_key'])
+                    ->timeout(25)
+                    ->post("{$config['base_url']}/chat/completions", $payload);
+
+                if ($response->successful()) {
+                    $content = $response->json('choices.0.message.content');
+                    if (! empty($content)) {
+                        $parsed = $this->parseJsonResponse($content);
+                    }
+                } else {
+                    $errorMsg = $response->json('error.message') ?? $response->body();
+                    Log::warning("AI Router returned HTTP {$response->status()} for submission ID {$submission->id}: {$errorMsg}");
+                }
+            } catch (Exception $e) {
+                Log::warning("AI Router call error for submission ID {$submission->id}, using rule evaluation: ".$e->getMessage());
+            }
         }
 
-        $payload = [
-            'model' => $config['model'] ?: 'ag/gemini-3-flash',
-            'messages' => [
-                [
-                    'role' => 'system',
-                    'content' => $this->getSystemPrompt(),
-                ],
-                [
-                    'role' => 'user',
-                    'content' => $this->buildUserPrompt($submission),
-                ],
-            ],
-            'stream' => false,
-            'temperature' => 0.1,
-        ];
-
-        $response = Http::withoutVerifying()
-            ->withToken($config['api_key'])
-            ->timeout(30)
-            ->post("{$config['base_url']}/chat/completions", $payload);
-
-        if (! $response->successful()) {
-            $errorMsg = $response->json('error.message') ?? $response->body();
-            throw new Exception("AI Router error (HTTP {$response->status()}): {$errorMsg}");
+        if (is_array($parsed) && ! empty($parsed['cek_dokumen'])) {
+            $cekDokumen = trim((string) $parsed['cek_dokumen']);
+            $statusPurchase = trim((string) ($parsed['status_potong_purchase'] ?? ''));
+            if (! in_array($statusPurchase, ProgramSubmission::STATUS_PURCHASE_OPTIONS, true)) {
+                $statusPurchase = ($parsed['is_complete'] ?? false) ? 'BISA DI POTONG' : 'BELUM BISA POTONG';
+            }
+            $keterangan = trim((string) ($parsed['keterangan'] ?? ''));
+        } else {
+            $cekDokumen = $fallback['cek_dokumen'];
+            $statusPurchase = $fallback['status_potong_purchase'];
+            $keterangan = $fallback['keterangan'];
+            $parsed = $fallback;
         }
-
-        $content = $response->json('choices.0.message.content');
-        if (empty($content)) {
-            throw new Exception('AI Router tidak mengembalikan konten respons.');
-        }
-
-        $parsed = $this->parseJsonResponse($content);
-
-        // Sanitize status potong purchase
-        $statusPurchase = trim((string) ($parsed['status_potong_purchase'] ?? ''));
-        if (! in_array($statusPurchase, ProgramSubmission::STATUS_PURCHASE_OPTIONS, true)) {
-            // Fallback according to completeness
-            $statusPurchase = ($parsed['is_complete'] ?? false) ? 'BISA DI POTONG' : 'BELUM BISA POTONG';
-        }
-
-        $cekDokumen = trim((string) ($parsed['cek_dokumen'] ?? ''));
-        $keterangan = trim((string) ($parsed['keterangan'] ?? ''));
 
         // Automatically update the submission (preserve keterangan for pending/aging 30 days status)
         $submission->update([
@@ -216,36 +269,43 @@ class DocumentAnalysisService
      */
     public function analyzeBatch(array $submissionIds): array
     {
-        $submissions = ProgramSubmission::whereIn('id', $submissionIds)->get();
+        $total = count($submissionIds);
         $results = [];
         $successCount = 0;
         $errorCount = 0;
 
-        foreach ($submissions as $sub) {
-            try {
-                $res = $this->analyzeSubmission($sub);
-                $results[] = [
-                    'id' => $sub->id,
-                    'dealer_name' => $sub->dealer_name,
-                    'success' => true,
-                    'cek_dokumen' => $res['cek_dokumen'],
-                    'status_potong_purchase' => $res['status_potong_purchase'],
-                    'keterangan' => $res['keterangan'],
-                ];
-                $successCount++;
-            } catch (Exception $e) {
-                $results[] = [
-                    'id' => $sub->id,
-                    'dealer_name' => $sub->dealer_name,
-                    'success' => false,
-                    'error' => $e->getMessage(),
-                ];
-                $errorCount++;
-            }
-        }
+        ProgramSubmission::whereIn('id', $submissionIds)
+            ->chunkById(100, function ($submissions) use (&$results, &$successCount, &$errorCount, $total) {
+                foreach ($submissions as $sub) {
+                    try {
+                        $res = $this->analyzeSubmission($sub);
+                        if ($total <= 100) {
+                            $results[] = [
+                                'id' => $sub->id,
+                                'dealer_name' => $sub->dealer_name,
+                                'success' => true,
+                                'cek_dokumen' => $res['cek_dokumen'],
+                                'status_potong_purchase' => $res['status_potong_purchase'],
+                                'keterangan' => $res['keterangan'],
+                            ];
+                        }
+                        $successCount++;
+                    } catch (Exception $e) {
+                        if ($total <= 100) {
+                            $results[] = [
+                                'id' => $sub->id,
+                                'dealer_name' => $sub->dealer_name,
+                                'success' => false,
+                                'error' => $e->getMessage(),
+                            ];
+                        }
+                        $errorCount++;
+                    }
+                }
+            });
 
         return [
-            'total' => count($submissions),
+            'total' => $total,
             'success_count' => $successCount,
             'error_count' => $errorCount,
             'results' => $results,

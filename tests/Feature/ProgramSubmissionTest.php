@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Console\Commands\AutoAnalyzeProgramAiCommand;
 use App\Models\ProgramSubmission;
 use App\Models\User;
 use App\Services\ProgramSubmissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
@@ -62,6 +64,23 @@ class ProgramSubmissionTest extends TestCase
 
     public function test_can_receive_webhook_from_google_form(): void
     {
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'is_complete' => true,
+                                'cek_dokumen' => 'LENGKAP',
+                                'status_potong_purchase' => 'BISA DI POTONG',
+                                'keterangan' => 'Semua dokumen lengkap',
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
         $payload = [
             'namedValues' => [
                 'Timestamp' => ['10/10/2022 12:48:07'],
@@ -84,6 +103,8 @@ class ProgramSubmissionTest extends TestCase
             'id_real' => 'IDME00567',
             'dealer_name' => 'K Cell',
             'region' => 'BIG KARAWANG',
+            'cek_dokumen' => 'LENGKAP',
+            'status_potong_purchase' => 'BISA DI POTONG',
         ]);
     }
 
@@ -335,6 +356,34 @@ class ProgramSubmissionTest extends TestCase
                 'base_url' => 'https://router.rizqis.com/v1',
                 'model' => 'ag/gemini-3-flash',
                 'has_key' => true,
+            ],
+        ]);
+    }
+
+    public function test_can_get_ai_status_with_running_indicator(): void
+    {
+        $user = User::factory()->create();
+
+        Cache::put(AutoAnalyzeProgramAiCommand::CACHE_KEY_STATUS, [
+            'is_running' => true,
+            'started_at' => now()->toIso8601String(),
+            'total' => 10,
+            'processed' => 3,
+            'success' => 3,
+            'failed' => 0,
+            'current_dealer' => 'Abadi Cell',
+            'last_heartbeat' => time(),
+        ], 300);
+
+        $response = $this->actingAs($user)->getJson('/api/program-submissions/ai-status');
+        $response->assertStatus(200);
+        $response->assertJson([
+            'is_running' => true,
+            'running_info' => [
+                'is_running' => true,
+                'total' => 10,
+                'processed' => 3,
+                'current_dealer' => 'Abadi Cell',
             ],
         ]);
     }

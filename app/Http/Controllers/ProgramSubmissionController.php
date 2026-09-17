@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Console\Commands\AutoAnalyzeProgramAiCommand;
 use App\Models\ProgramSubmission;
 use App\Services\DocumentAnalysisService;
 use App\Services\ProgramSubmissionService;
@@ -10,6 +11,7 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -275,6 +277,11 @@ class ProgramSubmissionController extends Controller
 
             $result = $this->service->syncFromWebAppUrl($customUrl, $limit);
 
+            // If new records were imported, automatically dispatch background AI analysis
+            if (($result['new_count'] ?? 0) > 0) {
+                $this->dispatchBackgroundAi(min(100, max(5, (int) $result['new_count'])));
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => $result['message'],
@@ -336,7 +343,8 @@ class ProgramSubmissionController extends Controller
     {
         $ids = $request->input('ids');
         $year = $request->input('year', '2026');
-        $limit = min(50, max(1, (int) $request->input('limit', 10)));
+        $all = $request->boolean('all', true);
+        $limit = $all ? 0 : max(0, (int) $request->input('limit', 0));
 
         if (! is_array($ids) || empty($ids)) {
             $query = ProgramSubmission::query();
@@ -344,26 +352,24 @@ class ProgramSubmissionController extends Controller
                 $query->where('submission_timestamp', 'like', "{$year}%");
             }
 
-            $ids = $query->where(function ($q) {
+            $query->where(function ($q) {
                 $q->whereNull('cek_dokumen')
                     ->orWhere('cek_dokumen', '')
                     ->orWhereNull('status_potong_purchase')
                     ->orWhere('status_potong_purchase', '');
-            })
-                ->orderByRaw("
-                (CASE WHEN credit_note_url != '' AND credit_note_url IS NOT NULL THEN 1 ELSE 0 END
-                 + CASE WHEN agreement_url != '' AND agreement_url IS NOT NULL THEN 1 ELSE 0 END
-                 + CASE WHEN tax_invoice_url != '' AND tax_invoice_url IS NOT NULL THEN 1 ELSE 0 END) DESC, id DESC
-            ")
-                ->limit($limit)
-                ->pluck('id')
-                ->all();
+            })->orderByDesc('id');
+
+            if ($limit > 0) {
+                $query->limit($limit);
+            }
+
+            $ids = $query->pluck('id')->all();
         }
 
         if (empty($ids)) {
             return response()->json([
                 'success' => true,
-                'message' => 'Tidak ada data program yang perlu dianalisis.',
+                'message' => 'Semua data program tahun '.$year.' sudah selesai dianalisis.',
                 'data' => [
                     'total' => 0,
                     'success_count' => 0,
@@ -378,7 +384,7 @@ class ProgramSubmissionController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => "Analisis AI selesai. {$result['success_count']} berhasil, {$result['error_count']} gagal.",
+                'message' => "Analisis AI selesai. {$result['success_count']} data berhasil dianalisis.",
                 'data' => $result,
             ]);
         } catch (Exception $e) {
@@ -459,6 +465,18 @@ class ProgramSubmissionController extends Controller
             ->where('status_potong_purchase', 'BELUM BISA POTONG')
             ->count();
 
+        $runningInfo = Cache::get(AutoAnalyzeProgramAiCommand::CACHE_KEY_STATUS);
+        $isRunning = false;
+
+        if (is_array($runningInfo) && ! empty($runningInfo['is_running'])) {
+            $heartbeat = (int) ($runningInfo['last_heartbeat'] ?? 0);
+            if (time() - $heartbeat < 60) {
+                $isRunning = true;
+            } else {
+                $runningInfo['is_running'] = false;
+            }
+        }
+
         return response()->json([
             'current_model' => $config['model'],
             'total_2026' => $total2026,
@@ -466,6 +484,8 @@ class ProgramSubmissionController extends Controller
             'unanalyzed_2026' => $unanalyzed2026,
             'bisa_potong_count' => $bisaPotong,
             'belum_bisa_potong_count' => $belumBisaPotong,
+            'is_running' => $isRunning,
+            'running_info' => $runningInfo,
         ]);
     }
 
@@ -475,22 +495,45 @@ class ProgramSubmissionController extends Controller
     public function runAiInBackground(Request $request): JsonResponse
     {
         $year = (string) $request->input('year', '2026');
-        $limit = min(100, max(5, (int) $request->input('limit', 25)));
+        $all = $request->boolean('all', true);
+        $limit = $all ? 0 : min(500, max(5, (int) $request->input('limit', 50)));
 
-        Process::path(base_path())
-            ->start([
+        $this->dispatchBackgroundAi($limit, $year, $all);
+
+        $msg = $all
+            ? "AI di latar belakang berhasil dijalankan untuk SELURUH data tahun {$year}."
+            : "AI di latar belakang berhasil dijalankan untuk {$limit} data tahun {$year}.";
+
+        return response()->json([
+            'success' => true,
+            'message' => $msg,
+        ]);
+    }
+
+    /**
+     * Dispatch artisan auto-analyze command in background process.
+     */
+    protected function dispatchBackgroundAi(int $limit = 25, string $year = '2026', bool $all = false): void
+    {
+        try {
+            $cmd = [
                 PHP_BINARY,
                 base_path('artisan'),
                 'program:auto-analyze-ai',
                 "--year={$year}",
-                "--limit={$limit}",
-                '--sleep=0.1',
-            ]);
+                '--sleep=0.05',
+            ];
 
-        return response()->json([
-            'success' => true,
-            'message' => "AI di latar belakang berhasil dijalankan untuk {$limit} data tahun {$year}.",
-        ]);
+            if ($all || $limit <= 0) {
+                $cmd[] = '--all';
+            } else {
+                $cmd[] = "--limit={$limit}";
+            }
+
+            Process::path(base_path())->start($cmd);
+        } catch (\Throwable $e) {
+            Log::warning('Gagal memulai background AI process: '.$e->getMessage());
+        }
     }
 
     /**
@@ -527,10 +570,24 @@ class ProgramSubmissionController extends Controller
 
             $submission = $this->service->saveWebhookPayload($payload);
 
+            // Automatically analyze newly submitted document with AI
+            $aiAnalyzed = false;
+            try {
+                $this->aiService->analyzeSubmission($submission);
+                $aiAnalyzed = true;
+            } catch (\Throwable $e) {
+                Log::warning("Auto-analysis on webhook failed for ID {$submission->id}: ".$e->getMessage());
+            }
+
+            $fresh = $submission->fresh();
+
             return response()->json([
                 'success' => true,
-                'message' => 'Data respon berhasil disimpan.',
+                'message' => 'Data respon berhasil disimpan'.($aiAnalyzed ? ' dan dianalisis AI.' : '.'),
                 'id' => $submission->id,
+                'ai_analyzed' => $aiAnalyzed,
+                'status_potong_purchase' => $fresh->status_potong_purchase,
+                'cek_dokumen' => $fresh->cek_dokumen,
             ]);
         } catch (Exception $e) {
             return response()->json([

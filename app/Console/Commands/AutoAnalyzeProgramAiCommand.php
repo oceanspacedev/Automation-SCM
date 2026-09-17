@@ -6,9 +6,12 @@ use App\Models\ProgramSubmission;
 use App\Services\DocumentAnalysisService;
 use Exception;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 
 class AutoAnalyzeProgramAiCommand extends Command
 {
+    public const CACHE_KEY_STATUS = 'program_ai_running_status';
+
     /**
      * The name and signature of the console command.
      *
@@ -55,12 +58,8 @@ class AutoAnalyzeProgramAiCommand extends Command
                 ->orWhere('status_potong_purchase', '');
         });
 
-        // Urutkan prioritas: yang memiliki link dokumen lebih lengkap dianalisis lebih dahulu
-        $query->orderByRaw("
-            (CASE WHEN credit_note_url != '' AND credit_note_url IS NOT NULL THEN 1 ELSE 0 END
-             + CASE WHEN agreement_url != '' AND agreement_url IS NOT NULL THEN 1 ELSE 0 END
-             + CASE WHEN tax_invoice_url != '' AND tax_invoice_url IS NOT NULL THEN 1 ELSE 0 END) DESC, id DESC
-        ");
+        // Process latest unanalyzed submissions first (matching table view)
+        $query->orderByDesc('id');
 
         $totalUnanalyzed = (clone $query)->count();
         $this->info("Ditemukan {$totalUnanalyzed} data yang belum dianalisis.");
@@ -79,7 +78,23 @@ class AutoAnalyzeProgramAiCommand extends Command
         }
 
         $submissions = $query->get();
-        $bar = $this->output->createProgressBar($submissions->count());
+        $totalToProcess = $submissions->count();
+        $startedAt = now()->toIso8601String();
+        $cacheKey = self::CACHE_KEY_STATUS;
+
+        Cache::put($cacheKey, [
+            'is_running' => true,
+            'started_at' => $startedAt,
+            'total' => $totalToProcess,
+            'processed' => 0,
+            'success' => 0,
+            'failed' => 0,
+            'current_dealer' => null,
+            'current_id' => null,
+            'last_heartbeat' => time(),
+        ], 300);
+
+        $bar = $this->output->createProgressBar($totalToProcess);
         $bar->start();
 
         $successCount = 0;
@@ -87,27 +102,66 @@ class AutoAnalyzeProgramAiCommand extends Command
         $bisaPotongCount = 0;
         $belumBisaPotongCount = 0;
 
-        foreach ($submissions as $sub) {
-            try {
-                $res = $aiService->analyzeSubmission($sub);
-                $successCount++;
+        try {
+            foreach ($submissions as $sub) {
+                $dealerIdentifier = $sub->dealer_name ?: ($sub->id_real ?: "ID #{$sub->id}");
 
-                if ($res['status_potong_purchase'] === 'BISA DI POTONG') {
-                    $bisaPotongCount++;
-                } else {
-                    $belumBisaPotongCount++;
+                Cache::put($cacheKey, [
+                    'is_running' => true,
+                    'started_at' => $startedAt,
+                    'total' => $totalToProcess,
+                    'processed' => $successCount + $errorCount,
+                    'success' => $successCount,
+                    'failed' => $errorCount,
+                    'current_dealer' => $dealerIdentifier,
+                    'current_id' => $sub->id,
+                    'last_heartbeat' => time(),
+                ], 300);
+
+                try {
+                    $res = $aiService->analyzeSubmission($sub);
+                    $successCount++;
+
+                    if ($res['status_potong_purchase'] === 'BISA DI POTONG') {
+                        $bisaPotongCount++;
+                    } else {
+                        $belumBisaPotongCount++;
+                    }
+                } catch (Exception $e) {
+                    $errorCount++;
+                    $this->newLine();
+                    $this->error("ID {$sub->id} ({$sub->dealer_name}): ".$e->getMessage());
                 }
-            } catch (Exception $e) {
-                $errorCount++;
-                $this->newLine();
-                $this->error("ID {$sub->id} ({$sub->dealer_name}): ".$e->getMessage());
-            }
 
-            $bar->advance();
+                $bar->advance();
 
-            if ($sleepSeconds > 0) {
-                usleep((int) ($sleepSeconds * 1000000));
+                Cache::put($cacheKey, [
+                    'is_running' => true,
+                    'started_at' => $startedAt,
+                    'total' => $totalToProcess,
+                    'processed' => $successCount + $errorCount,
+                    'success' => $successCount,
+                    'failed' => $errorCount,
+                    'current_dealer' => $dealerIdentifier,
+                    'current_id' => $sub->id,
+                    'last_heartbeat' => time(),
+                ], 300);
+
+                if ($sleepSeconds > 0) {
+                    usleep((int) ($sleepSeconds * 1000000));
+                }
             }
+        } finally {
+            Cache::put($cacheKey, [
+                'is_running' => false,
+                'completed_at' => now()->toIso8601String(),
+                'started_at' => $startedAt,
+                'total' => $totalToProcess,
+                'processed' => $successCount + $errorCount,
+                'success' => $successCount,
+                'failed' => $errorCount,
+                'last_heartbeat' => time(),
+            ], 45);
         }
 
         $bar->finish();

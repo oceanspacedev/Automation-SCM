@@ -69,12 +69,12 @@
             <button
               type="button"
               @click="handleTriggerBgAi"
-              :disabled="isTriggeringBgAi"
+              :disabled="isTriggeringBgAi || aiStats.is_running"
               class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <RefreshCwIcon v-if="isTriggeringBgAi" class="w-3.5 h-3.5 animate-spin text-gray-500 shrink-0" />
+              <RefreshCwIcon v-if="isTriggeringBgAi || aiStats.is_running" class="w-3.5 h-3.5 animate-spin text-emerald-600 shrink-0" />
               <BotIcon v-else class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-              <span>{{ isTriggeringBgAi ? 'Menjalankan AI...' : 'Jalankan AI di Belakang Layar' }}</span>
+              <span>{{ (isTriggeringBgAi || aiStats.is_running) ? 'AI Sedang Berjalan...' : 'Jalankan AI di Belakang Layar' }}</span>
             </button>
 
             <button
@@ -948,7 +948,7 @@
 
             <div class="p-6 space-y-3 text-xs">
               <p class="text-gray-600 leading-relaxed">
-                Fitur ini akan menganalisis kelengkapan dokumen <strong>Credit Note (CN)</strong>, <strong>Agreement (Agr)</strong>, dan <strong>Faktur Pajak</strong> secara otomatis untuk baris program yang belum dicek.
+                Fitur ini akan menganalisis kelengkapan dokumen <strong>Credit Note (CN)</strong>, <strong>Agreement (Agr)</strong>, dan <strong>Faktur Pajak</strong> secara otomatis untuk <strong>SELURUH</strong> data program yang belum dicek tanpa batasan jumlah.
               </p>
 
               <div class="p-3 bg-gray-50 rounded-lg border border-gray-200 text-gray-800 space-y-1">
@@ -958,7 +958,7 @@
                 </div>
                 <ul class="list-disc list-inside text-[11px] space-y-0.5 text-gray-600">
                   <li>Ketiga dokumen lengkap &rarr; <strong>BISA DI POTONG</strong> & status LENGKAP</li>
-                  <li>Ada dokumen kurang &rarr; <strong>BELUM BISA POTONG</strong> & rincian dokumen yang belum diunggah</li>
+                  <li>Ada dokumen kurang &rarr; <strong>BELUM BISA POTONG</strong> & rincian dokumen yang belum diunggah (misal: AGR & FAKTUR BELUM ADA)</li>
                 </ul>
               </div>
 
@@ -985,7 +985,7 @@
               >
                 <RefreshCwIcon v-if="isAnalyzingBatch" class="w-3.5 h-3.5 animate-spin text-gray-500" />
                 <BotIcon v-else class="w-3.5 h-3.5 text-gray-600" />
-                <span>{{ isAnalyzingBatch ? 'Sedang Menganalisis...' : 'Mulai Analisis Sekarang' }}</span>
+                <span>{{ isAnalyzingBatch ? 'Sedang Menganalisis Semua...' : 'Mulai Analisis Semua Sekarang' }}</span>
               </button>
             </div>
           </div>
@@ -1111,6 +1111,8 @@ const aiStats = reactive({
   unanalyzed_2026: 0,
   bisa_potong_count: 0,
   belum_bisa_potong_count: 0,
+  is_running: false,
+  running_info: null,
 });
 
 const recommendedModels = [
@@ -1321,9 +1323,14 @@ const triggerSync = async () => {
     const res = await axios.post('/api/program-submissions/sync', {
       limit: 200,
     });
-    syncMessage.value = res.data.message || 'Sinkronisasi berhasil diselesaikan.';
+    if (res.data?.data?.new_count > 0) {
+      syncMessage.value = `${res.data.message} ${res.data.data.new_count} data baru sedang otomatis dianalisis oleh AI di latar belakang.`;
+    } else {
+      syncMessage.value = res.data.message || 'Sinkronisasi berhasil diselesaikan.';
+    }
     syncError.value = false;
     await fetchSubmissions(1);
+    setTimeout(fetchAiConfigAndStats, 1000);
   } catch (err) {
     syncMessage.value = 'Sinkronisasi gagal: ' + (err.response?.data?.message || err.message);
     syncError.value = true;
@@ -1366,9 +1373,10 @@ const runAutoSync = async () => {
       limit: 100,
     });
     if (res.data?.data?.new_count > 0) {
-      syncMessage.value = `Otomatis menarik ${res.data.data.new_count} data baru dari Google Spreadsheet.`;
+      syncMessage.value = `Otomatis menarik ${res.data.data.new_count} data baru dari Google Spreadsheet & analisis AI otomatis dimulai.`;
       syncError.value = false;
       await fetchSubmissions(pagination.current_page, true);
+      setTimeout(fetchAiConfigAndStats, 1000);
     }
   } catch (err) {
     // Silent fail in background
@@ -1530,12 +1538,16 @@ const runBatchAiAnalysis = async () => {
   batchResultSummary.value = '';
 
   try {
-    const res = await axios.post('/api/program-submissions/analyze-ai-batch');
+    const res = await axios.post('/api/program-submissions/analyze-ai-batch', {
+      all: true,
+      year: '2026',
+    });
     const data = res.data.data;
-    batchResultSummary.value = `Analisis selesai! Total: ${data.total}, Berhasil: ${data.success_count}, Gagal: ${data.error_count}.`;
+    batchResultSummary.value = `Analisis selesai! Total: ${data.total} data berhasil dianalisis (Berhasil: ${data.success_count}, Gagal: ${data.error_count}).`;
     await fetchSubmissions(pagination.current_page, true);
     syncMessage.value = res.data.message;
     syncError.value = false;
+    setTimeout(fetchAiConfigAndStats, 1000);
   } catch (err) {
     batchResultSummary.value = 'Gagal menjalankan analisis batch: ' + (err.response?.data?.message || err.message);
   } finally {
