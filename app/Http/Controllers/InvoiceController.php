@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Mail\InvoiceMail;
 use App\Models\Draft;
+use App\Models\EmailAccount;
 use App\Models\EmailLog;
 use App\Models\Invoice;
 use App\Models\WhatsAppLog;
 use App\Services\CustomerLookupService;
+use App\Services\GoogleMailService;
 use App\Services\InvoiceGenerator;
 use App\Services\WhatsAppService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -21,7 +23,8 @@ class InvoiceController extends Controller
 {
     public function __construct(
         protected InvoiceGenerator $generator,
-        protected WhatsAppService $whatsAppService
+        protected WhatsAppService $whatsAppService,
+        protected GoogleMailService $googleMailService
     ) {}
 
     /**
@@ -75,6 +78,52 @@ class InvoiceController extends Controller
     public function billToOptions(): JsonResponse
     {
         return response()->json(CustomerLookupService::getBillToOptions());
+    }
+
+    /**
+     * Get list of active sender email accounts for dropdown.
+     */
+    public function emailAccounts(): JsonResponse
+    {
+        $accounts = EmailAccount::where('is_active', true)
+            ->orderByDesc('is_default')
+            ->orderBy('id')
+            ->get(['id', 'name', 'email', 'is_default']);
+
+        return response()->json([
+            'data' => $accounts,
+        ]);
+    }
+
+    /**
+     * Resolve active email sender account.
+     */
+    protected function resolveSender(?int $senderId = null): EmailAccount
+    {
+        if ($senderId) {
+            $sender = EmailAccount::where('id', $senderId)->where('is_active', true)->first();
+            if ($sender) {
+                return $sender;
+            }
+        }
+
+        $defaultSender = EmailAccount::where('is_default', true)->where('is_active', true)->first();
+        if ($defaultSender) {
+            return $defaultSender;
+        }
+
+        $activeSender = EmailAccount::where('is_active', true)->first();
+        if ($activeSender) {
+            return $activeSender;
+        }
+
+        return new EmailAccount([
+            'id' => 0,
+            'name' => 'Rebate. MSI',
+            'email' => 'ade@mediaselularindonesia.com',
+            'is_default' => true,
+            'is_active' => true,
+        ]);
     }
 
     /**
@@ -209,6 +258,20 @@ class InvoiceController extends Controller
             ], 422);
         }
 
+        // Validate sender if sender_id provided
+        if ($request->has('sender_id')) {
+            $senderCheck = EmailAccount::where('id', $request->input('sender_id'))->where('is_active', true)->first();
+            if (! $senderCheck) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Akun pengirim tidak valid atau tidak aktif.',
+                ], 422);
+            }
+            $sender = $senderCheck;
+        } else {
+            $sender = $this->resolveSender();
+        }
+
         $email = $request->input('email') ?: ($invoice->email ?? $invoice->draft?->email);
         $rawWhatsapp = $request->input('whatsapp') ?: ($invoice->whatsapp ?? $invoice->draft?->whatsapp);
         $whatsapp = $this->whatsAppService->formatPhone($rawWhatsapp);
@@ -230,7 +293,29 @@ class InvoiceController extends Controller
         // 1. Send Email if recipient email is available
         if ($hasValidEmail) {
             try {
-                Mail::to($email)->send(new InvoiceMail($invoice));
+                $subject = $request->input('subject');
+                $customMessage = $request->input('message');
+                $cc = (array) $request->input('cc', []);
+
+                if ($this->googleMailService->isConnected()) {
+                    $this->googleMailService->sendInvoiceMail(
+                        invoice: $invoice,
+                        sender: $sender,
+                        to: $email,
+                        cc: $cc,
+                        subject: $subject,
+                        customMessage: $customMessage
+                    );
+                } else {
+                    Mail::to($email)->send(new InvoiceMail(
+                        invoice: $invoice,
+                        senderEmail: $sender->email,
+                        senderName: $sender->name,
+                        customSubject: $subject,
+                        customMessage: $customMessage,
+                        ccEmails: $cc
+                    ));
+                }
 
                 $updates['email_sent_at'] = now();
                 $updates['email'] = $email;
@@ -238,15 +323,19 @@ class InvoiceController extends Controller
                 EmailLog::create([
                     'invoice_id' => $invoice->id,
                     'invoice_number' => $invoice->invoice_number,
+                    'sender_email' => $sender->email,
+                    'sender_name' => $sender->name,
                     'recipient_email' => $email,
                     'status' => 'sent',
                 ]);
 
-                $sentChannels[] = "Email ({$email})";
+                $sentChannels[] = "Email ({$email}) via {$sender->name}";
             } catch (Exception $e) {
                 EmailLog::create([
                     'invoice_id' => $invoice->id,
                     'invoice_number' => $invoice->invoice_number,
+                    'sender_email' => $sender->email,
+                    'sender_name' => $sender->name,
                     'recipient_email' => $email,
                     'status' => 'failed',
                     'error_message' => $e->getMessage(),
@@ -329,6 +418,7 @@ class InvoiceController extends Controller
             ], 422);
         }
 
+        $sender = $this->resolveSender($request->input('sender_id'));
         $successCount = 0;
         $failedCount = 0;
 
@@ -351,7 +441,19 @@ class InvoiceController extends Controller
 
             if ($hasEmail && ! $invoice->email_sent_at) {
                 try {
-                    Mail::to($email)->send(new InvoiceMail($invoice));
+                    if ($this->googleMailService->isConnected()) {
+                        $this->googleMailService->sendInvoiceMail(
+                            invoice: $invoice,
+                            sender: $sender,
+                            to: $email
+                        );
+                    } else {
+                        Mail::to($email)->send(new InvoiceMail(
+                            invoice: $invoice,
+                            senderEmail: $sender->email,
+                            senderName: $sender->name
+                        ));
+                    }
 
                     $updates['email_sent_at'] = now();
                     $updates['email'] = $email;
@@ -359,6 +461,8 @@ class InvoiceController extends Controller
                     EmailLog::create([
                         'invoice_id' => $invoice->id,
                         'invoice_number' => $invoice->invoice_number,
+                        'sender_email' => $sender->email,
+                        'sender_name' => $sender->name,
                         'recipient_email' => $email,
                         'status' => 'sent',
                     ]);
@@ -368,6 +472,8 @@ class InvoiceController extends Controller
                     EmailLog::create([
                         'invoice_id' => $invoice->id,
                         'invoice_number' => $invoice->invoice_number,
+                        'sender_email' => $sender->email,
+                        'sender_name' => $sender->name,
                         'recipient_email' => $email,
                         'status' => 'failed',
                         'error_message' => $e->getMessage(),
@@ -404,7 +510,7 @@ class InvoiceController extends Controller
     /**
      * Batch send all unsent invoices that have an email or WhatsApp number.
      */
-    public function quickSendAll(): JsonResponse
+    public function quickSendAll(Request $request): JsonResponse
     {
         $invoices = Invoice::with('draft')
             ->where(function ($q) {
@@ -431,6 +537,7 @@ class InvoiceController extends Controller
             ], 422);
         }
 
+        $sender = $this->resolveSender($request->input('sender_id'));
         $successCount = 0;
         $failedCount = 0;
 
@@ -451,7 +558,19 @@ class InvoiceController extends Controller
 
             if ($hasEmail && ! $invoice->email_sent_at) {
                 try {
-                    Mail::to($email)->send(new InvoiceMail($invoice));
+                    if ($this->googleMailService->isConnected()) {
+                        $this->googleMailService->sendInvoiceMail(
+                            invoice: $invoice,
+                            sender: $sender,
+                            to: $email
+                        );
+                    } else {
+                        Mail::to($email)->send(new InvoiceMail(
+                            invoice: $invoice,
+                            senderEmail: $sender->email,
+                            senderName: $sender->name
+                        ));
+                    }
 
                     $updates['email_sent_at'] = now();
                     $updates['email'] = $email;
@@ -459,6 +578,8 @@ class InvoiceController extends Controller
                     EmailLog::create([
                         'invoice_id' => $invoice->id,
                         'invoice_number' => $invoice->invoice_number,
+                        'sender_email' => $sender->email,
+                        'sender_name' => $sender->name,
                         'recipient_email' => $email,
                         'status' => 'sent',
                     ]);
@@ -468,6 +589,8 @@ class InvoiceController extends Controller
                     EmailLog::create([
                         'invoice_id' => $invoice->id,
                         'invoice_number' => $invoice->invoice_number,
+                        'sender_email' => $sender->email,
+                        'sender_name' => $sender->name,
                         'recipient_email' => $email,
                         'status' => 'failed',
                         'error_message' => $e->getMessage(),

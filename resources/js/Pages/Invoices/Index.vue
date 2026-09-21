@@ -3,7 +3,27 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-900">Invoices</h1>
+        <div class="flex items-center gap-2.5">
+          <h1 class="text-2xl font-bold tracking-tight text-gray-900">Invoices</h1>
+          <!-- Google Connection Status Badge -->
+          <span
+            v-if="googleStatus.is_connected"
+            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/70"
+            :title="`Terhubung dengan akun Google: ${googleStatus.account_email}`"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span>Gmail: {{ googleStatus.account_email }}</span>
+          </span>
+          <a
+            v-else
+            href="/auth/google/redirect"
+            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 transition cursor-pointer"
+            title="Klik untuk menghubungkan akun Google Workspace (Gmail API)"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            <span>Hubungkan Google Workspace</span>
+          </a>
+        </div>
         <p class="text-sm text-gray-500">Daftar invoice resmi yang telah diterbitkan.</p>
       </div>
       <div class="flex items-center gap-2.5">
@@ -137,7 +157,6 @@
               />
             </TableHead>
             <TableHead class="w-[150px] whitespace-nowrap text-xs">Invoice</TableHead>
-            <TableHead class="w-[110px] whitespace-nowrap text-xs">Status</TableHead>
             <TableHead class="min-w-[140px] text-xs">Dealer</TableHead>
             <TableHead class="min-w-[130px] text-xs">Customer</TableHead>
             <TableHead class="min-w-[130px] text-xs">Email</TableHead>
@@ -148,10 +167,10 @@
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableEmpty v-if="loading" :colspan="10">
+          <TableEmpty v-if="loading" :colspan="9">
             Memuat data invoice...
           </TableEmpty>
-          <TableEmpty v-else-if="invoices.length === 0" :colspan="10">
+          <TableEmpty v-else-if="invoices.length === 0" :colspan="9">
             Belum ada invoice yang dibuat. Silakan generate invoice dari menu <strong>Draft</strong>.
           </TableEmpty>
           <TableRow v-for="inv in invoices" :key="inv.id">
@@ -167,86 +186,9 @@
               />
             </TableCell>
             <TableCell class="text-xs">
-              <router-link :to="`/invoices/${inv.id}`" class="hover:underline font-medium text-xs">
+              <router-link :to="`/invoices/${inv.id}`" class="hover:underline text-xs text-gray-900">
                 {{ inv.invoice_number }}
               </router-link>
-            </TableCell>
-            <!-- Status Badge -->
-            <TableCell class="text-xs">
-              <!-- Fully Sent: Email & WhatsApp -->
-              <span
-                v-if="isFullySent(inv)"
-                class="inline-flex items-center gap-1.5 text-xs text-gray-700 whitespace-nowrap"
-                title="Email & WhatsApp sudah terkirim"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                <span>Email & WA</span>
-              </span>
-
-              <!-- Email Sent Only -->
-              <span
-                v-else-if="inv.email_sent_at && !inv.whatsapp_sent_at"
-                class="inline-flex items-center gap-1.5 text-xs text-gray-700 whitespace-nowrap"
-                title="Email sudah terkirim"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                <span>Email Sent</span>
-              </span>
-
-              <!-- WhatsApp Sent Only -->
-              <span
-                v-else-if="!inv.email_sent_at && inv.whatsapp_sent_at"
-                class="inline-flex items-center gap-1.5 text-xs text-gray-700 whitespace-nowrap"
-                title="WhatsApp sudah terkirim"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                <span>WA Sent</span>
-              </span>
-
-              <!-- Sent / Terkirim Generic -->
-              <span
-                v-else-if="inv.status === 'sent'"
-                class="inline-flex items-center gap-1.5 text-xs text-gray-700 whitespace-nowrap"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                <span>Terkirim</span>
-              </span>
-
-              <!-- Generated -->
-              <span
-                v-else-if="inv.status === 'generated'"
-                class="inline-flex items-center gap-1.5 text-xs text-gray-500 whitespace-nowrap"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0"></span>
-                <span>Generated</span>
-              </span>
-
-              <!-- Paid -->
-              <span
-                v-else-if="inv.status === 'paid'"
-                class="inline-flex items-center gap-1.5 text-xs text-gray-700 whitespace-nowrap"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
-                <span>Paid</span>
-              </span>
-
-              <!-- Failed / Gagal -->
-              <span
-                v-else-if="inv.status === 'failed'"
-                class="inline-flex items-center gap-1.5 text-xs text-rose-600 whitespace-nowrap"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
-                <span>Gagal</span>
-              </span>
-
-              <!-- Fallback -->
-              <span
-                v-else
-                class="inline-flex items-center gap-1.5 text-xs text-gray-700 capitalize whitespace-nowrap"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-gray-400 shrink-0"></span>
-                <span>{{ inv.status }}</span>
-              </span>
             </TableCell>
             <TableCell class="max-w-[170px] truncate text-xs" :title="`${inv.dealer_code} - ${inv.dealer_name}`">
               {{ inv.dealer_code }} - {{ inv.dealer_name }}
@@ -265,7 +207,7 @@
             <TableCell class="whitespace-nowrap text-xs">
               {{ inv.invoice_date || '-' }}
             </TableCell>
-            <TableCell class="text-right font-medium text-gray-900 whitespace-nowrap text-xs">
+            <TableCell class="text-right text-gray-800 whitespace-nowrap text-xs">
               {{ formatCurrency(inv.netpay) }}
             </TableCell>
 
@@ -302,16 +244,15 @@
                   <span>Terkirim</span>
                 </span>
 
-                <!-- Ready to send: Blue Kirim button -->
+                <!-- Ready to send: Blue Kirim button (opens Send modal with sender choice) -->
                 <button
                   v-else-if="hasDestination(inv)"
-                  @click="askSendSingle(inv)"
+                  @click="openEmailModal(inv)"
                   :disabled="sendingId === inv.id"
                   class="h-8 w-[88px] shrink-0 bg-[#1D70F5] hover:bg-blue-600 text-white text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
-                  :title="`Kirim notifikasi ke ${inv.email || inv.draft?.email || ''} ${inv.whatsapp || inv.draft?.whatsapp ? '(' + (inv.whatsapp || inv.draft?.whatsapp) + ')' : ''}`"
+                  :title="`Kirim invoice ke ${inv.email || inv.draft?.email || ''} ${inv.whatsapp || inv.draft?.whatsapp ? '(' + (inv.whatsapp || inv.draft?.whatsapp) + ')' : ''}`"
                 >
-                  <span v-if="sendingId === inv.id" class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                  <SendIcon v-else class="w-3.5 h-3.5 text-white shrink-0" />
+                  <SendIcon class="w-3.5 h-3.5 text-white shrink-0" />
                   <span>Kirim</span>
                 </button>
 
@@ -331,10 +272,10 @@
         </TableBody>
         <TableFooter v-if="invoices.length > 0">
           <TableRow>
-            <TableCell :colspan="8" class="font-medium text-xs">
+            <TableCell :colspan="7" class="text-xs text-gray-700">
               Total
             </TableCell>
-            <TableCell class="text-right whitespace-nowrap font-medium text-xs">
+            <TableCell class="text-right whitespace-nowrap text-xs text-gray-700">
               {{ formatCurrency(totalNetpay) }}
             </TableCell>
             <TableCell></TableCell>
@@ -369,11 +310,13 @@
       </div>
     </div>
 
-    <!-- Send Email Modal -->
+    <!-- Send Email Modal with Sender Selector -->
     <SendEmailModal
       v-model="showEmailModal"
       :invoice-id="selectedInvoice?.id"
       :invoice-number="selectedInvoice?.invoice_number"
+      :dealer-name="selectedInvoice?.dealer_name"
+      :customer-name="selectedInvoice?.customer_name"
       :default-email="selectedInvoice?.email || selectedInvoice?.draft?.email"
       :default-whatsapp="selectedInvoice?.whatsapp || selectedInvoice?.draft?.whatsapp"
       @sent="onEmailSent"
@@ -387,7 +330,24 @@
       :confirm-text="confirmState.confirmText"
       :loading="confirmState.loading"
       @confirm="onConfirmAction"
-    />
+    >
+      <div v-if="confirmState.showSenderSelect" class="mt-3 space-y-1.5 text-left">
+        <label class="block text-xs font-semibold uppercase tracking-wider text-gray-700">
+          Kirim dari
+        </label>
+        <select
+          v-model="batchSenderId"
+          class="w-full h-10 px-3 rounded-lg border border-gray-300 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
+        >
+          <option v-for="acc in emailAccounts" :key="acc.id" :value="acc.id">
+            {{ acc.name }} &lt;{{ acc.email }}&gt; {{ acc.is_default ? '(Default)' : '' }}
+          </option>
+        </select>
+        <p v-if="selectedBatchSender" class="text-[11px] text-gray-500">
+          Pengirim: <span class="font-medium text-gray-800">{{ selectedBatchSender.name }}</span> ({{ selectedBatchSender.email }})
+        </p>
+      </div>
+    </ConfirmModal>
   </div>
 </template>
 
@@ -433,12 +393,48 @@ const selectedIds = ref([]);
 const alertMessage = ref(null);
 const alertSuccess = ref(true);
 
+const emailAccounts = ref([]);
+const batchSenderId = ref(null);
+
+const selectedBatchSender = computed(() => {
+  return emailAccounts.value.find(acc => acc.id === batchSenderId.value) || null;
+});
+
+const fetchEmailAccounts = async () => {
+  try {
+    const res = await axios.get('/api/email-accounts');
+    emailAccounts.value = res.data.data || [];
+    if (!batchSenderId.value && emailAccounts.value.length > 0) {
+      const def = emailAccounts.value.find(a => a.is_default);
+      batchSenderId.value = def ? def.id : emailAccounts.value[0].id;
+    }
+  } catch (err) {
+    console.error('Failed to fetch email accounts', err);
+  }
+};
+
+const googleStatus = reactive({
+  is_configured: false,
+  is_connected: false,
+  account_email: null,
+});
+
+const fetchGoogleStatus = async () => {
+  try {
+    const res = await axios.get('/api/google/status');
+    Object.assign(googleStatus, res.data);
+  } catch (err) {
+    console.error('Failed to fetch Google status', err);
+  }
+};
+
 const confirmState = reactive({
   show: false,
   title: '',
   message: '',
   confirmText: 'Ya, Kirim Sekarang',
   loading: false,
+  showSenderSelect: false,
   action: null,
 });
 
@@ -551,6 +547,7 @@ const askSendBatch = () => {
   confirmState.title = 'Kirim Batch Notifikasi (Email & WA)';
   confirmState.message = `Apakah Anda yakin ingin mengirim ${selectedIds.value.length} invoice terpilih ke alamat Email dan WhatsApp tujuan masing-masing?`;
   confirmState.confirmText = `Ya, Kirim (${selectedIds.value.length}) Invoice`;
+  confirmState.showSenderSelect = true;
   confirmState.action = async () => {
     confirmState.loading = true;
     try {
@@ -570,6 +567,7 @@ const executeSendBatch = async () => {
   try {
     const res = await axios.post('/api/invoices/send-batch', {
       ids: selectedIds.value,
+      sender_id: batchSenderId.value,
     });
     alertSuccess.value = true;
     alertMessage.value = res.data.message;
@@ -588,6 +586,7 @@ const askSendAll = () => {
   confirmState.title = 'Kirim Semua Notifikasi Invoice';
   confirmState.message = 'Apakah Anda yakin ingin mengirim semua invoice yang belum terkirim via Email dan WhatsApp?';
   confirmState.confirmText = 'Ya, Kirim Semua';
+  confirmState.showSenderSelect = true;
   confirmState.action = async () => {
     confirmState.loading = true;
     try {
@@ -605,7 +604,9 @@ const executeSendAll = async () => {
   alertMessage.value = null;
 
   try {
-    const res = await axios.post('/api/invoices/quick-send-all');
+    const res = await axios.post('/api/invoices/quick-send-all', {
+      sender_id: batchSenderId.value,
+    });
     alertSuccess.value = true;
     alertMessage.value = res.data.message;
     selectedIds.value = [];
@@ -696,6 +697,19 @@ const formatCurrency = (val) => {
 };
 
 onMounted(() => {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('google_connected')) {
+    alertSuccess.value = true;
+    alertMessage.value = `Akun Google Workspace (${urlParams.get('account') || ''}) berhasil terhubung!`;
+    window.history.replaceState({}, document.title, window.location.pathname);
+  } else if (urlParams.get('google_error')) {
+    alertSuccess.value = false;
+    alertMessage.value = `Gagal menghubungkan akun Google: ${urlParams.get('google_error')}`;
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
   fetchInvoices(1);
+  fetchGoogleStatus();
+  fetchEmailAccounts();
 });
 </script>

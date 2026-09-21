@@ -3,49 +3,78 @@
     <!-- Header Page -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-900">Form Program</h1>
-        <p class="text-sm text-gray-500 mt-0.5">
+        <h1 class="text-xl font-bold tracking-tight text-gray-900">Form Program</h1>
+        <p class="text-xs text-gray-500 mt-0.5">
           Sinkronisasi respon Google Spreadsheet program cashback, SO, dan kelayakan dokumen.
         </p>
       </div>
 
       <!-- Action Buttons -->
       <div class="flex flex-wrap items-center gap-2">
-        <a
-          :href="googleSheetUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
-          title="Buka file Google Spreadsheet"
-        >
-          <ExternalLinkIcon class="w-3.5 h-3.5 text-gray-400" />
-          <span>Buka Spreadsheet</span>
-        </a>
+        <!-- Dropdown Spreadsheet -->
+        <div class="relative" ref="spreadsheetDropdownRef">
+          <button
+            type="button"
+            @click="showSpreadsheetDropdown = !showSpreadsheetDropdown"
+            class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
+            title="Menu aksi Spreadsheet & Export"
+          >
+            <RefreshCwIcon v-if="isSyncing" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
+            <FileSpreadsheetIcon v-else class="w-3.5 h-3.5 text-gray-500" />
+            <span>{{ isSyncing ? 'Menyinkronkan...' : 'Spreadsheet' }}</span>
+            <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 ml-0.5 transition-transform duration-150" :class="showSpreadsheetDropdown && 'rotate-180'" />
+          </button>
 
-        <!-- Export Excel Button -->
-        <button
-          type="button"
-          @click="exportExcel"
-          :disabled="isExporting"
-          class="h-9 px-3.5 inline-flex items-center justify-center gap-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer disabled:opacity-50"
-          title="Export data form program ke Excel (.xlsx)"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" class="w-4 h-4 shrink-0">
-            <path fill="#166e40" d="M37 6H17a2 2 0 0 0-2 2v32a2 2 0 0 0 2 2h20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>
-            <path fill="#23a455" d="M37 6H24v36h13a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>
-            <path fill="#2ecc71" opacity=".35" d="M24 13h15v4H24zm0 7h15v4H24zm0 7h15v4H24zm0 7h15v4H24z"/>
-            <path fill="#107c41" d="M22 13H8a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V15a2 2 0 0 0-2-2z"/>
-            <path fill="#ffffff" d="M12.4 28.5l2.4-4.8 2.4 4.8h2.3l-3.5-6.5 3.3-6.5h-2.3l-2.2 4.7-2.2-4.7h-2.3l3.3 6.5-3.5 6.5h2.3z"/>
-          </svg>
-          <span>{{ isExporting ? 'Mengekspor...' : 'Export Excel' }}</span>
-        </button>
+          <!-- Dropdown Menu -->
+          <div
+            v-if="showSpreadsheetDropdown"
+            class="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-30 font-sans"
+          >
+            <button
+              type="button"
+              @click="handleTriggerSync"
+              :disabled="isSyncing"
+              class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCwIcon :class="['w-3.5 h-3.5 text-gray-500 shrink-0', isSyncing && 'animate-spin text-emerald-600']" />
+              <span>{{ isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Sekarang' }}</span>
+            </button>
+
+            <a
+              :href="googleSheetUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+              @click="showSpreadsheetDropdown = false"
+              class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 flex items-center gap-2 cursor-pointer"
+            >
+              <ExternalLinkIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <span>Buka Spreadsheet</span>
+            </a>
+
+            <button
+              type="button"
+              @click="handleExportExcel"
+              :disabled="isExporting"
+              class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" class="w-3.5 h-3.5 shrink-0">
+                <path fill="#166e40" d="M37 6H17a2 2 0 0 0-2 2v32a2 2 0 0 0 2 2h20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>
+                <path fill="#23a455" d="M37 6H24v36h13a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>
+                <path fill="#2ecc71" opacity=".35" d="M24 13h15v4H24zm0 7h15v4H24zm0 7h15v4H24zm0 7h15v4H24z"/>
+                <path fill="#107c41" d="M22 13H8a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V15a2 2 0 0 0-2-2z"/>
+                <path fill="#ffffff" d="M12.4 28.5l2.4-4.8 2.4 4.8h2.3l-3.5-6.5 3.3-6.5h-2.3l-2.2 4.7-2.2-4.7h-2.3l3.3 6.5-3.5 6.5h2.3z"/>
+              </svg>
+              <span>{{ isExporting ? 'Mengekspor...' : 'Export Excel' }}</span>
+            </button>
+          </div>
+        </div>
 
         <!-- Dropdown Fitur AI -->
         <div class="relative" ref="aiDropdownRef">
           <button
             type="button"
             @click="showAiDropdown = !showAiDropdown"
-            class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
+            class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
           >
             <BotIcon class="w-3.5 h-3.5 text-gray-500" />
             <span>Fitur AI</span>
@@ -89,16 +118,6 @@
             </button>
           </div>
         </div>
-
-        <button
-          type="button"
-          @click="triggerSync"
-          :disabled="isSyncing"
-          class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 disabled:opacity-50 transition shadow-2xs cursor-pointer"
-        >
-          <RefreshCwIcon :class="['w-3.5 h-3.5 text-gray-500', isSyncing && 'animate-spin']" />
-          <span>{{ isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Sekarang' }}</span>
-        </button>
       </div>
     </div>
 
@@ -273,13 +292,13 @@
               </TableCell>
 
               <!-- ID Real -->
-              <TableCell class="whitespace-nowrap font-mono text-gray-700 py-2.5">
+              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
                 {{ row.id_real || '-' }}
               </TableCell>
 
               <!-- Nama Dealer -->
               <TableCell class="text-gray-700 py-2.5 leading-snug">
-                <div class="line-clamp-2 font-medium text-gray-900" :title="row.dealer_name">{{ row.dealer_name || '-' }}</div>
+                <div class="line-clamp-2 text-gray-800" :title="row.dealer_name">{{ row.dealer_name || '-' }}</div>
               </TableCell>
 
               <!-- Nama Program -->
@@ -341,12 +360,12 @@
               </TableCell>
 
               <!-- Kolom: No PO/SJ -->
-              <TableCell class="whitespace-nowrap font-mono text-gray-700 py-2.5">
+              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
                 {{ row.no_po_sj || '-' }}
               </TableCell>
 
               <!-- Kolom: No Transaksi -->
-              <TableCell class="whitespace-nowrap font-mono text-gray-700 py-2.5">
+              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
                 {{ row.no_transaksi || '-' }}
               </TableCell>
 
@@ -362,7 +381,7 @@
 
               <!-- Kolom: Lama Pending -->
               <TableCell class="text-center text-gray-700 py-2.5 whitespace-nowrap">
-                <span v-if="row.lama_pending" class="px-1.5 py-0.5 rounded bg-white border border-gray-200 font-mono text-xs text-gray-700">
+                <span v-if="row.lama_pending" class="px-1.5 py-0.5 rounded bg-white border border-gray-200 text-xs text-gray-700">
                   {{ row.lama_pending }}
                 </span>
                 <span v-else class="text-gray-300">-</span>
@@ -386,9 +405,9 @@
               <TableCell class="text-gray-700 py-2.5 leading-snug">
                 <div
                   :class="[
-                    'line-clamp-2 max-w-[160px] font-medium text-xs px-1.5 py-0.5 rounded inline-block',
+                    'line-clamp-2 max-w-[160px] text-xs px-1.5 py-0.5 rounded inline-block',
                     row.cek_dokumen === 'LENGKAP'
-                      ? 'bg-teal-50 text-teal-700 font-semibold border border-teal-200'
+                      ? 'bg-teal-50 text-teal-700 border border-teal-200'
                       : row.cek_dokumen
                       ? 'bg-amber-50 text-amber-800 border border-amber-200'
                       : 'text-gray-400'
@@ -405,7 +424,7 @@
                   :value="row.status_potong_purchase || ''"
                   @change="quickUpdateStatus(row, $event.target.value)"
                   :class="[
-                    'h-7 px-2 rounded-md text-xs font-semibold border focus:outline-none focus:ring-1 focus:ring-black cursor-pointer transition',
+                    'h-7 px-2 rounded-md text-xs font-normal border focus:outline-none focus:ring-1 focus:ring-black cursor-pointer transition',
                     row.status_potong_purchase === 'BISA DI POTONG'
                       ? 'bg-teal-50 text-teal-700 border-teal-300'
                       : row.status_potong_purchase === 'SUDAH POTONG'
@@ -440,13 +459,13 @@
 
               <!-- Aksi: Tombol Edit Row Modal & Kirim WA AR -->
               <TableCell class="text-center py-2.5 whitespace-nowrap sticky right-0 bg-white">
-                <div class="inline-flex items-center gap-1.5">
+                <div class="inline-flex items-center justify-center gap-1.5">
                   <button
                     v-if="row.status_potong_purchase === 'BISA DI POTONG'"
                     type="button"
                     @click="sendWaToAr(row)"
                     :disabled="sendingWaId === row.id"
-                    class="inline-flex items-center justify-center p-1.5 rounded-md border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition shadow-2xs cursor-pointer disabled:opacity-50"
+                    class="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition shadow-2xs cursor-pointer disabled:opacity-50"
                     title="Kirim Notifikasi Klaim ke WhatsApp AR (081224290502)"
                   >
                     <RefreshCwIcon v-if="sendingWaId === row.id" class="w-3.5 h-3.5 animate-spin" />
@@ -456,7 +475,7 @@
                   <button
                     type="button"
                     @click="openEditModal(row)"
-                    class="inline-flex items-center justify-center p-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition shadow-2xs cursor-pointer"
+                    class="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition shadow-2xs cursor-pointer"
                     title="Edit Data Tracking & Status Potong"
                   >
                     <PencilIcon class="w-3.5 h-3.5" />
@@ -1016,6 +1035,7 @@ import {
   CheckCircle as CheckCircleIcon,
   Check as CheckIcon,
   FileText as FileTextIcon,
+  FileSpreadsheet as FileSpreadsheetIcon,
   Pencil as PencilIcon,
   X as XIcon,
   Sparkles as SparklesIcon,
@@ -1052,6 +1072,26 @@ const autoRefresh = ref(true);
 const lastUpdatedText = ref('');
 const sendingWaId = ref(null);
 const isSendingWaModal = ref(false);
+
+// Dropdown Spreadsheet state
+const showSpreadsheetDropdown = ref(false);
+const spreadsheetDropdownRef = ref(null);
+
+const handleClickOutsideSpreadsheetDropdown = (e) => {
+  if (spreadsheetDropdownRef.value && !spreadsheetDropdownRef.value.contains(e.target)) {
+    showSpreadsheetDropdown.value = false;
+  }
+};
+
+const handleTriggerSync = () => {
+  showSpreadsheetDropdown.value = false;
+  triggerSync();
+};
+
+const handleExportExcel = () => {
+  showSpreadsheetDropdown.value = false;
+  exportExcel();
+};
 
 // AI state
 const analyzingRowId = ref(null);
@@ -1706,6 +1746,7 @@ const saveEditModal = async () => {
 onMounted(() => {
   fetchSubmissions(1);
   fetchAiConfigAndStats();
+  document.addEventListener('click', handleClickOutsideSpreadsheetDropdown);
   document.addEventListener('click', handleClickOutsideAiDropdown);
   document.addEventListener('click', handleClickOutsideModelDropdown);
 
@@ -1728,6 +1769,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutsideSpreadsheetDropdown);
   document.removeEventListener('click', handleClickOutsideAiDropdown);
   document.removeEventListener('click', handleClickOutsideModelDropdown);
   if (pollTimer) clearInterval(pollTimer);

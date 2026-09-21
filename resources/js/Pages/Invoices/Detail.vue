@@ -14,7 +14,7 @@
       </div>
 
       <div class="flex items-center space-x-2">
-        <!-- Already Sent Status Badge -->
+        <!-- Status Badges -->
         <span
           v-if="invoice.status === 'sent' && invoice.email_sent_at && invoice.whatsapp_sent_at"
           class="h-9 px-3.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
@@ -42,28 +42,58 @@
           <span>WA Terkirim</span>
         </span>
 
-        <!-- 1-Click Send if destination exists and not completely sent -->
-        <button
-          v-if="!(invoice.email_sent_at && invoice.whatsapp_sent_at) && (invoice.email || invoice.draft?.email || invoice.whatsapp || invoice.draft?.whatsapp)"
-          @click="quickSend"
-          :disabled="quickSending"
-          class="h-9 px-3.5 bg-[#1D70F5] text-white hover:bg-blue-600 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
-          title="Kirim notifikasi langsung ke Email & WhatsApp yang tersedia"
+        <span
+          v-else-if="invoice.status === 'sent'"
+          class="h-9 px-3.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          title="Invoice sudah terkirim"
         >
-          <span v-if="quickSending" class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-          <SendIcon v-else class="w-4 h-4" />
-          <span>{{ quickSending ? 'Mengirim...' : 'Kirim Notifikasi' }}</span>
-        </button>
+          <CheckCircleIcon class="h-4 w-4 text-emerald-600" />
+          <span>Terkirim</span>
+        </span>
 
-        <!-- Manual or Customize Destination -->
+        <span
+          v-else-if="invoice.status === 'paid'"
+          class="h-9 px-3.5 bg-blue-50 text-blue-700 border border-blue-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+        >
+          <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+          <span>Paid</span>
+        </span>
+
+        <span
+          v-else-if="invoice.status === 'failed'"
+          class="h-9 px-3.5 bg-rose-50 text-rose-700 border border-rose-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+        >
+          <AlertCircleIcon class="h-4 w-4 text-rose-600" />
+          <span>Gagal Terkirim</span>
+        </span>
+
+        <span
+          v-else-if="invoice.status === 'generated'"
+          class="h-9 px-3.5 bg-gray-50 text-gray-700 border border-gray-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          title="Invoice telah digenerate, siap dikirim"
+        >
+          <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+          <span>Generated</span>
+        </span>
+
+        <span
+          v-else-if="invoice.status"
+          class="h-9 px-3.5 bg-gray-50 text-gray-700 border border-gray-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none capitalize"
+        >
+          <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+          <span>{{ invoice.status }}</span>
+        </span>
+
+        <!-- Kirim Button -->
         <button
           v-if="!(invoice.email_sent_at && invoice.whatsapp_sent_at)"
           @click="showEmailModal = true"
-          class="h-9 px-3 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5 cursor-pointer"
-          title="Sesuaikan Email / Nomor WhatsApp dan kirim"
+          :disabled="quickSending"
+          class="h-9 px-3.5 bg-[#1D70F5] text-white hover:bg-blue-600 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
+          title="Pilih pengirim dan kirim invoice"
         >
           <SendIcon class="w-4 h-4" />
-          <span>{{ (invoice.email || invoice.draft?.email || invoice.whatsapp || invoice.draft?.whatsapp) ? 'Kirim ke Tujuan Lain' : 'Kirim Notifikasi' }}</span>
+          <span>Kirim Notifikasi</span>
         </button>
 
         <a
@@ -97,6 +127,8 @@
       v-model="showEmailModal"
       :invoice-id="invoice.id"
       :invoice-number="invoice.invoice_number"
+      :dealer-name="invoice.dealer_name"
+      :customer-name="invoice.customer_name"
       :default-email="invoice.email || invoice.draft?.email"
       :default-whatsapp="invoice.whatsapp || invoice.draft?.whatsapp"
       @sent="onEmailSent"
@@ -170,6 +202,18 @@
               <tr>
                 <td class="py-1 text-gray-500">Tanggal Inv</td>
                 <td class="py-1 text-gray-900">{{ invoice.invoice_date || '-' }}</td>
+              </tr>
+              <tr>
+                <td class="py-1 text-gray-500">Status</td>
+                <td class="py-1 text-gray-900 font-medium capitalize">{{ invoice.status || '-' }}</td>
+              </tr>
+              <tr v-if="invoice.email_sent_at">
+                <td class="py-1 text-gray-500">Email Dikirim</td>
+                <td class="py-1 text-gray-900 text-xs">{{ formatDateTime(invoice.email_sent_at) }}</td>
+              </tr>
+              <tr v-if="invoice.whatsapp_sent_at">
+                <td class="py-1 text-gray-500">WA Dikirim</td>
+                <td class="py-1 text-gray-900 text-xs">{{ formatDateTime(invoice.whatsapp_sent_at) }}</td>
               </tr>
             </tbody>
           </table>
@@ -327,6 +371,12 @@ const quickSend = async () => {
 const formatCurrency = (val) => {
   const num = Math.round(Number(val) || 0);
   return 'Rp ' + new Intl.NumberFormat('id-ID').format(num);
+};
+
+const formatDateTime = (val) => {
+  if (!val) return '-';
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? val : d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' });
 };
 
 onMounted(() => {

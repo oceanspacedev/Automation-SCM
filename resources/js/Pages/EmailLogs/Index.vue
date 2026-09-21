@@ -83,7 +83,8 @@
                 <TableHead class="w-[170px]">Invoice</TableHead>
                 <TableHead class="w-[90px]">Type</TableHead>
                 <TableHead>Dealer</TableHead>
-                <TableHead>Recipient Email</TableHead>
+                <TableHead>Pengirim</TableHead>
+                <TableHead>Penerima</TableHead>
                 <TableHead class="w-[90px]">Status</TableHead>
                 <TableHead class="w-[120px]">Waktu</TableHead>
                 <TableHead class="w-[80px]">Action</TableHead>
@@ -102,10 +103,14 @@
                 <TableCell class="text-gray-600">
                   {{ log.invoice?.invoice_type || '-' }}
                 </TableCell>
-                <TableCell class="max-w-[180px] truncate text-gray-700" :title="log.invoice?.dealer_name">
+                <TableCell class="max-w-[150px] truncate text-gray-700 text-xs" :title="log.invoice?.dealer_name">
                   {{ log.invoice?.dealer_name || '-' }}
                 </TableCell>
-                <TableCell class="text-gray-700">
+                <TableCell class="text-xs">
+                  <div class="font-medium text-gray-900">{{ log.sender_name || 'Rebate. MSI' }}</div>
+                  <div class="text-[11px] text-gray-400">{{ log.sender_email || 'ade@mediaselularindonesia.com' }}</div>
+                </TableCell>
+                <TableCell class="text-gray-700 text-xs">
                   {{ log.recipient_email }}
                 </TableCell>
                 <TableCell>

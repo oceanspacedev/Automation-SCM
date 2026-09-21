@@ -22,7 +22,7 @@ class CustomerLookupService
         ],
         'PT MSI' => [
             'code' => 'PT MSI',
-            'name' => 'PT MITRA TELEKOMUNIKASI SELULAR',
+            'name' => 'PT MEDIA SELULER INDONESIA',
             'address' => 'Gedung Telkom Landmark Tower Lt. 12, Jl. Gatot Subroto Kav. 52, Jakarta Selatan',
             'npwp' => '01.555.666.7-011.000',
         ],
@@ -53,7 +53,12 @@ class CustomerLookupService
             'npwp' => '61.186.183.2-044.000',
         ],
         'PT MSI' => [
-            'name' => 'PT MITRA TELEKOMUNIKASI SELULAR',
+            'name' => 'PT MEDIA SELULER INDONESIA',
+            'address' => 'Gedung Telkom Landmark Tower Lt. 12, Jl. Gatot Subroto Kav. 52, Jakarta Selatan',
+            'npwp' => '01.555.666.7-011.000',
+        ],
+        'PT MEDIA SELULER INDONESIA' => [
+            'name' => 'PT MEDIA SELULER INDONESIA',
             'address' => 'Gedung Telkom Landmark Tower Lt. 12, Jl. Gatot Subroto Kav. 52, Jakarta Selatan',
             'npwp' => '01.555.666.7-011.000',
         ],
@@ -63,7 +68,7 @@ class CustomerLookupService
             'npwp' => '02.456.789.1-426.000',
         ],
         'PT MITRA TELEKOMUNIKASI SELULAR' => [
-            'name' => 'PT MITRA TELEKOMUNIKASI SELULAR',
+            'name' => 'PT MEDIA SELULER INDONESIA',
             'address' => 'Gedung Telkom Landmark Tower Lt. 12, Jl. Gatot Subroto Kav. 52, Jakarta Selatan',
             'npwp' => '01.555.666.7-011.000',
         ],

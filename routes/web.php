@@ -3,10 +3,15 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DraftController;
 use App\Http\Controllers\DraftImportController;
+use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\ProgramClaimConfirmationController;
 use App\Http\Controllers\ProgramSubmissionController;
 use Illuminate\Support\Facades\Route;
+
+// Google OAuth Authentication
+Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])->name('google.redirect');
+Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])->name('google.callback');
 
 // Invoice preview & PDF download
 Route::get('/invoices/{id}/preview', [InvoiceController::class, 'preview'])->name('invoices.preview');
@@ -22,6 +27,10 @@ Route::prefix('api')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
 
+    // Google OAuth Status & Disconnect
+    Route::get('/google/status', [GoogleAuthController::class, 'status']);
+    Route::post('/google/disconnect', [GoogleAuthController::class, 'disconnect']);
+
     // Dashboard
     Route::get('/dashboard', [InvoiceController::class, 'dashboard']);
 
@@ -31,7 +40,8 @@ Route::prefix('api')->group(function () {
     Route::get('/drafts/{id}', [DraftController::class, 'show']);
     Route::post('/drafts/{id}/validate', [DraftController::class, 'validateDraft']);
 
-    // Invoices
+    // Invoices & Email Accounts
+    Route::get('/email-accounts', [InvoiceController::class, 'emailAccounts']);
     Route::get('/bill-to-options', [InvoiceController::class, 'billToOptions']);
     Route::get('/invoices', [InvoiceController::class, 'index']);
     Route::get('/invoices/{id}', [InvoiceController::class, 'show']);
@@ -40,6 +50,7 @@ Route::prefix('api')->group(function () {
     Route::post('/invoices/generate/{draftId}', [InvoiceController::class, 'generate']);
     Route::post('/invoices/quick-send-all', [InvoiceController::class, 'quickSendAll']);
     Route::post('/invoices/send-batch', [InvoiceController::class, 'sendBatch']);
+    Route::post('/invoices/{id}/send', [InvoiceController::class, 'sendEmail']);
     Route::post('/invoices/{id}/send-email', [InvoiceController::class, 'sendEmail']);
     Route::post('/invoices/{id}/quick-send-email', [InvoiceController::class, 'quickSendEmail']);
     Route::get('/email-logs', [InvoiceController::class, 'emailLogs']);
@@ -65,4 +76,4 @@ Route::prefix('api')->group(function () {
 // SPA catch-all
 Route::get('/{any?}', function () {
     return view('app');
-})->where('any', '^(?!api|p\/confirm|invoices\/[0-9]+\/(preview|pdf)|storage).*$');
+})->where('any', '^(?!api|auth|p\/confirm|invoices\/[0-9]+\/(preview|pdf)|storage).*$');

@@ -54,9 +54,13 @@
     <div class="content">
         <p>Kepada Yth.<br>{{ $invoice->customer_name ?? $invoice->dealer_name }},</p>
 
-        <p>
-            Bersama ini kami sampaikan invoice berikut. Mohon periksa detail di bawah dan PDF yang terlampir.
-        </p>
+        @if (! empty($customMessage))
+            <p style="white-space: pre-line;">{{ $customMessage }}</p>
+        @else
+            <p>
+                Bersama ini kami sampaikan invoice berikut. Mohon periksa detail di bawah dan PDF yang terlampir.
+            </p>
+        @endif
 
         <table>
             <tr><td>Nomor Invoice</td><td>{{ $invoice->invoice_number }}</td></tr>
@@ -87,7 +91,7 @@
         <hr>
 
         <div class="footer">
-            Ocean Space<br>
+            {{ $senderName ?? 'Ocean Space' }}<br>
             Email ini dikirim otomatis oleh sistem SCM Invoice.
         </div>
     </div>

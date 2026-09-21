@@ -133,7 +133,7 @@ const defaultOptions = [
   },
   {
     code: 'PT MSI',
-    name: 'PT MITRA TELEKOMUNIKASI SELULAR',
+    name: 'PT MEDIA SELULER INDONESIA',
     address: 'Gedung Telkom Landmark Tower Lt. 12, Jl. Gatot Subroto Kav. 52, Jakarta Selatan',
     npwp: '01.555.666.7-011.000',
   },

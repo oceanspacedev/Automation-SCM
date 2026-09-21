@@ -8,12 +8,44 @@
         </router-link>
         <span class="text-gray-300">|</span>
         <h1 class="text-xl font-bold tracking-tight text-gray-900">Detail Draft #{{ id }}</h1>
-        <span class="text-sm font-medium capitalize text-gray-700">
-          ({{ draft.status }})
-        </span>
       </div>
 
       <div class="flex items-center space-x-2">
+        <!-- Status Badges -->
+        <span
+          v-if="draft.status === 'ready'"
+          class="h-9 px-3.5 bg-gray-50 text-gray-700 border border-gray-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          title="Draft siap untuk digenerate menjadi invoice"
+        >
+          <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+          <span>Ready</span>
+        </span>
+
+        <span
+          v-else-if="draft.status === 'invoiced'"
+          class="h-9 px-3.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          title="Invoice telah diterbitkan"
+        >
+          <CheckCircleIcon class="h-4 w-4 text-emerald-600" />
+          <span>Invoiced</span>
+        </span>
+
+        <span
+          v-else-if="draft.status === 'error'"
+          class="h-9 px-3.5 bg-rose-50 text-rose-700 border border-rose-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          title="Draft memiliki ketidaksesuaian rumus"
+        >
+          <AlertCircleIcon class="h-4 w-4 text-rose-600" />
+          <span>Error</span>
+        </span>
+
+        <span
+          v-else-if="draft.status"
+          class="h-9 px-3.5 bg-gray-50 text-gray-700 border border-gray-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none capitalize"
+        >
+          <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+          <span>{{ draft.status }}</span>
+        </span>
         <button
           v-if="draft.status !== 'invoiced'"
           @click="validateDraft"
@@ -142,6 +174,12 @@
                 <td class="py-1 text-gray-500 w-32">Invoice Type</td>
                 <td class="py-1 text-gray-900">
                   {{ draft.invoice_type || 'N/A' }}
+                </td>
+              </tr>
+              <tr>
+                <td class="py-1 text-gray-500">Status</td>
+                <td class="py-1 text-gray-900 font-medium capitalize">
+                  {{ draft.status || '-' }}
                 </td>
               </tr>
               <tr>
