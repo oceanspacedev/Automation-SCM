@@ -15,12 +15,12 @@
         @input="debounceFetch"
         type="text"
         placeholder="Cari invoice, email..."
-        class="h-9 w-60 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
+        class="h-9 w-64 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
       />
       <select
         v-model="filters.status"
         @change="fetchLogs(1)"
-        class="h-9 rounded-md border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-black"
+        class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
       >
         <option value="">Semua Status</option>
         <option value="sent">Sent</option>
@@ -30,11 +30,11 @@
         <PopoverTrigger as-child>
           <button
             :class="[
-              'h-9 px-3 inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white text-sm text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-black transition',
+              'h-9 px-3 inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white text-xs text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-black transition cursor-pointer',
               !filters.date && 'text-gray-400'
             ]"
           >
-            <CalendarIcon class="h-4 w-4" />
+            <CalendarIcon class="h-3.5 w-3.5" />
             {{ filters.date ? formatDateDisplay(filters.date) : 'Pilih tanggal' }}
           </button>
         </PopoverTrigger>
@@ -49,18 +49,18 @@
       <button
         v-if="filters.search || filters.status || filters.date"
         @click="resetFilters"
-        class="h-9 px-3 text-sm text-gray-500 hover:text-black cursor-pointer"
+        class="h-9 px-3 text-xs text-gray-500 hover:text-black cursor-pointer"
       >
         Reset
       </button>
     </div>
 
     <!-- Grouped by date -->
-    <div v-if="loading" class="py-10 text-center text-sm text-gray-400">
+    <div v-if="loading" class="py-10 text-center text-xs text-gray-400">
       Memuat riwayat email...
     </div>
 
-    <div v-else-if="groupedLogs.length === 0" class="py-10 text-center text-sm text-gray-400">
+    <div v-else-if="groupedLogs.length === 0" class="py-10 text-center text-xs text-gray-400">
       Belum ada riwayat pengiriman email.
     </div>
 
@@ -68,7 +68,7 @@
       <div v-for="group in groupedLogs" :key="group.date">
         <!-- Date label -->
         <div class="flex items-center gap-3 mb-2">
-          <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+          <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">
             {{ group.label }}
           </span>
           <span class="text-xs text-gray-400">{{ group.logs.length }} email dikirim</span>
@@ -80,19 +80,19 @@
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead class="w-[170px]">Invoice</TableHead>
-                <TableHead class="w-[90px]">Type</TableHead>
-                <TableHead>Dealer</TableHead>
-                <TableHead>Pengirim</TableHead>
-                <TableHead>Penerima</TableHead>
-                <TableHead class="w-[90px]">Status</TableHead>
-                <TableHead class="w-[120px]">Waktu</TableHead>
-                <TableHead class="w-[80px]">Action</TableHead>
+                <TableHead class="w-[170px] text-xs">Invoice</TableHead>
+                <TableHead class="w-[90px] text-xs">Type</TableHead>
+                <TableHead class="text-xs">Dealer</TableHead>
+                <TableHead class="text-xs">Pengirim</TableHead>
+                <TableHead class="text-xs">Penerima</TableHead>
+                <TableHead class="w-[90px] text-xs">Status</TableHead>
+                <TableHead class="w-[120px] text-xs">Waktu</TableHead>
+                <TableHead class="w-[80px] text-right text-xs">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow v-for="log in group.logs" :key="log.id">
-                <TableCell class="font-medium">
+              <TableRow v-for="log in group.logs" :key="log.id" class="text-xs">
+                <TableCell class="text-xs font-normal">
                   <router-link
                     :to="`/invoices/${log.invoice_id}`"
                     class="hover:underline text-gray-900"
@@ -100,25 +100,25 @@
                     {{ log.invoice_number }}
                   </router-link>
                 </TableCell>
-                <TableCell class="text-gray-600">
+                <TableCell class="text-gray-600 text-xs">
                   {{ log.invoice?.invoice_type || '-' }}
                 </TableCell>
                 <TableCell class="max-w-[150px] truncate text-gray-700 text-xs" :title="log.invoice?.dealer_name">
                   {{ log.invoice?.dealer_name || '-' }}
                 </TableCell>
                 <TableCell class="text-xs">
-                  <div class="font-medium text-gray-900">{{ log.sender_name || 'Rebate. MSI' }}</div>
+                  <div class="text-gray-900 font-normal">{{ log.sender_name || 'Rebate. MSI' }}</div>
                   <div class="text-[11px] text-gray-400">{{ log.sender_email || 'ade@mediaselularindonesia.com' }}</div>
                 </TableCell>
                 <TableCell class="text-gray-700 text-xs">
                   {{ log.recipient_email }}
                 </TableCell>
-                <TableCell>
+                <TableCell class="text-xs">
                   <span
                     :class="log.status === 'sent'
                       ? 'bg-green-50 text-green-700 border-green-200'
                       : 'bg-red-50 text-red-700 border-red-200'"
-                    class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded border"
+                    class="inline-flex items-center gap-1 text-xs font-normal px-2 py-0.5 rounded border"
                   >
                     <span v-if="log.status === 'sent'">✓</span>
                     <span v-else>✗</span>
@@ -128,7 +128,7 @@
                 <TableCell class="text-gray-500 text-xs whitespace-nowrap">
                   {{ formatTime(log.created_at) }}
                 </TableCell>
-                <TableCell>
+                <TableCell class="text-right">
                   <a
                     :href="`/invoices/${log.invoice_id}/pdf`"
                     class="text-xs text-gray-500 hover:text-black hover:underline"
@@ -144,7 +144,7 @@
     </div>
 
     <!-- Pagination -->
-    <div v-if="!loading && pagination.last_page > 1" class="flex items-center justify-between py-2 text-sm text-gray-500">
+    <div v-if="!loading && pagination.last_page > 1" class="flex flex-col sm:flex-row items-center justify-between gap-3 py-2 text-xs text-gray-500">
       <div>
         Menampilkan {{ pagination.total > 0 ? (pagination.current_page - 1) * pagination.per_page + 1 : 0 }}
         sampai {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }}
@@ -154,17 +154,17 @@
         <button
           @click="fetchLogs(pagination.current_page - 1)"
           :disabled="pagination.current_page <= 1"
-          class="h-8 px-3 rounded-md border border-gray-200 text-sm font-medium hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+          class="h-8 px-3 rounded-md border border-gray-200 text-xs font-normal hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
         >
           Previous
         </button>
-        <span class="text-sm font-medium text-gray-700">
+        <span class="text-xs font-normal text-gray-700">
           {{ pagination.current_page }} / {{ pagination.last_page }}
         </span>
         <button
           @click="fetchLogs(pagination.current_page + 1)"
           :disabled="pagination.current_page >= pagination.last_page"
-          class="h-8 px-3 rounded-md border border-gray-200 text-sm font-medium hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+          class="h-8 px-3 rounded-md border border-gray-200 text-xs font-normal hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
         >
           Next
         </button>

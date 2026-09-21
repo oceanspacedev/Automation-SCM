@@ -8,19 +8,19 @@
           <!-- Google Connection Status Badge -->
           <span
             v-if="googleStatus.is_connected"
-            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/70"
+            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-normal bg-gray-50 text-gray-600 border border-gray-200"
             :title="`Terhubung dengan akun Google: ${googleStatus.account_email}`"
           >
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
             <span>Gmail: {{ googleStatus.account_email }}</span>
           </span>
           <a
             v-else
             href="/auth/google/redirect"
-            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 transition cursor-pointer"
+            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-normal bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 transition cursor-pointer"
             title="Klik untuk menghubungkan akun Google Workspace (Gmail API)"
           >
-            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
             <span>Hubungkan Google Workspace</span>
           </a>
         </div>

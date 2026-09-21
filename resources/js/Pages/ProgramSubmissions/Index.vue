@@ -16,25 +16,25 @@
           <button
             type="button"
             @click="showSpreadsheetDropdown = !showSpreadsheetDropdown"
-            class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
+            class="h-8 px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-xs font-normal text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
             title="Menu aksi Spreadsheet & Export"
           >
             <RefreshCwIcon v-if="isSyncing" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
             <FileSpreadsheetIcon v-else class="w-3.5 h-3.5 text-gray-500" />
             <span>{{ isSyncing ? 'Menyinkronkan...' : 'Spreadsheet' }}</span>
-            <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 ml-0.5 transition-transform duration-150" :class="showSpreadsheetDropdown && 'rotate-180'" />
+            <ChevronDownIcon class="w-3 h-3 text-gray-400 ml-0.5 transition-transform duration-150" :class="showSpreadsheetDropdown && 'rotate-180'" />
           </button>
 
           <!-- Dropdown Menu -->
           <div
             v-if="showSpreadsheetDropdown"
-            class="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-30 font-sans"
+            class="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-lg shadow-lg border border-gray-200 p-1 z-30 font-sans"
           >
             <button
               type="button"
               @click="handleTriggerSync"
               :disabled="isSyncing"
-              class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <RefreshCwIcon :class="['w-3.5 h-3.5 text-gray-500 shrink-0', isSyncing && 'animate-spin text-emerald-600']" />
               <span>{{ isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Sekarang' }}</span>
@@ -45,7 +45,7 @@
               target="_blank"
               rel="noopener noreferrer"
               @click="showSpreadsheetDropdown = false"
-              class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 flex items-center gap-2 cursor-pointer"
+              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer"
             >
               <ExternalLinkIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
               <span>Buka Spreadsheet</span>
@@ -55,7 +55,7 @@
               type="button"
               @click="handleExportExcel"
               :disabled="isExporting"
-              class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" class="w-3.5 h-3.5 shrink-0">
                 <path fill="#166e40" d="M37 6H17a2 2 0 0 0-2 2v32a2 2 0 0 0 2 2h20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>
@@ -74,22 +74,22 @@
           <button
             type="button"
             @click="showAiDropdown = !showAiDropdown"
-            class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
+            class="h-8 px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-xs font-normal text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
           >
             <BotIcon class="w-3.5 h-3.5 text-gray-500" />
             <span>Fitur AI</span>
-            <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 ml-0.5 transition-transform duration-150" :class="showAiDropdown && 'rotate-180'" />
+            <ChevronDownIcon class="w-3 h-3 text-gray-400 ml-0.5 transition-transform duration-150" :class="showAiDropdown && 'rotate-180'" />
           </button>
 
           <!-- Dropdown Menu -->
           <div
             v-if="showAiDropdown"
-            class="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-30 font-sans"
+            class="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-lg shadow-lg border border-gray-200 p-1 z-30 font-sans"
           >
             <button
               type="button"
               @click="handleOpenModelAiModal"
-              class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 flex items-center gap-2 cursor-pointer"
+              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer"
             >
               <BotIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
               <span>Model AI</span>
@@ -99,18 +99,18 @@
               type="button"
               @click="handleTriggerBgAi"
               :disabled="isTriggeringBgAi || aiStats.is_running"
-              class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <RefreshCwIcon v-if="isTriggeringBgAi || aiStats.is_running" class="w-3.5 h-3.5 animate-spin text-emerald-600 shrink-0" />
               <BotIcon v-else class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-              <span>{{ (isTriggeringBgAi || aiStats.is_running) ? 'AI Sedang Berjalan...' : 'Jalankan AI di Belakang Layar' }}</span>
+              <span>{{ (isTriggeringBgAi || aiStats.is_running) ? 'AI Sedang Berjalan...' : 'Jalankan AI Background' }}</span>
             </button>
 
             <button
               type="button"
               @click="handleOpenBatchAiModal"
               :disabled="isAnalyzingBatch"
-              class="w-full text-left px-3.5 py-2 text-xs text-gray-700 hover:bg-gray-50 hover:text-gray-900 flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <RefreshCwIcon v-if="isAnalyzingBatch" class="w-3.5 h-3.5 animate-spin text-gray-500 shrink-0" />
               <BotIcon v-else class="w-3.5 h-3.5 text-gray-500 shrink-0" />
