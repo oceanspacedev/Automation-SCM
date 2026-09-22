@@ -177,6 +177,74 @@ class DocumentAnalysisService
      *
      * @return array{
      *     submission: ProgramSubmission,
+    /**
+     * Download a document from Google Drive or direct URL and convert to base64 data URI.
+     */
+    public function fetchDocumentAsDataUri(?string $url): ?string
+    {
+        if (empty($url) || ! str_starts_with(trim($url), 'http')) {
+            return null;
+        }
+
+        $url = trim($url);
+        $downloadUrl = $url;
+
+        // Check if it's a Google Drive link
+        if (preg_match('/(?:id=|\/d\/)([a-zA-Z0-9_-]{20,})/', $url, $matches)) {
+            $fileId = $matches[1];
+            $downloadUrl = "https://drive.google.com/uc?export=download&id={$fileId}";
+        }
+
+        try {
+            $response = Http::withoutVerifying()
+                ->withHeaders([
+                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                ])
+                ->timeout(15)
+                ->get($downloadUrl);
+
+            if (! $response->successful()) {
+                return null;
+            }
+
+            $bytes = $response->body();
+            if (empty($bytes) || strlen($bytes) > 20 * 1024 * 1024) {
+                return null;
+            }
+
+            // Check if returned HTML error page instead of binary
+            if (str_starts_with(trim($bytes), '<!DOCTYPE') || str_starts_with(trim($bytes), '<html')) {
+                return null;
+            }
+
+            if (str_starts_with($bytes, "\xFF\xD8\xFF")) {
+                $mime = 'image/jpeg';
+            } elseif (str_starts_with($bytes, "\x89PNG")) {
+                $mime = 'image/png';
+            } elseif (str_starts_with($bytes, '%PDF')) {
+                $mime = 'application/pdf';
+            } elseif (str_starts_with($bytes, 'RIFF') && str_contains(substr($bytes, 0, 16), 'WEBP')) {
+                $mime = 'image/webp';
+            } else {
+                $contentType = $response->header('Content-Type');
+                $mime = ! empty($contentType) && ! str_contains($contentType, 'octet-stream')
+                    ? explode(';', $contentType)[0]
+                    : 'image/jpeg';
+            }
+
+            return "data:{$mime};base64,".base64_encode($bytes);
+        } catch (\Throwable $e) {
+            Log::warning("Gagal mengunduh dokumen dari {$url}: ".$e->getMessage());
+
+            return null;
+        }
+    }
+
+    /**
+     * Analyze a single ProgramSubmission row with AI and update tracking columns.
+     *
+     * @return array{
+     *     submission: ProgramSubmission,
      *     cek_dokumen: string,
      *     status_potong_purchase: string,
      *     keterangan: string,
@@ -191,6 +259,56 @@ class DocumentAnalysisService
 
         if (! empty($config['api_key'])) {
             try {
+                // Build multimodal content (Text + Image/PDF parts)
+                $userParts = [
+                    [
+                        'type' => 'text',
+                        'text' => $this->buildUserPrompt($submission),
+                    ],
+                ];
+
+                // Fetch and attach Credit Note document if available
+                if ($cnDataUri = $this->fetchDocumentAsDataUri($submission->credit_note_url)) {
+                    $userParts[] = [
+                        'type' => 'text',
+                        'text' => '--- LAMPIRAN DOKUMEN CREDIT NOTE (CN) ---',
+                    ];
+                    $userParts[] = [
+                        'type' => 'image_url',
+                        'image_url' => [
+                            'url' => $cnDataUri,
+                        ],
+                    ];
+                }
+
+                // Fetch and attach Faktur Pajak document if available
+                if ($taxDataUri = $this->fetchDocumentAsDataUri($submission->tax_invoice_url)) {
+                    $userParts[] = [
+                        'type' => 'text',
+                        'text' => '--- LAMPIRAN DOKUMEN FAKTUR PAJAK ---',
+                    ];
+                    $userParts[] = [
+                        'type' => 'image_url',
+                        'image_url' => [
+                            'url' => $taxDataUri,
+                        ],
+                    ];
+                }
+
+                // Fetch and attach Agreement document if available
+                if ($agrDataUri = $this->fetchDocumentAsDataUri($submission->agreement_url)) {
+                    $userParts[] = [
+                        'type' => 'text',
+                        'text' => '--- LAMPIRAN DOKUMEN AGREEMENT (AGR) ---',
+                    ];
+                    $userParts[] = [
+                        'type' => 'image_url',
+                        'image_url' => [
+                            'url' => $agrDataUri,
+                        ],
+                    ];
+                }
+
                 $payload = [
                     'model' => $config['model'] ?: 'ag/gemini-3-flash',
                     'messages' => [
@@ -200,7 +318,7 @@ class DocumentAnalysisService
                         ],
                         [
                             'role' => 'user',
-                            'content' => $this->buildUserPrompt($submission),
+                            'content' => $userParts,
                         ],
                     ],
                     'stream' => false,
@@ -209,7 +327,7 @@ class DocumentAnalysisService
 
                 $response = Http::withoutVerifying()
                     ->withToken($config['api_key'])
-                    ->timeout(25)
+                    ->timeout(45)
                     ->post("{$config['base_url']}/chat/completions", $payload);
 
                 if ($response->successful()) {
@@ -226,11 +344,174 @@ class DocumentAnalysisService
             }
         }
 
+        $financialData = [];
+        if (is_array($parsed)) {
+            // Extract or calculate financial and tax values
+            $dpp = isset($parsed['dpp']) && is_numeric($parsed['dpp']) ? (float) $parsed['dpp'] : $submission->dpp;
+            $dppLain = isset($parsed['dpp_lain']) && is_numeric($parsed['dpp_lain']) ? (float) $parsed['dpp_lain'] : ($submission->dpp_lain ?? 0);
+            $ppn = isset($parsed['ppn']) && is_numeric($parsed['ppn']) ? (float) $parsed['ppn'] : ($submission->ppn ?? 0);
+            $nilaiPph = isset($parsed['nilai_pph']) && is_numeric($parsed['nilai_pph']) ? (float) $parsed['nilai_pph'] : $submission->nilai_pph;
+            $netPay = isset($parsed['net_pay']) && is_numeric($parsed['net_pay']) ? (float) $parsed['net_pay'] : $submission->net_pay;
+
+            $incentive = isset($parsed['incentive']) && is_numeric($parsed['incentive'])
+                ? (float) $parsed['incentive']
+                : (isset($parsed['total']) && is_numeric($parsed['total']) ? (float) $parsed['total'] : $submission->incentive);
+
+            // Reconstruct Gross Incentive if dealer is Non-PKP:
+            // In CN documents for Non-PKP dealers, the printed value is DPP (which was back-calculated as Gross / 1.11).
+            // If incentive is missing or equal to DPP, dynamically calculate Gross: DPP * 1.11 rounded to nearest 1,000.
+            $hasPpn = ! empty($ppn) && (float) $ppn > 0;
+            $hasFaktur = (! empty($parsed['no_faktur']) && trim((string) $parsed['no_faktur']) !== '-') ||
+                         (! empty($submission->tax_invoice_url) && trim((string) $submission->tax_invoice_url) !== '-' && str_starts_with(trim((string) $submission->tax_invoice_url), 'http'));
+            $isNonPkp = ! $hasPpn && ! $hasFaktur;
+
+            if ($isNonPkp && $dpp !== null && ($incentive === null || abs($incentive - $dpp) < 0.01)) {
+                $grossCandidate = round($dpp * 1.11);
+                if (abs($grossCandidate - round($grossCandidate, -3)) <= 15) {
+                    $incentive = (float) round($grossCandidate, -3);
+                } else {
+                    $incentive = (float) $grossCandidate;
+                }
+            } elseif ($incentive === null && $dpp !== null) {
+                $incentive = $dpp;
+            }
+
+            if ($dpp === null && $incentive !== null) {
+                $dpp = $incentive;
+            }
+
+            // Auto-calculate Net Pay if missing: Net Pay = DPP + PPN - Nilai PPh
+            if ($netPay === null && $dpp !== null) {
+                $netPay = round($dpp + ($ppn ?? 0) - ($nilaiPph ?? 0), 2);
+            }
+
+            // Cek Pajak Tarif PPh (standard 2.5% of DPP matching financial sheet formula: DPP * 2.5%)
+            if (isset($parsed['cek_pajak_tarif_pph']) && is_numeric($parsed['cek_pajak_tarif_pph'])) {
+                $cekPajak = (float) $parsed['cek_pajak_tarif_pph'];
+            } elseif ($submission->cek_pajak_tarif_pph !== null) {
+                $cekPajak = $submission->cek_pajak_tarif_pph;
+            } elseif ($dpp !== null) {
+                $cekPajak = round($dpp * 0.025, 2);
+            } else {
+                $cekPajak = null;
+            }
+
+            // If AI returned 2% (e.g. standard pph 23) but calculated 2.5% matches nilai_pph exactly, use 2.5%
+            if ($dpp !== null && $nilaiPph !== null && abs($nilaiPph - round($dpp * 0.025, 2)) <= 1) {
+                $cekPajak = round($dpp * 0.025, 2);
+            }
+
+            // Calculate Selisih (0 if difference is negligible)
+            if ($nilaiPph !== null && $cekPajak !== null) {
+                $diff = round($nilaiPph - $cekPajak, 2);
+                $selisih = abs($diff) <= 1 ? 0.0 : $diff;
+            } else {
+                $selisih = $submission->selisih;
+            }
+
+            // Physical audit status (CAP?, TTD?, NPWP?, ok)
+            $hasStamp = $parsed['has_stamp'] ?? true;
+            $hasSignature = $parsed['has_signature'] ?? true;
+            $hasNpwp = $parsed['has_npwp'] ?? true;
+
+            $noteParts = [];
+            if (! $hasNpwp) {
+                $noteParts[] = 'NPWP?';
+            }
+            if (! $hasStamp) {
+                $noteParts[] = 'CAP?';
+            }
+            if (! $hasSignature) {
+                $noteParts[] = 'TTD?';
+            }
+
+            if (! empty($parsed['note_pph'])) {
+                $notePph = trim((string) $parsed['note_pph']);
+            } elseif (! empty($noteParts)) {
+                $notePph = implode(' ', $noteParts);
+            } else {
+                $notePph = ($submission->credit_note_url || $submission->tax_invoice_url) ? 'ok' : null;
+            }
+
+            $noFaktur = ! empty($parsed['no_faktur']) ? trim((string) $parsed['no_faktur']) : $submission->no_faktur;
+            $tglFaktur = ! empty($parsed['tgl_faktur']) ? trim((string) $parsed['tgl_faktur']) : $submission->tgl_faktur;
+
+            // Process document classification & swap detection
+            $docValidation = $submission->doc_validation;
+            if (isset($parsed['doc_validation']) && is_array($parsed['doc_validation'])) {
+                $cleanValidation = [];
+                foreach (['cn', 'agr', 'faktur'] as $slot) {
+                    if (isset($parsed['doc_validation'][$slot]) && is_array($parsed['doc_validation'][$slot])) {
+                        $rawSlot = $parsed['doc_validation'][$slot];
+                        $status = in_array($rawSlot['status'] ?? '', ['valid', 'swapped', 'invalid'], true)
+                            ? $rawSlot['status']
+                            : 'valid';
+                        $cleanValidation[$slot] = [
+                            'status' => $status,
+                            'actual_type' => (string) ($rawSlot['actual_type'] ?? $slot),
+                            'message' => (string) ($rawSlot['message'] ?? ''),
+                        ];
+                    }
+                }
+                if (! empty($cleanValidation)) {
+                    $docValidation = $cleanValidation;
+                }
+            }
+
+            // Check if any document is swapped or invalid
+            $hasSwapped = false;
+            $hasInvalid = false;
+            $swapDetails = [];
+            $invalidDetails = [];
+
+            if (is_array($docValidation)) {
+                foreach ($docValidation as $slot => $info) {
+                    if (($info['status'] ?? '') === 'swapped') {
+                        $hasSwapped = true;
+                        $swapDetails[] = strtoupper($slot).' ('.strtoupper($info['actual_type'] ?? '').')';
+                    } elseif (($info['status'] ?? '') === 'invalid') {
+                        $hasInvalid = true;
+                        $invalidDetails[] = strtoupper($slot);
+                    }
+                }
+            }
+
+            $financialData = [
+                'incentive' => $incentive,
+                'dpp' => $dpp,
+                'dpp_lain' => $dppLain,
+                'ppn' => $ppn,
+                'nilai_pph' => $nilaiPph,
+                'net_pay' => $netPay,
+                'cek_pajak_tarif_pph' => $cekPajak,
+                'selisih' => $selisih,
+                'note_pph' => $notePph,
+                'no_faktur' => $noFaktur,
+                'tgl_faktur' => $tglFaktur,
+                'doc_validation' => $docValidation,
+            ];
+        }
+
         if (is_array($parsed) && ! empty($parsed['cek_dokumen'])) {
             $cekDokumen = trim((string) $parsed['cek_dokumen']);
             $statusPurchase = trim((string) ($parsed['status_potong_purchase'] ?? ''));
+
+            if ($hasSwapped) {
+                $statusPurchase = 'BELUM BISA POTONG';
+                if (! str_contains(strtoupper($cekDokumen), 'TERTUKAR')) {
+                    $cekDokumen = 'DOKUMEN TERTUKAR ('.implode(', ', $swapDetails).')';
+                }
+            } elseif ($hasInvalid) {
+                $statusPurchase = 'BELUM BISA POTONG';
+                if (! str_contains(strtoupper($cekDokumen), 'TIDAK SESUAI') && ! str_contains(strtoupper($cekDokumen), 'SALAH')) {
+                    $cekDokumen = 'DOKUMEN TIDAK SESUAI ('.implode(', ', $invalidDetails).')';
+                }
+            }
+
             if (! in_array($statusPurchase, ProgramSubmission::STATUS_PURCHASE_OPTIONS, true)) {
-                $statusPurchase = ($parsed['is_complete'] ?? false) ? 'BISA DI POTONG' : 'BELUM BISA POTONG';
+                $statusPurchase = ($parsed['is_complete'] ?? false) && ! $hasSwapped && ! $hasInvalid
+                    ? 'BISA DI POTONG'
+                    : 'BELUM BISA POTONG';
             }
             $keterangan = trim((string) ($parsed['keterangan'] ?? ''));
         } else {
@@ -240,11 +521,13 @@ class DocumentAnalysisService
             $parsed = $fallback;
         }
 
-        // Automatically update the submission (preserve keterangan for pending/aging 30 days status)
-        $submission->update([
+        // Automatically update the submission
+        $updatePayload = array_merge([
             'cek_dokumen' => $cekDokumen,
             'status_potong_purchase' => $statusPurchase,
-        ]);
+        ], $financialData);
+
+        $submission->update($updatePayload);
 
         return [
             'submission' => $submission->fresh(),
@@ -252,6 +535,7 @@ class DocumentAnalysisService
             'status_potong_purchase' => $statusPurchase,
             'keterangan' => $submission->keterangan,
             'ai_keterangan' => $keterangan,
+            'financial' => $financialData,
             'raw_analysis' => $parsed,
         ];
     }
@@ -328,14 +612,56 @@ Aturan Evaluasi:
 - Dokumen dianggap ADA jika URL dokumen tidak kosong dan diawali "http://" atau "https://".
 - Dokumen dianggap KOSONG jika URL bernilai kosong, "-", "null", atau tidak valid.
 
+Analisis Finansial & Pajak:
+- Ekstrak atau hitung nilai angka sesuai aturan SCM:
+  * incentive: Nilai kotor insentif program yang dijanjikan.
+    - Untuk dealer Non-PKP (PPN 0% / tidak ada Faktur Pajak): Dokumen CN biasanya mencetak DPP. Nilai Incentive kotor dihitung dari DPP x 1.11 dibulatkan ke ribuan terdekat (contoh: DPP 450.450 -> Incentive 500.000; DPP 225.225 -> Incentive 250.000; DPP 900.901 -> Incentive 1.000.000).
+    - Untuk dealer PKP (ada Faktur Pajak): Incentive sama dengan DPP.
+  * dpp: Dasar Pengenaan Pajak (DPP yang tercetak di lembar CN atau Faktur)
+  * dpp_lain: DPP Nilai Lain (jika "-" atau kosong isi 0)
+  * ppn: Pajak Pertambahan Nilai (PPN, jika "-" atau kosong isi 0)
+  * nilai_pph: Potongan PPh (tertulis PPH di CN)
+  * net_pay: Nilai bersih yang dibayarkan ke dealer (DPP + PPN - PPh)
+  * cek_pajak_tarif_pph: Cek tarif pajak standar (2.5% dari DPP)
+  * no_faktur: Nomor Faktur Pajak jika ditemukan (format: 010.xxx-xx.xxxxxxxx)
+  * tgl_faktur: Tanggal Faktur Pajak (format: DD/MM/YYYY)
+- Audit Fisik / Kelengkapan Dokumen:
+  * has_stamp: boolean (apakah ada stempel/cap basah atau digital dari dealer/perusahaan)
+  * has_signature: boolean (apakah dokumen ditandatangani)
+  * has_npwp: boolean (apakah NPWP tertera atau valid)
+  * note_pph: Catatan ringkas status fisik: "ok" jika lengkap dan ada cap/TTD/NPWP, atau sebutkan yang kurang seperti "CAP?", "TTD?", "NPWP?", "CAP? TTD?", dsb.
+
+- Validasi Isi Dokumen (Deteksi Dokumen Tertukar atau Tidak Sesuai):
+  Untuk masing-masing slot dokumen yang dilampirkan:
+  1. Slot CN: Periksa apakah isinya benar Credit Note / Invoice Fee Marketing. Jika isinya Agreement, tandai "swapped". Jika Faktur, tandai "swapped". Jika foto selfie/nota biasa/bukan dokumen program, tandai "invalid".
+  2. Slot Agr: Periksa apakah isinya benar Agreement / Perjanjian Komitmen Fee. Jika isinya Credit Note, tandai "swapped". Jika Faktur, tandai "swapped". Jika bukan dokumen program, tandai "invalid".
+  3. Slot Faktur: Periksa apakah isinya benar Faktur Pajak resmi (e-Faktur). Jika isinya CN/Agr, tandai "swapped". Jika bukan Faktur Pajak, tandai "invalid".
+  
+  Status per slot ("valid", "swapped", "invalid"):
+  - "valid": Dokumen sesuai slotnya dan data dealer/program cocok.
+  - "swapped": Dokumen tertukar antar slot (contoh: slot CN berisi Agreement, atau slot Agr berisi CN).
+  - "invalid": Dokumen bukan dokumen resmi program, tidak terbaca, atau salah dealer.
+
 Ketentuan Penentuan Output:
-1. Jika KETIGA dokumen (CN, Agr, Faktur) LENGKAP:
+1. Jika KETIGA dokumen LENGKAP dan SEMUA VALID (tidak ada yang tertukar/invalid):
    - "is_complete": true
    - "cek_dokumen": "LENGKAP"
    - "status_potong_purchase": "BISA DI POTONG"
-   - "keterangan": "Semua dokumen (Credit Note, Agreement, dan Faktur Pajak) lengkap dan siap diproses potong."
+   - "keterangan": "Semua dokumen lengkap dan valid, siap diproses potong."
 
-2. Jika ADA dokumen yang KURANG atau KOSONG:
+2. Jika ADA dokumen yang TERTUKAR (swapped):
+   - "is_complete": false
+   - "cek_dokumen": Sebutkan dokumen yang tertukar, contoh: "DOKUMEN TERTUKAR (CN ↔ AGR)"
+   - "status_potong_purchase": "BELUM BISA POTONG"
+   - "keterangan": "File dokumen tertukar antar kolom. Harap perbaiki posisi upload dokumen."
+
+3. Jika ADA dokumen yang TIDAK SESUAI (invalid):
+   - "is_complete": false
+   - "cek_dokumen": Sebutkan dokumen yang salah, contoh: "CN TIDAK SESUAI (BUKAN CN)"
+   - "status_potong_purchase": "BELUM BISA POTONG"
+   - "keterangan": "File yang diunggah bukan dokumen resmi program atau tidak sesuai."
+
+4. Jika ADA dokumen yang KURANG atau KOSONG:
    - "is_complete": false
    - "cek_dokumen": Sebutkan dokumen yang belum ada dalam huruf kapital singkat, contoh:
      * Jika Agr dan Faktur tidak ada: "AGR & FAKTUR BELUM ADA"
@@ -352,7 +678,25 @@ Wajib mengembalikan JSON murni TANPA pembungkus markdown ```json ``` dengan key 
   "is_complete": boolean,
   "cek_dokumen": string,
   "status_potong_purchase": "BISA DI POTONG" | "BELUM BISA POTONG",
-  "keterangan": string
+  "keterangan": string,
+  "incentive": number | null,
+  "dpp": number | null,
+  "dpp_lain": number,
+  "ppn": number,
+  "nilai_pph": number | null,
+  "net_pay": number | null,
+  "cek_pajak_tarif_pph": number | null,
+  "has_stamp": boolean,
+  "has_signature": boolean,
+  "has_npwp": boolean,
+  "note_pph": string,
+  "no_faktur": string | null,
+  "tgl_faktur": string | null,
+  "doc_validation": {
+    "cn": { "status": "valid" | "swapped" | "invalid", "actual_type": "cn" | "agr" | "faktur" | "other", "message": string },
+    "agr": { "status": "valid" | "swapped" | "invalid", "actual_type": "cn" | "agr" | "faktur" | "other", "message": string },
+    "faktur": { "status": "valid" | "swapped" | "invalid", "actual_type": "cn" | "agr" | "faktur" | "other", "message": string }
+  }
 }
 PROMPT;
     }
@@ -370,6 +714,9 @@ PROMPT;
             'credit_note_url' => $submission->credit_note_url ?: '',
             'agreement_url' => $submission->agreement_url ?: '',
             'tax_invoice_url' => $submission->tax_invoice_url ?: '',
+            'incentive' => $submission->incentive,
+            'dpp' => $submission->dpp,
+            'net_pay' => $submission->net_pay,
             'status_saat_ini' => $submission->status_potong_purchase ?: 'Belum ditentukan',
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     }

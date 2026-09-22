@@ -22,6 +22,15 @@ class ProgramSubmission extends Model
 
     protected $casts = [
         'raw_data' => 'array',
+        'incentive' => 'float',
+        'dpp' => 'float',
+        'dpp_lain' => 'float',
+        'ppn' => 'float',
+        'nilai_pph' => 'float',
+        'net_pay' => 'float',
+        'cek_pajak_tarif_pph' => 'float',
+        'selisih' => 'float',
+        'doc_validation' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

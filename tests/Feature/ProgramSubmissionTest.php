@@ -60,6 +60,17 @@ class ProgramSubmissionTest extends TestCase
         $response->assertStatus(200);
         $this->assertCount(1, $response->json('submissions.data'));
         $this->assertEquals('Samudra Komunika', $response->json('submissions.data.0.dealer_name'));
+
+        // 4. Check programs dropdown list in response
+        $this->assertContains('Program SO C11 2021 Series', $response->json('programs'));
+        $this->assertContains('Refund Realme 9 4G Series', $response->json('programs'));
+
+        // 5. Filter by program name
+        $response = $this->actingAs($user)->getJson('/api/program-submissions?program='.urlencode('Program SO C11 2021 Series'));
+        $response->assertStatus(200);
+        $this->assertCount(1, $response->json('submissions.data'));
+        $this->assertEquals('Program SO C11 2021 Series', $response->json('submissions.data.0.program_name'));
+        $this->assertEquals('Abadi Cell', $response->json('submissions.data.0.dealer_name'));
     }
 
     public function test_can_receive_webhook_from_google_form(): void
@@ -491,5 +502,206 @@ class ProgramSubmissionTest extends TestCase
         // Access without valid signature
         $response = $this->get("/p/confirm/{$submission->id}?action=potong&signature=invalid_hash");
         $response->assertStatus(403);
+    }
+
+    public function test_can_update_and_export_financial_and_tax_audit_columns(): void
+    {
+        $user = User::factory()->create();
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2026 10:00:00',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME00999',
+            'dealer_name' => 'Mitra Komunika',
+            'program_name' => 'Cashback Realme 12',
+            'credit_note_url' => 'https://drive.google.com/open?id=cn123',
+            'agreement_url' => 'https://drive.google.com/open?id=agr123',
+            'tax_invoice_url' => 'https://drive.google.com/open?id=tax123',
+            'row_hash' => 'hash_fin_test_1',
+        ]);
+
+        // 1. Update financial columns
+        $updatePayload = [
+            'incentive' => 700000,
+            'dpp' => 630631,
+            'dpp_lain' => 0,
+            'ppn' => 0,
+            'nilai_pph' => 15766,
+            'net_pay' => 614865,
+            'cek_pajak_tarif_pph' => 14640,
+            'note_pph' => 'CAP?',
+            'no_faktur' => '010.000-24.12345678',
+            'tgl_faktur' => '15/05/2026',
+        ];
+
+        $res = $this->actingAs($user)->patchJson("/api/program-submissions/{$submission->id}", $updatePayload);
+        $res->assertStatus(200);
+        $res->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('program_submissions', [
+            'id' => $submission->id,
+            'incentive' => 700000,
+            'dpp' => 630631,
+            'net_pay' => 614865,
+            'selisih' => 1126.00, // 15766 - 14640
+            'note_pph' => 'CAP?',
+            'no_faktur' => '010.000-24.12345678',
+            'tgl_faktur' => '15/05/2026',
+        ]);
+
+        // 2. Fetch list and assert columns returned
+        $listRes = $this->actingAs($user)->getJson('/api/program-submissions');
+        $listRes->assertStatus(200);
+        $listRes->assertJsonFragment([
+            'id' => $submission->id,
+            'incentive' => 700000,
+            'dpp' => 630631,
+            'note_pph' => 'CAP?',
+            'no_faktur' => '010.000-24.12345678',
+        ]);
+
+        // 3. Export Excel
+        $exportRes = $this->actingAs($user)->get('/api/program-submissions/export');
+        $exportRes->assertStatus(200);
+        $this->assertTrue(str_contains($exportRes->headers->get('content-disposition'), '.xlsx'));
+    }
+
+    public function test_non_pkp_reconstructs_gross_incentive_and_net_pay(): void
+    {
+        $user = User::factory()->create();
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2026 10:00:00',
+            'region' => 'CIREBON',
+            'id_real' => 'B100969',
+            'dealer_name' => 'LESTARI CELL CIGASONG',
+            'program_name' => 'PROGRAM DSA AGUSTUS 2026',
+            'sales_name' => 'AAB ABDURAHMAN',
+            'credit_note_url' => 'https://drive.google.com/open?id=test_cn',
+            'agreement_url' => 'https://drive.google.com/open?id=test_agr',
+            'tax_invoice_url' => null,
+            'row_hash' => 'hash_lestari_test',
+        ]);
+
+        // Fake AI Router returning DPP 450450 from CN
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'is_complete' => false,
+                                'cek_dokumen' => 'FAKTUR BELUM ADA',
+                                'status_potong_purchase' => 'BELUM BISA POTONG',
+                                'keterangan' => 'Faktur belum ada',
+                                'dpp' => 450450,
+                                'nilai_pph' => 11261,
+                                'has_stamp' => true,
+                                'has_signature' => false,
+                                'has_npwp' => true,
+                                'note_pph' => 'TTD?',
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        Cache::put('ai_router_config', [
+            'base_url' => 'https://router.example.com/v1',
+            'api_key' => 'test-key',
+            'model' => 'test-model',
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/api/program-submissions/{$submission->id}/analyze-ai");
+        $response->assertStatus(200);
+
+        $submission->refresh();
+
+        // 450.450 * 1.11 = 499.999,5 rounded to thousands => 500.000
+        $this->assertEquals(500000.0, $submission->incentive);
+        $this->assertEquals(450450.0, $submission->dpp);
+        $this->assertEquals(11261.0, $submission->nilai_pph);
+        // Net pay: 450450 - 11261 = 439189
+        $this->assertEquals(439189.0, $submission->net_pay);
+        // Cek pajak: 450450 * 2.5% = 11261.25 => round 11261.25
+        $this->assertEquals(11261.25, $submission->cek_pajak_tarif_pph);
+        $this->assertEquals(0.0, $submission->selisih);
+        $this->assertEquals('TTD?', $submission->note_pph);
+    }
+
+    public function test_detects_swapped_and_invalid_documents_and_locks_status(): void
+    {
+        $user = User::factory()->create();
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2026 10:00:00',
+            'region' => 'CIREBON',
+            'id_real' => 'B100970',
+            'dealer_name' => 'BERKAH CELL',
+            'program_name' => 'PROGRAM DSA AGUSTUS 2026',
+            'sales_name' => 'AAB ABDURAHMAN',
+            'credit_note_url' => 'https://drive.google.com/open?id=test_cn',
+            'agreement_url' => 'https://drive.google.com/open?id=test_agr',
+            'tax_invoice_url' => 'https://drive.google.com/open?id=test_tax',
+            'row_hash' => 'hash_swapped_test',
+        ]);
+
+        // Fake AI Router returning swapped documents (CN has Agreement, Agr has CN)
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'is_complete' => true,
+                                'cek_dokumen' => 'LENGKAP',
+                                'status_potong_purchase' => 'BISA DI POTONG',
+                                'keterangan' => 'Semua dokumen ada tapi tertukar',
+                                'dpp' => 500000,
+                                'nilai_pph' => 12500,
+                                'doc_validation' => [
+                                    'cn' => [
+                                        'status' => 'swapped',
+                                        'actual_type' => 'agr',
+                                        'message' => 'File di kolom CN adalah dokumen Agreement',
+                                    ],
+                                    'agr' => [
+                                        'status' => 'swapped',
+                                        'actual_type' => 'cn',
+                                        'message' => 'File di kolom Agr adalah dokumen Credit Note',
+                                    ],
+                                    'faktur' => [
+                                        'status' => 'valid',
+                                        'actual_type' => 'faktur',
+                                        'message' => 'Valid Faktur Pajak',
+                                    ],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        Cache::put('ai_router_config', [
+            'base_url' => 'https://router.example.com/v1',
+            'api_key' => 'test-key',
+            'model' => 'test-model',
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/api/program-submissions/{$submission->id}/analyze-ai");
+        $response->assertStatus(200);
+
+        $submission->refresh();
+
+        // Must lock status to BELUM BISA POTONG due to swapped documents
+        $this->assertEquals('BELUM BISA POTONG', $submission->status_potong_purchase);
+        $this->assertStringContainsString('TERTUKAR', $submission->cek_dokumen);
+        $this->assertIsArray($submission->doc_validation);
+        $this->assertEquals('swapped', $submission->doc_validation['cn']['status']);
+        $this->assertEquals('agr', $submission->doc_validation['cn']['actual_type']);
+        $this->assertEquals('swapped', $submission->doc_validation['agr']['status']);
+        $this->assertEquals('valid', $submission->doc_validation['faktur']['status']);
     }
 }

@@ -21,7 +21,8 @@ class AutoAnalyzeProgramAiCommand extends Command
                             {--year=2026 : Filter tahun data submission (default: 2026)}
                             {--limit=50 : Batas jumlah data yang diproses}
                             {--all : Proses seluruh data yang belum dianalisis tanpa batasan}
-                            {--sleep=0.5 : Jeda waktu antar pemanggilan AI dalam detik}';
+                            {--sleep=0.5 : Jeda waktu antar pemanggilan AI dalam detik}
+                            {--force : Jalankan meskipun di lingkungan local}';
 
     /**
      * The console command description.
@@ -35,6 +36,12 @@ class AutoAnalyzeProgramAiCommand extends Command
      */
     public function handle(DocumentAnalysisService $aiService): int
     {
+        if (app()->environment('local') && ! $this->option('force') && ! env('ENABLE_AUTO_AI_SCHEDULE', false)) {
+            $this->warn('Auto-analyze AI dinonaktifkan di lingkungan local. Gunakan flag --force jika ingin tetap menjalankan.');
+
+            return Command::SUCCESS;
+        }
+
         $year = (string) $this->option('year');
         $limit = $this->option('all') ? 0 : (int) $this->option('limit');
         $sleepSeconds = (float) $this->option('sleep');

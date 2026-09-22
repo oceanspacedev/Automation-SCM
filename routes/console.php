@@ -8,7 +8,10 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command('program:auto-analyze-ai --year=2026 --limit=15 --sleep=0.2')
-    ->everyMinute()
-    ->withoutOverlapping()
-    ->runInBackground();
+// Nonaktifkan auto-analyze AI terjadwal di lingkungan local agar tidak otomatis berjalan
+if (! app()->environment('local') || env('ENABLE_AUTO_AI_SCHEDULE', false)) {
+    Schedule::command('program:auto-analyze-ai --year=2026 --limit=15 --sleep=0.2')
+        ->everyMinute()
+        ->withoutOverlapping()
+        ->runInBackground();
+}

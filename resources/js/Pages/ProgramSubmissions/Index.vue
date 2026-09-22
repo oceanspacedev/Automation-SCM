@@ -167,6 +167,103 @@
           </option>
         </select>
 
+        <!-- Filter Nama Program (Searchable Dropdown) -->
+        <div class="relative" ref="programDropdownRef">
+          <button
+            type="button"
+            @click="toggleProgramDropdown"
+            class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs flex items-center justify-between gap-2 hover:border-gray-300 focus:outline-none focus:ring-1 focus:ring-black transition cursor-pointer min-w-[140px] max-w-[240px]"
+            :class="filters.program ? 'border-gray-900 text-gray-900 font-medium bg-gray-50/60' : 'text-gray-700'"
+            :title="filters.program || 'Filter berdasarkan Nama Program'"
+          >
+            <span class="truncate text-left">
+              {{ filters.program || 'Semua Program' }}
+            </span>
+            <div class="flex items-center gap-1 shrink-0">
+              <span
+                v-if="filters.program"
+                @click.stop="clearProgramFilter"
+                class="text-gray-400 hover:text-gray-700 p-0.5 rounded cursor-pointer"
+                title="Hapus filter program"
+              >
+                <XIcon class="w-3 h-3" />
+              </span>
+              <ChevronDownIcon
+                class="w-3.5 h-3.5 text-gray-400 transition-transform duration-150"
+                :class="showProgramDropdown && 'rotate-180'"
+              />
+            </div>
+          </button>
+
+          <!-- Dropdown Popover -->
+          <div
+            v-if="showProgramDropdown"
+            class="absolute top-full left-0 mt-1.5 w-72 sm:w-84 max-w-[90vw] bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden text-xs"
+          >
+            <!-- Search Inside Dropdown -->
+            <div class="p-2 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
+              <SearchIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <input
+                ref="programSearchInput"
+                v-model="programSearchQuery"
+                type="text"
+                placeholder="Cari nama program..."
+                class="w-full bg-transparent border-none text-xs text-gray-900 placeholder-gray-400 focus:outline-none"
+                @click.stop
+                @keydown.esc="showProgramDropdown = false"
+              />
+              <button
+                v-if="programSearchQuery"
+                @click.stop="programSearchQuery = ''"
+                type="button"
+                class="text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                <XIcon class="w-3 h-3" />
+              </button>
+            </div>
+
+            <!-- Program List Items -->
+            <div class="max-h-60 overflow-y-auto py-1 divide-y divide-gray-50">
+              <button
+                type="button"
+                @click="selectProgram('')"
+                class="w-full text-left px-3 py-2 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer text-xs"
+                :class="!filters.program ? 'bg-gray-50 font-medium text-gray-900' : 'text-gray-600'"
+              >
+                <span>Semua Program</span>
+                <CheckIcon v-if="!filters.program" class="w-3.5 h-3.5 text-gray-900 shrink-0" />
+              </button>
+
+              <div
+                v-if="filteredProgramOptions.length === 0"
+                class="px-3 py-4 text-center text-gray-400 text-xs"
+              >
+                Tidak ada nama program yang cocok
+              </div>
+
+              <button
+                v-for="prog in filteredProgramOptions"
+                :key="prog"
+                type="button"
+                @click="selectProgram(prog)"
+                class="w-full text-left px-3 py-2 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer text-xs"
+                :class="filters.program === prog ? 'bg-gray-50 font-semibold text-gray-900' : 'text-gray-700'"
+              >
+                <span class="truncate pr-2" :title="prog">{{ prog }}</span>
+                <CheckIcon v-if="filters.program === prog" class="w-3.5 h-3.5 text-gray-900 shrink-0" />
+              </button>
+            </div>
+
+            <!-- Footer count -->
+            <div class="px-3 py-1.5 bg-gray-50 border-t border-gray-100 text-[10px] text-gray-500 flex justify-between items-center">
+              <span>{{ filteredProgramOptions.length }} program ditemukan</span>
+              <span v-if="filters.program" class="text-black font-medium cursor-pointer hover:underline" @click="selectProgram('')">
+                Reset
+              </span>
+            </div>
+          </div>
+        </div>
+
         <!-- Filter Status Purchase -->
         <select
           v-model="filters.status_purchase"
@@ -192,7 +289,7 @@
         </select>
 
         <button
-          v-if="filters.search || filters.region || filters.status_purchase || filters.keterangan"
+          v-if="filters.search || filters.region || filters.program || filters.status_purchase || filters.keterangan"
           type="button"
           @click="resetFilters"
           class="h-9 px-2.5 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-md transition cursor-pointer"
@@ -231,9 +328,22 @@
               <TableHead class="min-w-[170px] font-medium text-gray-500">Nama Dealer</TableHead>
               <TableHead class="min-w-[200px] font-medium text-gray-500">Nama Program</TableHead>
               <TableHead class="whitespace-nowrap font-medium text-gray-500">Nama Sales</TableHead>
-              <TableHead class="w-[48px] text-center font-medium text-gray-500">CN</TableHead>
-              <TableHead class="w-[48px] text-center font-medium text-gray-500">Agr</TableHead>
-              <TableHead class="w-[54px] text-center font-medium text-gray-500">Faktur</TableHead>
+              <TableHead class="min-w-[65px] text-center font-medium text-gray-500">CN</TableHead>
+              <TableHead class="min-w-[65px] text-center font-medium text-gray-500">Agr</TableHead>
+              <TableHead class="min-w-[70px] text-center font-medium text-gray-500">Faktur</TableHead>
+
+              <!-- 11 Kolom Finansial & Audit Pajak (Sesuai Format OneDrive) -->
+              <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Incentive</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">DPP</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">DPP Lain</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">PPN</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Nilai PPh</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Net Pay</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Cek Pajak</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Selisih</TableHead>
+              <TableHead class="min-w-[100px] text-center font-medium text-gray-500">Note PPh</TableHead>
+              <TableHead class="min-w-[140px] font-medium text-gray-500">No Faktur</TableHead>
+              <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl Faktur</TableHead>
 
               <!-- Kolom Tracking Manual & Status Potong -->
               <TableHead class="whitespace-nowrap font-medium text-gray-500">No PO/SJ</TableHead>
@@ -246,12 +356,12 @@
               <TableHead class="min-w-[190px] font-medium text-gray-500">Status Potong Purchase</TableHead>
               <TableHead class="whitespace-nowrap font-medium text-gray-500">Status AR</TableHead>
               <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl Potong/TF</TableHead>
-              <TableHead class="w-[96px] text-center font-medium text-gray-500 sticky right-0 bg-white border-b border-gray-200">Aksi</TableHead>
+              <TableHead class="w-[90px] text-center font-medium text-gray-500 sticky right-0 bg-white border-b border-gray-200">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <!-- Loading State -->
-            <TableEmpty v-if="loading && submissions.length === 0" :colspan="21">
+            <TableEmpty v-if="loading && submissions.length === 0" :colspan="32">
               <div class="inline-flex items-center gap-2 text-gray-500 py-8">
                 <RefreshCwIcon class="w-4 h-4 animate-spin text-gray-400" />
                 <span>Memuat data form program...</span>
@@ -259,7 +369,7 @@
             </TableEmpty>
 
             <!-- Empty State -->
-            <TableEmpty v-else-if="submissions.length === 0" :colspan="21">
+            <TableEmpty v-else-if="submissions.length === 0" :colspan="32">
               <div class="max-w-md mx-auto py-8 space-y-1.5 text-center text-gray-500">
                 <p class="font-medium text-gray-800">Belum ada data form program yang tersimpan.</p>
                 <p class="text-xs text-gray-500">
@@ -313,50 +423,204 @@
 
               <!-- Dokumen Credit Note -->
               <TableCell class="text-center py-2.5 whitespace-nowrap">
-                <a
-                  v-if="isValidUrl(row.credit_note_url)"
-                  :href="row.credit_note_url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer"
-                  title="Buka Dokumen Credit Note di Google Drive"
-                >
-                  <FileTextIcon class="w-3 h-3 text-gray-500 shrink-0" />
-                  <span>CN</span>
-                </a>
+                <template v-if="isValidUrl(row.credit_note_url)">
+                  <a
+                    v-if="row.doc_validation?.cn?.status === 'swapped'"
+                    :href="row.credit_note_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs transition cursor-pointer font-medium"
+                    :title="row.doc_validation.cn.message || 'File di kolom CN terdeteksi tertukar (berisi ' + formatDocTypeName(row.doc_validation.cn.actual_type) + ')'"
+                  >
+                    <AlertTriangleIcon class="w-3 h-3 text-amber-600 shrink-0" />
+                    <span>CN</span>
+                    <span class="text-[10px] text-amber-700 bg-amber-200/60 px-1 py-0.2 rounded font-normal leading-none">isi: {{ formatDocTypeName(row.doc_validation.cn.actual_type) }}</span>
+                  </a>
+                  <a
+                    v-else-if="row.doc_validation?.cn?.status === 'invalid'"
+                    :href="row.credit_note_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs transition cursor-pointer font-medium"
+                    :title="row.doc_validation.cn.message || 'Dokumen di kolom CN tidak sesuai / bukan Credit Note'"
+                  >
+                    <XCircleIcon class="w-3 h-3 text-rose-600 shrink-0" />
+                    <span>CN</span>
+                    <span class="text-[10px] text-rose-600 bg-rose-200/60 px-1 py-0.2 rounded font-normal leading-none">Salah</span>
+                  </a>
+                  <a
+                    v-else
+                    :href="row.credit_note_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer"
+                    title="Buka Dokumen Credit Note di Google Drive"
+                  >
+                    <FileTextIcon class="w-3 h-3 text-gray-500 shrink-0" />
+                    <span>CN</span>
+                  </a>
+                </template>
                 <span v-else class="text-gray-300 text-xs">-</span>
               </TableCell>
 
               <!-- Agreement -->
               <TableCell class="text-center py-2.5 whitespace-nowrap">
-                <a
-                  v-if="isValidUrl(row.agreement_url)"
-                  :href="row.agreement_url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer"
-                  title="Buka Dokumen Agreement di Google Drive"
-                >
-                  <FileTextIcon class="w-3 h-3 text-gray-500 shrink-0" />
-                  <span>Agr</span>
-                </a>
+                <template v-if="isValidUrl(row.agreement_url)">
+                  <a
+                    v-if="row.doc_validation?.agr?.status === 'swapped'"
+                    :href="row.agreement_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs transition cursor-pointer font-medium"
+                    :title="row.doc_validation.agr.message || 'File di kolom Agr terdeteksi tertukar (berisi ' + formatDocTypeName(row.doc_validation.agr.actual_type) + ')'"
+                  >
+                    <AlertTriangleIcon class="w-3 h-3 text-amber-600 shrink-0" />
+                    <span>Agr</span>
+                    <span class="text-[10px] text-amber-700 bg-amber-200/60 px-1 py-0.2 rounded font-normal leading-none">isi: {{ formatDocTypeName(row.doc_validation.agr.actual_type) }}</span>
+                  </a>
+                  <a
+                    v-else-if="row.doc_validation?.agr?.status === 'invalid'"
+                    :href="row.agreement_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs transition cursor-pointer font-medium"
+                    :title="row.doc_validation.agr.message || 'Dokumen di kolom Agr tidak sesuai / bukan Agreement'"
+                  >
+                    <XCircleIcon class="w-3 h-3 text-rose-600 shrink-0" />
+                    <span>Agr</span>
+                    <span class="text-[10px] text-rose-600 bg-rose-200/60 px-1 py-0.2 rounded font-normal leading-none">Salah</span>
+                  </a>
+                  <a
+                    v-else
+                    :href="row.agreement_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer"
+                    title="Buka Dokumen Agreement di Google Drive"
+                  >
+                    <FileTextIcon class="w-3 h-3 text-gray-500 shrink-0" />
+                    <span>Agr</span>
+                  </a>
+                </template>
                 <span v-else class="text-gray-300 text-xs">-</span>
               </TableCell>
 
               <!-- Faktur Pajak -->
               <TableCell class="text-center py-2.5 whitespace-nowrap">
-                <a
-                  v-if="isValidUrl(row.tax_invoice_url)"
-                  :href="row.tax_invoice_url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer"
-                  title="Buka Faktur Pajak di Google Drive"
-                >
-                  <FileTextIcon class="w-3 h-3 text-gray-500 shrink-0" />
-                  <span>Faktur</span>
-                </a>
+                <template v-if="isValidUrl(row.tax_invoice_url)">
+                  <a
+                    v-if="row.doc_validation?.faktur?.status === 'swapped'"
+                    :href="row.tax_invoice_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs transition cursor-pointer font-medium"
+                    :title="row.doc_validation.faktur.message || 'File di kolom Faktur terdeteksi tertukar (berisi ' + formatDocTypeName(row.doc_validation.faktur.actual_type) + ')'"
+                  >
+                    <AlertTriangleIcon class="w-3 h-3 text-amber-600 shrink-0" />
+                    <span>Faktur</span>
+                    <span class="text-[10px] text-amber-700 bg-amber-200/60 px-1 py-0.2 rounded font-normal leading-none">isi: {{ formatDocTypeName(row.doc_validation.faktur.actual_type) }}</span>
+                  </a>
+                  <a
+                    v-else-if="row.doc_validation?.faktur?.status === 'invalid'"
+                    :href="row.tax_invoice_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs transition cursor-pointer font-medium"
+                    :title="row.doc_validation.faktur.message || 'Dokumen di kolom Faktur tidak sesuai / bukan Faktur Pajak'"
+                  >
+                    <XCircleIcon class="w-3 h-3 text-rose-600 shrink-0" />
+                    <span>Faktur</span>
+                    <span class="text-[10px] text-rose-600 bg-rose-200/60 px-1 py-0.2 rounded font-normal leading-none">Salah</span>
+                  </a>
+                  <a
+                    v-else
+                    :href="row.tax_invoice_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer"
+                    title="Buka Faktur Pajak di Google Drive"
+                  >
+                    <FileTextIcon class="w-3 h-3 text-gray-500 shrink-0" />
+                    <span>Faktur</span>
+                  </a>
+                </template>
                 <span v-else class="text-gray-300 text-xs">-</span>
+              </TableCell>
+
+              <!-- 11 Kolom Finansial & Audit Pajak (Format OneDrive) -->
+              <!-- Incentive -->
+              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+                {{ formatRupiah(row.incentive) }}
+              </TableCell>
+
+              <!-- DPP -->
+              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+                {{ formatRupiah(row.dpp) }}
+              </TableCell>
+
+              <!-- DPP Lain -->
+              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+                {{ formatRupiah(row.dpp_lain) }}
+              </TableCell>
+
+              <!-- PPN -->
+              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+                {{ formatRupiah(row.ppn) }}
+              </TableCell>
+
+              <!-- Nilai PPh -->
+              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+                {{ formatRupiah(row.nilai_pph) }}
+              </TableCell>
+
+              <!-- Net Pay -->
+              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+                {{ formatRupiah(row.net_pay) }}
+              </TableCell>
+
+              <!-- Cek Pajak Tarif PPh -->
+              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+                {{ formatRupiah(row.cek_pajak_tarif_pph) }}
+              </TableCell>
+
+              <!-- Selisih -->
+              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+                <span v-if="row.selisih === 0 || row.selisih === '0' || row.selisih === 0.0" class="text-gray-400">
+                  0
+                </span>
+                <span v-else-if="row.selisih !== null && row.selisih !== undefined && row.selisih !== ''">
+                  {{ formatRupiah(row.selisih) }}
+                </span>
+                <span v-else class="text-gray-300">-</span>
+              </TableCell>
+
+              <!-- Note PPh -->
+              <TableCell class="text-center py-2.5 whitespace-nowrap">
+                <span
+                  v-if="row.note_pph === 'ok'"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold"
+                >
+                  <CheckIcon class="w-3 h-3" />
+                  <span>ok</span>
+                </span>
+                <span
+                  v-else-if="row.note_pph"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-medium"
+                >
+                  <AlertCircleIcon class="w-3 h-3 text-amber-600 shrink-0" />
+                  <span>{{ row.note_pph }}</span>
+                </span>
+                <span v-else class="text-gray-300">-</span>
+              </TableCell>
+
+              <!-- No Faktur -->
+              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+                {{ row.no_faktur || '-' }}
+              </TableCell>
+
+              <!-- Tgl Faktur -->
+              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+                {{ row.tgl_faktur || '-' }}
               </TableCell>
 
               <!-- Kolom: No PO/SJ -->
@@ -457,9 +721,21 @@
                 {{ row.tgl_potong_tf || '-' }}
               </TableCell>
 
-              <!-- Aksi: Tombol Edit Row Modal & Kirim WA AR -->
+              <!-- Aksi: Tombol AI Baris, WA AR, & Edit Row Modal -->
               <TableCell class="text-center py-2.5 whitespace-nowrap sticky right-0 bg-white">
                 <div class="inline-flex items-center justify-center gap-1.5">
+                  <!-- Tombol Analisis AI Khusus Baris Ini -->
+                  <button
+                    type="button"
+                    @click="analyzeRowWithAi(row)"
+                    :disabled="analyzingRowId === row.id"
+                    class="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition shadow-2xs cursor-pointer disabled:opacity-50"
+                    title="Analisis AI untuk Baris Ini (Baca Dokumen & Finansial)"
+                  >
+                    <RefreshCwIcon v-if="analyzingRowId === row.id" class="w-3.5 h-3.5 animate-spin text-gray-500" />
+                    <BotIcon v-else class="w-3.5 h-3.5 text-gray-600" />
+                  </button>
+
                   <button
                     v-if="row.status_potong_purchase === 'BISA DI POTONG'"
                     type="button"
@@ -588,17 +864,52 @@
                   &bull; {{ editingSubmission?.program_name }}
                 </p>
               </div>
-              <button
-                type="button"
-                @click="showEditModal = false"
-                class="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition cursor-pointer"
-              >
-                <XIcon class="w-4 h-4" />
-              </button>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  @click="analyzeCurrentRowWithAi"
+                  :disabled="isAnalyzingCurrent"
+                  class="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium transition cursor-pointer shadow-2xs disabled:opacity-50"
+                  title="Analisis dokumen baris ini dengan AI sekarang"
+                >
+                  <RefreshCwIcon v-if="isAnalyzingCurrent" class="w-3.5 h-3.5 animate-spin text-gray-500" />
+                  <BotIcon v-else class="w-3.5 h-3.5 text-gray-600" />
+                  <span>{{ isAnalyzingCurrent ? 'Menganalisis...' : 'Analisis AI Baris Ini' }}</span>
+                </button>
+                <button
+                  type="button"
+                  @click="showEditModal = false"
+                  class="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition cursor-pointer"
+                >
+                  <XIcon class="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             <!-- Modal Form Body -->
             <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+              <!-- Warning banner if any document is swapped or invalid -->
+              <div
+                v-if="hasSwappedOrInvalidDocs(editingSubmission)"
+                class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-xs space-y-1.5"
+              >
+                <div class="font-semibold flex items-center gap-1.5 text-amber-900">
+                  <AlertTriangleIcon class="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Peringatan Kelayakan Dokumen:</span>
+                </div>
+                <ul class="list-disc list-inside text-[11px] text-amber-800 space-y-0.5 pl-1">
+                  <li v-if="editingSubmission.doc_validation?.cn?.status !== 'valid' && editingSubmission.doc_validation?.cn">
+                    <strong>Kolom CN:</strong> {{ editingSubmission.doc_validation.cn.message || 'File tidak sesuai atau tertukar' }}
+                  </li>
+                  <li v-if="editingSubmission.doc_validation?.agr?.status !== 'valid' && editingSubmission.doc_validation?.agr">
+                    <strong>Kolom Agr:</strong> {{ editingSubmission.doc_validation.agr.message || 'File tidak sesuai atau tertukar' }}
+                  </li>
+                  <li v-if="editingSubmission.doc_validation?.faktur?.status !== 'valid' && editingSubmission.doc_validation?.faktur">
+                    <strong>Kolom Faktur:</strong> {{ editingSubmission.doc_validation.faktur.message || 'File tidak sesuai atau tertukar' }}
+                  </li>
+                </ul>
+              </div>
+
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <!-- No PO/SJ -->
                 <div>
@@ -713,6 +1024,123 @@
                     {{ opt }}
                   </option>
                 </select>
+              </div>
+
+              <!-- Data Finansial & Pajak (Sesuai OneDrive) -->
+              <div class="pt-4 border-t border-gray-100 space-y-3">
+                <h4 class="font-bold text-gray-900 flex items-center gap-1.5 text-xs">
+                  <FileSpreadsheetIcon class="w-4 h-4 text-emerald-600" />
+                  <span>Data Finansial & Audit Pajak (Format OneDrive)</span>
+                </h4>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div>
+                    <label class="block font-semibold text-gray-700 mb-1">Incentive:</label>
+                    <input
+                      v-model.number="editForm.incentive"
+                      type="number"
+                      step="any"
+                      placeholder="0"
+                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                    />
+                  </div>
+                  <div>
+                    <label class="block font-semibold text-gray-700 mb-1">DPP:</label>
+                    <input
+                      v-model.number="editForm.dpp"
+                      type="number"
+                      step="any"
+                      placeholder="0"
+                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                    />
+                  </div>
+                  <div>
+                    <label class="block font-semibold text-gray-700 mb-1">DPP Lain:</label>
+                    <input
+                      v-model.number="editForm.dpp_lain"
+                      type="number"
+                      step="any"
+                      placeholder="0"
+                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                    />
+                  </div>
+                  <div>
+                    <label class="block font-semibold text-gray-700 mb-1">PPN:</label>
+                    <input
+                      v-model.number="editForm.ppn"
+                      type="number"
+                      step="any"
+                      placeholder="0"
+                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                    />
+                  </div>
+                  <div>
+                    <label class="block font-semibold text-gray-700 mb-1">Nilai PPh:</label>
+                    <input
+                      v-model.number="editForm.nilai_pph"
+                      type="number"
+                      step="any"
+                      placeholder="0"
+                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                    />
+                  </div>
+                  <div>
+                    <label class="block font-semibold text-gray-700 mb-1">Net Pay:</label>
+                    <input
+                      v-model.number="editForm.net_pay"
+                      type="number"
+                      step="any"
+                      placeholder="0"
+                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                    />
+                  </div>
+                  <div>
+                    <label class="block font-semibold text-gray-700 mb-1">Cek Pajak (Tarif):</label>
+                    <input
+                      v-model.number="editForm.cek_pajak_tarif_pph"
+                      type="number"
+                      step="any"
+                      placeholder="0"
+                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                    />
+                  </div>
+                  <div>
+                    <label class="block font-semibold text-gray-700 mb-1">Selisih:</label>
+                    <input
+                      v-model.number="editForm.selisih"
+                      type="number"
+                      step="any"
+                      placeholder="0"
+                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                    />
+                  </div>
+                  <div class="col-span-2">
+                    <label class="block font-semibold text-gray-700 mb-1">Note PPh (ok, CAP?, TTD?, NPWP?):</label>
+                    <input
+                      v-model="editForm.note_pph"
+                      type="text"
+                      placeholder="Contoh: ok, CAP?, TTD?, NPWP?"
+                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                    />
+                  </div>
+                  <div>
+                    <label class="block font-semibold text-gray-700 mb-1">No Faktur:</label>
+                    <input
+                      v-model="editForm.no_faktur"
+                      type="text"
+                      placeholder="010.xxx-xx.xxxxxxxx"
+                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                    />
+                  </div>
+                  <div>
+                    <label class="block font-semibold text-gray-700 mb-1">Tgl Faktur:</label>
+                    <input
+                      v-model="editForm.tgl_faktur"
+                      type="text"
+                      placeholder="DD/MM/YYYY"
+                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1025,7 +1453,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import axios from 'axios';
 import {
   Search as SearchIcon,
@@ -1045,6 +1473,8 @@ import {
   Bot as BotIcon,
   ChevronDown as ChevronDownIcon,
   Send as SendIcon,
+  AlertTriangle as AlertTriangleIcon,
+  XCircle as XCircleIcon,
 } from 'lucide-vue-next';
 import {
   Table,
@@ -1061,6 +1491,7 @@ const googleSheetUrl = 'https://docs.google.com/spreadsheets/d/1jf_i5r4Nn3q0RE6n
 
 const submissions = ref([]);
 const regionOptions = ref([]);
+const programOptions = ref([]);
 const statusPurchaseOptions = ref(['BELUM BISA POTONG', 'BISA DI POTONG', 'SUDAH POTONG', 'DONE TRANSFER']);
 const keteranganOptions = ref(['LEBIH DARI 30 HARI', 'KURANG DARI 30 HARI']);
 const loading = ref(false);
@@ -1155,6 +1586,48 @@ const handleClickOutsideModelDropdown = (e) => {
   }
 };
 
+// Program filter dropdown state & helpers
+const showProgramDropdown = ref(false);
+const programDropdownRef = ref(null);
+const programSearchQuery = ref('');
+const programSearchInput = ref(null);
+
+const filteredProgramOptions = computed(() => {
+  const q = programSearchQuery.value.trim().toLowerCase();
+  if (!q) return programOptions.value;
+  return programOptions.value.filter((p) => p.toLowerCase().includes(q));
+});
+
+const toggleProgramDropdown = () => {
+  showProgramDropdown.value = !showProgramDropdown.value;
+  if (showProgramDropdown.value) {
+    programSearchQuery.value = '';
+    nextTick(() => {
+      programSearchInput.value?.focus();
+    });
+  }
+};
+
+const selectProgram = (prog) => {
+  filters.program = prog;
+  showProgramDropdown.value = false;
+  programSearchQuery.value = '';
+  fetchSubmissions(1);
+};
+
+const clearProgramFilter = (e) => {
+  if (e) e.stopPropagation();
+  filters.program = '';
+  programSearchQuery.value = '';
+  fetchSubmissions(1);
+};
+
+const handleClickOutsideProgramDropdown = (e) => {
+  if (programDropdownRef.value && !programDropdownRef.value.contains(e.target)) {
+    showProgramDropdown.value = false;
+  }
+};
+
 const aiStats = reactive({
   total_2026: 0,
   analyzed_2026: 0,
@@ -1216,11 +1689,23 @@ const editForm = reactive({
   status_potong_purchase: '',
   status_potong_ar: '',
   tgl_potong_tf: '',
+  incentive: null,
+  dpp: null,
+  dpp_lain: null,
+  ppn: null,
+  nilai_pph: null,
+  net_pay: null,
+  cek_pajak_tarif_pph: null,
+  selisih: null,
+  note_pph: '',
+  no_faktur: '',
+  tgl_faktur: '',
 });
 
 const filters = reactive({
   search: '',
   region: '',
+  program: '',
   status_purchase: '',
   keterangan: '',
 });
@@ -1303,6 +1788,7 @@ const fetchSubmissions = async (page = 1, silent = false) => {
     };
     if (filters.search) params.search = filters.search;
     if (filters.region) params.region = filters.region;
+    if (filters.program) params.program = filters.program;
     if (filters.status_purchase) params.status_purchase = filters.status_purchase;
     if (filters.keterangan) params.keterangan = filters.keterangan;
 
@@ -1317,8 +1803,15 @@ const fetchSubmissions = async (page = 1, silent = false) => {
     pagination.last_page = data.submissions.last_page || 1;
     pagination.total = data.submissions.total || 0;
 
-    if (data.regions && Array.isArray(data.regions)) {
-      regionOptions.value = data.regions;
+    if (data.regions) {
+      regionOptions.value = Array.isArray(data.regions)
+        ? data.regions
+        : Object.values(data.regions).filter((v) => typeof v === 'string');
+    }
+    if (data.programs) {
+      programOptions.value = Array.isArray(data.programs)
+        ? data.programs
+        : Object.values(data.programs).filter((v) => typeof v === 'string');
     }
     if (data.status_purchase_options && Array.isArray(data.status_purchase_options)) {
       statusPurchaseOptions.value = data.status_purchase_options;
@@ -1357,8 +1850,11 @@ const debounceFetch = () => {
 const resetFilters = () => {
   filters.search = '';
   filters.region = '';
+  filters.program = '';
   filters.status_purchase = '';
   filters.keterangan = '';
+  programSearchQuery.value = '';
+  showProgramDropdown.value = false;
   fetchSubmissions(1);
 };
 
@@ -1536,12 +2032,19 @@ const analyzeRowWithAi = async (row) => {
     const res = await axios.post(`/api/program-submissions/${row.id}/analyze-ai`);
     const data = res.data.data;
 
-    // Update locally
-    row.cek_dokumen = data.cek_dokumen;
-    row.status_potong_purchase = data.status_potong_purchase;
-    row.keterangan = data.keterangan;
+    // Update row locally with all fresh data (including 11 financial columns)
+    if (data.submission) {
+      Object.assign(row, data.submission);
+    } else {
+      row.cek_dokumen = data.cek_dokumen;
+      row.status_potong_purchase = data.status_potong_purchase;
+      row.keterangan = data.keterangan;
+      if (data.financial) {
+        Object.assign(row, data.financial);
+      }
+    }
 
-    syncMessage.value = `Analisis AI untuk "${row.dealer_name || row.id_real}": ${data.cek_dokumen} → ${data.status_potong_purchase}`;
+    syncMessage.value = `Analisis AI selesai untuk "${row.dealer_name || row.id_real}": Status ${row.cek_dokumen || '-'} → ${row.status_potong_purchase || '-'} | Note PPh: ${row.note_pph || '-'}`;
     syncError.value = false;
   } catch (err) {
     syncMessage.value = 'Gagal menganalisis dengan AI: ' + (err.response?.data?.message || err.message);
@@ -1560,15 +2063,35 @@ const analyzeCurrentRowWithAi = async () => {
     const res = await axios.post(`/api/program-submissions/${editingSubmission.value.id}/analyze-ai`);
     const data = res.data.data;
 
-    // Update edit form fields
-    editForm.cek_dokumen = data.cek_dokumen;
-    editForm.status_potong_purchase = data.status_potong_purchase;
-    editForm.keterangan = data.keterangan;
+    if (data.submission) {
+      Object.assign(editingSubmission.value, data.submission);
+      Object.assign(editForm, {
+        no_po_sj: data.submission.no_po_sj || '',
+        no_transaksi: data.submission.no_transaksi || '',
+        tgl_input: data.submission.tgl_input || '',
+        tgl_share_cn: data.submission.tgl_share_cn || '',
+        lama_pending: data.submission.lama_pending || '',
+        keterangan: data.submission.keterangan || '',
+        cek_dokumen: data.submission.cek_dokumen || '',
+        status_potong_purchase: data.submission.status_potong_purchase || '',
+        status_potong_ar: data.submission.status_potong_ar || '',
+        tgl_potong_tf: data.submission.tgl_potong_tf || '',
+        incentive: data.submission.incentive ?? null,
+        dpp: data.submission.dpp ?? null,
+        dpp_lain: data.submission.dpp_lain ?? null,
+        ppn: data.submission.ppn ?? null,
+        nilai_pph: data.submission.nilai_pph ?? null,
+        net_pay: data.submission.net_pay ?? null,
+        cek_pajak_tarif_pph: data.submission.cek_pajak_tarif_pph ?? null,
+        selisih: data.submission.selisih ?? null,
+        note_pph: data.submission.note_pph || '',
+        no_faktur: data.submission.no_faktur || '',
+        tgl_faktur: data.submission.tgl_faktur || '',
+      });
+    }
 
-    // Also update parent submission object
-    editingSubmission.value.cek_dokumen = data.cek_dokumen;
-    editingSubmission.value.status_potong_purchase = data.status_potong_purchase;
-    editingSubmission.value.keterangan = data.keterangan;
+    syncMessage.value = `Analisis AI selesai untuk "${editingSubmission.value.dealer_name || editingSubmission.value.id_real}".`;
+    syncError.value = false;
   } catch (err) {
     alert('Gagal menganalisis dokumen: ' + (err.response?.data?.message || err.message));
   } finally {
@@ -1707,6 +2230,29 @@ const triggerBackgroundAi = async (all = false) => {
   }
 };
 
+const formatRupiah = (val) => {
+  if (val === null || val === undefined || val === '') return '-';
+  const num = Number(val);
+  if (isNaN(num)) return val;
+  return new Intl.NumberFormat('id-ID').format(num);
+};
+
+const formatDocTypeName = (type) => {
+  if (!type) return '';
+  const lower = String(type).toLowerCase();
+  if (lower === 'cn') return 'CN';
+  if (lower === 'agr' || lower === 'agreement') return 'Agr';
+  if (lower === 'faktur' || lower === 'tax_invoice') return 'Faktur';
+  return 'Lain';
+};
+
+const hasSwappedOrInvalidDocs = (submission) => {
+  if (!submission || !submission.doc_validation) return false;
+  return Object.values(submission.doc_validation).some(
+    (info) => info && (info.status === 'swapped' || info.status === 'invalid')
+  );
+};
+
 // Edit Modal logic
 const openEditModal = (row) => {
   editingSubmission.value = row;
@@ -1720,6 +2266,18 @@ const openEditModal = (row) => {
   editForm.status_potong_purchase = row.status_potong_purchase || '';
   editForm.status_potong_ar = row.status_potong_ar || '';
   editForm.tgl_potong_tf = row.tgl_potong_tf || '';
+  editForm.incentive = row.incentive ?? null;
+  editForm.dpp = row.dpp ?? null;
+  editForm.dpp_lain = row.dpp_lain ?? null;
+  editForm.ppn = row.ppn ?? null;
+  editForm.nilai_pph = row.nilai_pph ?? null;
+  editForm.net_pay = row.net_pay ?? null;
+  editForm.cek_pajak_tarif_pph = row.cek_pajak_tarif_pph ?? null;
+  editForm.selisih = row.selisih ?? null;
+  editForm.note_pph = row.note_pph || '';
+  editForm.no_faktur = row.no_faktur || '';
+  editForm.tgl_faktur = row.tgl_faktur || '';
+  editForm.doc_validation = row.doc_validation || null;
   showEditModal.value = true;
 };
 
@@ -1749,6 +2307,7 @@ onMounted(() => {
   document.addEventListener('click', handleClickOutsideSpreadsheetDropdown);
   document.addEventListener('click', handleClickOutsideAiDropdown);
   document.addEventListener('click', handleClickOutsideModelDropdown);
+  document.addEventListener('click', handleClickOutsideProgramDropdown);
 
   // Otomatis sinkronkan dari spreadsheet saat halaman dibuka
   runAutoSync();
@@ -1772,6 +2331,7 @@ onUnmounted(() => {
   document.removeEventListener('click', handleClickOutsideSpreadsheetDropdown);
   document.removeEventListener('click', handleClickOutsideAiDropdown);
   document.removeEventListener('click', handleClickOutsideModelDropdown);
+  document.removeEventListener('click', handleClickOutsideProgramDropdown);
   if (pollTimer) clearInterval(pollTimer);
   if (autoSyncTimer) clearInterval(autoSyncTimer);
   clearTimeout(debounceTimer);

@@ -10,9 +10,11 @@ use App\Services\WhatsAppService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
@@ -64,7 +66,9 @@ class ProgramSubmissionController extends Controller
         $cols = [
             'id', 'submission_timestamp', 'region', 'id_real', 'dealer_name',
             'program_name', 'sales_name', 'credit_note_url', 'agreement_url',
-            'tax_invoice_url', 'no_po_sj', 'no_transaksi', 'tgl_input',
+            'tax_invoice_url', 'incentive', 'dpp', 'dpp_lain', 'ppn', 'nilai_pph',
+            'net_pay', 'cek_pajak_tarif_pph', 'selisih', 'note_pph', 'no_faktur',
+            'tgl_faktur', 'no_po_sj', 'no_transaksi', 'tgl_input',
             'tgl_share_cn', 'lama_pending', 'keterangan', 'cek_dokumen',
             'status_potong_purchase', 'status_potong_ar', 'tgl_potong_tf', 'updated_at',
         ];
@@ -72,14 +76,49 @@ class ProgramSubmissionController extends Controller
         $perPage = min((int) $request->input('per_page', 15), 100);
         $submissions = $query->select($cols)->orderByDesc('id')->paginate($perPage);
 
-        // Cache regions dropdown so it doesn't scan 20,850 rows on every pagination click
-        $regions = Cache::remember('program_submissions_regions_list', 300, function () {
+        // Cache regions dropdown as plain array
+        $regions = Cache::remember('program_submissions_regions_list_v2', 300, function () {
             return ProgramSubmission::whereNotNull('region')
                 ->where('region', '!=', '')
                 ->distinct()
                 ->orderBy('region')
-                ->pluck('region');
+                ->pluck('region')
+                ->filter(function ($r) {
+                    $trimmed = trim((string) $r);
+
+                    return $trimmed !== '' && $trimmed !== '\\' && $trimmed !== '-';
+                })
+                ->values()
+                ->all();
         });
+
+        // Cache programs dropdown as plain array
+        $programs = Cache::remember('program_submissions_programs_list_v2', 300, function () {
+            return ProgramSubmission::whereNotNull('program_name')
+                ->where('program_name', '!=', '')
+                ->distinct()
+                ->orderBy('program_name')
+                ->pluck('program_name')
+                ->filter(function ($p) {
+                    $trimmed = trim((string) $p);
+
+                    return $trimmed !== '' && $trimmed !== '.' && $trimmed !== '-';
+                })
+                ->values()
+                ->all();
+        });
+
+        if ($regions instanceof Collection) {
+            $regions = $regions->values()->all();
+        } elseif (! is_array($regions)) {
+            $regions = [];
+        }
+
+        if ($programs instanceof Collection) {
+            $programs = $programs->values()->all();
+        } elseif (! is_array($programs)) {
+            $programs = [];
+        }
 
         // Fast lookup for latest sync timestamp using indexed ID
         $lastSyncedAt = Cache::remember('program_submissions_latest_time', 30, function () {
@@ -93,6 +132,7 @@ class ProgramSubmissionController extends Controller
         return response()->json([
             'submissions' => $submissions,
             'regions' => $regions,
+            'programs' => $programs,
             'status_purchase_options' => ProgramSubmission::STATUS_PURCHASE_OPTIONS,
             'keterangan_options' => ProgramSubmission::KETERANGAN_OPTIONS,
             'total_submissions' => $totalSubmissions,
@@ -138,7 +178,9 @@ class ProgramSubmissionController extends Controller
         $cols = [
             'id', 'submission_timestamp', 'region', 'id_real', 'dealer_name',
             'program_name', 'sales_name', 'credit_note_url', 'agreement_url',
-            'tax_invoice_url', 'no_po_sj', 'no_transaksi', 'tgl_input',
+            'tax_invoice_url', 'incentive', 'dpp', 'dpp_lain', 'ppn', 'nilai_pph',
+            'net_pay', 'cek_pajak_tarif_pph', 'selisih', 'note_pph', 'no_faktur',
+            'tgl_faktur', 'no_po_sj', 'no_transaksi', 'tgl_input',
             'tgl_share_cn', 'lama_pending', 'keterangan', 'cek_dokumen',
             'status_potong_purchase', 'status_potong_ar', 'tgl_potong_tf',
         ];
@@ -158,6 +200,17 @@ class ProgramSubmissionController extends Controller
             'Link CN',
             'Link Agreement',
             'Link Faktur Pajak',
+            'Incentive',
+            'DPP',
+            'DPP Lain',
+            'PPN',
+            'Nilai PPh',
+            'Net Pay',
+            'Cek Pajak Tarif PPh',
+            'Selisih',
+            'Note PPh',
+            'No Faktur',
+            'Tgl Faktur',
             'No PO / SJ',
             'No Transaksi',
             'Tgl Input',
@@ -172,11 +225,12 @@ class ProgramSubmissionController extends Controller
 
         $sheet->fromArray([$headers], null, 'A1');
 
-        $sheet->getStyle('A1:T1')->getFont()->setBold(true)->setSize(10);
-        $sheet->getStyle('A1:T1')->getFill()
+        $highestCol = Coordinate::stringFromColumnIndex(count($headers));
+        $sheet->getStyle("A1:{$highestCol}1")->getFont()->setBold(true)->setSize(10);
+        $sheet->getStyle("A1:{$highestCol}1")->getFill()
             ->setFillType(Fill::FILL_SOLID)
             ->getStartColor()->setARGB('FFF3F4F6');
-        $sheet->getStyle('A1:T1')->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+        $sheet->getStyle("A1:{$highestCol}1")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
         $sheet->getRowDimension(1)->setRowHeight(26);
 
         $dataRows = [];
@@ -194,6 +248,17 @@ class ProgramSubmissionController extends Controller
                     $item->credit_note_url ?? '',
                     $item->agreement_url ?? '',
                     $item->tax_invoice_url ?? '',
+                    $item->incentive ?? '',
+                    $item->dpp ?? '',
+                    $item->dpp_lain ?? '',
+                    $item->ppn ?? '',
+                    $item->nilai_pph ?? '',
+                    $item->net_pay ?? '',
+                    $item->cek_pajak_tarif_pph ?? '',
+                    $item->selisih ?? '',
+                    $item->note_pph ?? '',
+                    $item->no_faktur ?? '',
+                    $item->tgl_faktur ?? '',
                     $item->no_po_sj ?? '',
                     $item->no_transaksi ?? '',
                     $item->tgl_input ?? '',
@@ -212,8 +277,10 @@ class ProgramSubmissionController extends Controller
             $sheet->fromArray($dataRows, null, 'A2');
         }
 
-        foreach (range('A', 'T') as $col) {
-            $sheet->getColumnDimension($col)->setAutoSize(true);
+        $highestColumnIndex = count($headers);
+        for ($col = 1; $col <= $highestColumnIndex; $col++) {
+            $colLetter = Coordinate::stringFromColumnIndex($col);
+            $sheet->getColumnDimension($colLetter)->setAutoSize(true);
         }
 
         $sheet->freezePane('A2');
@@ -252,13 +319,29 @@ class ProgramSubmissionController extends Controller
             'status_potong_purchase' => 'nullable|string|max:255',
             'status_potong_ar' => 'nullable|string|max:255',
             'tgl_potong_tf' => 'nullable|string|max:255',
+            'incentive' => 'nullable|numeric',
+            'dpp' => 'nullable|numeric',
+            'dpp_lain' => 'nullable|numeric',
+            'ppn' => 'nullable|numeric',
+            'nilai_pph' => 'nullable|numeric',
+            'net_pay' => 'nullable|numeric',
+            'cek_pajak_tarif_pph' => 'nullable|numeric',
+            'selisih' => 'nullable|numeric',
+            'note_pph' => 'nullable|string|max:100',
+            'no_faktur' => 'nullable|string|max:100',
+            'tgl_faktur' => 'nullable|string|max:50',
+            'doc_validation' => 'nullable|array',
         ]);
+
+        if (isset($validated['nilai_pph']) && isset($validated['cek_pajak_tarif_pph']) && ! array_key_exists('selisih', $validated)) {
+            $validated['selisih'] = round((float) $validated['nilai_pph'] - (float) $validated['cek_pajak_tarif_pph'], 2);
+        }
 
         $submission->update($validated);
 
         return response()->json([
             'success' => true,
-            'message' => 'Data tracking program berhasil diperbarui.',
+            'message' => 'Data tracking & keuangan program berhasil diperbarui.',
             'submission' => $submission,
         ]);
     }
@@ -277,8 +360,8 @@ class ProgramSubmissionController extends Controller
 
             $result = $this->service->syncFromWebAppUrl($customUrl, $limit);
 
-            // If new records were imported, automatically dispatch background AI analysis
-            if (($result['new_count'] ?? 0) > 0) {
+            // If new records were imported, automatically dispatch background AI analysis (hanya di non-local)
+            if (! app()->environment('local') && ($result['new_count'] ?? 0) > 0) {
                 $this->dispatchBackgroundAi(min(100, max(5, (int) $result['new_count'])));
             }
 
@@ -523,12 +606,13 @@ class ProgramSubmissionController extends Controller
             $yearArg = escapeshellarg("--year={$year}");
             $limitArg = ($all || $limit <= 0) ? '--all' : '--limit='.(int) $limit;
             $sleepArg = '--sleep=0.05';
+            $forceArg = '--force';
 
             if (PHP_OS_FAMILY === 'Windows') {
-                $cmd = "start /B {$phpBinary} {$artisan} program:auto-analyze-ai {$yearArg} {$limitArg} {$sleepArg}";
+                $cmd = "start /B {$phpBinary} {$artisan} program:auto-analyze-ai {$yearArg} {$limitArg} {$sleepArg} {$forceArg}";
                 pclose(popen($cmd, 'r'));
             } else {
-                $cmd = "nohup {$phpBinary} {$artisan} program:auto-analyze-ai {$yearArg} {$limitArg} {$sleepArg} > /dev/null 2>&1 &";
+                $cmd = "nohup {$phpBinary} {$artisan} program:auto-analyze-ai {$yearArg} {$limitArg} {$sleepArg} {$forceArg} > /dev/null 2>&1 &";
                 exec($cmd);
             }
         } catch (\Throwable $e) {
