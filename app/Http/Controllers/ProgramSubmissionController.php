@@ -730,4 +730,28 @@ class ProgramSubmissionController extends Controller
             'provider_id' => $result['provider_id'] ?? null,
         ]);
     }
+
+    /**
+     * Send WhatsApp notification to Telemarketing for program claim offer to dealer.
+     */
+    public function sendWaToTelemarketing(Request $request, int|string $id): JsonResponse
+    {
+        $submission = ProgramSubmission::findOrFail($id);
+        $phone = $request->input('phone');
+
+        $result = $this->waService->sendProgramClaimNotificationToTelemarketing($submission, $phone);
+
+        if (! $result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+            'provider_id' => $result['provider_id'] ?? null,
+        ]);
+    }
 }

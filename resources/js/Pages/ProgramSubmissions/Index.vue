@@ -710,7 +710,19 @@
 
               <!-- Kolom: Status Potong by AR -->
               <TableCell class="whitespace-nowrap text-gray-700 py-2.5">
-                <span v-if="row.status_potong_ar" class="px-1.5 py-0.5 rounded bg-white border border-gray-200 text-gray-700 text-xs">
+                <span
+                  v-if="row.status_potong_ar"
+                  :class="[
+                    'px-2 py-0.5 rounded text-xs font-medium border inline-block',
+                    row.status_potong_ar.includes('DEALER SETUJU')
+                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                      : row.status_potong_ar === 'DONE'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : row.status_potong_ar.includes('PENDING')
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-white border-gray-200 text-gray-700'
+                  ]"
+                >
                   {{ row.status_potong_ar }}
                 </span>
                 <span v-else class="text-gray-300">-</span>
@@ -739,10 +751,10 @@
                   <button
                     v-if="row.status_potong_purchase === 'BISA DI POTONG'"
                     type="button"
-                    @click="sendWaToAr(row)"
+                    @click="sendWaToTelemarketing(row)"
                     :disabled="sendingWaId === row.id"
-                    class="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition shadow-2xs cursor-pointer disabled:opacity-50"
-                    title="Kirim Notifikasi Klaim ke WhatsApp AR (081224290502)"
+                    class="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700 transition shadow-2xs cursor-pointer disabled:opacity-50"
+                    title="Kirim Info Klaim ke WhatsApp Telemarketing (Tawarkan Potong Order ke Dealer)"
                   >
                     <RefreshCwIcon v-if="sendingWaId === row.id" class="w-3.5 h-3.5 animate-spin" />
                     <SendIcon v-else class="w-3.5 h-3.5" />
@@ -995,7 +1007,7 @@
                   <input
                     v-model="editForm.status_potong_ar"
                     type="text"
-                    placeholder="Contoh: DONE / PENDING"
+                    placeholder="Contoh: DEALER SETUJU / DONE / PENDING DEALER"
                     class="h-9 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
                   />
                 </div>
@@ -1149,14 +1161,14 @@
               <button
                 v-if="editingSubmission && editForm.status_potong_purchase === 'BISA DI POTONG'"
                 type="button"
-                @click="sendWaToAr(editingSubmission)"
+                @click="sendWaToTelemarketing(editingSubmission)"
                 :disabled="isSendingWaModal"
-                class="px-3 py-1.5 rounded-md border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
-                title="Kirim notifikasi klaim ini langsung ke WhatsApp AR"
+                class="px-3 py-1.5 rounded-md border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
+                title="Kirim info klaim ini ke WhatsApp Telemarketing untuk ditawarkan potong order"
               >
-                <RefreshCwIcon v-if="isSendingWaModal" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
-                <SendIcon v-else class="w-3.5 h-3.5 text-emerald-600" />
-                <span>{{ isSendingWaModal ? 'Mengirim ke AR...' : 'Kirim WA ke AR' }}</span>
+                <RefreshCwIcon v-if="isSendingWaModal" class="w-3.5 h-3.5 animate-spin text-blue-600" />
+                <SendIcon v-else class="w-3.5 h-3.5 text-blue-600" />
+                <span>{{ isSendingWaModal ? 'Mengirim ke Telemarketing...' : 'Kirim WA ke Telemarketing' }}</span>
               </button>
               <div v-else></div>
 
@@ -1967,24 +1979,27 @@ const quickUpdateKeterangan = async (row, newKeterangan) => {
   }
 };
 
-// Send WhatsApp notification to AR
-const sendWaToAr = async (row) => {
+// Send WhatsApp notification to Telemarketing
+const sendWaToTelemarketing = async (row) => {
   if (!row) return;
   sendingWaId.value = row.id;
   isSendingWaModal.value = true;
 
   try {
-    const res = await axios.post(`/api/program-submissions/${row.id}/send-wa-ar`);
-    syncMessage.value = res.data.message || `Notifikasi klaim "${row.dealer_name || row.id_real}" berhasil dikirim ke WhatsApp AR!`;
+    const res = await axios.post(`/api/program-submissions/${row.id}/send-wa-telemarketing`);
+    syncMessage.value = res.data.message || `Info klaim "${row.dealer_name || row.id_real}" berhasil dikirim ke WhatsApp Telemarketing!`;
     syncError.value = false;
   } catch (err) {
-    syncMessage.value = 'Gagal mengirim WhatsApp ke AR: ' + (err.response?.data?.message || err.message);
+    syncMessage.value = 'Gagal mengirim WhatsApp ke Telemarketing: ' + (err.response?.data?.message || err.message);
     syncError.value = true;
   } finally {
     sendingWaId.value = null;
     isSendingWaModal.value = false;
   }
 };
+
+// Backward-compatible alias for AR send
+const sendWaToAr = sendWaToTelemarketing;
 
 // Auto-select Keterangan based on lama_pending or tgl_share_cn in edit modal
 watch(

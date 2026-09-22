@@ -354,7 +354,7 @@ class ProgramSubmissionTest extends TestCase
         $saveResponse = $this->actingAs($user)->postJson('/api/program-submissions/ai-config', [
             'base_url' => 'https://router.rizqis.com/v1',
             'api_key' => 'sk-test-key-1234567890',
-            'model' => 'ag/gemini-3-flash',
+            'model' => 'ag/gemini-3.7-flash-low',
         ]);
 
         $saveResponse->assertStatus(200);
@@ -365,7 +365,7 @@ class ProgramSubmissionTest extends TestCase
         $getResponse->assertJson([
             'config' => [
                 'base_url' => 'https://router.rizqis.com/v1',
-                'model' => 'ag/gemini-3-flash',
+                'model' => 'ag/gemini-3.7-flash-low',
                 'has_key' => true,
             ],
         ]);
@@ -424,6 +424,11 @@ class ProgramSubmissionTest extends TestCase
     {
         $user = User::factory()->create();
 
+        config([
+            'services.wag.token' => 'fake-test-token',
+            'services.wag.ar_phone' => '081224290502',
+        ]);
+
         $submission = ProgramSubmission::create([
             'submission_timestamp' => '10/10/2022 12:32:55',
             'region' => 'BIG KARAWANG',
@@ -452,8 +457,107 @@ class ProgramSubmissionTest extends TestCase
         Http::assertSent(function ($request) {
             return str_contains($request->url(), '/api/v1/messages') &&
                 $request['recipient']['value'] === '6281224290502' &&
-                str_contains($request['message']['text'], 'BISA DI POTONG') &&
+                str_contains($request['message']['text'], 'UNTUK TIM AR') &&
                 str_contains($request['message']['text'], '/p/confirm/');
+        });
+    }
+
+    public function test_can_send_wa_notification_to_telemarketing(): void
+    {
+        config([
+            'services.wag.token' => 'fake-test-token',
+            'services.wag.telemarketing_phone' => '081234567890',
+        ]);
+
+        $user = User::factory()->create();
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:32:55',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME00652',
+            'dealer_name' => 'Abadi Cell',
+            'program_name' => 'Program SO C11 2021 Series',
+            'status_potong_purchase' => 'BISA DI POTONG',
+            'net_pay' => 439189,
+            'row_hash' => 'hash_test_send_wa_tm',
+        ]);
+
+        Http::fake([
+            'https://waghub.mekayastudio.com/api/v1/messages' => Http::response([
+                'status' => 'success',
+                'data' => [
+                    'id' => 'msg-tm-12345',
+                    'provider_message_id' => 'wamid-tm-12345',
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/api/program-submissions/{$submission->id}/send-wa-telemarketing");
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/api/v1/messages') &&
+                $request['recipient']['value'] === '6281234567890' &&
+                str_contains($request['message']['text'], 'INFO TELEMARKETING') &&
+                str_contains($request['message']['text'], 'BISA DI POTONG') &&
+                str_contains($request['message']['text'], '439.189') &&
+                str_contains($request['message']['text'], 'action=setuju') &&
+                str_contains($request['message']['text'], '/p/confirm/');
+        });
+    }
+
+    public function test_telemarketing_can_confirm_dealer_setuju_via_signed_url(): void
+    {
+        config([
+            'services.wag.token' => 'fake-token-test',
+            'services.wag.ar_phone' => '081224290502',
+        ]);
+
+        Http::fake([
+            'https://waghub.mekayastudio.com/api/v1/messages' => Http::response([
+                'status' => 'success',
+                'data' => [
+                    'id' => 'msg-ar-forward-123',
+                    'provider_message_id' => 'wamid-ar-123',
+                ],
+            ], 201),
+        ]);
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:32:55',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME00652',
+            'dealer_name' => 'Abadi Cell',
+            'program_name' => 'Program SO C11 2021 Series',
+            'status_potong_purchase' => 'BISA DI POTONG',
+            'net_pay' => 500000,
+            'row_hash' => 'hash_test_confirm_tm_setuju',
+        ]);
+
+        $signedUrl = URL::temporarySignedRoute(
+            'program-submissions.confirm',
+            now()->addHours(1),
+            ['id' => $submission->id, 'action' => 'setuju']
+        );
+
+        $response = $this->get($signedUrl);
+        $response->assertStatus(200);
+        $response->assertSee('Dealer Setuju Dipotong!');
+        $response->assertSee('STATUS AR: DEALER SETUJU (PROSES AR)');
+        $response->assertSee('WhatsApp Berhasil Terkirim ke AR');
+
+        $this->assertDatabaseHas('program_submissions', [
+            'id' => $submission->id,
+            'status_potong_ar' => 'DEALER SETUJU (PROSES AR)',
+        ]);
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/api/v1/messages') &&
+                $request['recipient']['value'] === '6281224290502' &&
+                str_contains($request['message']['text'], 'UNTUK TIM AR') &&
+                str_contains($request['message']['text'], 'action=potong') &&
+                str_contains($request['message']['text'], '500.000');
         });
     }
 
@@ -703,5 +807,62 @@ class ProgramSubmissionTest extends TestCase
         $this->assertEquals('agr', $submission->doc_validation['cn']['actual_type']);
         $this->assertEquals('swapped', $submission->doc_validation['agr']['status']);
         $this->assertEquals('valid', $submission->doc_validation['faktur']['status']);
+    }
+
+    public function test_missing_faktur_marked_as_faktur_belum_ada_not_tidak_sesuai(): void
+    {
+        $user = User::factory()->create();
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2026 10:00:00',
+            'region' => 'CIREBON',
+            'id_real' => 'B100971',
+            'dealer_name' => 'MANDIRI CELL',
+            'program_name' => 'PROGRAM DSA AGUSTUS 2026',
+            'sales_name' => 'AAB ABDURAHMAN',
+            'credit_note_url' => 'https://drive.google.com/open?id=test_cn',
+            'agreement_url' => 'https://drive.google.com/open?id=test_agr',
+            'tax_invoice_url' => '',
+            'row_hash' => 'hash_empty_faktur_test',
+        ]);
+
+        // Even if AI mistakenly returned 'invalid' for empty faktur
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'is_complete' => false,
+                                'cek_dokumen' => 'DOKUMEN TIDAK SESUAI (FAKTUR)',
+                                'status_potong_purchase' => 'BELUM BISA POTONG',
+                                'keterangan' => 'Faktur tidak diunggah',
+                                'doc_validation' => [
+                                    'cn' => ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'CN valid'],
+                                    'agr' => ['status' => 'valid', 'actual_type' => 'agr', 'message' => 'Agr valid'],
+                                    'faktur' => ['status' => 'invalid', 'actual_type' => 'other', 'message' => 'Faktur kosong'],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        Cache::put('ai_router_config', [
+            'base_url' => 'https://router.example.com/v1',
+            'api_key' => 'test-key',
+            'model' => 'test-model',
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/api/program-submissions/{$submission->id}/analyze-ai");
+        $response->assertStatus(200);
+
+        $submission->refresh();
+
+        // Must be FAKTUR BELUM ADA, NOT DOKUMEN TIDAK SESUAI
+        $this->assertEquals('FAKTUR BELUM ADA', $submission->cek_dokumen);
+        $this->assertEquals('BELUM BISA POTONG', $submission->status_potong_purchase);
+        $this->assertEquals('empty', $submission->doc_validation['faktur']['status']);
     }
 }

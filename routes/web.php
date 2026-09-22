@@ -70,6 +70,7 @@ Route::prefix('api')->group(function () {
     Route::post('/program-submissions/ai-run-background', [ProgramSubmissionController::class, 'runAiInBackground']);
     Route::post('/program-submissions/ai-test', [ProgramSubmissionController::class, 'testAiConnection']);
     Route::post('/program-submissions/{id}/send-wa-ar', [ProgramSubmissionController::class, 'sendWaToAr']);
+    Route::post('/program-submissions/{id}/send-wa-telemarketing', [ProgramSubmissionController::class, 'sendWaToTelemarketing']);
     Route::post('/webhooks/form-program', [ProgramSubmissionController::class, 'webhook']);
 });
 

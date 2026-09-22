@@ -41,12 +41,13 @@ return [
         'verify_ssl' => env('WAG_VERIFY_SSL', false),
         'public_url' => env('WAG_PUBLIC_URL', env('APP_URL')),
         'ar_phone' => env('AR_DEFAULT_PHONE', '081224290502'),
+        'telemarketing_phone' => env('TELEMARKETING_DEFAULT_PHONE', env('AR_DEFAULT_PHONE', '081224290502')),
     ],
 
     'openai_compatible' => [
         'base_url' => env('OPENAI_COMPATIBLE_BASE_URL', 'https://router.rizqis.com/v1'),
         'api_key' => env('OPENAI_COMPATIBLE_API_KEY', 'sk-3948f4654c3abea8-q0276y-980d240c'),
-        'model' => env('OPENAI_COMPATIBLE_MODEL', 'ag/gemini-3-flash'),
+        'model' => env('OPENAI_COMPATIBLE_MODEL', 'ag/gemini-3.7-flash-low'),
     ],
 
     'google' => [
