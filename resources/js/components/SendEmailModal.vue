@@ -202,9 +202,17 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'sent']);
 
-const emailAccounts = ref([]);
+const defaultFallbackAccounts = [
+  { id: 1, name: 'Rebate. MSI', email: 'ade@mediaselulerindonesia.com', is_default: true },
+  { id: 2, name: 'Program CS', email: 'admin.scm@completeselular.com', is_default: false },
+  { id: 3, name: 'Program MSI', email: 'admin.scm@mediaselulerindonesia.com', is_default: false },
+  { id: 4, name: 'Program SMI', email: 'admin.scm@satumediaindonesia.com', is_default: false },
+  { id: 5, name: 'Program Top', email: 'admin.scm@topselular.com', is_default: false },
+];
+
+const emailAccounts = ref([...defaultFallbackAccounts]);
 const accountsLoading = ref(false);
-const senderId = ref(null);
+const senderId = ref(1);
 const email = ref('');
 const whatsapp = ref('');
 const ccInput = ref('');
@@ -215,17 +223,19 @@ const error = ref('');
 const success = ref('');
 
 const selectedSender = computed(() => {
-  return emailAccounts.value.find(acc => acc.id === senderId.value) || null;
+  return emailAccounts.value.find(acc => acc.id === senderId.value) || emailAccounts.value[0] || null;
 });
 
 const fetchEmailAccounts = async () => {
   try {
     accountsLoading.value = true;
     const res = await axios.get('/api/email-accounts');
-    emailAccounts.value = res.data.data || [];
-    if (!senderId.value && emailAccounts.value.length > 0) {
-      const defaultAcc = emailAccounts.value.find(acc => acc.is_default);
-      senderId.value = defaultAcc ? defaultAcc.id : emailAccounts.value[0].id;
+    if (Array.isArray(res.data.data) && res.data.data.length > 0) {
+      emailAccounts.value = res.data.data;
+      if (!senderId.value || !emailAccounts.value.some(acc => acc.id === senderId.value)) {
+        const defaultAcc = emailAccounts.value.find(acc => acc.is_default);
+        senderId.value = defaultAcc ? defaultAcc.id : emailAccounts.value[0].id;
+      }
     }
   } catch (e) {
     console.error('Gagal mengambil daftar email accounts:', e);

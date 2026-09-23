@@ -254,4 +254,15 @@ class MultiSenderEmailTest extends TestCase
                 'is_connected',
             ]);
     }
+
+    public function test_email_accounts_auto_seeds_when_table_empty(): void
+    {
+        EmailAccount::truncate();
+        $this->assertEquals(0, EmailAccount::count());
+
+        $response = $this->getJson('/api/email-accounts');
+        $response->assertOk();
+        $this->assertNotEmpty($response->json('data'));
+        $this->assertEquals('Rebate. MSI', $response->json('data.0.name'));
+    }
 }

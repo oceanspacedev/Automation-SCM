@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\EmailAccount;
 use App\Services\GoogleMailService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class GoogleAuthController extends Controller
 {
@@ -46,6 +48,17 @@ class GoogleAuthController extends Controller
 
         try {
             $token = $this->googleMailService->handleCallback($code);
+
+            if (! empty($token->account_email) && Schema::hasTable('email_accounts')) {
+                EmailAccount::firstOrCreate(
+                    ['email' => $token->account_email],
+                    [
+                        'name' => 'Google Workspace',
+                        'is_default' => false,
+                        'is_active' => true,
+                    ]
+                );
+            }
 
             return redirect('/invoices?google_connected=1&account='.urlencode((string) $token->account_email));
         } catch (Exception $e) {

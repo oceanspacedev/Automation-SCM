@@ -393,20 +393,30 @@ const selectedIds = ref([]);
 const alertMessage = ref(null);
 const alertSuccess = ref(true);
 
-const emailAccounts = ref([]);
-const batchSenderId = ref(null);
+const defaultFallbackAccounts = [
+  { id: 1, name: 'Rebate. MSI', email: 'ade@mediaselulerindonesia.com', is_default: true },
+  { id: 2, name: 'Program CS', email: 'admin.scm@completeselular.com', is_default: false },
+  { id: 3, name: 'Program MSI', email: 'admin.scm@mediaselulerindonesia.com', is_default: false },
+  { id: 4, name: 'Program SMI', email: 'admin.scm@satumediaindonesia.com', is_default: false },
+  { id: 5, name: 'Program Top', email: 'admin.scm@topselular.com', is_default: false },
+];
+
+const emailAccounts = ref([...defaultFallbackAccounts]);
+const batchSenderId = ref(1);
 
 const selectedBatchSender = computed(() => {
-  return emailAccounts.value.find(acc => acc.id === batchSenderId.value) || null;
+  return emailAccounts.value.find(acc => acc.id === batchSenderId.value) || emailAccounts.value[0] || null;
 });
 
 const fetchEmailAccounts = async () => {
   try {
     const res = await axios.get('/api/email-accounts');
-    emailAccounts.value = res.data.data || [];
-    if (!batchSenderId.value && emailAccounts.value.length > 0) {
-      const def = emailAccounts.value.find(a => a.is_default);
-      batchSenderId.value = def ? def.id : emailAccounts.value[0].id;
+    if (Array.isArray(res.data.data) && res.data.data.length > 0) {
+      emailAccounts.value = res.data.data;
+      if (!batchSenderId.value || !emailAccounts.value.some(a => a.id === batchSenderId.value)) {
+        const def = emailAccounts.value.find(a => a.is_default);
+        batchSenderId.value = def ? def.id : emailAccounts.value[0].id;
+      }
     }
   } catch (err) {
     console.error('Failed to fetch email accounts', err);

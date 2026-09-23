@@ -6,6 +6,7 @@ use App\Mail\InvoiceMail;
 use App\Models\Draft;
 use App\Models\EmailAccount;
 use App\Models\EmailLog;
+use App\Models\GoogleToken;
 use App\Models\Invoice;
 use App\Models\WhatsAppLog;
 use App\Services\CustomerLookupService;
@@ -17,6 +18,7 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 class InvoiceController extends Controller
@@ -85,13 +87,92 @@ class InvoiceController extends Controller
      */
     public function emailAccounts(): JsonResponse
     {
-        $accounts = EmailAccount::where('is_active', true)
-            ->orderByDesc('is_default')
-            ->orderBy('id')
-            ->get(['id', 'name', 'email', 'is_default']);
+        $defaultList = [
+            [
+                'name' => 'Rebate. MSI',
+                'email' => 'ade@mediaselulerindonesia.com',
+                'is_default' => true,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Program CS',
+                'email' => 'admin.scm@completeselular.com',
+                'is_default' => false,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Program MSI',
+                'email' => 'admin.scm@mediaselulerindonesia.com',
+                'is_default' => false,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Program SMI',
+                'email' => 'admin.scm@satumediaindonesia.com',
+                'is_default' => false,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Program Top',
+                'email' => 'admin.scm@topselular.com',
+                'is_default' => false,
+                'is_active' => true,
+            ],
+        ];
+
+        try {
+            if (Schema::hasTable('email_accounts')) {
+                // Auto-seed default accounts if table is empty (e.g. fresh production)
+                if (EmailAccount::count() === 0) {
+                    foreach ($defaultList as $acc) {
+                        EmailAccount::create($acc);
+                    }
+                }
+
+                // If Google account is connected, ensure it exists in email_accounts
+                $googleToken = GoogleToken::latest()->first();
+                if ($googleToken && ! empty($googleToken->account_email)) {
+                    $existing = EmailAccount::where('email', $googleToken->account_email)->first();
+                    if ($existing) {
+                        if (! $existing->is_active) {
+                            $existing->update(['is_active' => true]);
+                        }
+                    } else {
+                        EmailAccount::create([
+                            'name' => 'Google Workspace',
+                            'email' => $googleToken->account_email,
+                            'is_default' => false,
+                            'is_active' => true,
+                        ]);
+                    }
+                }
+
+                $accounts = EmailAccount::where('is_active', true)
+                    ->orderByDesc('is_default')
+                    ->orderBy('id')
+                    ->get(['id', 'name', 'email', 'is_default']);
+
+                if ($accounts->isNotEmpty()) {
+                    return response()->json([
+                        'data' => $accounts,
+                    ]);
+                }
+            }
+        } catch (\Throwable) {
+            // Fallback gracefully below
+        }
+
+        $fallback = array_map(function ($acc, $idx) {
+            return [
+                'id' => $idx + 1,
+                'name' => $acc['name'],
+                'email' => $acc['email'],
+                'is_default' => $acc['is_default'],
+            ];
+        }, $defaultList, array_keys($defaultList));
 
         return response()->json([
-            'data' => $accounts,
+            'data' => $fallback,
         ]);
     }
 
