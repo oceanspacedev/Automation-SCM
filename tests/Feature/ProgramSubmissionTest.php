@@ -502,7 +502,7 @@ class ProgramSubmissionTest extends TestCase
                 str_contains($request['message']['text'], 'INFO TELEMARKETING') &&
                 str_contains($request['message']['text'], 'BISA DI POTONG') &&
                 str_contains($request['message']['text'], '439.189') &&
-                str_contains($request['message']['text'], 'action=setuju') &&
+                str_contains($request['message']['text'], 'role=telemarketing') &&
                 str_contains($request['message']['text'], '/p/confirm/');
         });
     }
@@ -537,15 +537,30 @@ class ProgramSubmissionTest extends TestCase
 
         $signedUrl = URL::temporarySignedRoute(
             'program-submissions.confirm',
-            now()->addHours(1),
-            ['id' => $submission->id, 'action' => 'setuju']
+            now()->addDays(7),
+            ['id' => $submission->id, 'role' => 'telemarketing']
         );
 
-        $response = $this->get($signedUrl);
-        $response->assertStatus(200);
-        $response->assertSee('Dealer Setuju Dipotong!');
-        $response->assertSee('STATUS AR: DEALER SETUJU (PROSES AR)');
-        $response->assertSee('WhatsApp Berhasil Terkirim ke AR');
+        // 1. GET request should display the interactive page with "Iya" and "Tidak" buttons, WITHOUT modifying the database
+        $getResponse = $this->get($signedUrl);
+        $getResponse->assertStatus(200);
+        $getResponse->assertSee('Konfirmasi Klaim Program');
+        $getResponse->assertSee('Iya, Dealer Setuju (Ajukan ke AR)');
+        $getResponse->assertSee('Tidak / Tunda (Dealer Belum Order)');
+
+        $this->assertDatabaseHas('program_submissions', [
+            'id' => $submission->id,
+            'status_potong_ar' => null,
+        ]);
+
+        // 2. POST request with action=setuju simulates clicking the "Iya" button
+        $postResponse = $this->post($signedUrl, [
+            'action' => 'setuju',
+        ]);
+        $postResponse->assertStatus(200);
+        $postResponse->assertSee('Dealer Setuju Dipotong!');
+        $postResponse->assertSee('STATUS AR: DEALER SETUJU (PROSES AR)');
+        $postResponse->assertSee('WhatsApp Berhasil Terkirim ke AR');
 
         $this->assertDatabaseHas('program_submissions', [
             'id' => $submission->id,
@@ -556,7 +571,7 @@ class ProgramSubmissionTest extends TestCase
             return str_contains($request->url(), '/api/v1/messages') &&
                 $request['recipient']['value'] === '6281224290502' &&
                 str_contains($request['message']['text'], 'UNTUK TIM AR') &&
-                str_contains($request['message']['text'], 'action=potong') &&
+                str_contains($request['message']['text'], 'role=ar') &&
                 str_contains($request['message']['text'], '500.000');
         });
     }
@@ -575,14 +590,28 @@ class ProgramSubmissionTest extends TestCase
 
         $signedUrl = URL::temporarySignedRoute(
             'program-submissions.confirm',
-            now()->addHours(1),
-            ['id' => $submission->id, 'action' => 'potong']
+            now()->addDays(7),
+            ['id' => $submission->id, 'role' => 'ar']
         );
 
-        $response = $this->get($signedUrl);
-        $response->assertStatus(200);
-        $response->assertSee('Konfirmasi Berhasil!');
-        $response->assertSee('STATUS: SUDAH POTONG');
+        // 1. GET request should display the interactive page without updating database
+        $getResponse = $this->get($signedUrl);
+        $getResponse->assertStatus(200);
+        $getResponse->assertSee('Konfirmasi Pemotongan Klaim');
+        $getResponse->assertSee('Iya, Sudah Dipotong (Selesai)');
+
+        $this->assertDatabaseHas('program_submissions', [
+            'id' => $submission->id,
+            'status_potong_purchase' => 'BISA DI POTONG',
+        ]);
+
+        // 2. POST request with action=potong executes the update
+        $postResponse = $this->post($signedUrl, [
+            'action' => 'potong',
+        ]);
+        $postResponse->assertStatus(200);
+        $postResponse->assertSee('Konfirmasi Berhasil!');
+        $postResponse->assertSee('STATUS: SUDAH POTONG');
 
         $this->assertDatabaseHas('program_submissions', [
             'id' => $submission->id,

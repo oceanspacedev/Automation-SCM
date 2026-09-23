@@ -17,8 +17,8 @@ Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])->
 Route::get('/invoices/{id}/preview', [InvoiceController::class, 'preview'])->name('invoices.preview');
 Route::get('/invoices/{id}/pdf', [InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
 
-// Program Claim Confirmation 1-Click Action Link
-Route::get('/p/confirm/{id}', [ProgramClaimConfirmationController::class, 'confirm'])->name('program-submissions.confirm');
+// Program Claim Confirmation Action Link (Landing Page on GET, Form Submit on POST)
+Route::match(['get', 'post'], '/p/confirm/{id}', [ProgramClaimConfirmationController::class, 'confirm'])->name('program-submissions.confirm');
 
 // API Endpoints
 Route::prefix('api')->group(function () {

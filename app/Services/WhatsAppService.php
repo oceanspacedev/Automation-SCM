@@ -382,20 +382,14 @@ class WhatsAppService
             URL::forceRootUrl($baseUrl);
         }
 
-        // Generate signed URLs valid for 30 days
-        $setujuUrl = URL::temporarySignedRoute(
+        // Generate signed confirmation URL valid for 7 days (1 week)
+        $confirmUrl = URL::temporarySignedRoute(
             'program-submissions.confirm',
-            now()->addDays(30),
-            ['id' => $submission->id, 'action' => 'setuju']
+            now()->addDays(7),
+            ['id' => $submission->id, 'role' => 'telemarketing']
         );
 
-        $tundaUrl = URL::temporarySignedRoute(
-            'program-submissions.confirm',
-            now()->addDays(30),
-            ['id' => $submission->id, 'action' => 'tunda']
-        );
-
-        $messageText = $this->buildProgramClaimTelemarketingMessage($submission, $setujuUrl, $tundaUrl);
+        $messageText = $this->buildProgramClaimTelemarketingMessage($submission, $confirmUrl);
         $uuid = Str::uuid()->toString();
 
         $payload = [
@@ -493,20 +487,14 @@ class WhatsAppService
             URL::forceRootUrl($baseUrl);
         }
 
-        // Generate signed URLs valid for 30 days
-        $potongUrl = URL::temporarySignedRoute(
+        // Generate signed confirmation URL valid for 7 days (1 week)
+        $confirmUrl = URL::temporarySignedRoute(
             'program-submissions.confirm',
-            now()->addDays(30),
-            ['id' => $submission->id, 'action' => 'potong']
+            now()->addDays(7),
+            ['id' => $submission->id, 'role' => 'ar']
         );
 
-        $tundaUrl = URL::temporarySignedRoute(
-            'program-submissions.confirm',
-            now()->addDays(30),
-            ['id' => $submission->id, 'action' => 'tunda']
-        );
-
-        $messageText = $this->buildProgramClaimMessage($submission, $potongUrl, $tundaUrl);
+        $messageText = $this->buildProgramClaimMessage($submission, $confirmUrl);
         $uuid = Str::uuid()->toString();
 
         $payload = [
@@ -573,7 +561,7 @@ class WhatsAppService
     /**
      * Build formatted Indonesian WhatsApp message for Telemarketing program claim offer.
      */
-    public function buildProgramClaimTelemarketingMessage(ProgramSubmission $submission, string $setujuUrl, string $tundaUrl): string
+    public function buildProgramClaimTelemarketingMessage(ProgramSubmission $submission, string $confirmUrl): string
     {
         $dealerName = $submission->dealer_name ?: '-';
         $idReal = $submission->id_real ?: '-';
@@ -598,14 +586,12 @@ class WhatsAppService
             '*Status Purchase:* BISA DI POTONG',
             '',
             'Silakan hubungi dealer dan tawarkan potongan saldo insentif ini pada invoice order mereka.',
-            'Jika dealer sudah FIX SETUJU untuk dipotong pada pesanan mereka, klik tombol di bawah untuk meneruskan/mengajukan ke Tim AR:',
+            'Buka tautan di bawah ini untuk mengonfirmasi kesediaan dealer (Iya / Tidak):',
             '',
-            '👉 *[ KLIK: DEALER SETUJU (AJUKAN KE AR) ]*',
-            $setujuUrl,
+            '👉 *[ KLIK: KONFIRMASI KEPUTUSAN DEALER ]*',
+            $confirmUrl,
             '',
-            '⏳ *[ KLIK: DEALER BELUM ORDER / TUNDA ]*',
-            $tundaUrl,
-            '',
+            '_(Tautan ini aktif selama 7 hari)_',
             '_Pesan otomatis dari Sistem SCM Invoice & Program Realme_',
         ];
 
@@ -615,7 +601,7 @@ class WhatsAppService
     /**
      * Build formatted Indonesian WhatsApp message for AR program claim confirmation.
      */
-    public function buildProgramClaimMessage(ProgramSubmission $submission, string $potongUrl, string $tundaUrl): string
+    public function buildProgramClaimMessage(ProgramSubmission $submission, string $confirmUrl): string
     {
         $dealerName = $submission->dealer_name ?: '-';
         $idReal = $submission->id_real ?: '-';
@@ -639,14 +625,13 @@ class WhatsAppService
             "*Status Dokumen:* {$cekDokumen}",
             '*Status Klaim:* DEALER SETUJU DIPOTONG',
             '',
-            'Silakan potongkan saldo piutang dealer pada invoice order mereka. Jika sudah selesai dipotong, silakan klik tombol di bawah:',
+            'Silakan potongkan saldo piutang dealer pada invoice order mereka.',
+            'Jika sudah selesai dipotong atau ingin konfirmasi, silakan klik tautan di bawah ini:',
             '',
-            '👉 *[ KLIK: SUDAH DIPOTONG ]*',
-            $potongUrl,
+            '👉 *[ KLIK: KONFIRMASI PEMOTONGAN AR ]*',
+            $confirmUrl,
             '',
-            '⏳ *[ KLIK: TUNDA / PENDING ]*',
-            $tundaUrl,
-            '',
+            '_(Tautan ini aktif selama 7 hari)_',
             '_Pesan otomatis dari Sistem SCM Invoice & Program Realme_',
         ];
 

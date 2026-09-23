@@ -2042,21 +2042,35 @@ watch(
 
 // AI: Analyze Single Row directly
 const analyzeRowWithAi = async (row) => {
+  if (!row) return;
   analyzingRowId.value = row.id;
   try {
     const res = await axios.post(`/api/program-submissions/${row.id}/analyze-ai`);
     const data = res.data.data;
 
     // Update row locally with all fresh data (including 11 financial columns)
-    if (data.submission) {
-      Object.assign(row, data.submission);
+    const freshData = data.submission || {
+      ...row,
+      cek_dokumen: data.cek_dokumen,
+      status_potong_purchase: data.status_potong_purchase,
+      keterangan: data.keterangan,
+      ...(data.financial || {}),
+    };
+
+    // Explicitly reassign array element to guarantee reactivity trigger in production minified builds
+    const targetIdx = submissions.value.findIndex((s) => s.id === row.id);
+    if (targetIdx !== -1) {
+      submissions.value[targetIdx] = {
+        ...submissions.value[targetIdx],
+        ...freshData,
+      };
+      Object.assign(row, submissions.value[targetIdx]);
     } else {
-      row.cek_dokumen = data.cek_dokumen;
-      row.status_potong_purchase = data.status_potong_purchase;
-      row.keterangan = data.keterangan;
-      if (data.financial) {
-        Object.assign(row, data.financial);
-      }
+      Object.assign(row, freshData);
+    }
+
+    if (editingSubmission.value && editingSubmission.value.id === row.id) {
+      Object.assign(editingSubmission.value, freshData);
     }
 
     syncMessage.value = `Analisis AI selesai untuk "${row.dealer_name || row.id_real}": Status ${row.cek_dokumen || '-'} → ${row.status_potong_purchase || '-'} | Note PPh: ${row.note_pph || '-'}`;
@@ -2103,6 +2117,15 @@ const analyzeCurrentRowWithAi = async () => {
         no_faktur: data.submission.no_faktur || '',
         tgl_faktur: data.submission.tgl_faktur || '',
       });
+
+      // Update row in table list too
+      const foundIdx = submissions.value.findIndex((s) => s.id === editingSubmission.value.id);
+      if (foundIdx !== -1) {
+        submissions.value[foundIdx] = {
+          ...submissions.value[foundIdx],
+          ...data.submission,
+        };
+      }
     }
 
     syncMessage.value = `Analisis AI selesai untuk "${editingSubmission.value.dealer_name || editingSubmission.value.id_real}".`;

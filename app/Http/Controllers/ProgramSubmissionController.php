@@ -70,7 +70,7 @@ class ProgramSubmissionController extends Controller
             'net_pay', 'cek_pajak_tarif_pph', 'selisih', 'note_pph', 'no_faktur',
             'tgl_faktur', 'no_po_sj', 'no_transaksi', 'tgl_input',
             'tgl_share_cn', 'lama_pending', 'keterangan', 'cek_dokumen',
-            'status_potong_purchase', 'status_potong_ar', 'tgl_potong_tf', 'updated_at',
+            'status_potong_purchase', 'status_potong_ar', 'tgl_potong_tf', 'doc_validation', 'updated_at',
         ];
 
         $perPage = min((int) $request->input('per_page', 15), 100);
