@@ -134,7 +134,7 @@ const defaultOptions = [
   {
     code: 'PT MSI',
     name: 'PT MEDIA SELULER INDONESIA',
-    address: 'Gedung Telkom Landmark Tower Lt. 12, Jl. Gatot Subroto Kav. 52, Jakarta Selatan',
+    address: 'Jl. Raya Cirebon - Bandung No.109, Kertawinangun, Kec. Kedawung, Kabupaten Cirebon, Jawa Barat 45153',
     npwp: '01.555.666.7-011.000',
   },
 ];

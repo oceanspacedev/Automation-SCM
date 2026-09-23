@@ -23,7 +23,7 @@ class CustomerLookupService
         'PT MSI' => [
             'code' => 'PT MSI',
             'name' => 'PT MEDIA SELULER INDONESIA',
-            'address' => 'Gedung Telkom Landmark Tower Lt. 12, Jl. Gatot Subroto Kav. 52, Jakarta Selatan',
+            'address' => 'Jl. Raya Cirebon - Bandung No.109, Kertawinangun, Kec. Kedawung, Kabupaten Cirebon, Jawa Barat 45153',
             'npwp' => '01.555.666.7-011.000',
         ],
     ];
@@ -54,12 +54,12 @@ class CustomerLookupService
         ],
         'PT MSI' => [
             'name' => 'PT MEDIA SELULER INDONESIA',
-            'address' => 'Gedung Telkom Landmark Tower Lt. 12, Jl. Gatot Subroto Kav. 52, Jakarta Selatan',
+            'address' => 'Jl. Raya Cirebon - Bandung No.109, Kertawinangun, Kec. Kedawung, Kabupaten Cirebon, Jawa Barat 45153',
             'npwp' => '01.555.666.7-011.000',
         ],
         'PT MEDIA SELULER INDONESIA' => [
             'name' => 'PT MEDIA SELULER INDONESIA',
-            'address' => 'Gedung Telkom Landmark Tower Lt. 12, Jl. Gatot Subroto Kav. 52, Jakarta Selatan',
+            'address' => 'Jl. Raya Cirebon - Bandung No.109, Kertawinangun, Kec. Kedawung, Kabupaten Cirebon, Jawa Barat 45153',
             'npwp' => '01.555.666.7-011.000',
         ],
         'CV SEGAR INDAH' => [
@@ -69,7 +69,7 @@ class CustomerLookupService
         ],
         'PT MITRA TELEKOMUNIKASI SELULAR' => [
             'name' => 'PT MEDIA SELULER INDONESIA',
-            'address' => 'Gedung Telkom Landmark Tower Lt. 12, Jl. Gatot Subroto Kav. 52, Jakarta Selatan',
+            'address' => 'Jl. Raya Cirebon - Bandung No.109, Kertawinangun, Kec. Kedawung, Kabupaten Cirebon, Jawa Barat 45153',
             'npwp' => '01.555.666.7-011.000',
         ],
         'CV MITRA ABADI' => [
