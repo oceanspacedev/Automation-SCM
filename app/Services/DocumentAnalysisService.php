@@ -140,14 +140,7 @@ class DocumentAnalysisService
         $hasAgr = ! empty($submission->agreement_url) && str_starts_with(trim((string) $submission->agreement_url), 'http');
         $hasFaktur = ! empty($submission->tax_invoice_url) && str_starts_with(trim((string) $submission->tax_invoice_url), 'http');
 
-        if ($hasCn && $hasAgr && $hasFaktur) {
-            return [
-                'is_complete' => true,
-                'cek_dokumen' => 'LENGKAP',
-                'status_potong_purchase' => 'BISA DI POTONG',
-                'keterangan' => 'Semua dokumen (Credit Note, Agreement, dan Faktur Pajak) lengkap dan siap diproses potong.',
-            ];
-        }
+        $isPkp = app(ProgramReconciliationService::class)->isPkpFromSubmission($submission);
 
         $missing = [];
         if (! $hasCn) {
@@ -156,13 +149,25 @@ class DocumentAnalysisService
         if (! $hasAgr) {
             $missing[] = 'AGR';
         }
-        if (! $hasFaktur) {
+        if ($isPkp && ! $hasFaktur) {
             $missing[] = 'FAKTUR';
         }
 
-        if (count($missing) === 3) {
+        if (empty($missing)) {
+            return [
+                'is_complete' => true,
+                'cek_dokumen' => 'LENGKAP',
+                'status_potong_purchase' => 'BISA DI POTONG',
+                'keterangan' => $isPkp
+                    ? 'Semua dokumen (Credit Note, Agreement, dan Faktur Pajak) lengkap dan siap diproses potong.'
+                    : 'Dokumen (Credit Note dan Agreement) lengkap untuk dealer Non PKP dan siap diproses potong.',
+            ];
+        }
+
+        $totalExpected = $isPkp ? 3 : 2;
+        if (count($missing) === $totalExpected) {
             $cek = 'SEMUA DOKUMEN BELUM ADA';
-        } elseif (count($missing) === 2) {
+        } elseif (count($missing) >= 2) {
             $cek = implode(' & ', $missing).' BELUM ADA';
         } else {
             $cek = $missing[0].' BELUM ADA';
@@ -606,6 +611,13 @@ class DocumentAnalysisService
 
         $submission->update($updatePayload);
 
+        // Automatically reconcile with DataProgram (56 kolom) if match is found
+        try {
+            app(ProgramReconciliationService::class)->reconcileFromSubmission($submission->fresh());
+        } catch (\Throwable $e) {
+            Log::warning('Auto-reconciliation after AI analysis failed: '.$e->getMessage());
+        }
+
         return [
             'submission' => $submission->fresh(),
             'cek_dokumen' => $cekDokumen,
@@ -718,21 +730,21 @@ Analisis Finansial & Pajak:
   - "invalid": Dokumen ada diunggah, tetapi isinya salah upload (contoh: foto selfie, nota sembarangan, dokumen dealer lain, dsb).
 
 Ketentuan Penentuan Output:
-1. Jika KETIGA dokumen LENGKAP dan SEMUA VALID (tidak ada yang tertukar/invalid/empty):
-   - "is_complete": true
-   - "cek_dokumen": "LENGKAP"
-   - "status_potong_purchase": "BISA DI POTONG"
-   - "keterangan": "Semua dokumen lengkap dan valid, siap diproses potong."
+1. Ketentuan Khusus Pajak (PKP vs NON PKP):
+   - JIKA STATUS PAJAK ADALAH "PKP" (Badan atau Pribadi PKP, atau ada PPN):
+     * Wajib melampirkan ketiga dokumen: CN, Agreement (AGR), dan Faktur Pajak.
+     * Jika Faktur Pajak tidak ada: "is_complete": false, "status_potong_purchase": "BELUM BISA POTONG", "cek_dokumen": "FAKTUR BELUM ADA".
+     * Jika ketiga dokumen lengkap & valid: "is_complete": true, "status_potong_purchase": "BISA DI POTONG", "cek_dokumen": "LENGKAP".
+
+   - JIKA STATUS PAJAK ADALAH "NON PKP" (Orang Pribadi, Non PKP, PPN = 0):
+     * TIDAK WAJIB FAKTUR PAJAK. Dokumen yang wajib hanya: CN dan Agreement (AGR).
+     * Jika CN dan Agreement (AGR) ada & valid (walaupun Faktur Pajak kosong): "is_complete": true, "status_potong_purchase": "BISA DI POTONG", "cek_dokumen": "LENGKAP".
+     * Jika CN atau AGR belum ada: "is_complete": false, "status_potong_purchase": "BELUM BISA POTONG", "cek_dokumen" mencatat dokumen yang kurang (misal "AGR BELUM ADA", tidak perlu menyebut Faktur).
 
 2. PENTING - JIKA ADA DOKUMEN YANG BELUM DIUNGGAH / KOSONG (URL kosong atau bernilai "-"):
    - Slot tersebut diberi status "empty" (BUKAN "invalid"!).
    - "is_complete": false
-   - "cek_dokumen": Wajib menyebutkan dokumen yang belum ada dalam format berikut:
-     * Jika hanya Faktur belum ada: "FAKTUR BELUM ADA"
-     * Jika Agr dan Faktur belum ada: "AGR & FAKTUR BELUM ADA"
-     * Jika hanya Agr belum ada: "AGR BELUM ADA"
-     * Jika hanya CN belum ada: "CN BELUM ADA"
-     * Jika semua dokumen tidak ada: "SEMUA DOKUMEN BELUM ADA"
+   - "cek_dokumen": Wajib menyebutkan dokumen yang belum ada (contoh: "FAKTUR BELUM ADA", "AGR BELUM ADA", dsb).
    - "status_potong_purchase": "BELUM BISA POTONG"
    - "keterangan": Penjelasan ringkas dokumen mana yang belum diunggah.
 
@@ -784,11 +796,14 @@ PROMPT;
      */
     protected function buildUserPrompt(ProgramSubmission $submission): string
     {
+        $isPkp = app(ProgramReconciliationService::class)->isPkpFromSubmission($submission);
+
         return json_encode([
             'id_real' => $submission->id_real ?: '-',
             'dealer_name' => $submission->dealer_name ?: '-',
             'program_name' => $submission->program_name ?: '-',
             'sales_name' => $submission->sales_name ?: '-',
+            'status_pajak' => $isPkp ? 'PKP (Badan/Pribadi PKP - Wajib Faktur Pajak)' : 'NON PKP (Orang Pribadi - Tidak Wajib Faktur Pajak, Hanya Wajib CN & AGR)',
             'credit_note_url' => $submission->credit_note_url ?: '',
             'agreement_url' => $submission->agreement_url ?: '',
             'tax_invoice_url' => $submission->tax_invoice_url ?: '',

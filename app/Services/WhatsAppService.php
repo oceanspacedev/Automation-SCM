@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\DataProgram;
 use App\Models\Invoice;
 use App\Models\ProgramSubmission;
 use App\Models\WhatsAppLog;
@@ -633,6 +634,291 @@ class WhatsAppService
             '',
             '_(Tautan ini aktif selama 7 hari)_',
             '_Pesan otomatis dari Sistem SCM Invoice & Program Realme_',
+        ];
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Send DataProgram claim notification to Telemarketing with 1-click confirmation link.
+     *
+     * @return array{success: bool, message: string, provider_id: ?string}
+     */
+    public function sendDataProgramClaimNotificationToTelemarketing(DataProgram $dp, ?string $overridePhone = null): array
+    {
+        $phone = $overridePhone ?: (config('services.wag.telemarketing_phone') ?: config('services.wag.ar_phone', '081224290502'));
+        $cleanPhone = $this->formatPhone($phone);
+
+        if (empty($cleanPhone)) {
+            return [
+                'success' => false,
+                'message' => 'Nomor WhatsApp Telemarketing tidak valid atau belum disetel.',
+                'provider_id' => null,
+            ];
+        }
+
+        $apiUrl = rtrim(config('services.wag.url', 'https://waghub.mekayastudio.com'), '/').'/api/v1/messages';
+        $token = config('services.wag.token');
+
+        if (empty($token)) {
+            return [
+                'success' => false,
+                'message' => 'WAG_TOKEN belum dikonfigurasi pada sistem.',
+                'provider_id' => null,
+            ];
+        }
+
+        $baseUrl = $this->resolveBaseUrl();
+        if (! empty($baseUrl)) {
+            URL::forceRootUrl($baseUrl);
+        }
+
+        $confirmUrl = URL::temporarySignedRoute(
+            'data-programs.confirm',
+            now()->addDays(7),
+            ['id' => $dp->id, 'role' => 'telemarketing']
+        );
+
+        $messageText = $this->buildDataProgramClaimTelemarketingMessage($dp, $confirmUrl);
+        $uuid = Str::uuid()->toString();
+
+        $payload = [
+            'idempotency_key' => $uuid,
+            'recipient' => [
+                'type' => 'phone',
+                'value' => $cleanPhone,
+            ],
+            'message' => [
+                'type' => 'text',
+                'text' => $messageText,
+            ],
+            'purpose' => 'transactional',
+            'mode' => 'async',
+            'route_key' => 'default',
+            'client_reference' => "DP-CLAIM-TM-{$dp->id}",
+        ];
+
+        try {
+            $client = Http::withToken($token)
+                ->acceptJson()
+                ->asJson()
+                ->withHeaders([
+                    'Idempotency-Key' => $uuid,
+                ])
+                ->timeout(25)
+                ->retry(2, 500, throw: false);
+
+            if (! config('services.wag.verify_ssl', false)) {
+                $client = $client->withoutVerifying();
+            }
+
+            $response = $client->post($apiUrl, $payload);
+            $data = $response->json();
+            $providerMessageId = $data['data']['provider_message_id'] ?? ($data['data']['id'] ?? null);
+
+            if ($response->successful() && ($response->status() === 200 || $response->status() === 201)) {
+                return [
+                    'success' => true,
+                    'message' => "Notifikasi klaim program {$dp->dealer_name} berhasil dikirim ke WhatsApp Telemarketing ({$cleanPhone}).",
+                    'provider_id' => $providerMessageId,
+                ];
+            }
+
+            $errorMessage = $data['message'] ?? ('HTTP Error '.$response->status());
+            if (! empty($data['errors'])) {
+                $errorMessage .= ' ('.json_encode($data['errors']).')';
+            }
+
+            return [
+                'success' => false,
+                'message' => 'Gagal mengirim pesan WhatsApp ke Telemarketing: '.$errorMessage,
+                'provider_id' => null,
+            ];
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Exception pengiriman WhatsApp ke Telemarketing: '.$e->getMessage(),
+                'provider_id' => null,
+            ];
+        }
+    }
+
+    /**
+     * Send DataProgram claim notification to AR with 1-click confirmation link.
+     *
+     * @return array{success: bool, message: string, provider_id: ?string}
+     */
+    public function sendDataProgramClaimNotificationToAr(DataProgram $dp, ?string $overridePhone = null): array
+    {
+        $phone = $overridePhone ?: config('services.wag.ar_phone', '081224290502');
+        $cleanPhone = $this->formatPhone($phone);
+
+        if (empty($cleanPhone)) {
+            return [
+                'success' => false,
+                'message' => 'Nomor WhatsApp AR tidak valid atau belum disetel.',
+                'provider_id' => null,
+            ];
+        }
+
+        $apiUrl = rtrim(config('services.wag.url', 'https://waghub.mekayastudio.com'), '/').'/api/v1/messages';
+        $token = config('services.wag.token');
+
+        if (empty($token)) {
+            return [
+                'success' => false,
+                'message' => 'WAG_TOKEN belum dikonfigurasi pada sistem.',
+                'provider_id' => null,
+            ];
+        }
+
+        $baseUrl = $this->resolveBaseUrl();
+        if (! empty($baseUrl)) {
+            URL::forceRootUrl($baseUrl);
+        }
+
+        $confirmUrl = URL::temporarySignedRoute(
+            'data-programs.confirm',
+            now()->addDays(7),
+            ['id' => $dp->id, 'role' => 'ar']
+        );
+
+        $messageText = $this->buildDataProgramClaimArMessage($dp, $confirmUrl);
+        $uuid = Str::uuid()->toString();
+
+        $payload = [
+            'idempotency_key' => $uuid,
+            'recipient' => [
+                'type' => 'phone',
+                'value' => $cleanPhone,
+            ],
+            'message' => [
+                'type' => 'text',
+                'text' => $messageText,
+            ],
+            'purpose' => 'transactional',
+            'mode' => 'async',
+            'route_key' => 'default',
+            'client_reference' => "DP-CLAIM-AR-{$dp->id}",
+        ];
+
+        try {
+            $client = Http::withToken($token)
+                ->acceptJson()
+                ->asJson()
+                ->withHeaders([
+                    'Idempotency-Key' => $uuid,
+                ])
+                ->timeout(25)
+                ->retry(2, 500, throw: false);
+
+            if (! config('services.wag.verify_ssl', false)) {
+                $client = $client->withoutVerifying();
+            }
+
+            $response = $client->post($apiUrl, $payload);
+            $data = $response->json();
+            $providerMessageId = $data['data']['provider_message_id'] ?? ($data['data']['id'] ?? null);
+
+            if ($response->successful() && ($response->status() === 200 || $response->status() === 201)) {
+                return [
+                    'success' => true,
+                    'message' => "Notifikasi klaim program {$dp->dealer_name} berhasil dikirim ke WhatsApp AR ({$cleanPhone}).",
+                    'provider_id' => $providerMessageId,
+                ];
+            }
+
+            $errorMessage = $data['message'] ?? ('HTTP Error '.$response->status());
+            if (! empty($data['errors'])) {
+                $errorMessage .= ' ('.json_encode($data['errors']).')';
+            }
+
+            return [
+                'success' => false,
+                'message' => 'Gagal mengirim pesan WhatsApp ke AR: '.$errorMessage,
+                'provider_id' => null,
+            ];
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Exception pengiriman WhatsApp ke AR: '.$e->getMessage(),
+                'provider_id' => null,
+            ];
+        }
+    }
+
+    /**
+     * Build formatted Indonesian WhatsApp message for Telemarketing DataProgram claim offer.
+     */
+    public function buildDataProgramClaimTelemarketingMessage(DataProgram $dp, string $confirmUrl): string
+    {
+        $dealerName = $dp->dealer_name ?: '-';
+        $kodeBt = $dp->kode_bt ?: '-';
+        $programName = $dp->program_name ?: ($dp->program ?: '-');
+        $region = $dp->region ?: ($dp->big_region ?: '-');
+        $salesName = $dp->sales_person ?: '-';
+        $cekDokumen = $dp->cek_dokumen ?: 'LENGKAP';
+        $netPayFormatted = 'Rp '.number_format((float) ($dp->net_pay ?? 0), 0, ',', '.');
+
+        $lines = [
+            '*PEMBERITAHUAN KLAIM BISA DIPOTONG (DATA PROGRAM)*',
+            '',
+            'Halo Tim Telemarketing / Sales, dokumen klaim program berikut telah LENGKAP dan SIAP DITAWARKAN POTONG ke dealer saat order:',
+            '',
+            "*Kode BT / ID Real:* {$kodeBt}",
+            "*Dealer:* {$dealerName}",
+            "*Region:* {$region}",
+            "*Program:* {$programName}",
+            "*Sales:* {$salesName}",
+            "*Nominal Potongan (Net Pay):* {$netPayFormatted}",
+            "*Status Dokumen:* {$cekDokumen}",
+            '*Status Purchase:* BISA DI POTONG',
+            '',
+            'Silakan hubungi dealer dan tawarkan potongan saldo insentif ini pada invoice order mereka.',
+            'Buka tautan di bawah ini untuk mengonfirmasi kesediaan dealer (Iya / Tidak):',
+            '',
+            '👉 *[ KLIK: KONFIRMASI KEPUTUSAN DEALER ]*',
+            $confirmUrl,
+            '',
+            '_(Tautan ini aktif selama 7 hari)_',
+            '_Pesan otomatis dari Sistem SCM Automation Realme_',
+        ];
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Build formatted Indonesian WhatsApp message for AR DataProgram claim confirmation.
+     */
+    public function buildDataProgramClaimArMessage(DataProgram $dp, string $confirmUrl): string
+    {
+        $dealerName = $dp->dealer_name ?: '-';
+        $kodeBt = $dp->kode_bt ?: '-';
+        $programName = $dp->program_name ?: ($dp->program ?: '-');
+        $region = $dp->region ?: ($dp->big_region ?: '-');
+        $salesName = $dp->sales_person ?: '-';
+        $netPayFormatted = 'Rp '.number_format((float) ($dp->net_pay ?? 0), 0, ',', '.');
+
+        $lines = [
+            '*PEMBERITAHUAN POTONG KLAIM (TIM AR)*',
+            '',
+            'Halo Tim AR, dealer telah MENYETUJUI pemotongan saldo insentif program berikut pada invoice order mereka:',
+            '',
+            "*Kode BT / ID Real:* {$kodeBt}",
+            "*Dealer:* {$dealerName}",
+            "*Region:* {$region}",
+            "*Program:* {$programName}",
+            "*Sales:* {$salesName}",
+            "*Nominal Potongan (Net Pay):* {$netPayFormatted}",
+            '*Status Telemarketing:* DEALER SETUJU (PROSES AR)',
+            '',
+            'Mohon diproses pemotongan pada tagihan dealer. Jika sudah selesai dipotong, silakan klik tautan di bawah ini:',
+            '',
+            '👉 *[ KLIK: KONFIRMASI PEMOTONGAN AR ]*',
+            $confirmUrl,
+            '',
+            '_(Tautan ini aktif selama 7 hari)_',
+            '_Pesan otomatis dari Sistem SCM Automation Realme_',
         ];
 
         return implode("\n", $lines);

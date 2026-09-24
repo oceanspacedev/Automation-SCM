@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\DataProgramController;
 use App\Http\Controllers\DraftController;
 use App\Http\Controllers\DraftImportController;
 use App\Http\Controllers\GoogleAuthController;
@@ -19,6 +20,7 @@ Route::get('/invoices/{id}/pdf', [InvoiceController::class, 'downloadPdf'])->nam
 
 // Program Claim Confirmation Action Link (Landing Page on GET, Form Submit on POST)
 Route::match(['get', 'post'], '/p/confirm/{id}', [ProgramClaimConfirmationController::class, 'confirm'])->name('program-submissions.confirm');
+Route::match(['get', 'post'], '/dp/confirm/{id}', [ProgramClaimConfirmationController::class, 'confirmDataProgram'])->name('data-programs.confirm');
 
 // API Endpoints
 Route::prefix('api')->group(function () {
@@ -72,9 +74,22 @@ Route::prefix('api')->group(function () {
     Route::post('/program-submissions/{id}/send-wa-ar', [ProgramSubmissionController::class, 'sendWaToAr']);
     Route::post('/program-submissions/{id}/send-wa-telemarketing', [ProgramSubmissionController::class, 'sendWaToTelemarketing']);
     Route::post('/webhooks/form-program', [ProgramSubmissionController::class, 'webhook']);
+
+    // Data Program (56 Kolom Google Spreadsheet)
+    Route::get('/data-program', [DataProgramController::class, 'index']);
+    Route::post('/data-program/sync', [DataProgramController::class, 'sync']);
+    Route::get('/data-program/url', [DataProgramController::class, 'getUrl']);
+    Route::get('/data-program/export', [DataProgramController::class, 'export']);
+    Route::post('/data-program/reconcile', [DataProgramController::class, 'reconcile']);
+    Route::post('/data-program/{id}/reconcile', [DataProgramController::class, 'reconcileRow']);
+    Route::post('/data-program/{id}/send-wa-telemarketing', [DataProgramController::class, 'sendWaToTelemarketing']);
+    Route::post('/data-program/{id}/send-wa-ar', [DataProgramController::class, 'sendWaToAr']);
+    Route::get('/data-program/reconcile-stats', [DataProgramController::class, 'reconcileStats']);
+    Route::put('/data-program/{id}', [DataProgramController::class, 'update']);
+    Route::post('/webhooks/data-program', [DataProgramController::class, 'webhook']);
 });
 
 // SPA catch-all
 Route::get('/{any?}', function () {
     return view('app');
-})->where('any', '^(?!api|auth|p\/confirm|invoices\/[0-9]+\/(preview|pdf)|storage).*$');
+})->where('any', '^(?!api|auth|p\/confirm|dp\/confirm|invoices\/[0-9]+\/(preview|pdf)|storage).*$');

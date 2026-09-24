@@ -94,6 +94,21 @@
                     </router-link>
                   </NavigationMenuLink>
                 </NavigationMenuItem>
+
+                <!-- 6. Data Program -->
+                <NavigationMenuItem>
+                  <NavigationMenuLink as-child>
+                    <router-link
+                      to="/data-program"
+                      :class="[
+                        navigationMenuTriggerStyle(),
+                        isActive('/data-program') && 'bg-gray-100 text-gray-900 font-semibold'
+                      ]"
+                    >
+                      Data Program
+                    </router-link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
               </NavigationMenuList>
             </NavigationMenu>
           </div>

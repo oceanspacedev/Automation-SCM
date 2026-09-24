@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'api/*',
             'p/confirm/*',
+            'dp/confirm/*',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
