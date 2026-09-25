@@ -29,6 +29,39 @@ class DataProgramSyncService
         return self::DEFAULT_SPREADSHEET_URL;
     }
 
+    public const CACHE_KEY_WEBAPP_URL = 'data_program_webapp_url';
+
+    /**
+     * Get configured Google Apps Script Web App URL for pushing updates.
+     */
+    public function getWebAppUrl(): string
+    {
+        $url = (string) Cache::get(self::CACHE_KEY_WEBAPP_URL, env('DATA_PROGRAM_WEBAPP_URL', ''));
+        if (! empty($url) && str_contains($url, 'script.google.com/macros/s/')) {
+            return $url;
+        }
+
+        $sheetUrl = (string) Cache::get(self::CACHE_KEY_SPREADSHEET_URL, env('DATA_PROGRAM_SPREADSHEET_URL', ''));
+        if (! empty($sheetUrl) && str_contains($sheetUrl, 'script.google.com/macros/s/')) {
+            return $sheetUrl;
+        }
+
+        $formWebappUrl = (string) Cache::get(ProgramSubmissionService::CACHE_KEY_WEBAPP_URL, env('GOOGLE_SHEET_WEBAPP_URL', ''));
+        if (! empty($formWebappUrl) && str_contains($formWebappUrl, 'script.google.com/macros/s/')) {
+            return $formWebappUrl;
+        }
+
+        return ProgramSubmissionService::DEFAULT_WEBAPP_URL;
+    }
+
+    /**
+     * Set configured Google Apps Script Web App URL.
+     */
+    public function setWebAppUrl(string $url): void
+    {
+        Cache::forever(self::CACHE_KEY_WEBAPP_URL, trim($url));
+    }
+
     /**
      * Set configured Google Sheet CSV URL.
      */
@@ -175,7 +208,7 @@ class DataProgramSyncService
      */
     public function pushUpdatesToSpreadsheet(array $rowsToUpdate, ?string $customUrl = null): array
     {
-        $url = trim((string) ($customUrl ?: $this->getSpreadsheetUrl()));
+        $url = trim((string) ($customUrl ?: $this->getWebAppUrl()));
 
         if (empty($url) || ! str_contains($url, 'script.google.com/macros/s/')) {
             return [

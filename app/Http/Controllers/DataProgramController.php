@@ -173,7 +173,11 @@ class DataProgramController extends Controller
             $limit = max(0, (int) $request->input('limit', 0));
 
             if ($customUrl) {
-                $this->syncService->setSpreadsheetUrl($customUrl);
+                if (str_contains($customUrl, 'script.google.com/macros/s/')) {
+                    $this->syncService->setWebAppUrl($customUrl);
+                } else {
+                    $this->syncService->setSpreadsheetUrl($customUrl);
+                }
             }
 
             $result = $this->syncService->sync($customUrl, $limit);
@@ -198,6 +202,7 @@ class DataProgramController extends Controller
     {
         return response()->json([
             'url' => $this->syncService->getSpreadsheetUrl(),
+            'webapp_url' => $this->syncService->getWebAppUrl(),
         ]);
     }
 
