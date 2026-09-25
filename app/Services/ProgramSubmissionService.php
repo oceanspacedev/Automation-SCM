@@ -6,6 +6,7 @@ use App\Models\ProgramSubmission;
 use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ProgramSubmissionService
 {
@@ -225,7 +226,7 @@ class ProgramSubmissionService
         $hashString = "{$timestamp}|{$region}|{$idReal}|{$dealerName}|{$programName}";
         $rowHash = sha1($hashString);
 
-        return ProgramSubmission::updateOrCreate(
+        $submission = ProgramSubmission::updateOrCreate(
             ['row_hash' => $rowHash],
             [
                 'submission_timestamp' => $timestamp ?: date('d/m/Y H:i:s'),
@@ -240,6 +241,15 @@ class ProgramSubmissionService
                 'raw_data' => $payload,
             ]
         );
+
+        // Otomatis cocokkan dengan Data Program & kirim ke Google Spreadsheet realtime
+        try {
+            app(ProgramReconciliationService::class)->reconcileFromSubmission($submission);
+        } catch (\Throwable $e) {
+            Log::warning('Auto-reconcile submission to DataProgram failed: '.$e->getMessage());
+        }
+
+        return $submission;
     }
 
     protected function findHeaderIndex(array $headers, array $candidates): ?int

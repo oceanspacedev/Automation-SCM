@@ -31,6 +31,8 @@ class DataProgramSyncService
 
     public const CACHE_KEY_WEBAPP_URL = 'data_program_webapp_url';
 
+    public const DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzXBZOrWjaxN2F_JYslnurQB3FMgbZNysW3ZhXZRqyQMcmUTIIYWghFln43o6iU7YhW/exec';
+
     /**
      * Get configured Google Apps Script Web App URL for pushing updates.
      */
@@ -46,12 +48,7 @@ class DataProgramSyncService
             return $sheetUrl;
         }
 
-        $formWebappUrl = (string) Cache::get(ProgramSubmissionService::CACHE_KEY_WEBAPP_URL, env('GOOGLE_SHEET_WEBAPP_URL', ''));
-        if (! empty($formWebappUrl) && str_contains($formWebappUrl, 'script.google.com/macros/s/')) {
-            return $formWebappUrl;
-        }
-
-        return ProgramSubmissionService::DEFAULT_WEBAPP_URL;
+        return self::DEFAULT_WEBAPP_URL;
     }
 
     /**
@@ -527,6 +524,49 @@ class DataProgramSyncService
 
         foreach (array_chunk($batch, 300) as $chunk) {
             $this->upsertBatch($chunk);
+        }
+
+        // Otomatis rekonsiliasi data baru/edit dengan Form Program & kirim balik ke Spreadsheet secara realtime
+        $rowsToPush = [];
+        try {
+            $reconciliationService = app(ProgramReconciliationService::class);
+            foreach ($batch as $item) {
+                $dp = DataProgram::where('row_hash', $item['row_hash'])->first();
+                if (! $dp) {
+                    continue;
+                }
+
+                $res = $reconciliationService->reconcileSingle($dp, null, false);
+                if ($res['success']) {
+                    $dp->refresh();
+                    $rowIndex = (int) str_replace('row_', '', (string) $dp->row_hash);
+                    $rowsToPush[] = [
+                        'row_index' => $rowIndex > 0 ? $rowIndex : null,
+                        'kode_bt' => $dp->kode_bt,
+                        'dealer_name' => $dp->dealer_name,
+                        'program' => $dp->program,
+                        'program_name' => $dp->program_name,
+                        'periode' => $dp->periode,
+                        'status_potong_purchase' => $dp->status_potong_purchase,
+                        'status_potong_ar' => $dp->status_potong_ar,
+                        'tgl_potong_tf' => $dp->tgl_potong_tf,
+                        'cek_dokumen' => $dp->cek_dokumen,
+                        'keterangan' => $dp->keterangan,
+                        'cn' => $dp->cn,
+                        'agrement' => $dp->agrement,
+                        'cek_fp' => $dp->cek_fp,
+                        'no_faktur_pajak' => $dp->no_faktur_pajak,
+                        'ket_faktur_pajak' => $dp->ket_faktur_pajak,
+                        'noted' => $dp->noted,
+                    ];
+                }
+            }
+
+            if (! empty($rowsToPush)) {
+                $this->pushUpdatesToSpreadsheet($rowsToPush);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Auto-reconcile on webhook failed: '.$e->getMessage());
         }
 
         return [
