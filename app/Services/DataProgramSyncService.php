@@ -253,11 +253,21 @@ class DataProgramSyncService
         $tmpFile = tempnam(sys_get_temp_dir(), 'dp_csv_');
         $fp = fopen($tmpFile, 'w+');
 
-        $ch = curl_init($url);
+        // Tambahkan query parameter cache-buster agar CDN Google tidak menyajikan cache CSV usang
+        $fetchUrl = $url;
+        $separator = str_contains($fetchUrl, '?') ? '&' : '?';
+        $fetchUrl .= "{$separator}_t=".time();
+
+        $ch = curl_init($fetchUrl);
         curl_setopt($ch, CURLOPT_FILE, $fp);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_TIMEOUT, 90);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Cache-Control: no-cache, no-store, must-revalidate',
+            'Pragma: no-cache',
+            'Expires: 0',
+        ]);
         curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
         $success = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -288,6 +298,7 @@ class DataProgramSyncService
         $totalProcessed = 0;
         $rowIdx = 1; // 1 was header
 
+        $syncTimestamp = now()->subSecond()->toDateTimeString();
         $now = now()->toDateTimeString();
 
         try {
@@ -316,6 +327,11 @@ class DataProgramSyncService
 
             if (! empty($batch)) {
                 $this->upsertBatch($batch);
+            }
+
+            // Hapus data di database yang barisnya sudah dihapus dari Spreadsheet (termasuk duplikat hash lama)
+            if ($limit === 0 && $totalProcessed > 0) {
+                DataProgram::where('updated_at', '<', $syncTimestamp)->delete();
             }
 
             DB::commit();
@@ -358,7 +374,8 @@ class DataProgramSyncService
             return null;
         }
 
-        $rowHash = sha1("row_{$rowIdx}|{$kodeBt}|{$dealerName}|{$program}|{$programName}");
+        // Identifier konsisten berdasarkan nomor baris spreadsheet agar saat data diubah tidak membuat baris duplikat baru
+        $rowHash = sprintf('row_%d', $rowIdx);
         $now = $now ?? now()->toDateTimeString();
 
         return [
