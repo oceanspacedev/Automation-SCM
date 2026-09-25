@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Console\Commands\AutoAnalyzeProgramAiCommand;
+use App\Models\DataProgram;
 use App\Models\ProgramSubmission;
+use App\Services\DataProgramSyncService;
 use App\Services\DocumentAnalysisService;
 use App\Services\ProgramSubmissionService;
 use App\Services\WhatsAppService;
@@ -338,6 +340,55 @@ class ProgramSubmissionController extends Controller
         }
 
         $submission->update($validated);
+
+        if (! empty($submission->id_real)) {
+            $matchingDp = DataProgram::where('kode_bt', $submission->id_real)->first();
+            if ($matchingDp) {
+                $dpUpdates = [];
+                if (isset($validated['status_potong_purchase'])) {
+                    $dpUpdates['status_potong_purchase'] = $validated['status_potong_purchase'];
+                }
+                if (isset($validated['status_potong_ar'])) {
+                    $dpUpdates['status_potong_ar'] = $validated['status_potong_ar'];
+                    if ($validated['status_potong_ar'] === 'DONE' && empty($dpUpdates['status_potong_purchase'])) {
+                        $dpUpdates['status_potong_purchase'] = 'SUDAH POTONG';
+                    }
+                }
+                if (isset($validated['tgl_potong_tf'])) {
+                    $dpUpdates['tgl_potong_tf'] = $validated['tgl_potong_tf'];
+                }
+                if (isset($validated['cek_dokumen'])) {
+                    $dpUpdates['cek_dokumen'] = $validated['cek_dokumen'];
+                }
+                if (! empty($dpUpdates)) {
+                    $matchingDp->update($dpUpdates);
+                    try {
+                        $rowIndex = (int) str_replace('row_', '', (string) $matchingDp->row_hash);
+                        app(DataProgramSyncService::class)->pushUpdatesToSpreadsheet([[
+                            'row_index' => $rowIndex > 0 ? $rowIndex : null,
+                            'kode_bt' => $matchingDp->kode_bt,
+                            'dealer_name' => $matchingDp->dealer_name,
+                            'program' => $matchingDp->program,
+                            'program_name' => $matchingDp->program_name,
+                            'periode' => $matchingDp->periode,
+                            'status_potong_purchase' => $matchingDp->status_potong_purchase,
+                            'status_potong_ar' => $matchingDp->status_potong_ar,
+                            'tgl_potong_tf' => $matchingDp->tgl_potong_tf,
+                            'cek_dokumen' => $matchingDp->cek_dokumen,
+                            'keterangan' => $matchingDp->keterangan,
+                            'cn' => $matchingDp->cn,
+                            'agrement' => $matchingDp->agrement,
+                            'cek_fp' => $matchingDp->cek_fp,
+                            'no_faktur_pajak' => $matchingDp->no_faktur_pajak,
+                            'ket_faktur_pajak' => $matchingDp->ket_faktur_pajak,
+                            'noted' => $matchingDp->noted,
+                        ]]);
+                    } catch (\Throwable $e) {
+                        Log::warning("Gagal push matching DP saat update submission: {$e->getMessage()}");
+                    }
+                }
+            }
+        }
 
         return response()->json([
             'success' => true,

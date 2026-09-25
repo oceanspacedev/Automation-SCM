@@ -363,13 +363,17 @@ class DataProgramController extends Controller
             $sheetPushResult = null;
             if ($result['success'] && $pushToSheet) {
                 try {
+                    $rowIndex = (int) str_replace('row_', '', (string) $dp->row_hash);
                     $sheetPushResult = $this->syncService->pushUpdatesToSpreadsheet([[
+                        'row_index' => $rowIndex > 0 ? $rowIndex : null,
                         'kode_bt' => $dp->kode_bt,
                         'dealer_name' => $dp->dealer_name,
                         'program' => $dp->program,
                         'program_name' => $dp->program_name,
                         'periode' => $dp->periode,
                         'status_potong_purchase' => $dp->status_potong_purchase,
+                        'status_potong_ar' => $dp->status_potong_ar,
+                        'tgl_potong_tf' => $dp->tgl_potong_tf,
                         'cek_dokumen' => $dp->cek_dokumen,
                         'keterangan' => $dp->keterangan,
                         'cn' => $dp->cn,
@@ -490,13 +494,17 @@ class DataProgramController extends Controller
         $sheetPushResult = null;
         if ($pushToSheet) {
             try {
+                $rowIndex = (int) str_replace('row_', '', (string) $dp->row_hash);
                 $sheetPushResult = $this->syncService->pushUpdatesToSpreadsheet([[
+                    'row_index' => $rowIndex > 0 ? $rowIndex : null,
                     'kode_bt' => $dp->kode_bt,
                     'dealer_name' => $dp->dealer_name,
                     'program' => $dp->program,
                     'program_name' => $dp->program_name,
                     'periode' => $dp->periode,
                     'status_potong_purchase' => $dp->status_potong_purchase,
+                    'status_potong_ar' => $dp->status_potong_ar,
+                    'tgl_potong_tf' => $dp->tgl_potong_tf,
                     'cek_dokumen' => $dp->cek_dokumen,
                     'keterangan' => $dp->keterangan,
                     'cn' => $dp->cn,

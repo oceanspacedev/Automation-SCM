@@ -62,9 +62,7 @@ class ProgramClaimConfirmationController extends Controller
                 }
 
                 // Cari dan sinkronkan DataProgram yang cocok jika ada
-                $matchingDp = DataProgram::where('kode_bt', $submission->id_real)
-                    ->where('status_potong_purchase', 'BISA DI POTONG')
-                    ->first();
+                $matchingDp = DataProgram::where('kode_bt', $submission->id_real)->first();
                 if ($matchingDp) {
                     $matchingDp->update(['status_potong_ar' => 'DEALER SETUJU (PROSES AR)']);
                     $this->pushDpToSpreadsheet($matchingDp);
@@ -77,15 +75,23 @@ class ProgramClaimConfirmationController extends Controller
                     'tgl_potong_tf' => $todayDate,
                 ]);
 
-                $matchingDp = DataProgram::where('kode_bt', $submission->id_real)
-                    ->whereIn('status_potong_purchase', ['BISA DI POTONG', 'SUDAH POTONG'])
-                    ->first();
+                $matchingDp = DataProgram::where('kode_bt', $submission->id_real)->first();
                 if ($matchingDp) {
-                    $matchingDp->update([
+                    $updateData = [
                         'status_potong_purchase' => 'SUDAH POTONG',
                         'status_potong_ar' => 'DONE',
                         'tgl_potong_tf' => $todayDate,
-                    ]);
+                    ];
+                    if (empty($matchingDp->cn) && ! empty($submission->credit_note_file)) {
+                        $updateData['cn'] = $submission->credit_note_file;
+                    }
+                    if (empty($matchingDp->agrement) && ! empty($submission->agreement_file)) {
+                        $updateData['agrement'] = $submission->agreement_file;
+                    }
+                    if (empty($matchingDp->cek_fp) && ! empty($submission->tax_invoice_file)) {
+                        $updateData['cek_fp'] = $submission->tax_invoice_file;
+                    }
+                    $matchingDp->update($updateData);
                     $this->pushDpToSpreadsheet($matchingDp);
                 }
             } elseif ($action === 'tunda') {
@@ -93,9 +99,7 @@ class ProgramClaimConfirmationController extends Controller
                     'status_potong_ar' => 'PENDING DEALER',
                 ]);
 
-                $matchingDp = DataProgram::where('kode_bt', $submission->id_real)
-                    ->where('status_potong_purchase', 'BISA DI POTONG')
-                    ->first();
+                $matchingDp = DataProgram::where('kode_bt', $submission->id_real)->first();
                 if ($matchingDp) {
                     $matchingDp->update(['status_potong_ar' => 'PENDING DEALER']);
                     $this->pushDpToSpreadsheet($matchingDp);
@@ -203,7 +207,9 @@ class ProgramClaimConfirmationController extends Controller
     protected function pushDpToSpreadsheet(DataProgram $dp): void
     {
         try {
+            $rowIndex = (int) str_replace('row_', '', (string) $dp->row_hash);
             $this->dpSyncService->pushUpdatesToSpreadsheet([[
+                'row_index' => $rowIndex > 0 ? $rowIndex : null,
                 'kode_bt' => $dp->kode_bt,
                 'dealer_name' => $dp->dealer_name,
                 'program' => $dp->program,
@@ -212,6 +218,14 @@ class ProgramClaimConfirmationController extends Controller
                 'status_potong_purchase' => $dp->status_potong_purchase,
                 'status_potong_ar' => $dp->status_potong_ar,
                 'tgl_potong_tf' => $dp->tgl_potong_tf,
+                'cek_dokumen' => $dp->cek_dokumen,
+                'keterangan' => $dp->keterangan,
+                'cn' => $dp->cn,
+                'agrement' => $dp->agrement,
+                'cek_fp' => $dp->cek_fp,
+                'no_faktur_pajak' => $dp->no_faktur_pajak,
+                'ket_faktur_pajak' => $dp->ket_faktur_pajak,
+                'noted' => $dp->noted,
             ]]);
         } catch (\Throwable $e) {
             Log::warning("Gagal push status potong ke spreadsheet untuk DP ID {$dp->id}: {$e->getMessage()}");

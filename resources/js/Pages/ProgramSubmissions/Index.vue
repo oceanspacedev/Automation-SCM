@@ -264,32 +264,8 @@
           </div>
         </div>
 
-        <!-- Filter Status Purchase -->
-        <select
-          v-model="filters.status_purchase"
-          @change="fetchSubmissions(1)"
-          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-        >
-          <option value="">Semua Status Purchase</option>
-          <option v-for="opt in statusPurchaseOptions" :key="opt" :value="opt">
-            {{ opt }}
-          </option>
-        </select>
-
-        <!-- Filter Keterangan -->
-        <select
-          v-model="filters.keterangan"
-          @change="fetchSubmissions(1)"
-          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-        >
-          <option value="">Semua Keterangan</option>
-          <option v-for="opt in keteranganOptions" :key="opt" :value="opt">
-            {{ opt }}
-          </option>
-        </select>
-
         <button
-          v-if="filters.search || filters.region || filters.program || filters.status_purchase || filters.keterangan"
+          v-if="filters.search || filters.region || filters.program"
           type="button"
           @click="resetFilters"
           class="h-9 px-2.5 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-md transition cursor-pointer"
@@ -345,23 +321,12 @@
               <TableHead class="min-w-[140px] font-medium text-gray-500">No Faktur</TableHead>
               <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl Faktur</TableHead>
 
-              <!-- Kolom Tracking Manual & Status Potong -->
-              <TableHead class="whitespace-nowrap font-medium text-gray-500">No PO/SJ</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500">No Transaksi</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl Input</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl Share CN</TableHead>
-              <TableHead class="w-[80px] text-center font-medium text-gray-500">Pending</TableHead>
-              <TableHead class="min-w-[150px] font-medium text-gray-500">Keterangan</TableHead>
-              <TableHead class="min-w-[150px] font-medium text-gray-500">Cek Dokumen</TableHead>
-              <TableHead class="min-w-[190px] font-medium text-gray-500">Status Potong Purchase</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500">Status AR</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl Potong/TF</TableHead>
               <TableHead class="w-[90px] text-center font-medium text-gray-500 sticky right-0 bg-white border-b border-gray-200">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <!-- Loading State -->
-            <TableEmpty v-if="loading && submissions.length === 0" :colspan="32">
+            <TableEmpty v-if="loading && submissions.length === 0" :colspan="22">
               <div class="inline-flex items-center gap-2 text-gray-500 py-8">
                 <RefreshCwIcon class="w-4 h-4 animate-spin text-gray-400" />
                 <span>Memuat data form program...</span>
@@ -369,7 +334,7 @@
             </TableEmpty>
 
             <!-- Empty State -->
-            <TableEmpty v-else-if="submissions.length === 0" :colspan="32">
+            <TableEmpty v-else-if="submissions.length === 0" :colspan="22">
               <div class="max-w-md mx-auto py-8 space-y-1.5 text-center text-gray-500">
                 <p class="font-medium text-gray-800">Belum ada data form program yang tersimpan.</p>
                 <p class="text-xs text-gray-500">
@@ -623,117 +588,7 @@
                 {{ row.tgl_faktur || '-' }}
               </TableCell>
 
-              <!-- Kolom: No PO/SJ -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
-                {{ row.no_po_sj || '-' }}
-              </TableCell>
-
-              <!-- Kolom: No Transaksi -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
-                {{ row.no_transaksi || '-' }}
-              </TableCell>
-
-              <!-- Kolom: Tgl Input -->
-              <TableCell class="whitespace-nowrap text-gray-700 py-2.5">
-                {{ row.tgl_input || '-' }}
-              </TableCell>
-
-              <!-- Kolom: Tgl Share CN -->
-              <TableCell class="whitespace-nowrap text-gray-700 py-2.5">
-                {{ row.tgl_share_cn || '-' }}
-              </TableCell>
-
-              <!-- Kolom: Lama Pending -->
-              <TableCell class="text-center text-gray-700 py-2.5 whitespace-nowrap">
-                <span v-if="row.lama_pending" class="px-1.5 py-0.5 rounded bg-white border border-gray-200 text-xs text-gray-700">
-                  {{ row.lama_pending }}
-                </span>
-                <span v-else class="text-gray-300">-</span>
-              </TableCell>
-
-              <!-- Kolom: Keterangan (Dropdown Polos Putih) -->
-              <TableCell class="py-2.5 whitespace-nowrap">
-                <select
-                  :value="row.keterangan || ''"
-                  @change="quickUpdateKeterangan(row, $event.target.value)"
-                  class="h-7 px-2 rounded-md text-xs bg-white text-gray-800 border border-gray-200 hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer font-normal"
-                >
-                  <option value="">- Pilih Keterangan -</option>
-                  <option v-for="opt in keteranganOptions" :key="opt" :value="opt">
-                    {{ opt }}
-                  </option>
-                </select>
-              </TableCell>
-
-              <!-- Kolom: Cek Dokumen -->
-              <TableCell class="text-gray-700 py-2.5 leading-snug">
-                <div
-                  :class="[
-                    'line-clamp-2 max-w-[160px] text-xs px-1.5 py-0.5 rounded inline-block',
-                    row.cek_dokumen === 'LENGKAP'
-                      ? 'bg-teal-50 text-teal-700 border border-teal-200'
-                      : row.cek_dokumen
-                      ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                      : 'text-gray-400'
-                  ]"
-                  :title="row.cek_dokumen"
-                >
-                  {{ row.cek_dokumen || '-' }}
-                </div>
-              </TableCell>
-
-              <!-- Kolom: Status Potong by Purchase (Dropdown Cepat Langsung di Baris) -->
-              <TableCell class="py-2.5 whitespace-nowrap">
-                <select
-                  :value="row.status_potong_purchase || ''"
-                  @change="quickUpdateStatus(row, $event.target.value)"
-                  :class="[
-                    'h-7 px-2 rounded-md text-xs font-normal border focus:outline-none focus:ring-1 focus:ring-black cursor-pointer transition',
-                    row.status_potong_purchase === 'BISA DI POTONG'
-                      ? 'bg-teal-50 text-teal-700 border-teal-300'
-                      : row.status_potong_purchase === 'SUDAH POTONG'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
-                      : row.status_potong_purchase === 'DONE TRANSFER'
-                      ? 'bg-blue-50 text-blue-700 border-blue-300'
-                      : row.status_potong_purchase === 'BELUM BISA POTONG'
-                      ? 'bg-rose-50 text-rose-700 border-rose-300'
-                      : 'bg-gray-50 text-gray-500 border-gray-200'
-                  ]"
-                >
-                  <option value="">- Pilih Status -</option>
-                  <option value="BELUM BISA POTONG">BELUM BISA POTONG</option>
-                  <option value="BISA DI POTONG">BISA DI POTONG</option>
-                  <option value="SUDAH POTONG">SUDAH POTONG</option>
-                  <option value="DONE TRANSFER">DONE TRANSFER</option>
-                </select>
-              </TableCell>
-
-              <!-- Kolom: Status Potong by AR -->
-              <TableCell class="whitespace-nowrap text-gray-700 py-2.5">
-                <span
-                  v-if="row.status_potong_ar"
-                  :class="[
-                    'px-2 py-0.5 rounded text-xs font-medium border inline-block',
-                    row.status_potong_ar.includes('DEALER SETUJU')
-                      ? 'bg-blue-50 text-blue-700 border-blue-200'
-                      : row.status_potong_ar === 'DONE'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : row.status_potong_ar.includes('PENDING')
-                      ? 'bg-amber-50 text-amber-700 border-amber-200'
-                      : 'bg-white border-gray-200 text-gray-700'
-                  ]"
-                >
-                  {{ row.status_potong_ar }}
-                </span>
-                <span v-else class="text-gray-300">-</span>
-              </TableCell>
-
-              <!-- Kolom: Tgl Potong/TF -->
-              <TableCell class="whitespace-nowrap text-gray-700 py-2.5">
-                {{ row.tgl_potong_tf || '-' }}
-              </TableCell>
-
-              <!-- Aksi: Tombol AI Baris, WA AR, & Edit Row Modal -->
+              <!-- Aksi: Tombol AI Baris, WA AR, & Lihat Detail / Edit Row Modal -->
               <TableCell class="text-center py-2.5 whitespace-nowrap sticky right-0 bg-white">
                 <div class="inline-flex items-center justify-center gap-1.5">
                   <!-- Tombol Analisis AI Khusus Baris Ini -->
@@ -760,13 +615,14 @@
                     <SendIcon v-else class="w-3.5 h-3.5" />
                   </button>
 
+                  <!-- Icon Lihat: Lihat Detail Data Tracking & Status Potong -->
                   <button
                     type="button"
                     @click="openEditModal(row)"
                     class="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition shadow-2xs cursor-pointer"
-                    title="Edit Data Tracking & Status Potong"
+                    title="Lihat Detail & Tracking (No PO/SJ, TRX, Status Potong, dll)"
                   >
-                    <PencilIcon class="w-3.5 h-3.5" />
+                    <EyeIcon class="w-3.5 h-3.5 text-gray-600" />
                   </button>
                 </div>
               </TableCell>
@@ -865,23 +721,23 @@
           class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
           @click.self="showEditModal = false"
         >
-          <div class="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden font-sans">
+          <div class="relative w-full max-w-3xl bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden font-sans my-6">
             <!-- Modal Header -->
-            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <div>
-                <h3 class="text-base font-bold text-gray-900">Edit Data Tracking & Status Potong</h3>
-                <p class="text-xs text-gray-500 mt-0.5">
-                  Dealer: <strong class="text-gray-800">{{ editingSubmission?.dealer_name || '-' }}</strong> 
-                  <span v-if="editingSubmission?.id_real">({{ editingSubmission?.id_real }})</span>
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50/70 flex items-center justify-between">
+              <div class="min-w-0 pr-4">
+                <h3 class="text-sm font-semibold text-gray-900">Detail & Tracking Program</h3>
+                <p class="text-xs text-gray-500 mt-0.5 truncate">
+                  Dealer: <strong class="text-gray-800">{{ editingSubmission?.dealer_name || '-' }}</strong>
+                  <span v-if="editingSubmission?.id_real" class="text-gray-400"> ({{ editingSubmission?.id_real }})</span>
                   &bull; {{ editingSubmission?.program_name }}
                 </p>
               </div>
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   @click="analyzeCurrentRowWithAi"
                   :disabled="isAnalyzingCurrent"
-                  class="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium transition cursor-pointer shadow-2xs disabled:opacity-50"
+                  class="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium transition cursor-pointer shadow-2xs disabled:opacity-50"
                   title="Analisis dokumen baris ini dengan AI sekarang"
                 >
                   <RefreshCwIcon v-if="isAnalyzingCurrent" class="w-3.5 h-3.5 animate-spin text-gray-500" />
@@ -891,7 +747,7 @@
                 <button
                   type="button"
                   @click="showEditModal = false"
-                  class="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition cursor-pointer"
+                  class="w-8 h-8 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition cursor-pointer"
                 >
                   <XIcon class="w-4 h-4" />
                 </button>
@@ -899,257 +755,263 @@
             </div>
 
             <!-- Modal Form Body -->
-            <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+            <div class="p-6 space-y-5 max-h-[75vh] overflow-y-auto text-xs">
               <!-- Warning banner if any document is swapped or invalid -->
               <div
                 v-if="hasSwappedOrInvalidDocs(editingSubmission)"
-                class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-xs space-y-1.5"
+                class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs"
               >
-                <div class="font-semibold flex items-center gap-1.5 text-amber-900">
-                  <AlertTriangleIcon class="w-4 h-4 text-amber-600 shrink-0" />
+                <div class="font-medium flex items-center gap-1.5 text-amber-900 mb-1">
+                  <AlertTriangleIcon class="w-3.5 h-3.5 text-amber-600 shrink-0" />
                   <span>Peringatan Kelayakan Dokumen:</span>
                 </div>
                 <ul class="list-disc list-inside text-[11px] text-amber-800 space-y-0.5 pl-1">
                   <li v-if="editingSubmission.doc_validation?.cn?.status !== 'valid' && editingSubmission.doc_validation?.cn">
-                    <strong>Kolom CN:</strong> {{ editingSubmission.doc_validation.cn.message || 'File tidak sesuai atau tertukar' }}
+                    <span class="font-medium">CN:</span> {{ editingSubmission.doc_validation.cn.message || 'File tidak sesuai atau tertukar' }}
                   </li>
                   <li v-if="editingSubmission.doc_validation?.agr?.status !== 'valid' && editingSubmission.doc_validation?.agr">
-                    <strong>Kolom Agr:</strong> {{ editingSubmission.doc_validation.agr.message || 'File tidak sesuai atau tertukar' }}
+                    <span class="font-medium">Agr:</span> {{ editingSubmission.doc_validation.agr.message || 'File tidak sesuai atau tertukar' }}
                   </li>
                   <li v-if="editingSubmission.doc_validation?.faktur?.status !== 'valid' && editingSubmission.doc_validation?.faktur">
-                    <strong>Kolom Faktur:</strong> {{ editingSubmission.doc_validation.faktur.message || 'File tidak sesuai atau tertukar' }}
+                    <span class="font-medium">Faktur:</span> {{ editingSubmission.doc_validation.faktur.message || 'File tidak sesuai atau tertukar' }}
                   </li>
                 </ul>
               </div>
 
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <!-- No PO/SJ -->
-                <div>
-                  <label class="block font-semibold text-gray-700 mb-1">NO PO / SJ:</label>
-                  <input
-                    v-model="editForm.no_po_sj"
-                    type="text"
-                    placeholder="Contoh: PO/2026/09/123"
-                    class="h-9 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
-                  />
-                </div>
-
-                <!-- No Transaksi -->
-                <div>
-                  <label class="block font-semibold text-gray-700 mb-1">NO TRANSAKSI:</label>
-                  <input
-                    v-model="editForm.no_transaksi"
-                    type="text"
-                    placeholder="Contoh: TRX-998822"
-                    class="h-9 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
-                  />
-                </div>
-
-                <!-- Tgl Input -->
-                <div>
-                  <label class="block font-semibold text-gray-700 mb-1">Tgl Input:</label>
-                  <DatePicker
-                    v-model="editForm.tgl_input"
-                    placeholder="Pilih Tgl Input"
-                    format="DD/MM/YYYY"
-                  />
-                </div>
-
-                <!-- Tgl Share CN -->
-                <div>
-                  <label class="block font-semibold text-gray-700 mb-1">Tgl Share CN:</label>
-                  <DatePicker
-                    v-model="editForm.tgl_share_cn"
-                    placeholder="Pilih Tgl Share CN"
-                    format="DD/MM/YYYY"
-                  />
-                </div>
-
-                <!-- Lama Pending -->
-                <div>
-                  <label class="block font-semibold text-gray-700 mb-1">Lama Pending:</label>
-                  <input
-                    v-model="editForm.lama_pending"
-                    type="text"
-                    placeholder="Contoh: 1 Hari / Kurang dari 30 Hari"
-                    class="h-9 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
-                  />
-                </div>
-
-                <!-- Tanggal Potong/TF -->
-                <div>
-                  <label class="block font-semibold text-gray-700 mb-1">TANGGAL POTONG/TF:</label>
-                  <DatePicker
-                    v-model="editForm.tgl_potong_tf"
-                    placeholder="Pilih Tgl Potong/TF"
-                    format="DD/MM/YYYY"
-                  />
-                </div>
-
-                <!-- STATUS POTONG BY PURCHASE -->
-                <div>
-                  <label class="block font-semibold text-gray-700 mb-1">STATUS POTONG BY PURCHASE:</label>
-                  <select
-                    v-model="editForm.status_potong_purchase"
-                    class="h-9 w-full px-3 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-900 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-                  >
-                    <option value="">- Belum Ditentukan -</option>
-                    <option value="BELUM BISA POTONG">BELUM BISA POTONG</option>
-                    <option value="BISA DI POTONG">BISA DI POTONG</option>
-                    <option value="SUDAH POTONG">SUDAH POTONG</option>
-                    <option value="DONE TRANSFER">DONE TRANSFER</option>
-                  </select>
-                </div>
-
-                <!-- STATUS POTONG BY AR -->
-                <div>
-                  <label class="block font-semibold text-gray-700 mb-1">STATUS POTONG BY AR:</label>
-                  <input
-                    v-model="editForm.status_potong_ar"
-                    type="text"
-                    placeholder="Contoh: DEALER SETUJU / DONE / PENDING DEALER"
-                    class="h-9 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
-                  />
-                </div>
-              </div>
-
-              <!-- CEK DOKUMEN -->
+              <!-- 1. Tracking & Status Potong -->
               <div>
-                <label class="block font-semibold text-gray-700 mb-1">CEK DOKUMEN:</label>
-                <input
-                  v-model="editForm.cek_dokumen"
-                  type="text"
-                  placeholder="Contoh: LENGKAP, AGR BELUM ADA, FP KURANG..."
-                  class="h-9 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
-                />
-              </div>
-
-              <!-- Keterangan (Dropdown Polos Putih) -->
-              <div>
-                <label class="block font-semibold text-gray-700 mb-1">Keterangan:</label>
-                <select
-                  v-model="editForm.keterangan"
-                  class="h-9 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-                >
-                  <option value="">- Pilih Keterangan -</option>
-                  <option v-for="opt in keteranganOptions" :key="opt" :value="opt">
-                    {{ opt }}
-                  </option>
-                </select>
-              </div>
-
-              <!-- Data Finansial & Pajak (Sesuai OneDrive) -->
-              <div class="pt-4 border-t border-gray-100 space-y-3">
-                <h4 class="font-bold text-gray-900 flex items-center gap-1.5 text-xs">
-                  <FileSpreadsheetIcon class="w-4 h-4 text-emerald-600" />
-                  <span>Data Finansial & Audit Pajak (Format OneDrive)</span>
+                <h4 class="text-xs font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-100">
+                  Data Tracking & Status Potong
                 </h4>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+                  <!-- No PO/SJ -->
                   <div>
-                    <label class="block font-semibold text-gray-700 mb-1">Incentive:</label>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">No. PO / SJ</label>
+                    <input
+                      v-model="editForm.no_po_sj"
+                      type="text"
+                      placeholder="Contoh: PO/2026/09/123"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                    />
+                  </div>
+
+                  <!-- No Transaksi -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">No. Transaksi</label>
+                    <input
+                      v-model="editForm.no_transaksi"
+                      type="text"
+                      placeholder="Contoh: TRX-998822"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                    />
+                  </div>
+
+                  <!-- Tgl Input -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Tgl Input</label>
+                    <DatePicker
+                      v-model="editForm.tgl_input"
+                      placeholder="Pilih Tgl Input"
+                      format="DD/MM/YYYY"
+                    />
+                  </div>
+
+                  <!-- Tgl Share CN -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Tgl Share CN</label>
+                    <DatePicker
+                      v-model="editForm.tgl_share_cn"
+                      placeholder="Pilih Tgl Share CN"
+                      format="DD/MM/YYYY"
+                    />
+                  </div>
+
+                  <!-- Lama Pending -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Lama Pending</label>
+                    <input
+                      v-model="editForm.lama_pending"
+                      type="text"
+                      placeholder="Contoh: 1 Hari / Kurang dari 30 Hari"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                    />
+                  </div>
+
+                  <!-- Tanggal Potong/TF -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Tgl Potong / TF</label>
+                    <DatePicker
+                      v-model="editForm.tgl_potong_tf"
+                      placeholder="Pilih Tgl Potong/TF"
+                      format="DD/MM/YYYY"
+                    />
+                  </div>
+
+                  <!-- Status Potong Purchase -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Status Potong Purchase</label>
+                    <select
+                      v-model="editForm.status_potong_purchase"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-300 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition cursor-pointer"
+                    >
+                      <option value="">- Belum Ditentukan -</option>
+                      <option value="BELUM BISA POTONG">BELUM BISA POTONG</option>
+                      <option value="BISA DI POTONG">BISA DI POTONG</option>
+                      <option value="SUDAH POTONG">SUDAH POTONG</option>
+                      <option value="DONE TRANSFER">DONE TRANSFER</option>
+                    </select>
+                  </div>
+
+                  <!-- Status Potong AR -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Status Potong AR</label>
+                    <input
+                      v-model="editForm.status_potong_ar"
+                      type="text"
+                      placeholder="Contoh: DEALER SETUJU / DONE / PENDING"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                    />
+                  </div>
+
+                  <!-- Cek Dokumen -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Cek Dokumen</label>
+                    <input
+                      v-model="editForm.cek_dokumen"
+                      type="text"
+                      placeholder="Contoh: LENGKAP, AGR BELUM ADA, FP KURANG..."
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                    />
+                  </div>
+
+                  <!-- Keterangan -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Keterangan</label>
+                    <select
+                      v-model="editForm.keterangan"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-300 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition cursor-pointer"
+                    >
+                      <option value="">- Pilih Keterangan -</option>
+                      <option v-for="opt in keteranganOptions" :key="opt" :value="opt">
+                        {{ opt }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. Data Finansial & Pajak (Sesuai OneDrive) -->
+              <div class="pt-2">
+                <h4 class="text-xs font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-100 flex items-center gap-1.5">
+                  <FileSpreadsheetIcon class="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Data Finansial & Pajak (OneDrive)</span>
+                </h4>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2.5">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Incentive</label>
                     <input
                       v-model.number="editForm.incentive"
                       type="number"
                       step="any"
                       placeholder="0"
-                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
-                    <label class="block font-semibold text-gray-700 mb-1">DPP:</label>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">DPP</label>
                     <input
                       v-model.number="editForm.dpp"
                       type="number"
                       step="any"
                       placeholder="0"
-                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
-                    <label class="block font-semibold text-gray-700 mb-1">DPP Lain:</label>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">DPP Lain</label>
                     <input
                       v-model.number="editForm.dpp_lain"
                       type="number"
                       step="any"
                       placeholder="0"
-                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
-                    <label class="block font-semibold text-gray-700 mb-1">PPN:</label>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">PPN</label>
                     <input
                       v-model.number="editForm.ppn"
                       type="number"
                       step="any"
                       placeholder="0"
-                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
-                    <label class="block font-semibold text-gray-700 mb-1">Nilai PPh:</label>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Nilai PPh</label>
                     <input
                       v-model.number="editForm.nilai_pph"
                       type="number"
                       step="any"
                       placeholder="0"
-                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
-                    <label class="block font-semibold text-gray-700 mb-1">Net Pay:</label>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Net Pay</label>
                     <input
                       v-model.number="editForm.net_pay"
                       type="number"
                       step="any"
                       placeholder="0"
-                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
-                    <label class="block font-semibold text-gray-700 mb-1">Cek Pajak (Tarif):</label>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Cek Pajak</label>
                     <input
                       v-model.number="editForm.cek_pajak_tarif_pph"
                       type="number"
                       step="any"
                       placeholder="0"
-                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
-                    <label class="block font-semibold text-gray-700 mb-1">Selisih:</label>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Selisih</label>
                     <input
                       v-model.number="editForm.selisih"
                       type="number"
                       step="any"
                       placeholder="0"
-                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div class="col-span-2">
-                    <label class="block font-semibold text-gray-700 mb-1">Note PPh (ok, CAP?, TTD?, NPWP?):</label>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Note PPh</label>
                     <input
                       v-model="editForm.note_pph"
                       type="text"
                       placeholder="Contoh: ok, CAP?, TTD?, NPWP?"
-                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
-                    <label class="block font-semibold text-gray-700 mb-1">No Faktur:</label>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">No. Faktur</label>
                     <input
                       v-model="editForm.no_faktur"
                       type="text"
                       placeholder="010.xxx-xx.xxxxxxxx"
-                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
-                    <label class="block font-semibold text-gray-700 mb-1">Tgl Faktur:</label>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Tgl Faktur</label>
                     <input
                       v-model="editForm.tgl_faktur"
                       type="text"
                       placeholder="DD/MM/YYYY"
-                      class="h-9 w-full px-2.5 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
+                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                 </div>
@@ -1157,18 +1019,18 @@
             </div>
 
             <!-- Modal Footer -->
-            <div class="px-6 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between gap-2">
+            <div class="px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
               <button
                 v-if="editingSubmission && editForm.status_potong_purchase === 'BISA DI POTONG'"
                 type="button"
                 @click="sendWaToTelemarketing(editingSubmission)"
                 :disabled="isSendingWaModal"
-                class="px-3 py-1.5 rounded-md border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-800 text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
-                title="Kirim info klaim ini ke WhatsApp Telemarketing untuk ditawarkan potong order"
+                class="px-3 py-1.5 rounded-md border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-medium transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                title="Kirim info klaim ini ke WhatsApp Telemarketing"
               >
                 <RefreshCwIcon v-if="isSendingWaModal" class="w-3.5 h-3.5 animate-spin text-blue-600" />
                 <SendIcon v-else class="w-3.5 h-3.5 text-blue-600" />
-                <span>{{ isSendingWaModal ? 'Mengirim ke Telemarketing...' : 'Kirim WA ke Telemarketing' }}</span>
+                <span>{{ isSendingWaModal ? 'Mengirim...' : 'Kirim WA ke Telemarketing' }}</span>
               </button>
               <div v-else></div>
 
@@ -1177,7 +1039,7 @@
                   type="button"
                   @click="showEditModal = false"
                   :disabled="isSaving"
-                  class="px-3.5 py-1.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-xs text-gray-700 transition cursor-pointer"
+                  class="px-3.5 py-1.5 rounded-md border border-gray-300 bg-white hover:bg-gray-100 text-xs text-gray-700 font-medium transition cursor-pointer"
                 >
                   Batal
                 </button>
@@ -1185,9 +1047,9 @@
                   type="button"
                   @click="saveEditModal"
                   :disabled="isSaving"
-                  class="px-4 py-1.5 rounded-md border border-gray-300 bg-white text-gray-800 hover:bg-gray-50 text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                  class="px-4 py-1.5 rounded-md bg-gray-900 hover:bg-black text-white text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-xs"
                 >
-                  <RefreshCwIcon v-if="isSaving" class="w-3.5 h-3.5 animate-spin text-gray-500" />
+                  <RefreshCwIcon v-if="isSaving" class="w-3.5 h-3.5 animate-spin" />
                   <span>{{ isSaving ? 'Menyimpan...' : 'Simpan Perubahan' }}</span>
                 </button>
               </div>

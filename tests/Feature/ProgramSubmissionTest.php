@@ -617,7 +617,7 @@ class ProgramSubmissionTest extends TestCase
             'id' => $submission->id,
             'status_potong_purchase' => 'SUDAH POTONG',
             'status_potong_ar' => 'DONE',
-            'tgl_potong_tf' => date('d/m/Y'),
+            'tgl_potong_tf' => date('n/j/Y'),
         ]);
     }
 

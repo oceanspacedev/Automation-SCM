@@ -591,7 +591,23 @@ class ProgramReconciliationService
         // Only update status and cek_dokumen if not already locked to 'SUDAH POTONG' or 'DONE TRANSFER'
         $existingStatus = (string) $dataProgram->status_potong_purchase;
         if (! str_contains($existingStatus, 'SUDAH') && ! str_contains($existingStatus, 'DONE')) {
-            $dataProgram->status_potong_purchase = $statusPurchase;
+            if (! empty($submission->status_potong_purchase) && (str_contains((string) $submission->status_potong_purchase, 'SUDAH') || str_contains((string) $submission->status_potong_purchase, 'DONE'))) {
+                $dataProgram->status_potong_purchase = $submission->status_potong_purchase;
+            } elseif (($submission->status_potong_ar ?? '') === 'DONE') {
+                $dataProgram->status_potong_purchase = 'SUDAH POTONG';
+            } else {
+                $dataProgram->status_potong_purchase = $statusPurchase;
+            }
+        }
+
+        // Transfer status_potong_ar & tgl_potong_tf from submission if present
+        if (! empty($submission->status_potong_ar) && ($force || empty($dataProgram->status_potong_ar) || $dataProgram->status_potong_ar === '-')) {
+            $dataProgram->status_potong_ar = trim((string) $submission->status_potong_ar);
+        }
+        if (! empty($submission->tgl_potong_tf) && ($force || empty($dataProgram->tgl_potong_tf) || $dataProgram->tgl_potong_tf === '-')) {
+            $dataProgram->tgl_potong_tf = trim((string) $submission->tgl_potong_tf);
+        } elseif (($dataProgram->status_potong_ar === 'DONE' || $dataProgram->status_potong_purchase === 'SUDAH POTONG') && empty($dataProgram->tgl_potong_tf)) {
+            $dataProgram->tgl_potong_tf = date('n/j/Y');
         }
 
         $dataProgram->cek_dokumen = $cekDokumen;
@@ -750,13 +766,17 @@ class ProgramReconciliationService
                         'drive_transferred' => $res['drive_transferred'],
                     ];
 
+                    $rowIndex = (int) str_replace('row_', '', (string) $dp->row_hash);
                     $rowsToPush[] = [
+                        'row_index' => $rowIndex > 0 ? $rowIndex : null,
                         'kode_bt' => $dp->kode_bt,
                         'dealer_name' => $dp->dealer_name,
                         'program' => $dp->program,
                         'program_name' => $dp->program_name,
                         'periode' => $dp->periode,
                         'status_potong_purchase' => $dp->status_potong_purchase,
+                        'status_potong_ar' => $dp->status_potong_ar,
+                        'tgl_potong_tf' => $dp->tgl_potong_tf,
                         'cek_dokumen' => $dp->cek_dokumen,
                         'keterangan' => $dp->keterangan,
                         'cn' => $dp->cn,
@@ -843,13 +863,17 @@ class ProgramReconciliationService
 
             // Push updated row directly to Google Spreadsheet master if configured
             try {
+                $rowIndex = (int) str_replace('row_', '', (string) $bestDp->row_hash);
                 app(DataProgramSyncService::class)->pushUpdatesToSpreadsheet([[
+                    'row_index' => $rowIndex > 0 ? $rowIndex : null,
                     'kode_bt' => $bestDp->kode_bt,
                     'dealer_name' => $bestDp->dealer_name,
                     'program' => $bestDp->program,
                     'program_name' => $bestDp->program_name,
                     'periode' => $bestDp->periode,
                     'status_potong_purchase' => $bestDp->status_potong_purchase,
+                    'status_potong_ar' => $bestDp->status_potong_ar,
+                    'tgl_potong_tf' => $bestDp->tgl_potong_tf,
                     'cek_dokumen' => $bestDp->cek_dokumen,
                     'keterangan' => $bestDp->keterangan,
                     'cn' => $bestDp->cn,
