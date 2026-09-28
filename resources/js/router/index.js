@@ -8,6 +8,7 @@ import InvoiceDetail from '../Pages/Invoices/Detail.vue';
 import EmailLogsIndex from '../Pages/EmailLogs/Index.vue';
 import ProgramSubmissionsIndex from '../Pages/ProgramSubmissions/Index.vue';
 import DataProgramIndex from '../Pages/DataProgram/Index.vue';
+import ProgramHistoryIndex from '../Pages/ProgramHistory/Index.vue';
 import { useAuth } from '../composables/useAuth';
 
 const routes = [
@@ -21,6 +22,7 @@ const routes = [
   { path: '/email-logs', name: 'email-logs.index', component: EmailLogsIndex, meta: { requiresAuth: true } },
   { path: '/form-program', name: 'program-submissions.index', component: ProgramSubmissionsIndex, meta: { requiresAuth: true } },
   { path: '/data-program', name: 'data-program.index', component: DataProgramIndex, meta: { requiresAuth: true } },
+  { path: '/riwayat-program', name: 'program-history.index', component: ProgramHistoryIndex, meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({

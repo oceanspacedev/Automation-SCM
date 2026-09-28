@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Models\DataProgram;
+use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class ProgramReconciliationService
 {
@@ -442,13 +444,37 @@ class ProgramReconciliationService
      *     is_financial_match: bool
      * }
      */
-    public function reconcileSingle(DataProgram $dataProgram, ?ProgramSubmission $submission = null, bool $force = false): array
-    {
+    public function reconcileSingle(
+        DataProgram $dataProgram,
+        ?ProgramSubmission $submission = null,
+        bool $force = false,
+        ?string $batchId = null,
+        string $triggeredBy = 'manual_row'
+    ): array {
         if ($submission === null) {
             $submission = $this->findMatchingSubmission($dataProgram);
         }
 
         if (! $submission) {
+            $log = ProgramReconciliationLog::create([
+                'batch_id' => $batchId,
+                'data_program_id' => $dataProgram->id,
+                'program_submission_id' => null,
+                'dealer_name' => $dataProgram->dealer_name,
+                'kode_bt' => $dataProgram->kode_bt,
+                'program_name' => $dataProgram->program_name,
+                'status' => ProgramReconciliationLog::STATUS_NO_MATCH,
+                'dp_amount' => (float) ($dataProgram->net_pay ?: $dataProgram->dpp),
+                'submission_amount' => null,
+                'selisih' => 0.0,
+                'status_potong_purchase' => $dataProgram->status_potong_purchase ?? 'BELUM BISA POTONG',
+                'cek_dokumen' => $dataProgram->cek_dokumen ?? 'BELUM MATCH FORM',
+                'missing_docs' => null,
+                'drive_transferred' => null,
+                'notes' => 'Belum ditemukan data matching di Form Program.',
+                'triggered_by' => $triggeredBy,
+            ]);
+
             return [
                 'success' => false,
                 'data_program_id' => $dataProgram->id,
@@ -459,6 +485,8 @@ class ProgramReconciliationService
                 'drive_transferred' => ['cn' => false, 'agrement' => false, 'cek_fp' => false],
                 'selisih' => 0.0,
                 'is_financial_match' => false,
+                'log_id' => $log->id,
+                'match_status' => ProgramReconciliationLog::STATUS_NO_MATCH,
             ];
         }
 
@@ -617,6 +645,33 @@ class ProgramReconciliationService
 
         $dataProgram->save();
 
+        if ($hasFinancialMatch && $allDocsPresent) {
+            $matchLogStatus = ProgramReconciliationLog::STATUS_MATCHED;
+        } elseif (! $hasFinancialMatch) {
+            $matchLogStatus = ProgramReconciliationLog::STATUS_NOMINAL_MISMATCH;
+        } else {
+            $matchLogStatus = ProgramReconciliationLog::STATUS_DOC_INCOMPLETE;
+        }
+
+        $log = ProgramReconciliationLog::create([
+            'batch_id' => $batchId,
+            'data_program_id' => $dataProgram->id,
+            'program_submission_id' => $submission->id,
+            'dealer_name' => $dataProgram->dealer_name,
+            'kode_bt' => $dataProgram->kode_bt ?: $submission->id_real,
+            'program_name' => $dataProgram->program_name ?: $submission->program_name,
+            'status' => $matchLogStatus,
+            'dp_amount' => $dpNet > 0 ? $dpNet : $dpDpp,
+            'submission_amount' => $subNet > 0 ? $subNet : $subDpp,
+            'selisih' => $selisih,
+            'status_potong_purchase' => $dataProgram->status_potong_purchase,
+            'cek_dokumen' => $dataProgram->cek_dokumen,
+            'missing_docs' => $missingDocs,
+            'drive_transferred' => $transferred,
+            'notes' => $keterangan,
+            'triggered_by' => $triggeredBy,
+        ]);
+
         return [
             'success' => true,
             'data_program_id' => $dataProgram->id,
@@ -629,6 +684,8 @@ class ProgramReconciliationService
             'drive_transferred' => $transferred,
             'selisih' => $selisih,
             'is_financial_match' => $hasFinancialMatch,
+            'log_id' => $log->id,
+            'match_status' => $matchLogStatus,
         ];
     }
 
@@ -732,11 +789,12 @@ class ProgramReconciliationService
         $results = [];
         $rowsToPush = [];
 
+        $batchId = (string) Str::uuid();
         foreach ($dataPrograms as $dp) {
             try {
                 // Auto-retry up to 3 times on transient MySQL deadlocks/locks with 100ms delay
-                $res = retry(3, function () use ($dp, $force) {
-                    return $this->reconcileSingle($dp, null, $force);
+                $res = retry(3, function () use ($dp, $force, $batchId) {
+                    return $this->reconcileSingle($dp, null, $force, $batchId, 'manual_batch');
                 }, 100);
 
                 if ($res['success']) {
@@ -764,6 +822,7 @@ class ProgramReconciliationService
                         'cek_dokumen' => $res['cek_dokumen'],
                         'keterangan' => $res['keterangan'],
                         'drive_transferred' => $res['drive_transferred'],
+                        'match_status' => $res['match_status'] ?? 'MATCHED',
                     ];
 
                     $rowIndex = (int) str_replace('row_', '', (string) $dp->row_hash);
@@ -786,9 +845,35 @@ class ProgramReconciliationService
                         'ket_faktur_pajak' => $dp->ket_faktur_pajak,
                         'noted' => $dp->noted,
                     ];
+                } else {
+                    $results[] = [
+                        'dp_id' => $dp->id,
+                        'dealer' => $dp->dealer_name,
+                        'program' => $dp->program_name,
+                        'sub_id' => null,
+                        'status' => $res['status'],
+                        'cek_dokumen' => $res['cek_dokumen'],
+                        'keterangan' => $res['keterangan'],
+                        'drive_transferred' => $res['drive_transferred'],
+                        'match_status' => 'NO_MATCH',
+                    ];
                 }
             } catch (\Throwable $e) {
                 Log::warning("Gagal rekonsiliasi row ID {$dp->id}: ".$e->getMessage());
+                try {
+                    ProgramReconciliationLog::create([
+                        'batch_id' => $batchId,
+                        'data_program_id' => $dp->id,
+                        'dealer_name' => $dp->dealer_name,
+                        'kode_bt' => $dp->kode_bt,
+                        'program_name' => $dp->program_name,
+                        'status' => ProgramReconciliationLog::STATUS_ERROR,
+                        'dp_amount' => (float) ($dp->net_pay ?: $dp->dpp),
+                        'notes' => 'Error: '.$e->getMessage(),
+                        'triggered_by' => 'manual_batch',
+                    ]);
+                } catch (\Throwable) {
+                }
             }
         }
 
@@ -802,6 +887,7 @@ class ProgramReconciliationService
         }
 
         return [
+            'batch_id' => $batchId,
             'total_evaluated' => $dataPrograms->count(),
             'matched_count' => $matchedCount,
             'bisa_potong_count' => $bisaPotongCount,
@@ -844,6 +930,20 @@ class ProgramReconciliationService
         $candidates = $query->orderByDesc('id')->limit(50)->get();
 
         if ($candidates->isEmpty()) {
+            try {
+                ProgramReconciliationLog::create([
+                    'program_submission_id' => $submission->id,
+                    'dealer_name' => $submission->dealer_name,
+                    'kode_bt' => $submission->id_real,
+                    'program_name' => $submission->program_name,
+                    'status' => ProgramReconciliationLog::STATUS_NO_MATCH,
+                    'submission_amount' => (float) ($submission->net_pay ?: $submission->dpp),
+                    'notes' => 'Belum ditemukan data master Data Program (56 kolom) yang sesuai.',
+                    'triggered_by' => 'auto_submission',
+                ]);
+            } catch (\Throwable) {
+            }
+
             return null;
         }
 
@@ -859,7 +959,7 @@ class ProgramReconciliationService
         }
 
         if ($bestDp) {
-            $this->reconcileSingle($bestDp, $submission, false);
+            $this->reconcileSingle($bestDp, $submission, false, null, 'auto_submission');
 
             // Push updated row directly to Google Spreadsheet master if configured
             try {
@@ -888,6 +988,20 @@ class ProgramReconciliationService
             }
 
             return $bestDp;
+        }
+
+        try {
+            ProgramReconciliationLog::create([
+                'program_submission_id' => $submission->id,
+                'dealer_name' => $submission->dealer_name,
+                'kode_bt' => $submission->id_real,
+                'program_name' => $submission->program_name,
+                'status' => ProgramReconciliationLog::STATUS_NO_MATCH,
+                'submission_amount' => (float) ($submission->net_pay ?: $submission->dpp),
+                'notes' => 'Kandidat Data Program ditemukan tetapi kriteria (Region/BT/Finansial) tidak cocok.',
+                'triggered_by' => 'auto_submission',
+            ]);
+        } catch (\Throwable) {
         }
 
         return null;

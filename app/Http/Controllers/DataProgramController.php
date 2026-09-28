@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\DataProgram;
+use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
 use App\Services\DataProgramSyncService;
 use App\Services\ProgramReconciliationService;
@@ -358,7 +359,7 @@ class DataProgramController extends Controller
             $force = $request->boolean('force', false);
             $pushToSheet = $request->boolean('push_to_sheet', true);
 
-            $result = $this->reconciliationService->reconcileSingle($dp, null, $force);
+            $result = $this->reconciliationService->reconcileSingle($dp, null, $force, null, 'manual_row');
 
             $matchedSubmission = null;
             if ($result['submission_id']) {
@@ -467,6 +468,90 @@ class DataProgramController extends Controller
             'reconciled_data_program' => max(0, $totalDataProgram - $unreconciledDataProgram),
             'total_submissions' => $totalSubmissions,
             'analyzed_submissions' => $analyzedSubmissions,
+        ]);
+    }
+
+    /**
+     * Get paginated reconciliation logs with filtering by status, search, and date.
+     */
+    public function reconciliationLogs(Request $request): JsonResponse
+    {
+        $query = ProgramReconciliationLog::query()->with([
+            'dataProgram:id,kode_bt,dealer_name,program_name,periode,region,net_pay,dpp,status_potong_purchase,cek_dokumen,cn,agrement,cek_fp,no_faktur_pajak,keterangan,wajib_pajak',
+            'programSubmission:id,id_real,dealer_name,program_name,region,sales_name,net_pay,dpp,credit_note_url,agreement_url,tax_invoice_url,submission_timestamp,doc_validation,note_pph,no_faktur',
+        ]);
+
+        if ($request->filled('search')) {
+            $search = trim((string) $request->input('search'));
+            $query->where(function ($q) use ($search) {
+                $q->where('dealer_name', 'like', "%{$search}%")
+                    ->orWhere('kode_bt', 'like', "%{$search}%")
+                    ->orWhere('program_name', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('status') && $request->input('status') !== 'ALL') {
+            $query->where('status', $request->input('status'));
+        }
+
+        if ($request->filled('triggered_by')) {
+            $query->where('triggered_by', $request->input('triggered_by'));
+        }
+
+        if ($request->filled('date')) {
+            $query->whereDate('created_at', $request->input('date'));
+        }
+
+        if ($request->filled('data_program_id')) {
+            $query->where('data_program_id', $request->input('data_program_id'));
+        }
+
+        if ($request->filled('program_submission_id')) {
+            $query->where('program_submission_id', $request->input('program_submission_id'));
+        }
+
+        if ($request->filled('batch_id')) {
+            $query->where('batch_id', $request->input('batch_id'));
+        }
+
+        if ($request->filled('tab')) {
+            $tab = $request->input('tab');
+            if ($tab === 'matched') {
+                $query->where('status', ProgramReconciliationLog::STATUS_MATCHED);
+            } elseif ($tab === 'failed') {
+                $query->where('status', '!=', ProgramReconciliationLog::STATUS_MATCHED);
+            }
+        }
+
+        $perPage = min(100, max(10, (int) $request->input('per_page', 25)));
+        $logs = $query->orderByDesc('id')->paginate($perPage);
+
+        // Stats summary
+        $statsQuery = ProgramReconciliationLog::query();
+        if ($request->filled('date')) {
+            $statsQuery->whereDate('created_at', $request->input('date'));
+        }
+        $stats = [
+            'total' => (clone $statsQuery)->count(),
+            'matched' => (clone $statsQuery)->where('status', ProgramReconciliationLog::STATUS_MATCHED)->count(),
+            'failed' => (clone $statsQuery)->where('status', '!=', ProgramReconciliationLog::STATUS_MATCHED)->count(),
+            'doc_incomplete' => (clone $statsQuery)->where('status', ProgramReconciliationLog::STATUS_DOC_INCOMPLETE)->count(),
+            'nominal_mismatch' => (clone $statsQuery)->where('status', ProgramReconciliationLog::STATUS_NOMINAL_MISMATCH)->count(),
+            'no_match' => (clone $statsQuery)->where('status', ProgramReconciliationLog::STATUS_NO_MATCH)->count(),
+            'error' => (clone $statsQuery)->where('status', ProgramReconciliationLog::STATUS_ERROR)->count(),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => $logs->items(),
+            'pagination' => [
+                'current_page' => $logs->currentPage(),
+                'last_page' => $logs->lastPage(),
+                'per_page' => $logs->perPage(),
+                'total' => $logs->total(),
+            ],
+            'stats' => $stats,
         ]);
     }
 

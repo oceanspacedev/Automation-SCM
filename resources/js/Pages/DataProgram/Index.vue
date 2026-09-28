@@ -63,28 +63,60 @@
           </div>
         </div>
 
-        <button
-          type="button"
-          @click="triggerSync"
-          :disabled="isSyncing"
-          class="h-8 px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-xs font-normal text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer disabled:opacity-50"
-        >
-          <RefreshCwIcon :class="['w-3.5 h-3.5 text-gray-500', isSyncing && 'animate-spin text-emerald-600']" />
-          <span>Sinkronkan Sekarang</span>
-        </button>
+        <!-- Dropdown Pencocokan & Sinkronisasi Form Program -->
+        <div class="relative" ref="reconcileDropdownRef">
+          <button
+            type="button"
+            @click="showReconcileDropdown = !showReconcileDropdown"
+            class="h-8 px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-xs font-normal text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
+            title="Menu sinkronisasi & pencocokan Form Program"
+          >
+            <RefreshCwIcon v-if="isSyncing || isReconciling" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
+            <CheckCircleIcon v-else class="w-3.5 h-3.5 text-gray-600" />
+            <span>{{ isSyncing ? 'Menyinkronkan...' : (isReconciling ? 'Mencocokkan...' : 'Cocokkan Form Program') }}</span>
+            <ChevronDownIcon class="w-3 h-3 text-gray-400 ml-0.5 transition-transform duration-150" :class="showReconcileDropdown && 'rotate-180'" />
+          </button>
 
-        <!-- Tombol Cocokkan / Rekonsiliasi dengan Form Program -->
-        <button
-          type="button"
-          @click="openReconcileModal"
-          :disabled="isReconciling"
-          class="h-8 px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-xs font-normal text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer disabled:opacity-50"
-          title="Cocokkan finansial (DPP/Net Pay) & pindahkan link Drive dari Form Program"
-        >
-          <RefreshCwIcon v-if="isReconciling" class="w-3.5 h-3.5 animate-spin text-gray-600" />
-          <CheckCircleIcon v-else class="w-3.5 h-3.5 text-gray-600" />
-          <span>{{ isReconciling ? 'Mencocokkan...' : 'Cocokkan Form Program' }}</span>
-        </button>
+          <!-- Dropdown Menu -->
+          <div
+            v-if="showReconcileDropdown"
+            class="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-lg shadow-lg border border-gray-200 p-1 z-30 font-sans"
+          >
+            <!-- 1. Sinkronkan Sekarang -->
+            <button
+              type="button"
+              @click="handleTriggerSyncFromDropdown"
+              :disabled="isSyncing"
+              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCwIcon :class="['w-3.5 h-3.5 text-gray-500 shrink-0', isSyncing && 'animate-spin text-emerald-600']" />
+              <span>Sinkronkan Sekarang</span>
+            </button>
+
+            <!-- 2. Cocokkan Form Program -->
+            <button
+              type="button"
+              @click="handleOpenReconcileFromDropdown"
+              :disabled="isReconciling"
+              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <CheckCircleIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
+              <span>Cocokkan Form Program</span>
+            </button>
+
+            <div class="my-1 border-t border-gray-100"></div>
+
+            <!-- 3. Riwayat Pencocokan -->
+            <button
+              type="button"
+              @click="handleOpenHistoryFromDropdown"
+              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer"
+            >
+              <HistoryIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
+              <span>Riwayat Pencocokan</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1059,8 +1091,18 @@
                     </div>
                     <div class="text-[10px] text-gray-500 truncate" :title="item.keterangan">{{ item.keterangan }}</div>
                   </div>
-                  <div v-if="reconcileResult.results.length > 5" class="text-center text-[10px] text-emerald-700 pt-1">
-                    +{{ reconcileResult.results.length - 5 }} data lainnya berhasil diperbarui
+                  <div class="pt-2 flex items-center justify-between border-t border-emerald-100">
+                    <span v-if="reconcileResult.results.length > 5" class="text-[10px] text-emerald-800">
+                      +{{ reconcileResult.results.length - 5 }} data lainnya berhasil diperbarui
+                    </span>
+                    <button
+                      type="button"
+                      @click="openHistoryFromReconcile"
+                      class="text-[11px] font-medium text-emerald-900 hover:underline inline-flex items-center gap-1 cursor-pointer ml-auto"
+                    >
+                      <HistoryIcon class="w-3.5 h-3.5 text-emerald-700" />
+                      <span>Buka Riwayat Lengkap Batch Ini</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1106,336 +1148,215 @@
           class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs font-sans overflow-y-auto"
           @click.self="showTestModal = false"
         >
-          <div class="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-2xl overflow-hidden my-8">
+          <div class="relative w-full max-w-2xl bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden font-sans my-6">
             <!-- Modal Header -->
-            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <div class="flex items-center gap-2.5">
-                <div
-                  class="w-8 h-8 rounded-lg flex items-center justify-center"
-                  :class="testResult?.matched ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'"
-                >
-                  <CheckCircleIcon v-if="testResult?.matched" class="w-4 h-4" />
-                  <AlertCircleIcon v-else class="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 class="text-sm font-bold text-gray-900">Hasil Uji Kecocokan Data Program</h3>
-                  <p class="text-[11px] text-gray-500">
-                    {{ testRow?.dealer_name }} &bull; {{ testRow?.program_name }}
-                  </p>
-                </div>
+            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50/70 flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-semibold text-gray-900">Hasil Uji Kecocokan Data Program</h3>
+                <p class="text-xs text-gray-500 mt-0.5 truncate">
+                  Dealer: <strong class="text-gray-800">{{ testRow?.dealer_name || '-' }}</strong>
+                  <span v-if="testRow?.kode_bt" class="text-gray-400"> ({{ testRow.kode_bt }})</span>
+                  &bull; {{ testRow?.program_name }}
+                </p>
               </div>
               <button
                 type="button"
                 @click="showTestModal = false"
-                class="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition cursor-pointer"
+                class="w-8 h-8 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition cursor-pointer"
               >
                 <XIcon class="w-4 h-4" />
               </button>
             </div>
 
-            <!-- Modal Body -->
+            <!-- Modal Body (Tabel Polos yang Rapi) -->
             <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
-              <!-- Result Banner -->
-              <div
-                v-if="testResult?.matched"
-                class="p-4 rounded-xl border flex items-start gap-3 bg-emerald-50/60 border-emerald-200"
-              >
-                <CheckCircleIcon class="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                <div class="space-y-1 text-xs">
-                  <div class="font-semibold text-emerald-900 flex items-center gap-2">
-                    <span>BERHASIL DICOMPARE DENGAN FORM PROGRAM #{{ testResult.details?.submission_id }}</span>
-                    <span
-                      :class="[
-                        'px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase',
-                        testResult.details?.status_potong_purchase === 'BISA DI POTONG' ? 'bg-teal-100 text-teal-800' : 'bg-amber-100 text-amber-800'
-                      ]"
-                    >
-                      {{ testResult.details?.status_potong_purchase }}
-                    </span>
-                  </div>
-                  <p class="text-emerald-800 text-[11px] leading-relaxed">
-                    Status Cek Dokumen: <strong class="underline decoration-emerald-400">{{ testResult.details?.cek_dokumen }}</strong>.
-                    Data di tabel lokal dan Google Spreadsheet telah diperbarui secara otomatis.
-                  </p>
-                </div>
-              </div>
-
-              <div
-                v-else
-                class="p-4 rounded-xl border flex items-start gap-3 bg-amber-50/70 border-amber-200"
-              >
-                <AlertCircleIcon class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                <div class="space-y-1 text-xs">
-                  <div class="font-semibold text-amber-900">
-                    TIDAK ADA DATA FORM PROGRAM YANG COCOK
-                  </div>
-                  <p class="text-amber-800 text-[11px] leading-relaxed">
-                    Sistem mengevaluasi seluruh pengajuan Form Program namun tidak menemukan pasangan yang memenuhi ke-4 kriteria ketat (Region, ID Real, Nama Dealer, Program) serta kecocokan finansial.
-                  </p>
-                </div>
-              </div>
-
-              <!-- 4 Kriteria Utama Pencocokan (Region, ID Real, Nama Dealer, Nama Program) -->
-              <div class="border border-gray-200 rounded-xl overflow-hidden">
-                <div class="bg-gray-50 px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
-                  <span class="font-semibold text-gray-800 text-[11px]">Evaluasi 4 Kriteria Wajib</span>
-                  <span class="text-[10px] text-gray-500 font-mono">Region &bull; Kode BT &bull; Dealer &bull; Program</span>
-                </div>
-                <div class="divide-y divide-gray-100 text-xs">
-                  <!-- 1. Region -->
-                  <div class="p-3 flex items-center justify-between gap-4">
-                    <div class="w-28 text-gray-500 font-medium text-[11px]">1. Region</div>
-                    <div class="flex-1 flex items-center gap-2 text-[11px]">
-                      <div class="bg-gray-50 px-2 py-1 rounded border border-gray-200 text-gray-800 truncate max-w-[150px]" :title="testRow?.region">
-                        {{ testRow?.region || testRow?.big_region || '-' }}
-                      </div>
-                      <ArrowRightIcon class="w-3 h-3 text-gray-400 shrink-0" />
-                      <div class="bg-gray-50 px-2 py-1 rounded border border-gray-200 text-gray-800 truncate max-w-[150px]" :title="testResult?.details?.submission?.region">
-                        {{ testResult?.details?.submission?.region || '(Tidak ada)' }}
-                      </div>
-                    </div>
-                    <div class="shrink-0">
-                      <span
-                        v-if="testResult?.details?.criteria_match?.region"
-                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      >
-                        <CheckIcon class="w-3 h-3" /> Cocok
-                      </span>
-                      <span
-                        v-else
-                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-600 border border-red-200"
-                      >
-                        <XIcon class="w-3 h-3" /> Beda
-                      </span>
-                    </div>
-                  </div>
-
-                  <!-- 2. Kode BT / ID Real -->
-                  <div class="p-3 flex items-center justify-between gap-4">
-                    <div class="w-28 text-gray-500 font-medium text-[11px]">2. Kode BT / ID Real</div>
-                    <div class="flex-1 flex items-center gap-2 text-[11px]">
-                      <div class="bg-gray-50 px-2 py-1 rounded border border-gray-200 text-gray-800 truncate max-w-[150px]" :title="testRow?.kode_bt">
-                        {{ testRow?.kode_bt || '-' }}
-                      </div>
-                      <ArrowRightIcon class="w-3 h-3 text-gray-400 shrink-0" />
-                      <div class="bg-gray-50 px-2 py-1 rounded border border-gray-200 text-gray-800 truncate max-w-[150px]" :title="testResult?.details?.submission?.id_real">
-                        {{ testResult?.details?.submission?.id_real || '(Tidak ada)' }}
-                      </div>
-                    </div>
-                    <div class="shrink-0">
-                      <span
-                        v-if="testResult?.details?.criteria_match?.kode_bt"
-                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      >
-                        <CheckIcon class="w-3 h-3" /> Cocok
-                      </span>
-                      <span
-                        v-else-if="testResult?.details?.criteria_match?.kode_bt === false"
-                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-600 border border-red-200"
-                      >
-                        <XIcon class="w-3 h-3" /> Beda
-                      </span>
-                      <span
-                        v-else
-                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-50 text-gray-500 border border-gray-200"
-                      >
-                        Opsional
-                      </span>
-                    </div>
-                  </div>
-
-                  <!-- 3. Nama Dealer -->
-                  <div class="p-3 flex items-center justify-between gap-4">
-                    <div class="w-28 text-gray-500 font-medium text-[11px]">3. Nama Dealer</div>
-                    <div class="flex-1 flex items-center gap-2 text-[11px]">
-                      <div class="bg-gray-50 px-2 py-1 rounded border border-gray-200 text-gray-800 truncate max-w-[150px]" :title="testRow?.dealer_name">
-                        {{ testRow?.dealer_name || '-' }}
-                      </div>
-                      <ArrowRightIcon class="w-3 h-3 text-gray-400 shrink-0" />
-                      <div class="bg-gray-50 px-2 py-1 rounded border border-gray-200 text-gray-800 truncate max-w-[150px]" :title="testResult?.details?.submission?.dealer_name">
-                        {{ testResult?.details?.submission?.dealer_name || '(Tidak ada)' }}
-                      </div>
-                    </div>
-                    <div class="shrink-0">
-                      <span
-                        v-if="testResult?.details?.criteria_match?.dealer"
-                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      >
-                        <CheckIcon class="w-3 h-3" /> Cocok
-                      </span>
-                      <span
-                        v-else
-                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-600 border border-red-200"
-                      >
-                        <XIcon class="w-3 h-3" /> Beda
-                      </span>
-                    </div>
-                  </div>
-
-                  <!-- 4. Nama Program -->
-                  <div class="p-3 flex items-center justify-between gap-4">
-                    <div class="w-28 text-gray-500 font-medium text-[11px]">4. Nama Program</div>
-                    <div class="flex-1 flex items-center gap-2 text-[11px]">
-                      <div class="bg-gray-50 px-2 py-1 rounded border border-gray-200 text-gray-800 truncate max-w-[150px]" :title="testRow?.program_name">
-                        {{ testRow?.program_name || '-' }}
-                      </div>
-                      <ArrowRightIcon class="w-3 h-3 text-gray-400 shrink-0" />
-                      <div class="bg-gray-50 px-2 py-1 rounded border border-gray-200 text-gray-800 truncate max-w-[150px]" :title="testResult?.details?.submission?.program_name">
-                        {{ testResult?.details?.submission?.program_name || '(Tidak ada)' }}
-                      </div>
-                    </div>
-                    <div class="shrink-0">
-                      <span
-                        v-if="testResult?.details?.criteria_match?.program"
-                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      >
-                        <CheckIcon class="w-3 h-3" /> Cocok
-                      </span>
-                      <span
-                        v-else
-                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-red-50 text-red-600 border border-red-200"
-                      >
-                        <XIcon class="w-3 h-3" /> Beda
-                      </span>
-                    </div>
+              <!-- Ringkasan Status -->
+              <div class="p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 flex items-center justify-between">
+                <div>
+                  <span class="font-medium text-gray-900">
+                    {{ testResult?.matched ? 'Berhasil dicocokkan dengan Form Program #' + testResult.details?.submission_id : 'Belum ditemukan data Form Program yang cocok' }}
+                  </span>
+                  <div class="text-[11px] text-gray-500 mt-0.5">
+                    Status Potong: <strong class="text-gray-800">{{ testResult?.details?.status_potong_purchase || testRow?.status_potong_purchase || '-' }}</strong>
+                    &bull; Cek Dokumen: <strong class="text-gray-800">{{ testResult?.details?.cek_dokumen || testRow?.cek_dokumen || '-' }}</strong>
                   </div>
                 </div>
-              </div>
-
-              <!-- Validasi Aturan Pajak PKP vs Non-PKP -->
-              <div class="border border-gray-200 rounded-xl p-4 bg-gray-50/40 space-y-3">
-                <div class="flex items-center justify-between">
-                  <div class="font-semibold text-gray-800 text-[11px] flex items-center gap-1.5">
-                    <ShieldCheckIcon class="w-4 h-4 text-indigo-600" />
-                    <span>Kategori Pajak & Aturan Dokumen</span>
-                  </div>
+                <div class="shrink-0 ml-4">
                   <span
-                    :class="[
-                      'px-2 py-0.5 rounded text-[10px] font-semibold',
-                      testResult?.details?.is_pkp ? 'bg-purple-50 text-purple-700 border border-purple-200' : 'bg-blue-50 text-blue-700 border border-blue-200'
-                    ]"
+                    v-if="testResult?.matched"
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold"
                   >
-                    {{ testResult?.details?.is_pkp ? 'WAJIB PAJAK PKP' : 'NON-PKP' }}
+                    <CheckIcon class="w-3 h-3" />
+                    <span>Sesuai</span>
+                  </span>
+                  <span
+                    v-else
+                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 border border-gray-200 text-xs font-medium"
+                  >
+                    <span>Belum Cocok</span>
                   </span>
                 </div>
-
-                <div class="grid grid-cols-2 gap-3 text-xs">
-                  <div class="bg-white p-2.5 rounded-lg border border-gray-200">
-                    <div class="text-[10px] text-gray-500 mb-0.5">Wajib Pajak (Master)</div>
-                    <div class="font-semibold text-gray-800">{{ testResult?.details?.wajib_pajak || testRow?.wajib_pajak || '-' }}</div>
-                  </div>
-                  <div class="bg-white p-2.5 rounded-lg border border-gray-200">
-                    <div class="text-[10px] text-gray-500 mb-0.5">Persyaratan Dokumen</div>
-                    <div class="font-semibold" :class="testResult?.details?.is_pkp ? 'text-purple-700' : 'text-blue-700'">
-                      {{ testResult?.details?.is_pkp ? 'Wajib CN, AGR & Faktur Pajak' : 'Hanya butuh CN & AGR (Bebas FP)' }}
-                    </div>
-                  </div>
-                </div>
-
-                <div class="text-[11px] text-gray-600 bg-white p-2.5 rounded-lg border border-gray-200 leading-relaxed">
-                  <template v-if="testResult?.details?.is_pkp">
-                    <strong>Aturan PKP:</strong> Wajib melampirkan Faktur Pajak yang sah bersama CN dan Agreement. Jika Faktur Pajak kosong, status dipotong tidak dapat disetujui (BELUM BISA POTONG).
-                  </template>
-                  <template v-else>
-                    <strong>Aturan Non-PKP:</strong> Dealer Non-PKP (atau Pribadi Non-PKP) tidak menerbitkan faktur pajak. Cukup dokumen CN dan Agreement yang lengkap untuk status <strong>BISA DI POTONG</strong> dan Cek Dokumen <strong>LENGKAP</strong>.
-                  </template>
-                </div>
               </div>
 
-              <!-- Pemindahan Link Dokumen Google Drive -->
-              <div class="border border-gray-200 rounded-xl overflow-hidden">
-                <div class="bg-gray-50 px-4 py-2 border-b border-gray-200 text-[11px] font-semibold text-gray-800">
-                  Dokumen Pendukung (Google Drive)
-                </div>
-                <div class="p-3 divide-y divide-gray-100 text-xs">
-                  <!-- CN -->
-                  <div class="py-2 flex items-center justify-between gap-3">
-                    <div class="w-24 text-gray-600 font-medium text-[11px]">1. Credit Note (CN)</div>
-                    <div class="flex-1 truncate">
-                      <a
-                        v-if="isValidUrl(testRow?.cn)"
-                        :href="testRow.cn"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="text-indigo-600 hover:underline flex items-center gap-1 truncate text-[11px]"
-                      >
-                        <ExternalLinkIcon class="w-3 h-3 shrink-0" />
-                        <span class="truncate">{{ testRow.cn }}</span>
-                      </a>
-                      <span v-else class="text-gray-400 text-[11px]">Belum ada dokumen</span>
-                    </div>
-                  </div>
+              <!-- Tabel Komparasi Rapi -->
+              <div class="rounded-lg border border-gray-200 overflow-hidden">
+                <table class="w-full text-xs text-left">
+                  <thead class="bg-gray-50 border-b border-gray-200 text-gray-500 font-medium">
+                    <tr>
+                      <th class="px-3.5 py-2.5 w-1/4">Parameter</th>
+                      <th class="px-3.5 py-2.5 w-1/3">Data Program (Master)</th>
+                      <th class="px-3.5 py-2.5 w-1/3">Form Program (Respon)</th>
+                      <th class="px-3.5 py-2.5 w-[85px] text-center">Hasil</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-100 text-gray-700">
+                    <!-- 1. Region -->
+                    <tr>
+                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Region</td>
+                      <td class="px-3.5 py-2">{{ testRow?.region || testRow?.big_region || '-' }}</td>
+                      <td class="px-3.5 py-2">{{ testResult?.details?.submission?.region || '-' }}</td>
+                      <td class="px-3.5 py-2 text-center">
+                        <span v-if="testResult?.details?.criteria_match?.region" class="text-emerald-700 font-medium">Cocok</span>
+                        <span v-else class="text-rose-600 font-medium">Beda</span>
+                      </td>
+                    </tr>
 
-                  <!-- Agrement -->
-                  <div class="py-2 flex items-center justify-between gap-3">
-                    <div class="w-24 text-gray-600 font-medium text-[11px]">2. Agreement</div>
-                    <div class="flex-1 truncate">
-                      <a
-                        v-if="isValidUrl(testRow?.agrement)"
-                        :href="testRow.agrement"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="text-indigo-600 hover:underline flex items-center gap-1 truncate text-[11px]"
-                      >
-                        <ExternalLinkIcon class="w-3 h-3 shrink-0" />
-                        <span class="truncate">{{ testRow.agrement }}</span>
-                      </a>
-                      <span v-else class="text-gray-400 text-[11px]">Belum ada dokumen</span>
-                    </div>
-                  </div>
+                    <!-- 2. Kode BT / ID Real -->
+                    <tr>
+                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Kode BT / ID Real</td>
+                      <td class="px-3.5 py-2">{{ testRow?.kode_bt || '-' }}</td>
+                      <td class="px-3.5 py-2">{{ testResult?.details?.submission?.id_real || '-' }}</td>
+                      <td class="px-3.5 py-2 text-center">
+                        <span v-if="testResult?.details?.criteria_match?.kode_bt" class="text-emerald-700 font-medium">Cocok</span>
+                        <span v-else-if="testResult?.details?.criteria_match?.kode_bt === false" class="text-rose-600 font-medium">Beda</span>
+                        <span v-else class="text-gray-400">Opsional</span>
+                      </td>
+                    </tr>
 
-                  <!-- Faktur Pajak -->
-                  <div class="py-2 flex items-center justify-between gap-3">
-                    <div class="w-24 text-gray-600 font-medium text-[11px]">3. Faktur Pajak</div>
-                    <div class="flex-1 truncate">
-                      <a
-                        v-if="isValidUrl(testRow?.cek_fp)"
-                        :href="testRow.cek_fp"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="text-indigo-600 hover:underline flex items-center gap-1 truncate text-[11px]"
-                      >
-                        <ExternalLinkIcon class="w-3 h-3 shrink-0" />
-                        <span class="truncate">{{ testRow.cek_fp }}</span>
-                      </a>
-                      <span v-else-if="!testResult?.details?.is_pkp" class="text-emerald-600 text-[11px] font-medium">
-                        Bebas Faktur Pajak (Non-PKP)
-                      </span>
-                      <span v-else class="text-gray-400 text-[11px]">Belum ada dokumen</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                    <!-- 3. Nama Dealer -->
+                    <tr>
+                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Nama Dealer</td>
+                      <td class="px-3.5 py-2">{{ testRow?.dealer_name || '-' }}</td>
+                      <td class="px-3.5 py-2">{{ testResult?.details?.submission?.dealer_name || '-' }}</td>
+                      <td class="px-3.5 py-2 text-center">
+                        <span v-if="testResult?.details?.criteria_match?.dealer" class="text-emerald-700 font-medium">Cocok</span>
+                        <span v-else class="text-rose-600 font-medium">Beda</span>
+                      </td>
+                    </tr>
 
-              <!-- Catatan Rekonsiliasi AI (Noted) -->
-              <div v-if="testRow?.noted" class="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3 text-[11px] space-y-1">
-                <div class="text-indigo-700 font-semibold flex items-center gap-1.5">
-                  <SparklesIcon class="w-3.5 h-3.5 text-indigo-500" />
-                  <span>Catatan Rekonsiliasi AI (Noted):</span>
-                </div>
-                <div class="text-gray-800 break-words font-mono text-[10px] leading-relaxed">
-                  {{ testRow.noted }}
-                </div>
-              </div>
+                    <!-- 4. Nama Program -->
+                    <tr>
+                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Nama Program</td>
+                      <td class="px-3.5 py-2">{{ testRow?.program_name || '-' }}</td>
+                      <td class="px-3.5 py-2">{{ testResult?.details?.submission?.program_name || '-' }}</td>
+                      <td class="px-3.5 py-2 text-center">
+                        <span v-if="testResult?.details?.criteria_match?.program" class="text-emerald-700 font-medium">Cocok</span>
+                        <span v-else class="text-rose-600 font-medium">Beda</span>
+                      </td>
+                    </tr>
 
-              <!-- Keterangan Manual -->
-              <div v-if="testRow?.keterangan" class="bg-gray-50 border border-gray-200 rounded-xl p-3 text-[11px] space-y-1">
-                <div class="text-gray-500 font-semibold">Keterangan Manual (Spreadsheet):</div>
-                <div class="text-gray-800 break-words text-[11px]">
-                  {{ testRow.keterangan }}
-                </div>
+                    <!-- 5. Nominal Finansial (DPP / Net Pay) -->
+                    <tr>
+                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Nominal (DPP / Net)</td>
+                      <td class="px-3.5 py-2 font-medium">{{ formatRupiah(testRow?.net_pay || testRow?.dpp) }}</td>
+                      <td class="px-3.5 py-2 font-medium">{{ formatRupiah(testResult?.details?.submission?.net_pay || testResult?.details?.submission?.dpp) }}</td>
+                      <td class="px-3.5 py-2 text-center">
+                        <span v-if="testResult?.details?.financial_match || testResult?.details?.criteria_match?.financial" class="text-emerald-700 font-medium">Cocok</span>
+                        <span v-else class="text-gray-500">
+                          {{ testResult?.details?.selisih ? formatRupiah(testResult.details.selisih) : '-' }}
+                        </span>
+                      </td>
+                    </tr>
+
+                    <!-- 6. Dokumen CN -->
+                    <tr>
+                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Dokumen CN</td>
+                      <td class="px-3.5 py-2">
+                        <a v-if="isValidUrl(testRow?.cn)" :href="testRow.cn" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas</a>
+                        <span v-else class="text-gray-400">-</span>
+                      </td>
+                      <td class="px-3.5 py-2">
+                        <a v-if="isValidUrl(testResult?.details?.submission?.credit_note_url)" :href="testResult.details.submission.credit_note_url" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas Form</a>
+                        <span v-else class="text-gray-400">-</span>
+                      </td>
+                      <td class="px-3.5 py-2 text-center">
+                        <span v-if="isValidUrl(testRow?.cn) || isValidUrl(testResult?.details?.submission?.credit_note_url)" class="text-emerald-700 font-medium">Ada</span>
+                        <span v-else class="text-rose-600 font-medium">Kosong</span>
+                      </td>
+                    </tr>
+
+                    <!-- 7. Dokumen Agreement -->
+                    <tr>
+                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Dokumen Agreement</td>
+                      <td class="px-3.5 py-2">
+                        <a v-if="isValidUrl(testRow?.agrement)" :href="testRow.agrement" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas</a>
+                        <span v-else class="text-gray-400">-</span>
+                      </td>
+                      <td class="px-3.5 py-2">
+                        <a v-if="isValidUrl(testResult?.details?.submission?.agreement_url)" :href="testResult.details.submission.agreement_url" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas Form</a>
+                        <span v-else class="text-gray-400">-</span>
+                      </td>
+                      <td class="px-3.5 py-2 text-center">
+                        <span v-if="isValidUrl(testRow?.agrement) || isValidUrl(testResult?.details?.submission?.agreement_url)" class="text-emerald-700 font-medium">Ada</span>
+                        <span v-else class="text-rose-600 font-medium">Kosong</span>
+                      </td>
+                    </tr>
+
+                    <!-- 8. Dokumen Faktur Pajak -->
+                    <tr>
+                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Dokumen Faktur Pajak</td>
+                      <td class="px-3.5 py-2">
+                        <a v-if="isValidUrl(testRow?.cek_fp)" :href="testRow.cek_fp" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas</a>
+                        <span v-else-if="!testResult?.details?.is_pkp" class="text-gray-500">Bebas FP (Non-PKP)</span>
+                        <span v-else class="text-gray-400">-</span>
+                      </td>
+                      <td class="px-3.5 py-2">
+                        <a v-if="isValidUrl(testResult?.details?.submission?.tax_invoice_url)" :href="testResult.details.submission.tax_invoice_url" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas Form</a>
+                        <span v-else-if="!testResult?.details?.is_pkp" class="text-gray-500">Bebas FP (Non-PKP)</span>
+                        <span v-else class="text-gray-400">-</span>
+                      </td>
+                      <td class="px-3.5 py-2 text-center">
+                        <span v-if="!testResult?.details?.is_pkp" class="text-gray-500 font-medium">Bebas FP</span>
+                        <span v-else-if="isValidUrl(testRow?.cek_fp) || isValidUrl(testResult?.details?.submission?.tax_invoice_url)" class="text-emerald-700 font-medium">Ada</span>
+                        <span v-else class="text-rose-600 font-medium">Kosong</span>
+                      </td>
+                    </tr>
+
+                    <!-- 9. Wajib Pajak & Aturan -->
+                    <tr>
+                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Wajib Pajak & Aturan</td>
+                      <td colspan="3" class="px-3.5 py-2">
+                        <div class="flex items-center gap-2">
+                          <span class="font-medium text-gray-900">{{ testResult?.details?.wajib_pajak || testRow?.wajib_pajak || '-' }}</span>
+                          <span class="text-gray-400">&bull;</span>
+                          <span class="text-gray-600">
+                            {{ testResult?.details?.is_pkp ? 'PKP (Wajib melampirkan Faktur Pajak yang sah bersama CN & Agreement)' : 'NON-PKP (Cukup dokumen CN & Agreement)' }}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+
+                    <!-- 10. Catatan Rekonsiliasi -->
+                    <tr v-if="testRow?.noted || testRow?.keterangan || testResult?.details?.keterangan">
+                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Catatan Rekonsiliasi</td>
+                      <td colspan="3" class="px-3.5 py-2 text-gray-700">
+                        {{ testRow?.noted || testRow?.keterangan || testResult?.details?.keterangan || '-' }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
 
             <!-- Modal Footer -->
-            <div class="px-6 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-xs">
+            <div class="px-6 py-3 bg-gray-50/70 border-t border-gray-200 flex items-center justify-between text-xs">
               <button
                 type="button"
                 @click="testMatchSingleRow(testRow, true)"
                 :disabled="reconcilingRowId === testRow?.id"
-                class="h-8 px-3 rounded-lg border border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50 transition cursor-pointer flex items-center gap-1.5 font-medium disabled:opacity-50"
+                class="h-8 px-3 rounded-md border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition cursor-pointer flex items-center gap-1.5 font-medium disabled:opacity-50 text-xs shadow-2xs"
               >
-                <RefreshCwIcon :class="['w-3.5 h-3.5 text-indigo-600', reconcilingRowId === testRow?.id && 'animate-spin']" />
+                <RefreshCwIcon :class="['w-3.5 h-3.5 text-gray-500', reconcilingRowId === testRow?.id && 'animate-spin']" />
                 <span>{{ reconcilingRowId === testRow?.id ? 'Menguji Ulang...' : 'Uji Ulang (Paksa)' }}</span>
               </button>
               <div class="flex items-center gap-2">
@@ -1444,7 +1365,7 @@
                   type="button"
                   @click="sendWaToTelemarketing(testRow)"
                   :disabled="sendingWaId === testRow?.id"
-                  class="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer flex items-center gap-1.5 font-medium disabled:opacity-50 text-xs shadow-2xs"
+                  class="h-8 px-3 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer flex items-center gap-1.5 font-medium disabled:opacity-50 text-xs shadow-2xs"
                   title="Kirim info klaim ini ke WhatsApp Telemarketing"
                 >
                   <RefreshCwIcon v-if="sendingWaId === testRow?.id" class="w-3.5 h-3.5 animate-spin" />
@@ -1453,8 +1374,17 @@
                 </button>
                 <button
                   type="button"
+                  @click="openHistoryModal(testRow)"
+                  class="h-8 px-3 rounded-md border border-gray-200 bg-white text-gray-700 hover:bg-gray-100 transition cursor-pointer flex items-center gap-1.5 font-normal text-xs"
+                  title="Lihat riwayat pencocokan untuk baris ini"
+                >
+                  <HistoryIcon class="w-3.5 h-3.5 text-gray-500" />
+                  <span>Riwayat Baris Ini</span>
+                </button>
+                <button
+                  type="button"
                   @click="showTestModal = false"
-                  class="h-8 px-4 rounded-lg bg-gray-900 text-white font-medium hover:bg-gray-800 transition cursor-pointer"
+                  class="h-8 px-3.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 font-medium transition cursor-pointer text-xs"
                 >
                   Tutup
                 </button>
@@ -1464,6 +1394,14 @@
         </div>
       </Transition>
     </Teleport>
+
+    <!-- Modal Riwayat Pencocokan Form Program -->
+    <ReconciliationHistoryModal
+      v-model="showHistoryModal"
+      :initial-data-program-id="historyInitialRowId"
+      :initial-batch-id="historyInitialBatchId"
+      :filtered-row-name="historyFilteredRowName"
+    />
   </div>
 </template>
 
@@ -1487,6 +1425,7 @@ import {
   Info as InfoIcon,
   ArrowRight as ArrowRightIcon,
   ShieldCheck as ShieldCheckIcon,
+  History as HistoryIcon,
 } from 'lucide-vue-next';
 import {
   Table,
@@ -1497,6 +1436,7 @@ import {
   TableCell,
   TableEmpty,
 } from '@/components/ui/table';
+import ReconciliationHistoryModal from '@/components/ReconciliationHistoryModal.vue';
 
 const isValidUrl = (url) => {
   if (!url) return false;
@@ -1533,6 +1473,31 @@ const handleTriggerSync = () => {
 const handleExportCsv = () => {
   showSpreadsheetDropdown.value = false;
   exportCsv();
+};
+
+// Dropdown Pencocokan Form Program state
+const showReconcileDropdown = ref(false);
+const reconcileDropdownRef = ref(null);
+
+const handleClickOutsideReconcileDropdown = (e) => {
+  if (reconcileDropdownRef.value && !reconcileDropdownRef.value.contains(e.target)) {
+    showReconcileDropdown.value = false;
+  }
+};
+
+const handleTriggerSyncFromDropdown = () => {
+  showReconcileDropdown.value = false;
+  triggerSync();
+};
+
+const handleOpenReconcileFromDropdown = () => {
+  showReconcileDropdown.value = false;
+  openReconcileModal();
+};
+
+const handleOpenHistoryFromDropdown = () => {
+  showReconcileDropdown.value = false;
+  openHistoryModal(null);
 };
 
 // Filter states
@@ -1775,6 +1740,25 @@ const handleReconcile = async () => {
   }
 };
 
+// State for Reconciliation History Modal
+const showHistoryModal = ref(false);
+const historyInitialRowId = ref(null);
+const historyInitialBatchId = ref(null);
+const historyFilteredRowName = ref(null);
+
+const openHistoryModal = (row = null, batchId = null) => {
+  historyInitialRowId.value = row ? row.id : null;
+  historyFilteredRowName.value = row ? (row.dealer_name || row.kode_bt) : null;
+  historyInitialBatchId.value = batchId || null;
+  showHistoryModal.value = true;
+};
+
+const openHistoryFromReconcile = () => {
+  const batchId = reconcileResult.value?.batch_id || null;
+  showReconcileModal.value = false;
+  openHistoryModal(null, batchId);
+};
+
 // State for Single Row Reconciliation Test
 const reconcilingRowId = ref(null);
 const showTestModal = ref(false);
@@ -1826,12 +1810,14 @@ const sendWaToTelemarketing = async (row) => {
 onMounted(() => {
   fetchData(1);
   document.addEventListener('click', handleClickOutsideSpreadsheetDropdown);
+  document.addEventListener('click', handleClickOutsideReconcileDropdown);
   document.addEventListener('click', handleClickOutsideProgramDropdown);
 });
 
 onUnmounted(() => {
   if (autoRefreshTimer) clearInterval(autoRefreshTimer);
   document.removeEventListener('click', handleClickOutsideSpreadsheetDropdown);
+  document.removeEventListener('click', handleClickOutsideReconcileDropdown);
   document.removeEventListener('click', handleClickOutsideProgramDropdown);
 });
 </script>

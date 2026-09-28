@@ -85,6 +85,7 @@ Route::prefix('api')->group(function () {
     Route::post('/data-program/{id}/send-wa-telemarketing', [DataProgramController::class, 'sendWaToTelemarketing']);
     Route::post('/data-program/{id}/send-wa-ar', [DataProgramController::class, 'sendWaToAr']);
     Route::get('/data-program/reconcile-stats', [DataProgramController::class, 'reconcileStats']);
+    Route::get('/data-program/reconciliation-logs', [DataProgramController::class, 'reconciliationLogs']);
     Route::put('/data-program/{id}', [DataProgramController::class, 'update']);
     Route::post('/webhooks/data-program', [DataProgramController::class, 'webhook']);
 });

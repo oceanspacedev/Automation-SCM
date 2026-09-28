@@ -20,22 +20,7 @@
             <!-- Shadcn-Vue NavigationMenu (Direct Links without Sub-menu) -->
             <NavigationMenu>
               <NavigationMenuList class="flex items-center gap-1">
-                <!-- 1. Dashboard -->
-                <NavigationMenuItem>
-                  <NavigationMenuLink as-child>
-                    <router-link
-                      to="/dashboard"
-                      :class="[
-                        navigationMenuTriggerStyle(),
-                        isActive('/dashboard') && 'bg-gray-100 text-gray-900 font-semibold'
-                      ]"
-                    >
-                      Dashboard
-                    </router-link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-
-                <!-- 2. Draft -->
+                <!-- 1. Draft -->
                 <NavigationMenuItem>
                   <NavigationMenuLink as-child>
                     <router-link
@@ -50,7 +35,7 @@
                   </NavigationMenuLink>
                 </NavigationMenuItem>
 
-                <!-- 3. Invoice -->
+                <!-- 2. Invoice -->
                 <NavigationMenuItem>
                   <NavigationMenuLink as-child>
                     <router-link
@@ -65,22 +50,7 @@
                   </NavigationMenuLink>
                 </NavigationMenuItem>
 
-                <!-- 4. Riwayat Email -->
-                <NavigationMenuItem>
-                  <NavigationMenuLink as-child>
-                    <router-link
-                      to="/email-logs"
-                      :class="[
-                        navigationMenuTriggerStyle(),
-                        isActive('/email-logs') && 'bg-gray-100 text-gray-900 font-semibold'
-                      ]"
-                    >
-                      Riwayat Email
-                    </router-link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-
-                <!-- 5. Form Program -->
+                <!-- 3. Form Program -->
                 <NavigationMenuItem>
                   <NavigationMenuLink as-child>
                     <router-link
@@ -95,7 +65,7 @@
                   </NavigationMenuLink>
                 </NavigationMenuItem>
 
-                <!-- 6. Data Program -->
+                <!-- 4. Data Program -->
                 <NavigationMenuItem>
                   <NavigationMenuLink as-child>
                     <router-link
@@ -108,6 +78,62 @@
                       Data Program
                     </router-link>
                   </NavigationMenuLink>
+                </NavigationMenuItem>
+
+                <!-- 5. Dropdown Riwayat (Dashboard, Riwayat Program & Riwayat Email) -->
+                <NavigationMenuItem>
+                  <Popover v-model:open="isRiwayatOpen">
+                    <PopoverTrigger as-child>
+                      <button
+                        type="button"
+                        :class="[
+                          navigationMenuTriggerStyle(),
+                          (isActive('/dashboard') || isActive('/riwayat-program') || isActive('/email-logs')) && 'bg-gray-100 text-gray-900 font-semibold',
+                          'gap-1.5'
+                        ]"
+                      >
+                        <span>Riwayat</span>
+                        <ChevronDownIcon
+                          class="w-3.5 h-3.5 text-gray-500 transition-transform duration-200"
+                          :class="isRiwayatOpen && 'rotate-180'"
+                        />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" class="w-44 p-1 rounded-lg border border-gray-200 bg-white shadow-lg text-xs space-y-0.5">
+                      <router-link
+                        to="/dashboard"
+                        @click="isRiwayatOpen = false"
+                        :class="[
+                          'block px-3 py-2 rounded-md transition-colors text-xs font-medium',
+                          isActive('/dashboard') ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                        ]"
+                      >
+                        Dashboard
+                      </router-link>
+
+                      <router-link
+                        to="/riwayat-program"
+                        @click="isRiwayatOpen = false"
+                        :class="[
+                          'block px-3 py-2 rounded-md transition-colors text-xs font-medium',
+                          isActive('/riwayat-program') ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                        ]"
+                      >
+                        Riwayat Program
+                      </router-link>
+
+                      <router-link
+                        to="/email-logs"
+                        @click="isRiwayatOpen = false"
+                        :class="[
+                          'block px-3 py-2 rounded-md transition-colors text-xs font-medium',
+                          isActive('/email-logs') ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                        ]"
+                      >
+                        Riwayat Email
+                      </router-link>
+                    </PopoverContent>
+                  </Popover>
                 </NavigationMenuItem>
               </NavigationMenuList>
             </NavigationMenu>
@@ -280,11 +306,14 @@ import {
   CheckCircle2 as CheckCircle2Icon,
   Loader2 as Loader2Icon,
   ExternalLink as ExternalLinkIcon,
+  ChevronDown as ChevronDownIcon,
 } from 'lucide-vue-next';
 
 const route = useRoute();
 const router = useRouter();
 const { user, logout } = useAuth();
+
+const isRiwayatOpen = ref(false);
 
 const isLoginPage = computed(() => route.path === '/login');
 

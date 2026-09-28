@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\DataProgram;
+use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
+use App\Models\User;
 use App\Services\DataProgramSyncService;
 use App\Services\ProgramReconciliationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -907,5 +909,84 @@ class DataProgramTest extends TestCase
 
             return false;
         });
+    }
+
+    public function test_reconcile_creates_reconciliation_logs(): void
+    {
+        $user = User::factory()->create();
+
+        $dp = DataProgram::create([
+            'row_hash' => 'hash_log_test_1',
+            'dealer_name' => 'PT SUMBER BERKAT JAYA',
+            'kode_bt' => 'BT99001',
+            'program_name' => 'PROGRAM PROMO LEBARAN',
+            'net_pay' => 500000,
+            'region' => 'JAWA TIMUR',
+        ]);
+
+        $sub = ProgramSubmission::create([
+            'row_hash' => 'hash_sub_test_1',
+            'dealer_name' => 'PT SUMBER BERKAT JAYA',
+            'id_real' => 'BT99001',
+            'program_name' => 'PROGRAM PROMO LEBARAN',
+            'net_pay' => 500000,
+            'region' => 'JAWA TIMUR',
+            'credit_note_url' => 'https://drive.google.com/cn1',
+            'agreement_url' => 'https://drive.google.com/agr1',
+            'tax_invoice_url' => 'https://drive.google.com/faktur1',
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/api/data-program/{$dp->id}/reconcile", [
+            'push_to_sheet' => false,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('matched', true);
+
+        $this->assertDatabaseHas('program_reconciliation_logs', [
+            'data_program_id' => $dp->id,
+            'program_submission_id' => $sub->id,
+            'status' => 'MATCHED',
+            'dealer_name' => 'PT SUMBER BERKAT JAYA',
+            'kode_bt' => 'BT99001',
+            'triggered_by' => 'manual_row',
+        ]);
+    }
+
+    public function test_reconciliation_logs_endpoint_returns_data_and_stats(): void
+    {
+        $user = User::factory()->create();
+
+        ProgramReconciliationLog::create([
+            'dealer_name' => 'DEALER TEST A',
+            'kode_bt' => 'BT1001',
+            'program_name' => 'PROGRAM A',
+            'status' => 'MATCHED',
+            'dp_amount' => 100000,
+            'submission_amount' => 100000,
+            'selisih' => 0,
+            'triggered_by' => 'manual_batch',
+        ]);
+
+        ProgramReconciliationLog::create([
+            'dealer_name' => 'DEALER TEST B',
+            'kode_bt' => 'BT1002',
+            'program_name' => 'PROGRAM B',
+            'status' => 'NOMINAL_MISMATCH',
+            'dp_amount' => 200000,
+            'submission_amount' => 150000,
+            'selisih' => 50000,
+            'triggered_by' => 'manual_batch',
+        ]);
+
+        $response = $this->actingAs($user)->getJson('/api/data-program/reconciliation-logs?status=MATCHED');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.dealer_name', 'DEALER TEST A')
+            ->assertJsonPath('stats.matched', 1)
+            ->assertJsonPath('stats.nominal_mismatch', 1);
     }
 }
