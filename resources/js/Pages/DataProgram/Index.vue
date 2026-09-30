@@ -1,9 +1,16 @@
 <template>
   <div class="space-y-4 font-sans">
-    <!-- Header Page (Identical to Form Program) -->
+    <!-- Breadcrumbs (Filament style) -->
+    <div class="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+      <span>Data Program</span>
+      <ChevronRightIcon class="w-4 h-4 text-gray-400" />
+      <span class="text-gray-800 font-medium">List</span>
+    </div>
+
+    <!-- Header Page (Filament style) -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-xl font-bold tracking-tight text-gray-900">Data Program</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Data Program</h1>
         <p class="text-xs text-gray-500 mt-0.5">
           Sinkronisasi master data program (56 kolom) langsung dari Google Spreadsheet.
         </p>
@@ -16,13 +23,13 @@
           <button
             type="button"
             @click="showSpreadsheetDropdown = !showSpreadsheetDropdown"
-            class="h-8 px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-xs font-normal text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
+            class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer"
             title="Menu aksi Spreadsheet & Export"
           >
             <RefreshCwIcon v-if="isSyncing" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
             <FileSpreadsheetIcon v-else class="w-3.5 h-3.5 text-gray-500" />
             <span>{{ isSyncing ? 'Menyinkronkan...' : 'Spreadsheet' }}</span>
-            <ChevronDownIcon class="w-3 h-3 text-gray-400 ml-0.5 transition-transform duration-150" :class="showSpreadsheetDropdown && 'rotate-180'" />
+            <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 ml-0.5 transition-transform duration-150" :class="showSpreadsheetDropdown && 'rotate-180'" />
           </button>
 
           <!-- Dropdown Menu -->
@@ -68,13 +75,13 @@
           <button
             type="button"
             @click="showReconcileDropdown = !showReconcileDropdown"
-            class="h-8 px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-xs font-normal text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
+            class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer"
             title="Menu sinkronisasi & pencocokan Form Program"
           >
             <RefreshCwIcon v-if="isSyncing || isReconciling" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
-            <CheckCircleIcon v-else class="w-3.5 h-3.5 text-gray-600" />
+            <CheckCircleIcon v-else class="w-3.5 h-3.5 text-gray-500" />
             <span>{{ isSyncing ? 'Menyinkronkan...' : (isReconciling ? 'Mencocokkan...' : 'Cocokkan Form Program') }}</span>
-            <ChevronDownIcon class="w-3 h-3 text-gray-400 ml-0.5 transition-transform duration-150" :class="showReconcileDropdown && 'rotate-180'" />
+            <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 ml-0.5 transition-transform duration-150" :class="showReconcileDropdown && 'rotate-180'" />
           </button>
 
           <!-- Dropdown Menu -->
@@ -140,272 +147,295 @@
       </button>
     </div>
 
-    <!-- Toolbar Filters (Identical to Form Program) -->
-    <div class="flex flex-wrap items-center justify-between gap-2.5 py-1">
-      <div class="flex flex-wrap items-center gap-2">
-        <div class="relative">
-          <SearchIcon class="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
-          <input
-            v-model="filters.search"
-            @input="debounceFetch"
-            type="text"
-            placeholder="Cari dealer, program, kode BT, no PO/SJ..."
-            class="h-9 w-64 sm:w-80 pl-9 pr-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
-          />
+    <!-- Filament Table Card -->
+    <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <!-- Toolbar (Search & Filter like Filament) -->
+      <div class="p-3 sm:px-4 sm:py-3.5 border-b border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <!-- Left: Auto-Refresh & status -->
+        <div class="flex items-center gap-3 text-xs text-gray-500">
+          <label class="inline-flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              v-model="autoRefresh"
+              class="rounded border-gray-300 text-gray-900 focus:ring-0 w-3.5 h-3.5 cursor-pointer"
+            />
+            <span class="text-xs text-gray-600">Auto-Refresh (30s)</span>
+          </label>
+          <span v-if="lastUpdatedText" class="text-xs text-gray-400 hidden sm:inline">
+            &bull; Update: {{ lastUpdatedText }}
+          </span>
         </div>
 
-        <!-- Filter Region -->
-        <select
-          v-model="filters.region"
-          @change="fetchData(1)"
-          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-        >
-          <option value="">Semua Region</option>
-          <option v-for="reg in filterOptions.regions" :key="reg" :value="reg">
-            {{ reg }}
-          </option>
-        </select>
+        <!-- Right: Search Box & Filter Popover -->
+        <div class="flex items-center gap-2 self-end sm:self-auto w-full sm:w-auto">
+          <!-- Search box with Magnifying glass -->
+          <div class="relative flex-1 sm:w-72">
+            <SearchIcon class="w-4 h-4 text-gray-400 absolute left-3 top-2.5 pointer-events-none" />
+            <input
+              v-model="filters.search"
+              @input="debounceFetch"
+              type="text"
+              placeholder="Search dealer, program, kode BT, PO..."
+              class="h-9 w-full pl-9 pr-3 text-xs text-gray-900 bg-white border border-gray-300 rounded-lg placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-950 focus:border-gray-950 transition"
+            />
+          </div>
 
-        <!-- Filter Nama Program (Searchable Dropdown) -->
-        <div class="relative" ref="programDropdownRef">
-          <button
-            type="button"
-            @click="toggleProgramDropdown"
-            class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs flex items-center justify-between gap-2 hover:border-gray-300 focus:outline-none focus:ring-1 focus:ring-black transition cursor-pointer min-w-[140px] max-w-[240px]"
-            :class="filters.program ? 'border-gray-900 text-gray-900 font-medium bg-gray-50/60' : 'text-gray-700'"
-            :title="filters.program || 'Filter berdasarkan Nama Program'"
-          >
-            <span class="truncate text-left">
-              {{ filters.program || 'Semua Program' }}
-            </span>
-            <div class="flex items-center gap-1 shrink-0">
-              <span
-                v-if="filters.program"
-                @click.stop="clearProgramFilter"
-                class="text-gray-400 hover:text-gray-700 p-0.5 rounded cursor-pointer"
-                title="Hapus filter program"
-              >
-                <XIcon class="w-3 h-3" />
-              </span>
-              <ChevronDownIcon
-                class="w-3.5 h-3.5 text-gray-400 transition-transform duration-150"
-                :class="showProgramDropdown && 'rotate-180'"
-              />
-            </div>
-          </button>
-
-          <!-- Dropdown Popover -->
-          <div
-            v-if="showProgramDropdown"
-            class="absolute top-full left-0 mt-1.5 w-72 sm:w-84 max-w-[90vw] bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden text-xs"
-          >
-            <!-- Search Inside Dropdown -->
-            <div class="p-2 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
-              <SearchIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
-              <input
-                ref="programSearchInput"
-                v-model="programSearchQuery"
-                type="text"
-                placeholder="Cari nama program..."
-                class="w-full bg-transparent border-none text-xs text-gray-900 placeholder-gray-400 focus:outline-none"
-                @click.stop
-                @keydown.esc="showProgramDropdown = false"
-              />
-              <button
-                v-if="programSearchQuery"
-                @click.stop="programSearchQuery = ''"
-                type="button"
-                class="text-gray-400 hover:text-gray-600 cursor-pointer"
-              >
-                <XIcon class="w-3 h-3" />
-              </button>
-            </div>
-
-            <!-- Program List Items -->
-            <div class="max-h-60 overflow-y-auto py-1 divide-y divide-gray-50">
+          <!-- Filter Popover with Active Badge Count (funnel with badge) -->
+          <Popover v-model:open="isFilterOpen">
+            <PopoverTrigger as-child>
               <button
                 type="button"
-                @click="selectProgram('')"
-                class="w-full text-left px-3 py-2 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer text-xs"
-                :class="!filters.program ? 'bg-gray-50 font-medium text-gray-900' : 'text-gray-600'"
+                :class="[
+                  'h-9 px-2.5 rounded-lg border text-xs font-medium inline-flex items-center gap-1.5 transition shadow-2xs cursor-pointer',
+                  activeFilterCount > 0
+                    ? 'border-gray-900 bg-gray-50 text-gray-950'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                ]"
+                title="Buka Filter"
               >
-                <span>Semua Program</span>
-                <CheckIcon v-if="!filters.program" class="w-3.5 h-3.5 text-gray-900 shrink-0" />
+                <FilterIcon class="w-4 h-4 text-gray-600" />
+                <span
+                  :class="[
+                    'w-4 h-4 rounded-full text-[10px] font-semibold flex items-center justify-center',
+                    activeFilterCount > 0 ? 'bg-gray-950 text-white' : 'bg-gray-100 text-gray-600'
+                  ]"
+                >
+                  {{ activeFilterCount }}
+                </span>
               </button>
-
-              <div
-                v-if="filteredProgramOptions.length === 0"
-                class="px-3 py-4 text-center text-gray-400 text-xs"
-              >
-                Tidak ada nama program yang cocok
+            </PopoverTrigger>
+            <PopoverContent class="w-80 p-3 space-y-3" align="end">
+              <div class="text-xs font-semibold text-gray-900 border-b border-gray-100 pb-2 flex items-center justify-between">
+                <span>Filter Data Program</span>
+                <button
+                  v-if="activeFilterCount > 0"
+                  @click="resetFilters"
+                  class="text-[11px] font-normal text-rose-600 hover:underline cursor-pointer"
+                >
+                  Reset
+                </button>
               </div>
 
-              <button
-                v-for="prog in filteredProgramOptions"
-                :key="prog"
-                type="button"
-                @click="selectProgram(prog)"
-                class="w-full text-left px-3 py-2 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer text-xs"
-                :class="filters.program === prog ? 'bg-gray-50 font-semibold text-gray-900' : 'text-gray-700'"
-              >
-                <span class="truncate pr-2" :title="prog">{{ prog }}</span>
-                <CheckIcon v-if="filters.program === prog" class="w-3.5 h-3.5 text-gray-900 shrink-0" />
-              </button>
-            </div>
+              <!-- Region Filter -->
+              <div class="space-y-1">
+                <label class="text-[11px] font-medium text-gray-700">Region</label>
+                <select
+                  v-model="filters.region"
+                  @change="fetchData(1)"
+                  class="h-8 w-full rounded-md border border-gray-200 bg-white px-2.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
+                >
+                  <option value="">Semua Region</option>
+                  <option v-for="reg in filterOptions.regions" :key="reg" :value="reg">{{ reg }}</option>
+                </select>
+              </div>
 
-            <!-- Footer count -->
-            <div class="px-3 py-1.5 bg-gray-50 border-t border-gray-100 text-[10px] text-gray-500 flex justify-between items-center">
-              <span>{{ filteredProgramOptions.length }} program ditemukan</span>
-              <span v-if="filters.program" class="text-black font-medium cursor-pointer hover:underline" @click="selectProgram('')">
-                Reset
-              </span>
-            </div>
-          </div>
+              <!-- Program Filter -->
+              <div class="space-y-1">
+                <label class="text-[11px] font-medium text-gray-700">Nama Program</label>
+                <div class="relative" ref="programDropdownRef">
+                  <button
+                    type="button"
+                    @click="toggleProgramDropdown"
+                    class="h-8 w-full rounded-md border border-gray-200 bg-white px-2.5 text-xs flex items-center justify-between gap-2 hover:border-gray-300 focus:outline-none focus:ring-1 focus:ring-black transition cursor-pointer"
+                    :class="filters.program ? 'border-gray-900 text-gray-900 font-medium bg-gray-50/60' : 'text-gray-700'"
+                    :title="filters.program || 'Filter berdasarkan Nama Program'"
+                  >
+                    <span class="truncate text-left">{{ filters.program || 'Semua Program' }}</span>
+                    <div class="flex items-center gap-1 shrink-0">
+                      <span
+                        v-if="filters.program"
+                        @click.stop="clearProgramFilter"
+                        class="text-gray-400 hover:text-gray-700 p-0.5 rounded cursor-pointer"
+                        title="Hapus filter program"
+                      >
+                        <XIcon class="w-3 h-3" />
+                      </span>
+                      <ChevronDownIcon
+                        class="w-3.5 h-3.5 text-gray-400 transition-transform duration-150"
+                        :class="showProgramDropdown && 'rotate-180'"
+                      />
+                    </div>
+                  </button>
+
+                  <!-- Program Popover Inside Filter -->
+                  <div
+                    v-if="showProgramDropdown"
+                    class="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden text-xs"
+                  >
+                    <div class="p-2 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
+                      <SearchIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <input
+                        ref="programSearchInput"
+                        v-model="programSearchQuery"
+                        type="text"
+                        placeholder="Cari program..."
+                        class="w-full bg-transparent border-none text-xs text-gray-900 placeholder-gray-400 focus:outline-none"
+                        @click.stop
+                        @keydown.esc="showProgramDropdown = false"
+                      />
+                      <button
+                        v-if="programSearchQuery"
+                        @click.stop="programSearchQuery = ''"
+                        type="button"
+                        class="text-gray-400 hover:text-gray-600 cursor-pointer"
+                      >
+                        <XIcon class="w-3 h-3" />
+                      </button>
+                    </div>
+                    <div class="max-h-48 overflow-y-auto py-1 divide-y divide-gray-50">
+                      <button
+                        type="button"
+                        @click="selectProgram('')"
+                        class="w-full text-left px-3 py-1.5 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer text-xs"
+                        :class="!filters.program ? 'bg-gray-50 font-medium text-gray-900' : 'text-gray-600'"
+                      >
+                        <span>Semua Program</span>
+                        <CheckIcon v-if="!filters.program" class="w-3.5 h-3.5 text-gray-900 shrink-0" />
+                      </button>
+                      <button
+                        v-for="prog in filteredProgramOptions"
+                        :key="prog"
+                        type="button"
+                        @click="selectProgram(prog)"
+                        class="w-full text-left px-3 py-1.5 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer text-xs"
+                        :class="filters.program === prog ? 'bg-gray-50 font-semibold text-gray-900' : 'text-gray-700'"
+                      >
+                        <span class="truncate pr-2" :title="prog">{{ prog }}</span>
+                        <CheckIcon v-if="filters.program === prog" class="w-3.5 h-3.5 text-gray-900 shrink-0" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Filter Status Purchase -->
+              <div class="space-y-1">
+                <label class="text-[11px] font-medium text-gray-700">Status Purchase</label>
+                <select
+                  v-model="filters.status_purchase"
+                  @change="fetchData(1)"
+                  class="h-8 w-full rounded-md border border-gray-200 bg-white px-2.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
+                >
+                  <option value="">Semua Status Purchase</option>
+                  <option v-for="opt in filterOptions.status_purchase" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+
+              <!-- Filter Status AR -->
+              <div class="space-y-1">
+                <label class="text-[11px] font-medium text-gray-700">Status AR</label>
+                <select
+                  v-model="filters.status_ar"
+                  @change="fetchData(1)"
+                  class="h-8 w-full rounded-md border border-gray-200 bg-white px-2.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
+                >
+                  <option value="">Semua Status AR</option>
+                  <option v-for="opt in filterOptions.status_ar" :key="opt" :value="opt">{{ opt }}</option>
+                </select>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
-
-        <!-- Filter Status Purchase -->
-        <select
-          v-model="filters.status_purchase"
-          @change="fetchData(1)"
-          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-        >
-          <option value="">Semua Status Purchase</option>
-          <option v-for="opt in filterOptions.status_purchase" :key="opt" :value="opt">
-            {{ opt }}
-          </option>
-        </select>
-
-        <!-- Filter Status AR -->
-        <select
-          v-model="filters.status_ar"
-          @change="fetchData(1)"
-          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-        >
-          <option value="">Semua Status AR</option>
-          <option v-for="opt in filterOptions.status_ar" :key="opt" :value="opt">
-            {{ opt }}
-          </option>
-        </select>
-
-        <button
-          v-if="hasActiveFilters"
-          type="button"
-          @click="resetFilters"
-          class="h-9 px-2.5 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-md transition cursor-pointer"
-        >
-          Reset Filter
-        </button>
       </div>
 
-      <!-- Realtime Auto-Refresh & Status -->
-      <div class="flex flex-wrap items-center gap-3">
-        <label class="inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            v-model="autoRefresh"
-            class="rounded border-gray-300 text-black focus:ring-black cursor-pointer"
-          />
-          <span>Auto-Refresh (30d)</span>
-        </label>
-
-        <span v-if="lastUpdatedText" class="text-xs text-gray-400">
-          Update: {{ lastUpdatedText }}
-        </span>
-      </div>
-    </div>
-
-    <!-- Official Shadcn Table Card (Horizontal Scrollable, Exactly like Form Program) -->
-    <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
-      <Table>
+      <Table container-class="max-h-[calc(100vh-240px)]">
         <TableHeader>
-          <TableRow class="border-b border-gray-200 text-xs hover:bg-transparent">
+          <TableRow class="border-b border-gray-200 text-xs hover:bg-transparent bg-white">
             <!-- 1. No (Frozen) -->
-            <TableHead class="w-[50px] min-w-[50px] max-w-[50px] text-center font-medium text-gray-500 sticky z-20 bg-white border-b border-gray-200" style="left: 0px;">No</TableHead>
+            <TableHead class="w-[50px] min-w-[50px] max-w-[50px] text-center font-semibold text-gray-950 sticky top-0 z-30 bg-white border-b border-gray-200" style="left: 0px;">No</TableHead>
             <!-- 2. Nama Dealer (Frozen) -->
-            <TableHead class="w-[180px] min-w-[180px] max-w-[180px] font-medium text-gray-500 sticky z-20 bg-white border-b border-gray-200" style="left: 50px;">Nama Dealer</TableHead>
+            <TableHead class="w-[180px] min-w-[180px] max-w-[180px] font-semibold text-gray-950 sticky top-0 z-30 bg-white border-b border-gray-200" style="left: 50px;">
+              <span class="inline-flex items-center gap-1">Nama Dealer <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
+            </TableHead>
             <!-- 3. Program (Frozen) -->
-            <TableHead class="w-[110px] min-w-[110px] max-w-[110px] whitespace-nowrap font-medium text-gray-500 sticky z-20 bg-white border-b border-gray-200" style="left: 230px;">Program</TableHead>
+            <TableHead class="w-[150px] min-w-[150px] max-w-[150px] font-semibold text-gray-950 sticky top-0 z-30 bg-white border-b border-gray-200" style="left: 230px;">
+              <span class="inline-flex items-center gap-1">Program <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
+            </TableHead>
             <!-- 4. Kode BT (Frozen) -->
-            <TableHead class="w-[90px] min-w-[90px] max-w-[90px] whitespace-nowrap font-medium text-gray-500 sticky z-20 bg-white border-b border-gray-200" style="left: 340px;">Kode BT</TableHead>
+            <TableHead class="w-[110px] min-w-[110px] max-w-[110px] font-semibold text-gray-950 sticky top-0 z-30 bg-white border-b border-gray-200" style="left: 380px;">
+              <span class="inline-flex items-center gap-1">Kode BT <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
+            </TableHead>
             <!-- 5. Nama Program (Frozen) -->
-            <TableHead class="w-[220px] min-w-[220px] max-w-[220px] font-medium text-gray-500 sticky z-20 bg-white border-b border-gray-200" style="left: 430px;">Nama Program</TableHead>
+            <TableHead class="w-[300px] min-w-[300px] max-w-[300px] font-semibold text-gray-950 sticky top-0 z-30 bg-white border-b border-gray-200" style="left: 490px;">
+              <span class="inline-flex items-center gap-1">Nama Program <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
+            </TableHead>
             <!-- 6. Aksi (Frozen with divider shadow) -->
-            <TableHead class="w-[90px] min-w-[90px] max-w-[90px] text-center font-medium text-gray-500 sticky z-20 bg-white border-b border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]" style="left: 650px;">Aksi</TableHead>
-            <!-- 7. Periode -->
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Periode</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Region</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">No PO</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">ID GS</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Kode Supplier</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Status DL</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Sales Person</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Telemarketing</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Wajib Pajak</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">TRF PPh</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Incentive</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">DPP</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">DPP Lain</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">PPN</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Nilai PPh</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Net Pay</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Cek Pajak</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Selisih</TableHead>
-            <TableHead class="min-w-[100px] text-center font-medium text-gray-500">Note PPh</TableHead>
-            <TableHead class="min-w-[140px] font-medium text-gray-500">No Faktur</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Ket Faktur</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">No PO/SJ</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">No Transaksi</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl Input</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl Share CN</TableHead>
-            <TableHead class="w-[80px] text-center font-medium text-gray-500">Pending</TableHead>
-            <TableHead class="min-w-[150px] font-medium text-gray-500">Keterangan</TableHead>
-            <TableHead class="min-w-[150px] font-medium text-gray-500">Cek Dokumen</TableHead>
-            <TableHead class="min-w-[190px] font-medium text-gray-500">Status Potong Purchase</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Status AR</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl Potong/TF</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">No. UID</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">No. Pembayaran</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl Bank PPh</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">T/F</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl Proses</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl SJ</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">No. SJ</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Info Bank</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Pending Potongan</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">NPWP</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Nama NPWP</TableHead>
-            <TableHead class="min-w-[150px] font-medium text-gray-500">Program 2</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500 text-center">CN</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500 text-center">Agrement</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500 text-center">Cek FP</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500 text-center">Cek Evidance</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Noted</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Norek</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Namrek</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Bank</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Big Region</TableHead>
-          </TableRow>
-        </TableHeader>
+            <TableHead class="w-[90px] min-w-[90px] max-w-[90px] text-center font-semibold text-gray-950 sticky top-0 z-30 bg-white border-b border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08),0_1px_0_0_#e5e7eb]" style="left: 790px;">Aksi</TableHead>
+              <!-- 7. Periode -->
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Periode</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Region</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">No PO</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">ID GS</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Kode Supplier</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Status DL</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Sales Person</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Telemarketing</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Wajib Pajak</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">TRF PPh</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">Incentive</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">DPP</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">DPP Lain</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">PPN</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">Nilai PPh</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">Net Pay</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">Cek Pajak</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">Selisih</TableHead>
+              <TableHead class="min-w-[100px] text-center font-semibold text-gray-950">Note PPh</TableHead>
+              <TableHead class="min-w-[140px] font-semibold text-gray-950">No Faktur</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Ket Faktur</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">No PO/SJ</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">No Transaksi</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Tgl Input</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Tgl Share CN</TableHead>
+              <TableHead class="w-[80px] text-center font-semibold text-gray-950">Pending</TableHead>
+              <TableHead class="min-w-[150px] font-semibold text-gray-950">Keterangan</TableHead>
+              <TableHead class="min-w-[150px] font-semibold text-gray-950">Cek Dokumen</TableHead>
+              <TableHead class="min-w-[190px] font-semibold text-gray-950">Status Potong Purchase</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Status AR</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Tgl Potong/TF</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">No. UID</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">No. Pembayaran</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Tgl Bank PPh</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">T/F</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Tgl Proses</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Tgl SJ</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">No. SJ</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Info Bank</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Pending Potongan</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">NPWP</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Nama NPWP</TableHead>
+              <TableHead class="min-w-[150px] font-semibold text-gray-950">Program 2</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-center">CN</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-center">Agrement</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-center">Cek FP</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-center">Cek Evidance</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Noted</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Norek</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Namrek</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Bank</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Big Region</TableHead>
+            </TableRow>
+          </TableHeader>
         <TableBody>
           <!-- Loading State -->
           <TableEmpty v-if="isLoading && items.length === 0" :colspan="58">
             <div class="inline-flex items-center gap-2 text-gray-500 py-8">
               <RefreshCwIcon class="w-4 h-4 animate-spin text-gray-400" />
-              <span>Memuat data program...</span>
+              <span class="text-xs">Memuat data program...</span>
             </div>
           </TableEmpty>
 
           <!-- Empty State -->
           <TableEmpty v-else-if="items.length === 0" :colspan="58">
             <div class="max-w-md mx-auto py-8 space-y-1.5 text-center text-gray-500">
-              <p class="font-medium text-gray-800">Belum ada data program yang tersimpan.</p>
+              <p class="font-medium text-gray-800 text-xs">Belum ada data program yang tersimpan.</p>
               <p class="text-xs text-gray-500">
                 Klik tombol <strong>"Sinkronkan Sekarang"</strong> di atas untuk memuat data dari spreadsheet Anda.
               </p>
             </div>
           </TableEmpty>
 
-          <!-- Data Rows (All typography exactly matches Form Program: text-xs, text-gray-700, normal font weight, Inter sans) -->
+          <!-- Data Rows (All typography exactly matches Filament standard: text-xs, text-gray-800, Inter sans) -->
           <TableRow
             v-else
             v-for="(row, idx) in items"
@@ -419,26 +449,26 @@
 
             <!-- 2. Nama Dealer (Frozen) -->
             <TableCell class="w-[180px] min-w-[180px] max-w-[180px] text-xs text-gray-700 py-2.5 leading-snug sticky z-10 bg-white group-hover:bg-gray-50/80 transition-colors border-b border-gray-200" style="left: 50px;">
-              <div class="line-clamp-2 text-gray-800 break-words" :title="row.dealer_name">{{ row.dealer_name || '-' }}</div>
+              <div class="line-clamp-2 text-gray-700 break-words" :title="row.dealer_name">{{ row.dealer_name || '-' }}</div>
             </TableCell>
 
             <!-- 3. Program (Frozen) -->
-            <TableCell class="w-[110px] min-w-[110px] max-w-[110px] whitespace-nowrap text-xs text-gray-700 py-2.5 sticky z-10 bg-white group-hover:bg-gray-50/80 transition-colors border-b border-gray-200" style="left: 230px;">
+            <TableCell class="w-[150px] min-w-[150px] max-w-[150px] text-xs text-gray-700 py-2.5 sticky z-10 bg-white group-hover:bg-gray-50/80 transition-colors border-b border-gray-200" style="left: 230px;">
               <div class="truncate" :title="row.program">{{ row.program || '-' }}</div>
             </TableCell>
 
             <!-- 4. Kode BT (Frozen) -->
-            <TableCell class="w-[90px] min-w-[90px] max-w-[90px] whitespace-nowrap text-xs text-gray-700 py-2.5 sticky z-10 bg-white group-hover:bg-gray-50/80 transition-colors border-b border-gray-200" style="left: 340px;">
+            <TableCell class="w-[110px] min-w-[110px] max-w-[110px] text-xs text-gray-700 py-2.5 sticky z-10 bg-white group-hover:bg-gray-50/80 transition-colors border-b border-gray-200" style="left: 380px;">
               <div class="truncate" :title="row.kode_bt">{{ row.kode_bt || '-' }}</div>
             </TableCell>
 
             <!-- 5. Nama Program (Frozen) -->
-            <TableCell class="w-[220px] min-w-[220px] max-w-[220px] text-xs text-gray-700 py-2.5 leading-snug sticky z-10 bg-white group-hover:bg-gray-50/80 transition-colors border-b border-gray-200" style="left: 430px;">
-              <div class="line-clamp-2 break-words" :title="row.program_name">{{ row.program_name || '-' }}</div>
+            <TableCell class="w-[300px] min-w-[300px] max-w-[300px] text-xs text-gray-700 py-2.5 leading-snug sticky z-10 bg-white group-hover:bg-gray-50/80 transition-colors border-b border-gray-200" style="left: 490px;">
+              {{ row.program_name || '-' }}
             </TableCell>
 
             <!-- 6. Aksi / Cek Data (Frozen with divider shadow) -->
-            <TableCell class="w-[90px] min-w-[90px] max-w-[90px] text-center text-xs py-2 sticky z-10 bg-white group-hover:bg-gray-50/80 transition-colors border-b border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]" style="left: 650px;">
+            <TableCell class="w-[90px] min-w-[90px] max-w-[90px] text-center text-xs py-2 sticky z-10 bg-white group-hover:bg-gray-50/80 transition-colors border-b border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]" style="left: 790px;">
               <div class="flex items-center justify-center gap-1.5">
                 <button
                   type="button"
@@ -456,7 +486,7 @@
                   type="button"
                   @click.stop="sendWaToTelemarketing(row)"
                   :disabled="sendingWaId === row.id"
-                  class="w-7 h-7 shrink-0 inline-flex items-center justify-center rounded-md border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition shadow-2xs cursor-pointer disabled:opacity-50"
+                  class="w-7 h-7 shrink-0 inline-flex items-center justify-center rounded-md border border-emerald-200/80 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-700 transition shadow-2xs cursor-pointer disabled:opacity-50"
                   title="Kirim ke WhatsApp Telemarketing (Tawarkan Potong Order ke Dealer)"
                 >
                   <RefreshCwIcon v-if="sendingWaId === row.id" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
@@ -565,19 +595,19 @@
               <TableCell class="text-center py-2.5 whitespace-nowrap">
                 <span
                   v-if="row.note_pph === 'ok'"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50/70 text-emerald-700 border border-emerald-200/80 text-xs font-normal"
                 >
-                  <CheckIcon class="w-3 h-3" />
+                  <CheckIcon class="w-3.5 h-3.5 text-emerald-600" />
                   <span>ok</span>
                 </span>
                 <span
                   v-else-if="row.note_pph"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-medium"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50/70 text-amber-700 border border-amber-200/80 text-xs font-normal"
                 >
-                  <AlertCircleIcon class="w-3 h-3 text-amber-600 shrink-0" />
+                  <AlertCircleIcon class="w-3.5 h-3.5 text-amber-600 shrink-0" />
                   <span>{{ row.note_pph }}</span>
                 </span>
-                <span v-else class="text-gray-300">-</span>
+                <span v-else class="text-gray-300 text-xs">-</span>
               </TableCell>
 
               <!-- 25. No Faktur Pajak -->
@@ -612,10 +642,10 @@
 
               <!-- 31. Lama Pending -->
               <TableCell class="text-center text-xs text-gray-700 py-2.5 whitespace-nowrap">
-                <span v-if="row.lama_pending" class="px-1.5 py-0.5 rounded bg-white border border-gray-200 text-xs text-gray-700">
+                <span v-if="row.lama_pending" class="px-2 py-0.5 rounded bg-white border border-gray-200 text-xs text-gray-700">
                   {{ row.lama_pending }}
                 </span>
-                <span v-else class="text-gray-300">-</span>
+                <span v-else class="text-gray-300 text-xs">-</span>
               </TableCell>
 
               <!-- 32. Keterangan -->
@@ -628,16 +658,16 @@
                 <div
                   v-if="row.cek_dokumen"
                   :class="[
-                    'line-clamp-2 max-w-[160px] text-xs px-1.5 py-0.5 rounded inline-block',
+                    'line-clamp-2 max-w-[160px] text-xs px-2 py-0.5 rounded inline-block border',
                     row.cek_dokumen === 'LENGKAP' || row.cek_dokumen === 'OK'
-                      ? 'bg-teal-50 text-teal-700 border border-teal-200'
-                      : 'bg-amber-50 text-amber-800 border border-amber-200'
+                      ? 'bg-emerald-50/70 text-emerald-700 border-emerald-200/80'
+                      : 'bg-amber-50/70 text-amber-700 border-amber-200/80'
                   ]"
                   :title="row.cek_dokumen"
                 >
                   {{ row.cek_dokumen }}
                 </div>
-                <span v-else class="text-gray-300">-</span>
+                <span v-else class="text-gray-300 text-xs">-</span>
               </TableCell>
 
               <!-- 34. Status Potong By Purchase -->
@@ -647,19 +677,19 @@
                   :class="[
                     'px-2 py-0.5 rounded text-xs font-normal border inline-block',
                     row.status_potong_purchase === 'BISA DI POTONG'
-                      ? 'bg-teal-50 text-teal-700 border-teal-300'
+                      ? 'bg-emerald-50/70 text-emerald-700 border-emerald-200/80'
                       : row.status_potong_purchase === 'SUDAH POTONG'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                      ? 'bg-sky-50/70 text-sky-700 border-sky-200/80'
                       : row.status_potong_purchase === 'DONE TRANSFER'
-                      ? 'bg-blue-50 text-blue-700 border-blue-300'
+                      ? 'bg-violet-50/70 text-violet-700 border-violet-200/80'
                       : row.status_potong_purchase === 'BELUM BISA POTONG'
-                      ? 'bg-rose-50 text-rose-700 border-rose-300'
+                      ? 'bg-rose-50/70 text-rose-700 border-rose-200/80'
                       : 'bg-gray-50 text-gray-600 border-gray-200'
                   ]"
                 >
                   {{ row.status_potong_purchase }}
                 </span>
-                <span v-else class="text-gray-300">-</span>
+                <span v-else class="text-gray-300 text-xs">-</span>
               </TableCell>
 
               <!-- 35. Status Potong By AR -->
@@ -667,19 +697,19 @@
                 <span
                   v-if="row.status_potong_ar"
                   :class="[
-                    'px-2 py-0.5 rounded text-xs font-medium border inline-block',
+                    'px-2 py-0.5 rounded text-xs font-normal border inline-block',
                     row.status_potong_ar.includes('DEALER SETUJU')
-                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                      ? 'bg-sky-50/70 text-sky-700 border-sky-200/80'
                       : row.status_potong_ar === 'DONE'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      ? 'bg-emerald-50/70 text-emerald-700 border-emerald-200/80'
                       : row.status_potong_ar.includes('PENDING')
-                      ? 'bg-amber-50 text-amber-700 border-amber-200'
-                      : 'bg-white border-gray-200 text-gray-700'
+                      ? 'bg-amber-50/70 text-amber-700 border-amber-200/80'
+                      : 'bg-gray-50 text-gray-600 border-gray-200'
                   ]"
                 >
                   {{ row.status_potong_ar }}
                 </span>
-                <span v-else class="text-gray-300">-</span>
+                <span v-else class="text-gray-300 text-xs">-</span>
               </TableCell>
 
               <!-- 36. Tanggal Potong/TF -->
@@ -757,7 +787,7 @@
                     class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer shadow-2xs"
                     title="Buka Dokumen Credit Note di Google Drive"
                   >
-                    <FileTextIcon class="w-3 h-3 text-gray-500 shrink-0" />
+                    <FileTextIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
                     <span>CN</span>
                   </a>
                 </template>
@@ -775,7 +805,7 @@
                     class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer shadow-2xs"
                     title="Buka Dokumen Agreement di Google Drive"
                   >
-                    <FileTextIcon class="w-3 h-3 text-gray-500 shrink-0" />
+                    <FileTextIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
                     <span>Agr</span>
                   </a>
                 </template>
@@ -793,7 +823,7 @@
                     class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer shadow-2xs"
                     title="Buka Dokumen Faktur Pajak di Google Drive"
                   >
-                    <FileTextIcon class="w-3 h-3 text-gray-500 shrink-0" />
+                    <FileTextIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
                     <span>FP</span>
                   </a>
                 </template>
@@ -811,7 +841,7 @@
                     class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer shadow-2xs"
                     title="Buka Dokumen Evidance di Google Drive"
                   >
-                    <FileTextIcon class="w-3 h-3 text-gray-500 shrink-0" />
+                    <FileTextIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
                     <span>Evidance</span>
                   </a>
                 </template>
@@ -847,86 +877,16 @@
           </TableBody>
         </Table>
 
-      <!-- Pagination Footer (Identical to Form Program) -->
-      <div
-        v-if="pagination.total > 0"
-        class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-gray-200 bg-white text-xs text-gray-500 font-sans"
-      >
-        <div class="flex items-center gap-3">
-          <div>
-            Menampilkan <span class="font-semibold text-gray-900">{{ items.length }}</span> dari
-            <span class="font-semibold text-gray-900">{{ Number(pagination.total).toLocaleString('id-ID') }}</span> total baris
-          </div>
-          <div class="flex items-center gap-1.5 ml-2 pl-3 border-l border-gray-200">
-            <span>Per halaman:</span>
-            <select
-              v-model="pagination.per_page"
-              @change="fetchData(1)"
-              class="h-7 px-1.5 rounded border border-gray-200 bg-white text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-            >
-              <option :value="15">15</option>
-              <option :value="25">25</option>
-              <option :value="50">50</option>
-              <option :value="100">100</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-1.5">
-          <button
-            type="button"
-            :disabled="pagination.current_page <= 1 || isLoading"
-            @click="fetchData(1)"
-            class="px-2 py-1.5 rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-            title="Halaman Pertama"
-          >
-            &laquo; Pertama
-          </button>
-          <button
-            type="button"
-            :disabled="pagination.current_page <= 1 || isLoading"
-            @click="fetchData(pagination.current_page - 1)"
-            class="px-2.5 py-1.5 rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-          >
-            Sebelumnya
-          </button>
-
-          <div class="flex items-center gap-1 px-1">
-            <span>Halaman</span>
-            <input
-              type="number"
-              min="1"
-              :max="pagination.last_page"
-              :value="pagination.current_page"
-              @keydown.enter="onPageInputEnter($event)"
-              @blur="onPageInputBlur($event)"
-              class="w-14 h-7 text-center rounded border border-gray-200 bg-white text-xs font-semibold text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
-              title="Ketik nomor halaman lalu tekan Enter"
-            />
-            <span>dari {{ pagination.last_page || 1 }}</span>
-          </div>
-
-          <button
-            type="button"
-            :disabled="pagination.current_page >= pagination.last_page || isLoading"
-            @click="fetchData(pagination.current_page + 1)"
-            class="px-2.5 py-1.5 rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-          >
-            Selanjutnya
-          </button>
-          <button
-            type="button"
-            :disabled="pagination.current_page >= pagination.last_page || isLoading"
-            @click="fetchData(pagination.last_page)"
-            class="px-2 py-1.5 rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-            title="Halaman Terakhir"
-          >
-            Terakhir &raquo;
-          </button>
-
-          <RefreshCwIcon v-if="isLoading" class="w-3.5 h-3.5 text-gray-400 animate-spin ml-1.5" />
-        </div>
-      </div>
+      <!-- Filament Pagination Footer -->
+      <FilamentPagination
+        :total="pagination.total"
+        :current-page="pagination.current_page"
+        :last-page="pagination.last_page"
+        :per-page="pagination.per_page"
+        :per-page-options="[15, 25, 50, 100]"
+        @page-change="fetchData"
+        @per-page-change="changePerPage"
+      />
     </div>
 
     <!-- Modal Rekonsiliasi & Pencocokan Form Program -->
@@ -1419,6 +1379,8 @@ import {
   FileText as FileTextIcon,
   Download as DownloadIcon,
   ChevronDown as ChevronDownIcon,
+  ChevronRight as ChevronRightIcon,
+  Filter as FilterIcon,
   X as XIcon,
   Zap as ZapIcon,
   Send as SendIcon,
@@ -1436,6 +1398,9 @@ import {
   TableCell,
   TableEmpty,
 } from '@/components/ui/table';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import FilamentPagination from '@/components/ui/FilamentPagination.vue';
+import FilamentBadge from '@/components/ui/FilamentBadge.vue';
 import ReconciliationHistoryModal from '@/components/ReconciliationHistoryModal.vue';
 
 const isValidUrl = (url) => {
@@ -1556,6 +1521,22 @@ const handleClickOutsideProgramDropdown = (e) => {
   if (programDropdownRef.value && !programDropdownRef.value.contains(e.target)) {
     showProgramDropdown.value = false;
   }
+};
+
+const isFilterOpen = ref(false);
+
+const activeFilterCount = computed(() => {
+  let count = 0;
+  if (filters.region) count++;
+  if (filters.program) count++;
+  if (filters.status_purchase) count++;
+  if (filters.status_ar) count++;
+  return count;
+});
+
+const changePerPage = (newPerPage) => {
+  pagination.per_page = Number(newPerPage);
+  fetchData(1);
 };
 
 const pagination = reactive({

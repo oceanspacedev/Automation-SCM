@@ -1,46 +1,55 @@
 <template>
   <div class="space-y-4">
+    <!-- Breadcrumbs (Filament style) -->
+    <div class="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+      <span>Invoices</span>
+      <ChevronRightIcon class="w-4 h-4 text-gray-400" />
+      <span class="text-gray-800 font-medium">List</span>
+    </div>
+
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
         <div class="flex items-center gap-2.5">
-          <h1 class="text-2xl font-bold tracking-tight text-gray-900">Invoices</h1>
+          <h1 class="text-2xl font-bold tracking-tight text-gray-950">Invoices</h1>
           <!-- Google Connection Status Badge -->
           <span
             v-if="googleStatus.is_connected"
-            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-normal bg-gray-50 text-gray-600 border border-gray-200"
+            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-normal bg-gray-50 text-gray-600 border border-gray-200"
             :title="`Terhubung dengan akun Google: ${googleStatus.account_email}`"
           >
-            <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
             <span>Gmail: {{ googleStatus.account_email }}</span>
           </span>
           <a
             v-else
             href="/auth/google/redirect"
-            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-normal bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 transition cursor-pointer"
+            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-normal bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 transition cursor-pointer"
             title="Klik untuk menghubungkan akun Google Workspace (Gmail API)"
           >
-            <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
             <span>Hubungkan Google Workspace</span>
           </a>
         </div>
-        <p class="text-sm text-gray-500">Daftar invoice resmi yang telah diterbitkan.</p>
+        <p class="text-xs text-gray-500 mt-0.5">Daftar invoice resmi yang telah diterbitkan.</p>
       </div>
-      <div class="flex items-center gap-2.5">
+
+      <!-- Filament Page Actions -->
+      <div class="flex items-center gap-2">
         <!-- Multi-select Send Button -->
         <button
           v-if="selectedIds.length > 0"
           @click="askSendBatch"
           :disabled="sendingBatch"
-          class="h-9 px-4 bg-[#1D70F5] hover:bg-blue-600 text-white text-xs font-medium rounded-lg disabled:opacity-50 transition cursor-pointer flex items-center gap-2 shadow-2xs"
+          class="h-9 px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center gap-2"
           :title="`Kirim ${selectedIds.length} invoice terpilih`"
         >
-          <svg v-if="sendingBatch" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+          <svg v-if="sendingBatch" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <SendIcon v-else class="w-3.5 h-3.5 text-white" />
-          <span>{{ sendingBatch ? 'Mengirim...' : `Kirim (${selectedIds.length}) Notifikasi Terpilih` }}</span>
+          <SendIcon v-else class="w-3.5 h-3.5 text-gray-500" />
+          <span>{{ sendingBatch ? 'Mengirim...' : `Kirim (${selectedIds.length}) Terpilih` }}</span>
         </button>
 
         <!-- Send All Button (when nothing specifically selected) -->
@@ -48,23 +57,23 @@
           v-else
           @click="askSendAll"
           :disabled="sendingAll"
-          class="h-9 px-4 bg-[#1D70F5] hover:bg-blue-600 text-white text-xs font-medium rounded-lg disabled:opacity-50 transition cursor-pointer flex items-center gap-2 shadow-2xs"
+          class="h-9 px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center gap-2"
           title="Kirim semua invoice yang belum terkirim via Email & WhatsApp"
         >
-          <svg v-if="sendingAll" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+          <svg v-if="sendingAll" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <SendIcon v-else class="w-3.5 h-3.5 text-white" />
+          <SendIcon v-else class="w-3.5 h-3.5 text-gray-500" />
           <span>{{ sendingAll ? 'Mengirim Semua...' : 'Kirim Semua Notifikasi' }}</span>
         </button>
 
         <router-link
           to="/drafts"
-          class="h-10 px-4 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-lg transition inline-flex items-center gap-2 shadow-xs"
+          class="h-9 px-3 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center gap-1.5 shadow-2xs"
         >
-          <ArrowLeftIcon class="w-4 h-4 text-gray-600" />
-          <span>Kembali ke Draft</span>
+          <ArrowLeftIcon class="w-3.5 h-3.5 text-gray-500" />
+          <span>Draft Invoice</span>
         </router-link>
       </div>
     </div>
@@ -75,239 +84,318 @@
       <AlertCircleIcon v-else class="h-4 w-4" />
       <AlertDescription class="flex items-center justify-between">
         <span>{{ alertMessage }}</span>
-        <button @click="alertMessage = null" class="ml-4 text-sm opacity-60 hover:opacity-100 cursor-pointer">&times;</button>
+        <button @click="alertMessage = null" class="ml-4 text-xs opacity-60 hover:opacity-100 cursor-pointer">&times;</button>
       </AlertDescription>
     </Alert>
 
-    <!-- Toolbar Filters (Shadcn style) -->
-    <div class="flex flex-wrap items-center justify-between gap-3 py-1">
-      <div class="flex flex-wrap items-center gap-2">
-        <input
-          v-model="filters.search"
-          @input="debounceFetch"
-          type="text"
-          placeholder="Filter invoice, dealer, customer, email..."
-          class="h-9 w-64 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
-        />
-        <select
-          v-model="filters.invoice_type"
-          @change="fetchInvoices(1)"
-          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-        >
-          <option value="">Semua Tipe</option>
-          <option value="DSA">DSA</option>
-          <option value="NPS FL">NPS FL</option>
-          <option value="REGULAR">REGULAR</option>
-        </select>
-        <select
-          v-model="filters.status"
-          @change="fetchInvoices(1)"
-          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-        >
-          <option value="">Semua Status</option>
-          <option value="generated">Generated</option>
-          <option value="sent">Sent (Terkirim)</option>
-          <option value="paid">Paid</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-        <Popover>
-          <PopoverTrigger as-child>
-            <button
-              :class="[
-                'h-9 px-3 inline-flex items-center gap-2 rounded-md border border-gray-200 bg-white text-xs text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-black transition cursor-pointer',
-                !filters.date && 'text-gray-400'
-              ]"
-            >
-              <CalendarIcon class="h-3.5 w-3.5" />
-              {{ filters.date ? formatDateDisplay(filters.date) : 'Pilih tanggal' }}
-            </button>
-          </PopoverTrigger>
-          <PopoverContent class="w-auto p-0">
-            <Calendar
-              :model-value="selectedCalendarDate"
-              :initial-focus="true"
-              @update:model-value="onDateSelect"
-            />
-          </PopoverContent>
-        </Popover>
-        <button
-          v-if="filters.search || filters.invoice_type || filters.status || filters.date"
-          @click="resetFilters"
-          class="h-9 px-3 text-xs text-gray-500 hover:text-black cursor-pointer"
-        >
-          Reset
-        </button>
-      </div>
-    </div>
+    <!-- Filament Table Card -->
+    <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <!-- Toolbar (Search & Filter like Filament) -->
+      <div class="p-3 sm:px-4 sm:py-3.5 border-b border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <!-- Left: Quick Selection Info -->
+        <div class="flex items-center gap-2 text-xs">
+          <span v-if="selectedIds.length > 0" class="font-medium text-gray-900 bg-gray-100 px-2.5 py-1 rounded-md">
+            {{ selectedIds.length }} invoice terpilih
+          </span>
+          <span v-else class="text-gray-400 text-xs">
+            Daftar invoice resmi diterbitkan
+          </span>
+        </div>
 
-    <!-- Official Shadcn Table Card (All uniform font) -->
-    <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
+        <!-- Right: Search Box & Filter Popover -->
+        <div class="flex items-center gap-2 self-end sm:self-auto w-full sm:w-auto">
+          <!-- Search box with Magnifying glass -->
+          <div class="relative flex-1 sm:w-64">
+            <SearchIcon class="w-4 h-4 text-gray-400 absolute left-3 top-2.5 pointer-events-none" />
+            <input
+              v-model="filters.search"
+              @input="debounceFetch"
+              type="text"
+              placeholder="Search"
+              class="h-9 w-full pl-9 pr-3 text-xs text-gray-900 bg-white border border-gray-300 rounded-lg placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-950 focus:border-gray-950 transition"
+            />
+          </div>
+
+          <!-- Filter Popover with Active Badge Count (like photo: funnel with badge) -->
+          <Popover v-model:open="isFilterOpen">
+            <PopoverTrigger as-child>
+              <button
+                type="button"
+                :class="[
+                  'h-9 px-2.5 rounded-lg border text-xs font-medium inline-flex items-center gap-1.5 transition shadow-2xs cursor-pointer',
+                  activeFilterCount > 0
+                    ? 'border-gray-900 bg-gray-50 text-gray-950'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                ]"
+                title="Buka Filter"
+              >
+                <FilterIcon class="w-4 h-4 text-gray-600" />
+                <span
+                  :class="[
+                    'w-4 h-4 rounded-full text-[10px] font-semibold flex items-center justify-center',
+                    activeFilterCount > 0 ? 'bg-gray-950 text-white' : 'bg-gray-100 text-gray-600'
+                  ]"
+                >
+                  {{ activeFilterCount }}
+                </span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent class="w-72 p-3 space-y-3" align="end">
+              <div class="text-xs font-semibold text-gray-900 border-b border-gray-100 pb-2 flex items-center justify-between">
+                <span>Filter Invoices</span>
+                <button
+                  v-if="activeFilterCount > 0"
+                  @click="resetFilters"
+                  class="text-[11px] font-normal text-rose-600 hover:underline cursor-pointer"
+                >
+                  Reset
+                </button>
+              </div>
+
+              <!-- Tipe Filter -->
+              <div class="space-y-1">
+                <label class="text-[11px] font-medium text-gray-700">Tipe Invoice</label>
+                <select
+                  v-model="filters.invoice_type"
+                  @change="fetchInvoices(1)"
+                  class="w-full h-8 px-2.5 text-xs rounded-lg border border-gray-300 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-950 cursor-pointer"
+                >
+                  <option value="">Semua Tipe</option>
+                  <option value="DSA">DSA</option>
+                  <option value="NPS FL">NPS FL</option>
+                  <option value="REGULAR">REGULAR</option>
+                </select>
+              </div>
+
+              <!-- Status Filter -->
+              <div class="space-y-1">
+                <label class="text-[11px] font-medium text-gray-700">Status</label>
+                <select
+                  v-model="filters.status"
+                  @change="fetchInvoices(1)"
+                  class="w-full h-8 px-2.5 text-xs rounded-lg border border-gray-300 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-950 cursor-pointer"
+                >
+                  <option value="">Semua Status</option>
+                  <option value="generated">Generated</option>
+                  <option value="sent">Sent (Terkirim)</option>
+                  <option value="paid">Paid</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+
+              <!-- Date Filter -->
+              <div class="space-y-1">
+                <label class="text-[11px] font-medium text-gray-700">Tanggal</label>
+                <input
+                  v-model="filters.date"
+                  @change="fetchInvoices(1)"
+                  type="date"
+                  class="w-full h-8 px-2.5 text-xs rounded-lg border border-gray-300 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-950 cursor-pointer"
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+
+      <!-- Filament Table -->
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead class="w-[40px] text-center">
+            <TableHead class="w-[44px] text-center">
               <input
                 type="checkbox"
                 :checked="isAllSelected"
                 :indeterminate="isIndeterminate"
                 @change="toggleSelectAll"
                 :disabled="selectableInvoices.length === 0"
-                class="h-4 w-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer disabled:opacity-30"
                 title="Pilih semua yang belum dikirim di halaman ini"
               />
             </TableHead>
-            <TableHead class="w-[150px] whitespace-nowrap text-xs">Invoice</TableHead>
-            <TableHead class="min-w-[140px] text-xs">Dealer</TableHead>
-            <TableHead class="min-w-[130px] text-xs">Customer</TableHead>
-            <TableHead class="min-w-[130px] text-xs">Email</TableHead>
-            <TableHead class="w-[110px] whitespace-nowrap text-xs">WhatsApp</TableHead>
-            <TableHead class="w-[95px] whitespace-nowrap text-xs">Tanggal</TableHead>
-            <TableHead class="text-right w-[120px] whitespace-nowrap text-xs">Amount</TableHead>
-            <TableHead class="text-right w-[225px] whitespace-nowrap text-xs">Action</TableHead>
+            <TableHead class="min-w-[150px]">
+              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                Nomor Invoice
+                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+              </span>
+            </TableHead>
+            <TableHead class="min-w-[170px]">
+              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                Dealer Tujuan
+                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+              </span>
+            </TableHead>
+            <TableHead class="min-w-[140px]">
+              <span>Customer</span>
+            </TableHead>
+            <TableHead class="min-w-[100px]">
+              <span>Tipe</span>
+            </TableHead>
+            <TableHead class="min-w-[110px]">
+              <span>Status</span>
+            </TableHead>
+            <TableHead class="min-w-[120px]">
+              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                Tanggal
+                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+              </span>
+            </TableHead>
+            <TableHead class="text-right min-w-[130px]">
+              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer justify-end w-full">
+                Total Netpay
+                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+              </span>
+            </TableHead>
+            <TableHead class="text-right w-[210px] min-w-[210px]">
+              <span>Action</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
+
         <TableBody>
           <TableEmpty v-if="loading" :colspan="9">
-            Memuat data invoice...
+            <div class="py-8 flex flex-col items-center justify-center gap-2 text-gray-500">
+              <span class="inline-block w-5 h-5 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></span>
+              <span class="text-xs">Memuat data invoice...</span>
+            </div>
           </TableEmpty>
+
           <TableEmpty v-else-if="invoices.length === 0" :colspan="9">
-            Belum ada invoice yang dibuat. Silakan generate invoice dari menu <strong>Draft</strong>.
+            <div class="py-8 text-center text-gray-400 text-xs">
+              Belum ada invoice yang dibuat. Silakan generate invoice dari menu <strong>Draft</strong>.
+            </div>
           </TableEmpty>
-          <TableRow v-for="inv in invoices" :key="inv.id">
-            <!-- Row Checkbox -->
-            <TableCell class="w-[40px] text-center">
+
+          <TableRow
+            v-for="inv in invoices"
+            :key="inv.id"
+            :class="selectedIds.includes(inv.id) ? 'bg-gray-50' : ''"
+          >
+            <!-- Checkbox Selection -->
+            <TableCell class="w-[44px] text-center">
               <input
                 type="checkbox"
                 :value="inv.id"
                 v-model="selectedIds"
                 :disabled="isAlreadySent(inv) || !hasDestination(inv)"
-                class="h-4 w-4 rounded border-gray-300 text-black focus:ring-black cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer disabled:opacity-30"
                 :title="isAlreadySent(inv) ? 'Sudah dikirim' : (!hasDestination(inv) ? 'Tidak ada email atau nomor WhatsApp' : 'Pilih invoice ini')"
               />
             </TableCell>
-            <TableCell class="text-xs">
-              <router-link :to="`/invoices/${inv.id}`" class="hover:underline text-xs text-gray-900">
+
+            <!-- Nomor Invoice (Bold like SJ-xxxx) -->
+            <TableCell>
+              <router-link
+                :to="`/invoices/${inv.id}`"
+                class="text-gray-950 text-xs hover:underline"
+              >
                 {{ inv.invoice_number }}
               </router-link>
             </TableCell>
-            <TableCell class="max-w-[170px] truncate text-xs" :title="`${inv.dealer_code} - ${inv.dealer_name}`">
+
+            <!-- Dealer Tujuan -->
+            <TableCell class="text-xs text-gray-800" :title="`${inv.dealer_code} - ${inv.dealer_name}`">
               {{ inv.dealer_code }} - {{ inv.dealer_name }}
             </TableCell>
-            <TableCell class="max-w-[150px] truncate text-xs" :title="inv.customer_name">
+
+            <!-- Customer -->
+            <TableCell class="text-xs text-gray-600" :title="inv.customer_name">
               {{ inv.customer_name || '-' }}
             </TableCell>
-            <!-- Email -->
-            <TableCell class="max-w-[140px] truncate text-xs" :title="inv.email || inv.draft?.email">
-              {{ inv.email || inv.draft?.email || '-' }}
+
+            <!-- Tipe -->
+            <TableCell class="text-xs text-gray-600">
+              {{ inv.invoice_type || '-' }}
             </TableCell>
-            <!-- WhatsApp -->
-            <TableCell class="whitespace-nowrap text-xs" :title="inv.whatsapp || inv.draft?.whatsapp">
-              {{ inv.whatsapp || inv.draft?.whatsapp || '-' }}
+
+            <!-- Status (Filament Pill Badge) -->
+            <TableCell>
+              <FilamentBadge
+                :color="inv.status === 'sent' ? 'success' : (inv.status === 'paid' ? 'success' : 'info')"
+              >
+                {{ inv.status === 'sent' ? 'DELIVERED' : (inv.status || 'GENERATED') }}
+              </FilamentBadge>
             </TableCell>
-            <TableCell class="whitespace-nowrap text-xs">
+
+            <!-- Tanggal -->
+            <TableCell class="text-xs text-gray-600 whitespace-nowrap">
               {{ inv.invoice_date || '-' }}
             </TableCell>
-            <TableCell class="text-right text-gray-800 whitespace-nowrap text-xs">
+
+            <!-- Netpay -->
+            <TableCell class="text-right text-xs text-gray-950 whitespace-nowrap">
               {{ formatCurrency(inv.netpay) }}
             </TableCell>
 
-            <!-- Modern Action Buttons With Pixel-Perfect Vertical Alignment -->
-            <TableCell class="text-right w-[225px] whitespace-nowrap text-xs">
+            <!-- Filament Action Buttons (View, PDF, Kirim/Sent) -->
+            <TableCell class="text-right whitespace-nowrap">
               <div class="flex items-center justify-end gap-1.5">
-                <!-- 1. View / Detail Icon -->
+                <!-- 1. View Button -->
                 <router-link
                   :to="`/invoices/${inv.id}`"
-                  class="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer shadow-2xs"
+                  class="h-7 px-2 inline-flex items-center justify-center gap-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium transition shadow-2xs cursor-pointer"
                   title="Lihat Detail Invoice"
                 >
-                  <EyeIcon class="w-4 h-4 text-gray-600" />
+                  <EyeIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
+                  <span>View</span>
                 </router-link>
 
-                <!-- 2. PDF Download Button (Clean Monochrome Outline) -->
+                <!-- 2. PDF Link Button -->
                 <a
                   :href="`/invoices/${inv.id}/pdf`"
-                  class="h-8 w-[68px] shrink-0 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer shadow-2xs"
-                  title="Unduh PDF Invoice"
+                  target="_blank"
+                  class="h-7 px-2 inline-flex items-center justify-center gap-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium transition shadow-2xs cursor-pointer"
+                  title="Unduh PDF"
                 >
                   <FileTextIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                  <span class="text-xs font-medium text-gray-700">PDF</span>
+                  <span>PDF</span>
                 </a>
 
-                <!-- 3. Email/WA Action Button (Calm Neutral / Primary) -->
-                <!-- Already Sent: Subtle calm gray/emerald badge -->
+                <!-- 3. Kirim / Sent Action -->
                 <span
                   v-if="isAlreadySent(inv)"
-                  class="h-8 w-[88px] shrink-0 bg-gray-50 text-gray-600 border border-gray-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 cursor-default select-none shadow-2xs"
+                  class="h-7 w-[72px] inline-flex items-center justify-center gap-1 rounded-md border border-emerald-200/80 bg-emerald-50/70 text-emerald-700 text-xs font-medium transition shadow-2xs select-none"
                   title="Invoice ini sudah terkirim"
                 >
                   <CheckCircleIcon class="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Terkirim</span>
+                  <span>Sent</span>
                 </span>
-
-                <!-- Ready to send: Blue Kirim button (opens Send modal with sender choice) -->
-                <button
-                  v-else-if="hasDestination(inv)"
-                  @click="openEmailModal(inv)"
-                  :disabled="sendingId === inv.id"
-                  class="h-8 w-[88px] shrink-0 bg-[#1D70F5] hover:bg-blue-600 text-white text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-50"
-                  :title="`Kirim invoice ke ${inv.email || inv.draft?.email || ''} ${inv.whatsapp || inv.draft?.whatsapp ? '(' + (inv.whatsapp || inv.draft?.whatsapp) + ')' : ''}`"
-                >
-                  <SendIcon class="w-3.5 h-3.5 text-white shrink-0" />
-                  <span>Kirim</span>
-                </button>
-
-                <!-- No email/whatsapp: Manual Input Button -->
                 <button
                   v-else
                   @click="openEmailModal(inv)"
-                  class="h-8 w-[88px] shrink-0 border border-gray-200 bg-white text-gray-700 hover:text-gray-900 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
-                  title="Input email / WhatsApp manual & kirim"
+                  class="h-7 w-[72px] inline-flex items-center justify-center gap-1 rounded-md border border-blue-200/80 bg-blue-50/70 hover:bg-blue-100 text-blue-700 text-xs font-medium transition shadow-2xs cursor-pointer"
+                  title="Kirim Invoice via Email/WhatsApp"
                 >
-                  <SendIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                  <span>Manual</span>
+                  <SendIcon class="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>Kirim</span>
                 </button>
               </div>
             </TableCell>
           </TableRow>
         </TableBody>
+
         <TableFooter v-if="invoices.length > 0">
           <TableRow>
-            <TableCell :colspan="7" class="text-xs text-gray-700">
-              Total
+            <TableCell :colspan="7" class="text-xs font-semibold text-gray-950">
+              Total Netpay
             </TableCell>
-            <TableCell class="text-right whitespace-nowrap text-xs text-gray-700">
+            <TableCell class="text-right whitespace-nowrap text-xs font-bold text-gray-950">
               {{ formatCurrency(totalNetpay) }}
             </TableCell>
             <TableCell></TableCell>
           </TableRow>
         </TableFooter>
       </Table>
-    </div>
 
-    <!-- Pagination (Shadcn style) -->
-    <div class="flex items-center justify-between py-2 text-xs text-gray-500">
-      <div>
-        Menampilkan {{ pagination.total > 0 ? (pagination.current_page - 1) * pagination.per_page + 1 : 0 }} sampai {{ Math.min(pagination.current_page * pagination.per_page, pagination.total) }} dari {{ pagination.total }} invoice.
-      </div>
-      <div v-if="pagination.last_page > 1" class="flex items-center space-x-2">
-        <button
-          @click="fetchInvoices(pagination.current_page - 1)"
-          :disabled="pagination.current_page <= 1"
-          class="h-8 px-3 rounded-md border border-gray-200 text-xs font-medium hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
-        >
-          Previous
-        </button>
-        <span class="text-xs font-medium text-gray-700">
-          Halaman {{ pagination.current_page }} dari {{ pagination.last_page }}
-        </span>
-        <button
-          @click="fetchInvoices(pagination.current_page + 1)"
-          :disabled="pagination.current_page >= pagination.last_page"
-          class="h-8 px-3 rounded-md border border-gray-200 text-xs font-medium hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
-        >
-          Next
-        </button>
-      </div>
+      <!-- Filament Pagination Footer -->
+      <FilamentPagination
+        :total="pagination.total"
+        :current-page="pagination.current_page"
+        :last-page="pagination.last_page"
+        :per-page="pagination.per_page"
+        @page-change="fetchInvoices"
+        @per-page-change="(p) => { pagination.per_page = p; fetchInvoices(1); }"
+      />
     </div>
 
     <!-- Send Email Modal with Sender Selector -->
@@ -365,12 +453,18 @@ import {
   CheckCircle as CheckCircleIcon,
   AlertCircle as AlertCircleIcon,
   ArrowLeft as ArrowLeftIcon,
+  ChevronRight as ChevronRightIcon,
+  ChevronDown as ChevronDownIcon,
+  Search as SearchIcon,
+  Filter as FilterIcon,
 } from '@lucide/vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import SendEmailModal from '@/components/SendEmailModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
+import FilamentBadge from '@/components/ui/FilamentBadge.vue';
+import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 import {
   Table,
   TableHeader,
@@ -392,6 +486,7 @@ const sendingBatch = ref(false);
 const selectedIds = ref([]);
 const alertMessage = ref(null);
 const alertSuccess = ref(true);
+const isFilterOpen = ref(false);
 
 const defaultFallbackAccounts = [
   { id: 1, name: 'Rebate. MSI', email: 'ade@mediaselulerindonesia.com', is_default: true },
@@ -636,6 +731,14 @@ const filters = reactive({
   date: '',
 });
 
+const activeFilterCount = computed(() => {
+  let count = 0;
+  if (filters.invoice_type) count++;
+  if (filters.status) count++;
+  if (filters.date) count++;
+  return count;
+});
+
 const selectedCalendarDate = computed(() => {
   if (!filters.date) return undefined;
   try { return parseDate(filters.date); } catch { return undefined; }
@@ -657,7 +760,7 @@ const formatDateDisplay = (dateStr) => {
 const pagination = reactive({
   current_page: 1,
   last_page: 1,
-  per_page: 15,
+  per_page: 10,
   total: 0,
 });
 
@@ -678,6 +781,7 @@ const fetchInvoices = async (page = 1) => {
   try {
     const params = {
       page,
+      per_page: pagination.per_page,
       ...filters,
     };
     const res = await axios.get('/api/invoices', { params });
@@ -698,6 +802,7 @@ const resetFilters = () => {
   filters.invoice_type = '';
   filters.status = '';
   filters.date = '';
+  isFilterOpen.value = false;
   fetchInvoices(1);
 };
 

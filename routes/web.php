@@ -62,6 +62,8 @@ Route::prefix('api')->group(function () {
     Route::get('/program-submissions', [ProgramSubmissionController::class, 'index']);
     Route::get('/program-submissions/export', [ProgramSubmissionController::class, 'export']);
     Route::patch('/program-submissions/{id}', [ProgramSubmissionController::class, 'update']);
+    Route::delete('/program-submissions/{id}', [ProgramSubmissionController::class, 'destroy']);
+    Route::post('/program-submissions/{id}/swap-docs', [ProgramSubmissionController::class, 'swapDocs']);
     Route::post('/program-submissions/sync', [ProgramSubmissionController::class, 'sync']);
     Route::post('/program-submissions/config', [ProgramSubmissionController::class, 'saveConfig']);
     Route::post('/program-submissions/{id}/analyze-ai', [ProgramSubmissionController::class, 'analyzeAi']);

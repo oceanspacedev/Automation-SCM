@@ -417,23 +417,21 @@ class DocumentAnalysisService
                 $detectedRate = $hasPpn ? 0.02 : 0.025;
             }
 
-            // Cek Pajak Tarif PPh
-            if (isset($parsed['cek_pajak_tarif_pph']) && is_numeric($parsed['cek_pajak_tarif_pph'])) {
-                $cekPajak = (float) $parsed['cek_pajak_tarif_pph'];
-            } elseif ($submission->cek_pajak_tarif_pph !== null) {
-                $cekPajak = $submission->cek_pajak_tarif_pph;
-            } elseif ($dpp !== null) {
-                $cekPajak = round($dpp * $detectedRate, 2);
-            } else {
-                $cekPajak = null;
-            }
+            // Cek Pajak Tarif PPh:
+            // Penentuan/pengecekan pajak dilakukan oleh Tim Pajak internal, bukan oleh AI.
+            // Dibuat 0 kecuali jika sudah pernah diedit manual oleh admin.
+            $cekPajak = ($submission->is_manual_edit && $submission->cek_pajak_tarif_pph !== null)
+                ? (float) $submission->cek_pajak_tarif_pph
+                : 0.0;
 
-            // Calculate Selisih (0 jika perbedaan hanya toleransi pembulatan <= 1 rupiah)
-            if ($nilaiPph !== null && $cekPajak !== null) {
+            // Calculate Selisih: 0 jika verifikasi pajak diserahkan ke Tim Pajak
+            if ($submission->is_manual_edit && $submission->selisih !== null) {
+                $selisih = (float) $submission->selisih;
+            } elseif ($submission->is_manual_edit && $nilaiPph !== null && $cekPajak > 0) {
                 $diff = round($nilaiPph - $cekPajak, 2);
                 $selisih = abs($diff) <= 1 ? 0.0 : $diff;
             } else {
-                $selisih = $submission->selisih;
+                $selisih = 0.0;
             }
 
             // Physical audit status (CAP?, TTD?, NPWP?, ok)
@@ -711,9 +709,7 @@ Analisis Finansial & Pajak:
   * ppn: Pajak Pertambahan Nilai (PPN, jika "-" atau kosong isi 0)
   * nilai_pph: Potongan PPh (tertulis PPH di CN)
   * net_pay: Nilai bersih yang dibayarkan ke dealer (DPP + PPN - PPh)
-  * cek_pajak_tarif_pph: Hitung tarif pajak standar sesuai status:
-    - Jika tertera tarif 2.0% (PPh 23 untuk Badan/PKP): DPP x 2.0%
-    - Jika tertera tarif 2.5% (PPh 21 untuk Non-PKP/Orang Pribadi): DPP x 2.5%
+  * cek_pajak_tarif_pph: Selalu isi 0 (pengecekan/penentuan tarif pajak dilakukan oleh Tim Pajak internal, bukan oleh AI)
   * no_faktur: Nomor Faktur Pajak jika ditemukan (format: 010.xxx-xx.xxxxxxxx)
   * tgl_faktur: Tanggal Faktur Pajak (format: DD/MM/YYYY)
 - Audit Fisik / Kelengkapan Dokumen:
@@ -756,11 +752,26 @@ Ketentuan Penentuan Output:
    - "keterangan": "File dokumen tertukar antar kolom. Harap perbaiki posisi upload dokumen."
 
 4. DOKUMEN TIDAK SESUAI (invalid):
-   (HANYA berlaku jika ADA file yang diunggah pada slot tersebut tetapi isinya salah upload / bukan dokumen resmi yang diminta):
-   - "is_complete": false
-   - "cek_dokumen": Sebutkan dokumen yang salah upload, contoh: "DOKUMEN TIDAK SESUAI (FAKTUR)"
-   - "status_potong_purchase": "BELUM BISA POTONG"
-   - "keterangan": "File yang diunggah pada slot tersebut bukan dokumen resmi yang diminta."
+   (HANYA berlaku jika ADA file yang diunggah pada slot tersebut tetapi isinya salah upload / bukan dokumen resmi yang diminta, ATAU isi dokumen tidak sesuai data form):
+   * PENTING: JANGAN PERNAH mengubah data asli Form Program (nama dealer atau nama program TIDAK BOLEH diubah otomatis). Tugas AI murni mendeteksi dan memberikan CATATAN INFORMASI agar customer tahu letak perbedaannya dan dapat mengunggah ulang dokumen yang sesuai.
+   - Jika NAMA PROGRAM di lembar CN BERBEDA dengan nama program di Form Program (misal customer salah input program):
+     * Data form tetap dipertahankan (jangan diubah).
+     * Tandai slot CN sebagai "invalid" agar status tertahan dan customer tahu perlu upload ulang dokumen yang cocok.
+     * "message" pada slot CN: "Catatan: Nama program di form ('[Nama Program di Form]') berbeda dengan lembar CN ('[Nama Program di Lembar CN]'). Harap upload ulang dokumen yang sesuai."
+     * "cek_dokumen": "DOKUMEN TIDAK SESUAI (CN)"
+     * "status_potong_purchase": "BELUM BISA POTONG"
+     * "keterangan": "Catatan: Nama program di form ('[Nama Program di Form]') berbeda dengan lembar CN ('[Nama Program di Lembar CN]'). Harap upload ulang dokumen yang sesuai."
+   - Jika NAMA DEALER di dokumen BERBEDA dengan nama dealer di Form Program:
+     * Tandai slot dokumen terkait sebagai "invalid".
+     * "message": "Nama dealer di dokumen ('[Nama Dealer Dokumen]') berbeda dengan Form ('[Nama Dealer Form]'). Harap upload ulang."
+     * "cek_dokumen": "DOKUMEN TIDAK SESUAI (CN)"
+     * "status_potong_purchase": "BELUM BISA POTONG"
+     * "keterangan": "Nama dealer di dokumen berbeda dengan Form. Harap upload ulang dokumen yang sesuai."
+   - Dokumen bukan dokumen resmi program atau file acak (foto selfie, nota sembarangan, dll):
+     * "is_complete": false
+     * "cek_dokumen": Sebutkan dokumen yang salah upload, contoh: "DOKUMEN TIDAK SESUAI (FAKTUR)"
+     * "status_potong_purchase": "BELUM BISA POTONG"
+     * "keterangan": "File yang diunggah pada slot tersebut bukan dokumen resmi yang diminta."
 
 Format Keluaran:
 Wajib mengembalikan JSON murni TANPA pembungkus markdown ```json ``` dengan key berikut:

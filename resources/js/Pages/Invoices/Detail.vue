@@ -1,86 +1,86 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-4 font-sans">
     <!-- Top Bar -->
-    <div class="flex items-center justify-between pb-4 border-b border-gray-200">
-      <div class="flex items-center space-x-3">
-        <router-link to="/invoices" class="text-sm font-medium text-gray-500 hover:text-black">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-200">
+      <div class="flex items-center space-x-2.5">
+        <router-link to="/invoices" class="text-xs font-medium text-gray-500 hover:text-gray-900 transition">
           ← Kembali ke Daftar Invoice
         </router-link>
         <span class="text-gray-300">|</span>
-        <h1 class="text-xl font-bold tracking-tight text-gray-900">Invoice {{ invoice.invoice_number }}</h1>
-        <span class="text-sm font-medium text-gray-700">
+        <h1 class="text-lg font-bold tracking-tight text-gray-950">Invoice {{ invoice.invoice_number }}</h1>
+        <span class="text-xs font-medium text-gray-500">
           ({{ invoice.invoice_type }})
         </span>
       </div>
 
-      <div class="flex items-center space-x-2">
+      <div class="flex flex-wrap items-center gap-2">
         <!-- Status Badges -->
         <span
           v-if="invoice.status === 'sent' && invoice.email_sent_at && invoice.whatsapp_sent_at"
-          class="h-9 px-3.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
           title="Invoice ini sudah dikirim ke Email dan WhatsApp"
         >
-          <CheckCircleIcon class="h-4 w-4 text-emerald-600" />
+          <CheckCircleIcon class="h-3.5 w-3.5 text-emerald-600" />
           <span>Email & WA Terkirim</span>
         </span>
 
         <span
           v-else-if="invoice.email_sent_at && !invoice.whatsapp_sent_at"
-          class="h-9 px-3.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
           title="Email sudah terkirim"
         >
-          <CheckCircleIcon class="h-4 w-4 text-emerald-600" />
+          <CheckCircleIcon class="h-3.5 w-3.5 text-emerald-600" />
           <span>Email Terkirim</span>
         </span>
 
         <span
           v-else-if="!invoice.email_sent_at && invoice.whatsapp_sent_at"
-          class="h-9 px-3.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
           title="WhatsApp sudah terkirim"
         >
-          <CheckCircleIcon class="h-4 w-4 text-emerald-600" />
+          <CheckCircleIcon class="h-3.5 w-3.5 text-emerald-600" />
           <span>WA Terkirim</span>
         </span>
 
         <span
           v-else-if="invoice.status === 'sent'"
-          class="h-9 px-3.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
           title="Invoice sudah terkirim"
         >
-          <CheckCircleIcon class="h-4 w-4 text-emerald-600" />
+          <CheckCircleIcon class="h-3.5 w-3.5 text-emerald-600" />
           <span>Terkirim</span>
         </span>
 
         <span
           v-else-if="invoice.status === 'paid'"
-          class="h-9 px-3.5 bg-blue-50 text-blue-700 border border-blue-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
         >
-          <span class="w-2 h-2 rounded-full bg-blue-600"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
           <span>Paid</span>
         </span>
 
         <span
           v-else-if="invoice.status === 'failed'"
-          class="h-9 px-3.5 bg-rose-50 text-rose-700 border border-rose-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-rose-50 text-rose-700 border border-rose-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
         >
-          <AlertCircleIcon class="h-4 w-4 text-rose-600" />
+          <AlertCircleIcon class="h-3.5 w-3.5 text-rose-600" />
           <span>Gagal Terkirim</span>
         </span>
 
         <span
           v-else-if="invoice.status === 'generated'"
-          class="h-9 px-3.5 bg-gray-50 text-gray-700 border border-gray-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-gray-50 text-gray-700 border border-gray-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
           title="Invoice telah digenerate, siap dikirim"
         >
-          <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
           <span>Generated</span>
         </span>
 
         <span
           v-else-if="invoice.status"
-          class="h-9 px-3.5 bg-gray-50 text-gray-700 border border-gray-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none capitalize"
+          class="h-8 px-2.5 bg-gray-50 text-gray-700 border border-gray-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none capitalize"
         >
-          <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
           <span>{{ invoice.status }}</span>
         </span>
 
@@ -89,23 +89,23 @@
           v-if="!(invoice.email_sent_at && invoice.whatsapp_sent_at)"
           @click="showEmailModal = true"
           :disabled="quickSending"
-          class="h-9 px-3.5 bg-[#1D70F5] text-white hover:bg-blue-600 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-xs"
+          class="h-8 px-3 bg-[#1D70F5] text-white hover:bg-blue-600 text-xs font-medium rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-2xs"
           title="Pilih pengirim dan kirim invoice"
         >
-          <SendIcon class="w-4 h-4" />
+          <SendIcon class="w-3.5 h-3.5" />
           <span>Kirim Notifikasi</span>
         </button>
 
         <a
           :href="`/invoices/${invoice.id}/preview`"
           target="_blank"
-          class="h-9 px-3.5 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-md transition inline-flex items-center"
+          class="h-8 px-3 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center shadow-2xs"
         >
           Preview Invoice
         </a>
         <a
           :href="`/invoices/${invoice.id}/pdf`"
-          class="h-9 px-4 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-md transition inline-flex items-center"
+          class="h-8 px-3 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center shadow-2xs"
         >
           Download PDF
         </a>
@@ -113,12 +113,12 @@
     </div>
 
     <!-- Alert -->
-    <Alert v-if="alertMessage" :variant="alertSuccess ? 'default' : 'destructive'">
+    <Alert v-if="alertMessage" :variant="alertSuccess ? 'default' : 'destructive'" class="text-xs py-2.5">
       <CheckCircleIcon v-if="alertSuccess" class="h-4 w-4" />
       <AlertCircleIcon v-else class="h-4 w-4" />
-      <AlertDescription class="flex items-center justify-between">
+      <AlertDescription class="flex items-center justify-between text-xs">
         <span>{{ alertMessage }}</span>
-        <button @click="alertMessage = null" class="ml-4 text-sm opacity-60 hover:opacity-100 cursor-pointer">&times;</button>
+        <button @click="alertMessage = null" class="ml-4 text-xs opacity-60 hover:opacity-100 cursor-pointer">&times;</button>
       </AlertDescription>
     </Alert>
 
@@ -134,39 +134,39 @@
       @sent="onEmailSent"
     />
 
-    <div v-if="loading" class="py-8 text-center text-sm text-gray-500">
+    <div v-if="loading" class="py-8 text-center text-xs text-gray-500">
       Memuat rincian invoice...
     </div>
 
-    <div v-else class="space-y-6">
+    <div v-else class="space-y-4">
       <!-- Grid Informasi (3 Columns) -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <!-- Dealer -->
-        <div class="rounded-xl border border-gray-200 bg-white p-4">
-          <h2 class="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2 mb-3">
+        <div class="rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xs">
+          <h2 class="text-xs font-semibold text-gray-950 border-b border-gray-100 pb-2 mb-2.5">
             Dealer & Penerima
           </h2>
-          <table class="w-full text-sm">
+          <table class="w-full text-xs">
             <tbody>
               <tr>
-                <td class="py-1 text-gray-500 w-32">Dealer Code</td>
+                <td class="py-1 text-gray-500 w-28">Dealer Code</td>
                 <td class="py-1 font-medium text-gray-900">{{ invoice.dealer_code || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Dealer Name</td>
-                <td class="py-1 text-gray-900">{{ invoice.dealer_name || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ invoice.dealer_name || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Customer</td>
-                <td class="py-1 text-gray-900">{{ invoice.customer_name || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ invoice.customer_name || '-' }}</td>
               </tr>
               <tr>
-                <td class="py-1 text-gray-500">Alamat</td>
-                <td class="py-1 text-gray-700">{{ invoice.address || '-' }}</td>
+                <td class="py-1 text-gray-500 align-top">Alamat</td>
+                <td class="py-1 text-gray-700 leading-relaxed">{{ invoice.address || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Email</td>
-                <td class="py-1 text-gray-900 font-medium">{{ invoice.email || invoice.draft?.email || '-' }}</td>
+                <td class="py-1 text-gray-900 font-medium break-all">{{ invoice.email || invoice.draft?.email || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">WhatsApp</td>
@@ -177,31 +177,31 @@
         </div>
 
         <!-- Tax -->
-        <div class="rounded-xl border border-gray-200 bg-white p-4">
-          <h2 class="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2 mb-3">
+        <div class="rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xs">
+          <h2 class="text-xs font-semibold text-gray-950 border-b border-gray-100 pb-2 mb-2.5">
             Data Pajak & Dokumen
           </h2>
-          <table class="w-full text-sm">
+          <table class="w-full text-xs">
             <tbody>
               <tr>
-                <td class="py-1 text-gray-500 w-32">NPWP</td>
-                <td class="py-1 text-gray-900">{{ invoice.npwp || '-' }}</td>
+                <td class="py-1 text-gray-500 w-28">NPWP</td>
+                <td class="py-1 text-gray-800 font-mono">{{ invoice.npwp || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Nama NPWP</td>
-                <td class="py-1 text-gray-900">{{ invoice.npwp_name || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ invoice.npwp_name || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Jenis NPWP</td>
-                <td class="py-1 text-gray-900">{{ invoice.npwp_type || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ invoice.npwp_type || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Jenis PPh</td>
-                <td class="py-1 text-gray-900">{{ invoice.pph_type || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ invoice.pph_type || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Tanggal Inv</td>
-                <td class="py-1 text-gray-900">{{ invoice.invoice_date || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ invoice.invoice_date || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Status</td>
@@ -209,42 +209,42 @@
               </tr>
               <tr v-if="invoice.email_sent_at">
                 <td class="py-1 text-gray-500">Email Dikirim</td>
-                <td class="py-1 text-gray-900 text-xs">{{ formatDateTime(invoice.email_sent_at) }}</td>
+                <td class="py-1 text-gray-700 text-[11px]">{{ formatDateTime(invoice.email_sent_at) }}</td>
               </tr>
               <tr v-if="invoice.whatsapp_sent_at">
                 <td class="py-1 text-gray-500">WA Dikirim</td>
-                <td class="py-1 text-gray-900 text-xs">{{ formatDateTime(invoice.whatsapp_sent_at) }}</td>
+                <td class="py-1 text-gray-700 text-[11px]">{{ formatDateTime(invoice.whatsapp_sent_at) }}</td>
               </tr>
             </tbody>
           </table>
         </div>
 
         <!-- Program -->
-        <div class="rounded-xl border border-gray-200 bg-white p-4">
-          <h2 class="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2 mb-3">
+        <div class="rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xs">
+          <h2 class="text-xs font-semibold text-gray-950 border-b border-gray-100 pb-2 mb-2.5">
             Program & Item
           </h2>
-          <table class="w-full text-sm">
+          <table class="w-full text-xs">
             <tbody>
               <tr>
-                <td class="py-1 text-gray-500 w-32">Nama Program</td>
-                <td class="py-1 text-gray-900">{{ invoice.program_name || '-' }}</td>
+                <td class="py-1 text-gray-500 w-28">Nama Program</td>
+                <td class="py-1 text-gray-800">{{ invoice.program_name || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Periode Program</td>
-                <td class="py-1 text-gray-900">{{ invoice.program_period || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ invoice.program_period || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">No CN</td>
-                <td class="py-1 text-gray-900">{{ invoice.cn_number || '-' }}</td>
+                <td class="py-1 text-gray-800 font-mono">{{ invoice.cn_number || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Kode Item</td>
-                <td class="py-1 text-gray-900">{{ invoice.item_code || '-' }}</td>
+                <td class="py-1 text-gray-800 font-mono">{{ invoice.item_code || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Nama Item</td>
-                <td class="py-1 text-gray-900">{{ invoice.item_name || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ invoice.item_name || '-' }}</td>
               </tr>
             </tbody>
           </table>
@@ -252,48 +252,48 @@
       </div>
 
       <!-- Financial Calculation Card -->
-      <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
-        <div class="px-4 py-3 border-b border-gray-200 bg-gray-50/50">
-          <h3 class="text-sm font-medium text-gray-900">
+      <div class="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-2xs">
+        <div class="px-4 py-2.5 border-b border-gray-100 bg-gray-50/50">
+          <h3 class="text-xs font-semibold text-gray-950">
             Rincian Perhitungan Keuangan Invoice
           </h3>
         </div>
 
         <Table>
           <TableBody>
-            <TableRow>
-              <TableCell class="w-1/3 text-gray-600">Support Amount</TableCell>
-              <TableCell class="text-right font-medium">
+            <TableRow class="hover:bg-transparent">
+              <TableCell class="w-1/3 text-gray-600 text-xs py-2">Support Amount</TableCell>
+              <TableCell class="text-right font-medium text-xs text-gray-900 py-2">
                 {{ formatCurrency(invoice.support_amount) }}
               </TableCell>
             </TableRow>
-            <TableRow>
-              <TableCell class="text-gray-600">Dasar Pengenaan Pajak (DPP)</TableCell>
-              <TableCell class="text-right">
+            <TableRow class="hover:bg-transparent">
+              <TableCell class="text-gray-600 text-xs py-2">Dasar Pengenaan Pajak (DPP)</TableCell>
+              <TableCell class="text-right text-xs text-gray-800 py-2">
                 {{ formatCurrency(invoice.dpp) }}
               </TableCell>
             </TableRow>
-            <TableRow>
-              <TableCell class="text-gray-600">DPP Lain</TableCell>
-              <TableCell class="text-right">
+            <TableRow class="hover:bg-transparent">
+              <TableCell class="text-gray-600 text-xs py-2">DPP Lain</TableCell>
+              <TableCell class="text-right text-xs text-gray-800 py-2">
                 {{ formatCurrency(invoice.dpp_lain) }}
               </TableCell>
             </TableRow>
-            <TableRow>
-              <TableCell class="text-gray-600">PPN (12%)</TableCell>
-              <TableCell class="text-right">
+            <TableRow class="hover:bg-transparent">
+              <TableCell class="text-gray-600 text-xs py-2">PPN (12%)</TableCell>
+              <TableCell class="text-right text-xs text-gray-800 py-2">
                 {{ formatCurrency(invoice.ppn) }}
               </TableCell>
             </TableRow>
-            <TableRow>
-              <TableCell class="text-gray-600">PPh ({{ invoice.pph_type }})</TableCell>
-              <TableCell class="text-right text-red-600">
+            <TableRow class="hover:bg-transparent">
+              <TableCell class="text-gray-600 text-xs py-2">PPh ({{ invoice.pph_type }})</TableCell>
+              <TableCell class="text-right text-rose-600 text-xs py-2 font-medium">
                 ({{ formatCurrency(invoice.pph) }})
               </TableCell>
             </TableRow>
-            <TableRow class="bg-gray-50/50 font-semibold">
-              <TableCell class="text-gray-900 font-medium">TOTAL NETPAY</TableCell>
-              <TableCell class="text-right font-semibold text-gray-900 text-base">
+            <TableRow class="bg-gray-50/70 hover:bg-gray-50/70">
+              <TableCell class="text-gray-950 font-bold text-xs py-2.5">TOTAL NETPAY</TableCell>
+              <TableCell class="text-right font-bold text-gray-950 text-sm py-2.5">
                 {{ formatCurrency(invoice.netpay) }}
               </TableCell>
             </TableRow>

@@ -1,9 +1,16 @@
 <template>
   <div class="space-y-4">
+    <!-- Breadcrumbs (Filament style) -->
+    <div class="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+      <span>Form Program</span>
+      <ChevronRightIcon class="w-3.5 h-3.5 text-gray-400" />
+      <span class="text-gray-800 font-medium">List</span>
+    </div>
+
     <!-- Header Page -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-xl font-bold tracking-tight text-gray-900">Form Program</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Form Program</h1>
         <p class="text-xs text-gray-500 mt-0.5">
           Sinkronisasi respon Google Spreadsheet program cashback, SO, dan kelayakan dokumen.
         </p>
@@ -16,13 +23,13 @@
           <button
             type="button"
             @click="showSpreadsheetDropdown = !showSpreadsheetDropdown"
-            class="h-8 px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-xs font-normal text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
+            class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer"
             title="Menu aksi Spreadsheet & Export"
           >
             <RefreshCwIcon v-if="isSyncing" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
             <FileSpreadsheetIcon v-else class="w-3.5 h-3.5 text-gray-500" />
             <span>{{ isSyncing ? 'Menyinkronkan...' : 'Spreadsheet' }}</span>
-            <ChevronDownIcon class="w-3 h-3 text-gray-400 ml-0.5 transition-transform duration-150" :class="showSpreadsheetDropdown && 'rotate-180'" />
+            <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 ml-0.5 transition-transform duration-150" :class="showSpreadsheetDropdown && 'rotate-180'" />
           </button>
 
           <!-- Dropdown Menu -->
@@ -74,11 +81,11 @@
           <button
             type="button"
             @click="showAiDropdown = !showAiDropdown"
-            class="h-8 px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-xs font-normal text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer"
+            class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer"
           >
             <BotIcon class="w-3.5 h-3.5 text-gray-500" />
             <span>Fitur AI</span>
-            <ChevronDownIcon class="w-3 h-3 text-gray-400 ml-0.5 transition-transform duration-150" :class="showAiDropdown && 'rotate-180'" />
+            <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 ml-0.5 transition-transform duration-150" :class="showAiDropdown && 'rotate-180'" />
           </button>
 
           <!-- Dropdown Menu -->
@@ -141,187 +148,234 @@
       </button>
     </div>
 
-    <!-- Toolbar Filters -->
-    <div class="flex flex-wrap items-center justify-between gap-2.5 py-1">
-      <div class="flex flex-wrap items-center gap-2">
-        <div class="relative">
-          <SearchIcon class="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
-          <input
-            v-model="filters.search"
-            @input="debounceFetch"
-            type="text"
-            placeholder="Cari dealer, ID Real, program, sales, No PO/SJ, TRX..."
-            class="h-9 w-64 sm:w-80 pl-9 pr-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
-          />
+    <!-- Filament Table Card -->
+    <div class="rounded-xl border border-gray-200 bg-white shadow-sm">
+      <!-- Toolbar (Search & Filter like Filament) -->
+      <div class="p-3 sm:px-4 sm:py-3.5 border-b border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <!-- Left: Auto-Refresh & status -->
+        <div class="flex items-center gap-3 text-xs text-gray-500">
+          <label class="inline-flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              v-model="autoRefresh"
+              class="rounded border-gray-300 text-gray-900 focus:ring-0 w-3.5 h-3.5 cursor-pointer"
+            />
+            <span class="text-xs text-gray-600">Auto-Refresh (30s)</span>
+          </label>
+          <span v-if="lastUpdatedText" class="text-[11px] text-gray-400 hidden sm:inline">
+            &bull; Update: {{ lastUpdatedText }}
+          </span>
         </div>
 
-        <!-- Filter Region -->
-        <select
-          v-model="filters.region"
-          @change="fetchSubmissions(1)"
-          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-        >
-          <option value="">Semua Region</option>
-          <option v-for="reg in regionOptions" :key="reg" :value="reg">
-            {{ reg }}
-          </option>
-        </select>
+        <!-- Right: Search Box & Filter Popover -->
+        <div class="flex items-center gap-2 self-end sm:self-auto w-full sm:w-auto">
+          <!-- Search box with Magnifying glass -->
+          <div class="relative flex-1 sm:w-72">
+            <SearchIcon class="w-4 h-4 text-gray-400 absolute left-3 top-2.5 pointer-events-none" />
+            <input
+              v-model="filters.search"
+              @input="debounceFetch"
+              type="text"
+              placeholder="Search dealer, ID, program, sales..."
+              class="h-9 w-full pl-9 pr-3 text-xs text-gray-900 bg-white border border-gray-300 rounded-lg placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-950 focus:border-gray-950 transition"
+            />
+          </div>
 
-        <!-- Filter Nama Program (Searchable Dropdown) -->
-        <div class="relative" ref="programDropdownRef">
-          <button
-            type="button"
-            @click="toggleProgramDropdown"
-            class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs flex items-center justify-between gap-2 hover:border-gray-300 focus:outline-none focus:ring-1 focus:ring-black transition cursor-pointer min-w-[140px] max-w-[240px]"
-            :class="filters.program ? 'border-gray-900 text-gray-900 font-medium bg-gray-50/60' : 'text-gray-700'"
-            :title="filters.program || 'Filter berdasarkan Nama Program'"
-          >
-            <span class="truncate text-left">
-              {{ filters.program || 'Semua Program' }}
-            </span>
-            <div class="flex items-center gap-1 shrink-0">
-              <span
-                v-if="filters.program"
-                @click.stop="clearProgramFilter"
-                class="text-gray-400 hover:text-gray-700 p-0.5 rounded cursor-pointer"
-                title="Hapus filter program"
-              >
-                <XIcon class="w-3 h-3" />
-              </span>
-              <ChevronDownIcon
-                class="w-3.5 h-3.5 text-gray-400 transition-transform duration-150"
-                :class="showProgramDropdown && 'rotate-180'"
-              />
-            </div>
-          </button>
-
-          <!-- Dropdown Popover -->
-          <div
-            v-if="showProgramDropdown"
-            class="absolute top-full left-0 mt-1.5 w-72 sm:w-84 max-w-[90vw] bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden text-xs"
-          >
-            <!-- Search Inside Dropdown -->
-            <div class="p-2 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
-              <SearchIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
-              <input
-                ref="programSearchInput"
-                v-model="programSearchQuery"
-                type="text"
-                placeholder="Cari nama program..."
-                class="w-full bg-transparent border-none text-xs text-gray-900 placeholder-gray-400 focus:outline-none"
-                @click.stop
-                @keydown.esc="showProgramDropdown = false"
-              />
-              <button
-                v-if="programSearchQuery"
-                @click.stop="programSearchQuery = ''"
-                type="button"
-                class="text-gray-400 hover:text-gray-600 cursor-pointer"
-              >
-                <XIcon class="w-3 h-3" />
-              </button>
-            </div>
-
-            <!-- Program List Items -->
-            <div class="max-h-60 overflow-y-auto py-1 divide-y divide-gray-50">
+          <!-- Filter Popover with Active Badge Count (funnel with badge) -->
+          <Popover v-model:open="isFilterOpen">
+            <PopoverTrigger as-child>
               <button
                 type="button"
-                @click="selectProgram('')"
-                class="w-full text-left px-3 py-2 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer text-xs"
-                :class="!filters.program ? 'bg-gray-50 font-medium text-gray-900' : 'text-gray-600'"
+                :class="[
+                  'h-9 px-2.5 rounded-lg border text-xs font-medium inline-flex items-center gap-1.5 transition shadow-2xs cursor-pointer',
+                  activeFilterCount > 0
+                    ? 'border-gray-900 bg-gray-50 text-gray-950'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                ]"
+                title="Buka Filter"
               >
-                <span>Semua Program</span>
-                <CheckIcon v-if="!filters.program" class="w-3.5 h-3.5 text-gray-900 shrink-0" />
+                <FilterIcon class="w-4 h-4 text-gray-600" />
+                <span
+                  :class="[
+                    'w-4 h-4 rounded-full text-[10px] font-semibold flex items-center justify-center',
+                    activeFilterCount > 0 ? 'bg-gray-950 text-white' : 'bg-gray-100 text-gray-600'
+                  ]"
+                >
+                  {{ activeFilterCount }}
+                </span>
               </button>
-
-              <div
-                v-if="filteredProgramOptions.length === 0"
-                class="px-3 py-4 text-center text-gray-400 text-xs"
-              >
-                Tidak ada nama program yang cocok
+            </PopoverTrigger>
+            <PopoverContent class="w-80 p-3 space-y-3" align="end">
+              <div class="text-xs font-semibold text-gray-900 border-b border-gray-100 pb-2 flex items-center justify-between">
+                <span>Filter Pengajuan</span>
+                <button
+                  v-if="activeFilterCount > 0"
+                  @click="resetFilters"
+                  class="text-[11px] font-normal text-rose-600 hover:underline cursor-pointer"
+                >
+                  Reset
+                </button>
               </div>
 
-              <button
-                v-for="prog in filteredProgramOptions"
-                :key="prog"
-                type="button"
-                @click="selectProgram(prog)"
-                class="w-full text-left px-3 py-2 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer text-xs"
-                :class="filters.program === prog ? 'bg-gray-50 font-semibold text-gray-900' : 'text-gray-700'"
-              >
-                <span class="truncate pr-2" :title="prog">{{ prog }}</span>
-                <CheckIcon v-if="filters.program === prog" class="w-3.5 h-3.5 text-gray-900 shrink-0" />
-              </button>
-            </div>
+              <!-- Region Filter -->
+              <div class="space-y-1">
+                <label class="text-[11px] font-medium text-gray-700">Region</label>
+                <select
+                  v-model="filters.region"
+                  @change="fetchSubmissions(1)"
+                  class="h-8 w-full rounded-md border border-gray-200 bg-white px-2.5 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
+                >
+                  <option value="">Semua Region</option>
+                  <option v-for="reg in regionOptions" :key="reg" :value="reg">{{ reg }}</option>
+                </select>
+              </div>
 
-            <!-- Footer count -->
-            <div class="px-3 py-1.5 bg-gray-50 border-t border-gray-100 text-[10px] text-gray-500 flex justify-between items-center">
-              <span>{{ filteredProgramOptions.length }} program ditemukan</span>
-              <span v-if="filters.program" class="text-black font-medium cursor-pointer hover:underline" @click="selectProgram('')">
-                Reset
-              </span>
-            </div>
-          </div>
+              <!-- Program Filter -->
+              <div class="space-y-1">
+                <label class="text-[11px] font-medium text-gray-700">Nama Program</label>
+                <div class="relative" ref="programDropdownRef">
+                  <button
+                    type="button"
+                    @click="toggleProgramDropdown"
+                    class="h-8 w-full rounded-md border border-gray-200 bg-white px-2.5 text-xs flex items-center justify-between gap-2 hover:border-gray-300 focus:outline-none focus:ring-1 focus:ring-black transition cursor-pointer"
+                    :class="filters.program ? 'border-gray-900 text-gray-900 font-medium bg-gray-50/60' : 'text-gray-700'"
+                    :title="filters.program || 'Filter berdasarkan Nama Program'"
+                  >
+                    <span class="truncate text-left">{{ filters.program || 'Semua Program' }}</span>
+                    <div class="flex items-center gap-1 shrink-0">
+                      <span
+                        v-if="filters.program"
+                        @click.stop="clearProgramFilter"
+                        class="text-gray-400 hover:text-gray-700 p-0.5 rounded cursor-pointer"
+                        title="Hapus filter program"
+                      >
+                        <XIcon class="w-3 h-3" />
+                      </span>
+                      <ChevronDownIcon
+                        class="w-3.5 h-3.5 text-gray-400 transition-transform duration-150"
+                        :class="showProgramDropdown && 'rotate-180'"
+                      />
+                    </div>
+                  </button>
+
+                  <!-- Program Popover Inside Filter -->
+                  <div
+                    v-if="showProgramDropdown"
+                    class="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden text-xs"
+                  >
+                    <div class="p-2 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
+                      <SearchIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                      <input
+                        ref="programSearchInput"
+                        v-model="programSearchQuery"
+                        type="text"
+                        placeholder="Cari program..."
+                        class="w-full bg-transparent border-none text-xs text-gray-900 placeholder-gray-400 focus:outline-none"
+                        @click.stop
+                        @keydown.esc="showProgramDropdown = false"
+                      />
+                      <button
+                        v-if="programSearchQuery"
+                        @click.stop="programSearchQuery = ''"
+                        type="button"
+                        class="text-gray-400 hover:text-gray-600 cursor-pointer"
+                      >
+                        <XIcon class="w-3 h-3" />
+                      </button>
+                    </div>
+                    <div class="max-h-48 overflow-y-auto py-1 divide-y divide-gray-50">
+                      <button
+                        type="button"
+                        @click="selectProgram('')"
+                        class="w-full text-left px-3 py-1.5 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer text-xs"
+                        :class="!filters.program ? 'bg-gray-50 font-medium text-gray-900' : 'text-gray-600'"
+                      >
+                        <span>Semua Program</span>
+                        <CheckIcon v-if="!filters.program" class="w-3.5 h-3.5 text-gray-900 shrink-0" />
+                      </button>
+                      <button
+                        v-for="prog in filteredProgramOptions"
+                        :key="prog"
+                        type="button"
+                        @click="selectProgram(prog)"
+                        class="w-full text-left px-3 py-1.5 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer text-xs"
+                        :class="filters.program === prog ? 'bg-gray-50 font-semibold text-gray-900' : 'text-gray-700'"
+                      >
+                        <span class="truncate pr-2" :title="prog">{{ prog }}</span>
+                        <CheckIcon v-if="filters.program === prog" class="w-3.5 h-3.5 text-gray-900 shrink-0" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
+      </div>
 
-        <button
-          v-if="filters.search || filters.region || filters.program"
-          type="button"
-          @click="resetFilters"
-          class="h-9 px-2.5 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-md transition cursor-pointer"
+      <!-- Active Filter Pills -->
+      <div v-if="activeFilterCount > 0" class="px-4 py-2 border-b border-gray-100 flex items-center gap-2 flex-wrap bg-gray-50/50">
+        <span class="text-[11px] text-gray-400">Filter aktif:</span>
+        <span
+          v-if="filters.region"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-xs text-gray-700"
         >
-          Reset Filter
-        </button>
-      </div>
-
-      <!-- Realtime Auto-Refresh & Status -->
-      <div class="flex flex-wrap items-center gap-3">
-        <label class="inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            v-model="autoRefresh"
-            class="rounded border-gray-300 text-black focus:ring-black cursor-pointer"
-          />
-          <span>Auto-Refresh (30d)</span>
-        </label>
-
-        <span v-if="lastUpdatedText" class="text-xs text-gray-400">
-          Update: {{ lastUpdatedText }}
+          <span class="text-gray-400">Region:</span> {{ filters.region }}
+          <button @click="filters.region = ''; fetchSubmissions(1)" class="ml-0.5 text-gray-400 hover:text-gray-700 cursor-pointer" title="Hapus filter region">
+            <XIcon class="w-3 h-3" />
+          </button>
         </span>
+        <span
+          v-if="filters.program"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200 text-xs text-gray-700"
+        >
+          <span class="text-gray-400">Program:</span>
+          <span class="max-w-[200px] truncate" :title="filters.program">{{ filters.program }}</span>
+          <button @click="clearProgramFilter" class="ml-0.5 text-gray-400 hover:text-gray-700 cursor-pointer" title="Hapus filter program">
+            <XIcon class="w-3 h-3" />
+          </button>
+        </span>
+        <button @click="resetFilters" class="text-[11px] text-rose-500 hover:text-rose-700 hover:underline cursor-pointer ml-1">Reset semua</button>
       </div>
-    </div>
 
-    <!-- Official Shadcn Table Card (Horizontal Scrollable) -->
-    <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
-      <div class="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow class="border-b border-gray-200 text-xs hover:bg-transparent">
-              <TableHead class="w-[44px] text-center font-medium text-gray-500">No</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500">Waktu</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500">Region</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500">ID Real</TableHead>
-              <TableHead class="min-w-[170px] font-medium text-gray-500">Nama Dealer</TableHead>
-              <TableHead class="min-w-[200px] font-medium text-gray-500">Nama Program</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500">Nama Sales</TableHead>
-              <TableHead class="min-w-[65px] text-center font-medium text-gray-500">CN</TableHead>
-              <TableHead class="min-w-[65px] text-center font-medium text-gray-500">Agr</TableHead>
-              <TableHead class="min-w-[70px] text-center font-medium text-gray-500">Faktur</TableHead>
+      <Table container-class="max-h-[calc(100vh-240px)]">
+        <TableHeader>
+          <TableRow class="border-b border-gray-200 text-xs hover:bg-transparent bg-white">
+              <TableHead class="w-[44px] text-center font-semibold text-gray-950">No</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">
+                <span class="inline-flex items-center gap-1">Waktu <ChevronDownIcon class="w-3 h-3 text-gray-400" /></span>
+              </TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">
+                <span class="inline-flex items-center gap-1">Region <ChevronDownIcon class="w-3 h-3 text-gray-400" /></span>
+              </TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">
+                <span class="inline-flex items-center gap-1">ID Real <ChevronDownIcon class="w-3 h-3 text-gray-400" /></span>
+              </TableHead>
+              <TableHead class="min-w-[170px] font-semibold text-gray-950">
+                <span class="inline-flex items-center gap-1">Nama Dealer <ChevronDownIcon class="w-3 h-3 text-gray-400" /></span>
+              </TableHead>
+              <TableHead class="min-w-[200px] font-semibold text-gray-950">
+                <span class="inline-flex items-center gap-1">Nama Program <ChevronDownIcon class="w-3 h-3 text-gray-400" /></span>
+              </TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Nama Sales</TableHead>
+              <TableHead class="min-w-[65px] text-center font-semibold text-gray-950">CN</TableHead>
+              <TableHead class="min-w-[65px] text-center font-semibold text-gray-950">Agr</TableHead>
+              <TableHead class="min-w-[70px] text-center font-semibold text-gray-950">Faktur</TableHead>
 
               <!-- 11 Kolom Finansial & Audit Pajak (Sesuai Format OneDrive) -->
-              <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Incentive</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">DPP</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">DPP Lain</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">PPN</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Nilai PPh</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Net Pay</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Cek Pajak</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Selisih</TableHead>
-              <TableHead class="min-w-[100px] text-center font-medium text-gray-500">Note PPh</TableHead>
-              <TableHead class="min-w-[140px] font-medium text-gray-500">No Faktur</TableHead>
-              <TableHead class="whitespace-nowrap font-medium text-gray-500">Tgl Faktur</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">Incentive</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">DPP</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">DPP Lain</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">PPN</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">Nilai PPh</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">Net Pay</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">Cek Pajak</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">Selisih</TableHead>
+              <TableHead class="min-w-[100px] text-center font-semibold text-gray-950">Note PPh</TableHead>
+              <TableHead class="min-w-[140px] font-semibold text-gray-950">No Faktur</TableHead>
+              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Tgl Faktur</TableHead>
 
-              <TableHead class="w-[90px] text-center font-medium text-gray-500 sticky right-0 bg-white border-b border-gray-200">Aksi</TableHead>
+              <TableHead class="w-[90px] text-center font-semibold text-gray-950 sticky top-0 right-0 z-30 bg-white border-b border-gray-200">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -329,14 +383,14 @@
             <TableEmpty v-if="loading && submissions.length === 0" :colspan="22">
               <div class="inline-flex items-center gap-2 text-gray-500 py-8">
                 <RefreshCwIcon class="w-4 h-4 animate-spin text-gray-400" />
-                <span>Memuat data form program...</span>
+                <span class="text-xs">Memuat data form program...</span>
               </div>
             </TableEmpty>
 
             <!-- Empty State -->
             <TableEmpty v-else-if="submissions.length === 0" :colspan="22">
               <div class="max-w-md mx-auto py-8 space-y-1.5 text-center text-gray-500">
-                <p class="font-medium text-gray-800">Belum ada data form program yang tersimpan.</p>
+                <p class="font-medium text-gray-800 text-xs">Belum ada data form program yang tersimpan.</p>
                 <p class="text-xs text-gray-500">
                   Klik tombol <strong>"Sinkronkan Sekarang"</strong> di atas untuk memuat data dari spreadsheet Anda.
                 </p>
@@ -351,38 +405,45 @@
               class="hover:bg-gray-50/80 transition text-xs"
             >
               <!-- No -->
-              <TableCell class="text-center text-gray-500 py-2.5">
+              <TableCell class="text-center text-gray-500 py-2 text-xs">
                 {{ (pagination.current_page - 1) * pagination.per_page + idx + 1 }}
               </TableCell>
 
               <!-- Waktu -->
-              <TableCell class="whitespace-nowrap text-gray-700 py-2.5 leading-tight">
+              <TableCell class="whitespace-nowrap text-gray-700 py-2 leading-tight text-xs">
                 <div>{{ formatTimestamp(row.submission_timestamp).date }}</div>
-                <div class="text-[11px] text-gray-400">{{ formatTimestamp(row.submission_timestamp).time }}</div>
+                <div class="text-[10px] text-gray-400">{{ formatTimestamp(row.submission_timestamp).time }}</div>
               </TableCell>
 
               <!-- Region -->
-              <TableCell class="whitespace-nowrap text-gray-700 py-2.5">
+              <TableCell class="whitespace-nowrap text-gray-700 py-2 text-xs">
                 {{ row.region || '-' }}
               </TableCell>
 
               <!-- ID Real -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <TableCell class="whitespace-nowrap text-gray-700 py-2 text-xs">
                 {{ row.id_real || '-' }}
               </TableCell>
 
               <!-- Nama Dealer -->
-              <TableCell class="text-gray-700 py-2.5 leading-snug">
-                <div class="line-clamp-2 text-gray-800" :title="row.dealer_name">{{ row.dealer_name || '-' }}</div>
+              <TableCell class="text-gray-700 py-2 leading-snug text-xs">
+                <div v-if="row.dealer_name === '[Belum Ada Nama Dealer]' || !row.dealer_name" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 border border-gray-200 text-xs font-normal cursor-pointer" @click="openEditModal(row)" title="Klik untuk melengkapi Nama Dealer">
+                  <AlertCircleIcon class="w-3 h-3 text-gray-500 shrink-0" />
+                  <span>Tanpa Dealer</span>
+                </div>
+                <div v-else class="flex items-center gap-1.5">
+                  <span class="line-clamp-2 text-gray-700" :title="row.dealer_name">{{ row.dealer_name }}</span>
+                  <span v-if="row.is_manual_edit" class="text-[10px] px-1.5 py-0.2 rounded bg-gray-100 text-gray-600 border border-gray-200 font-normal shrink-0" title="Data pengajuan ini telah diedit/diperbaiki oleh admin di Web SCM">Diedit</span>
+                </div>
               </TableCell>
 
               <!-- Nama Program -->
-              <TableCell class="text-gray-700 py-2.5 leading-snug">
-                <div class="line-clamp-2" :title="row.program_name">{{ row.program_name || '-' }}</div>
+              <TableCell class="text-gray-700 py-2 text-xs min-w-[220px]">
+                {{ row.program_name || '-' }}
               </TableCell>
 
               <!-- Nama Sales -->
-              <TableCell class="whitespace-nowrap text-gray-700 py-2.5">
+              <TableCell class="whitespace-nowrap text-gray-700 py-2 text-xs">
                 {{ row.sales_name || '-' }}
               </TableCell>
 
@@ -394,24 +455,24 @@
                     :href="row.credit_note_url"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs transition cursor-pointer font-medium"
+                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-amber-50/70 hover:bg-amber-100/80 text-amber-700 border border-amber-200/80 text-xs transition cursor-pointer"
                     :title="row.doc_validation.cn.message || 'File di kolom CN terdeteksi tertukar (berisi ' + formatDocTypeName(row.doc_validation.cn.actual_type) + ')'"
                   >
                     <AlertTriangleIcon class="w-3 h-3 text-amber-600 shrink-0" />
                     <span>CN</span>
-                    <span class="text-[10px] text-amber-700 bg-amber-200/60 px-1 py-0.2 rounded font-normal leading-none">isi: {{ formatDocTypeName(row.doc_validation.cn.actual_type) }}</span>
+                    <span class="text-[10px] text-amber-700 bg-amber-100/70 px-1 py-0.2 rounded font-normal leading-none">isi: {{ formatDocTypeName(row.doc_validation.cn.actual_type) }}</span>
                   </a>
                   <a
                     v-else-if="row.doc_validation?.cn?.status === 'invalid'"
                     :href="row.credit_note_url"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs transition cursor-pointer font-medium"
+                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-rose-50/70 hover:bg-rose-100/80 text-rose-700 border border-rose-200/80 text-xs transition cursor-pointer"
                     :title="row.doc_validation.cn.message || 'Dokumen di kolom CN tidak sesuai / bukan Credit Note'"
                   >
-                    <XCircleIcon class="w-3 h-3 text-rose-600 shrink-0" />
+                    <XCircleIcon class="w-3 h-3 text-rose-500 shrink-0" />
                     <span>CN</span>
-                    <span class="text-[10px] text-rose-600 bg-rose-200/60 px-1 py-0.2 rounded font-normal leading-none">Salah</span>
+                    <span class="text-[10px] text-rose-700 bg-rose-100/70 px-1 py-0.2 rounded font-normal leading-none">Salah</span>
                   </a>
                   <a
                     v-else
@@ -436,24 +497,24 @@
                     :href="row.agreement_url"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs transition cursor-pointer font-medium"
+                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-amber-50/70 hover:bg-amber-100/80 text-amber-700 border border-amber-200/80 text-xs transition cursor-pointer"
                     :title="row.doc_validation.agr.message || 'File di kolom Agr terdeteksi tertukar (berisi ' + formatDocTypeName(row.doc_validation.agr.actual_type) + ')'"
                   >
                     <AlertTriangleIcon class="w-3 h-3 text-amber-600 shrink-0" />
                     <span>Agr</span>
-                    <span class="text-[10px] text-amber-700 bg-amber-200/60 px-1 py-0.2 rounded font-normal leading-none">isi: {{ formatDocTypeName(row.doc_validation.agr.actual_type) }}</span>
+                    <span class="text-[10px] text-amber-700 bg-amber-100/70 px-1 py-0.2 rounded font-normal leading-none">isi: {{ formatDocTypeName(row.doc_validation.agr.actual_type) }}</span>
                   </a>
                   <a
                     v-else-if="row.doc_validation?.agr?.status === 'invalid'"
                     :href="row.agreement_url"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs transition cursor-pointer font-medium"
+                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-rose-50/70 hover:bg-rose-100/80 text-rose-700 border border-rose-200/80 text-xs transition cursor-pointer"
                     :title="row.doc_validation.agr.message || 'Dokumen di kolom Agr tidak sesuai / bukan Agreement'"
                   >
-                    <XCircleIcon class="w-3 h-3 text-rose-600 shrink-0" />
+                    <XCircleIcon class="w-3 h-3 text-rose-500 shrink-0" />
                     <span>Agr</span>
-                    <span class="text-[10px] text-rose-600 bg-rose-200/60 px-1 py-0.2 rounded font-normal leading-none">Salah</span>
+                    <span class="text-[10px] text-rose-700 bg-rose-100/70 px-1 py-0.2 rounded font-normal leading-none">Salah</span>
                   </a>
                   <a
                     v-else
@@ -478,24 +539,24 @@
                     :href="row.tax_invoice_url"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 text-xs transition cursor-pointer font-medium"
+                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-amber-50/70 hover:bg-amber-100/80 text-amber-700 border border-amber-200/80 text-xs transition cursor-pointer"
                     :title="row.doc_validation.faktur.message || 'File di kolom Faktur terdeteksi tertukar (berisi ' + formatDocTypeName(row.doc_validation.faktur.actual_type) + ')'"
                   >
                     <AlertTriangleIcon class="w-3 h-3 text-amber-600 shrink-0" />
                     <span>Faktur</span>
-                    <span class="text-[10px] text-amber-700 bg-amber-200/60 px-1 py-0.2 rounded font-normal leading-none">isi: {{ formatDocTypeName(row.doc_validation.faktur.actual_type) }}</span>
+                    <span class="text-[10px] text-amber-700 bg-amber-100/70 px-1 py-0.2 rounded font-normal leading-none">isi: {{ formatDocTypeName(row.doc_validation.faktur.actual_type) }}</span>
                   </a>
                   <a
                     v-else-if="row.doc_validation?.faktur?.status === 'invalid'"
                     :href="row.tax_invoice_url"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs transition cursor-pointer font-medium"
+                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-rose-50/70 hover:bg-rose-100/80 text-rose-700 border border-rose-200/80 text-xs transition cursor-pointer"
                     :title="row.doc_validation.faktur.message || 'Dokumen di kolom Faktur tidak sesuai / bukan Faktur Pajak'"
                   >
-                    <XCircleIcon class="w-3 h-3 text-rose-600 shrink-0" />
+                    <XCircleIcon class="w-3 h-3 text-rose-500 shrink-0" />
                     <span>Faktur</span>
-                    <span class="text-[10px] text-rose-600 bg-rose-200/60 px-1 py-0.2 rounded font-normal leading-none">Salah</span>
+                    <span class="text-[10px] text-rose-700 bg-rose-100/70 px-1 py-0.2 rounded font-normal leading-none">Salah</span>
                   </a>
                   <a
                     v-else
@@ -514,42 +575,42 @@
 
               <!-- 11 Kolom Finansial & Audit Pajak (Format OneDrive) -->
               <!-- Incentive -->
-              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+              <TableCell class="whitespace-nowrap text-right text-xs text-gray-800 py-2.5">
                 {{ formatRupiah(row.incentive) }}
               </TableCell>
 
               <!-- DPP -->
-              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+              <TableCell class="whitespace-nowrap text-right text-xs text-gray-800 py-2.5">
                 {{ formatRupiah(row.dpp) }}
               </TableCell>
 
               <!-- DPP Lain -->
-              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+              <TableCell class="whitespace-nowrap text-right text-xs text-gray-800 py-2.5">
                 {{ formatRupiah(row.dpp_lain) }}
               </TableCell>
 
               <!-- PPN -->
-              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+              <TableCell class="whitespace-nowrap text-right text-xs text-gray-800 py-2.5">
                 {{ formatRupiah(row.ppn) }}
               </TableCell>
 
               <!-- Nilai PPh -->
-              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+              <TableCell class="whitespace-nowrap text-right text-xs text-gray-800 py-2.5">
                 {{ formatRupiah(row.nilai_pph) }}
               </TableCell>
 
               <!-- Net Pay -->
-              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+              <TableCell class="whitespace-nowrap text-right text-xs text-gray-800 py-2.5">
                 {{ formatRupiah(row.net_pay) }}
               </TableCell>
 
               <!-- Cek Pajak Tarif PPh -->
-              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+              <TableCell class="whitespace-nowrap text-right text-xs text-gray-800 py-2.5">
                 {{ formatRupiah(row.cek_pajak_tarif_pph) }}
               </TableCell>
 
               <!-- Selisih -->
-              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+              <TableCell class="whitespace-nowrap text-right text-xs text-gray-800 py-2.5">
                 <span v-if="row.selisih === 0 || row.selisih === '0' || row.selisih === 0.0" class="text-gray-400">
                   0
                 </span>
@@ -563,28 +624,28 @@
               <TableCell class="text-center py-2.5 whitespace-nowrap">
                 <span
                   v-if="row.note_pph === 'ok'"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50/70 text-emerald-700 border border-emerald-200/80 text-xs font-normal"
                 >
-                  <CheckIcon class="w-3 h-3" />
+                  <CheckIcon class="w-3.5 h-3.5 text-emerald-600" />
                   <span>ok</span>
                 </span>
                 <span
                   v-else-if="row.note_pph"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-medium"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50/70 text-amber-700 border border-amber-200/80 text-xs font-normal"
                 >
-                  <AlertCircleIcon class="w-3 h-3 text-amber-600 shrink-0" />
+                  <AlertCircleIcon class="w-3.5 h-3.5 text-amber-600 shrink-0" />
                   <span>{{ row.note_pph }}</span>
                 </span>
-                <span v-else class="text-gray-300">-</span>
+                <span v-else class="text-gray-300 text-xs">-</span>
               </TableCell>
 
               <!-- No Faktur -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <TableCell class="whitespace-nowrap text-xs text-gray-800 py-2.5">
                 {{ row.no_faktur || '-' }}
               </TableCell>
 
               <!-- Tgl Faktur -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <TableCell class="whitespace-nowrap text-xs text-gray-800 py-2.5">
                 {{ row.tgl_faktur || '-' }}
               </TableCell>
 
@@ -608,11 +669,11 @@
                     type="button"
                     @click="sendWaToTelemarketing(row)"
                     :disabled="sendingWaId === row.id"
-                    class="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-blue-300 bg-blue-50 hover:bg-blue-100 text-blue-700 transition shadow-2xs cursor-pointer disabled:opacity-50"
+                    class="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-emerald-200/80 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-700 transition shadow-2xs cursor-pointer disabled:opacity-50"
                     title="Kirim Info Klaim ke WhatsApp Telemarketing (Tawarkan Potong Order ke Dealer)"
                   >
-                    <RefreshCwIcon v-if="sendingWaId === row.id" class="w-3.5 h-3.5 animate-spin" />
-                    <SendIcon v-else class="w-3.5 h-3.5" />
+                    <RefreshCwIcon v-if="sendingWaId === row.id" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                    <SendIcon v-else class="w-3.5 h-3.5 text-emerald-600" />
                   </button>
 
                   <!-- Icon Lihat: Lihat Detail Data Tracking & Status Potong -->
@@ -620,97 +681,28 @@
                     type="button"
                     @click="openEditModal(row)"
                     class="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition shadow-2xs cursor-pointer"
-                    title="Lihat Detail & Tracking (No PO/SJ, TRX, Status Potong, dll)"
+                    title="Lihat Detail & Edit Pengajuan (Nama Dealer, Dokumen, Status, dll)"
                   >
                     <EyeIcon class="w-3.5 h-3.5 text-gray-600" />
                   </button>
+
+
                 </div>
               </TableCell>
             </TableRow>
           </TableBody>
         </Table>
-      </div>
 
-      <!-- Pagination Footer -->
-      <div
-        v-if="pagination.total > 0"
-        class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-gray-200 bg-white text-xs text-gray-500"
-      >
-        <div class="flex items-center gap-3">
-          <div>
-            Menampilkan <span class="font-semibold text-gray-900">{{ submissions.length }}</span> dari
-            <span class="font-semibold text-gray-900">{{ Number(pagination.total).toLocaleString('id-ID') }}</span> total respon
-          </div>
-          <div class="flex items-center gap-1.5 ml-2 pl-3 border-l border-gray-200">
-            <span>Per halaman:</span>
-            <select
-              v-model="pagination.per_page"
-              @change="changePerPage"
-              class="h-7 px-1.5 rounded border border-gray-200 bg-white text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-            >
-              <option :value="15">15</option>
-              <option :value="25">25</option>
-              <option :value="50">50</option>
-              <option :value="100">100</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-1.5">
-          <button
-            type="button"
-            :disabled="pagination.current_page <= 1 || loading"
-            @click="fetchSubmissions(1)"
-            class="px-2 py-1.5 rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-            title="Halaman Pertama"
-          >
-            &laquo; Pertama
-          </button>
-          <button
-            type="button"
-            :disabled="pagination.current_page <= 1 || loading"
-            @click="fetchSubmissions(pagination.current_page - 1)"
-            class="px-2.5 py-1.5 rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-          >
-            Sebelumnya
-          </button>
-
-          <div class="flex items-center gap-1 px-1">
-            <span>Halaman</span>
-            <input
-              type="number"
-              min="1"
-              :max="pagination.last_page"
-              :value="pagination.current_page"
-              @keydown.enter="onPageInputEnter($event)"
-              @blur="onPageInputBlur($event)"
-              class="w-14 h-7 text-center rounded border border-gray-200 bg-white text-xs font-semibold text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
-              title="Ketik nomor halaman lalu tekan Enter"
-            />
-            <span>dari {{ pagination.last_page || 1 }}</span>
-          </div>
-
-          <button
-            type="button"
-            :disabled="pagination.current_page >= pagination.last_page || loading"
-            @click="fetchSubmissions(pagination.current_page + 1)"
-            class="px-2.5 py-1.5 rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-          >
-            Selanjutnya
-          </button>
-          <button
-            type="button"
-            :disabled="pagination.current_page >= pagination.last_page || loading"
-            @click="fetchSubmissions(pagination.last_page)"
-            class="px-2 py-1.5 rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-            title="Halaman Terakhir"
-          >
-            Terakhir &raquo;
-          </button>
-
-          <RefreshCwIcon v-if="loading" class="w-3.5 h-3.5 text-gray-400 animate-spin ml-1.5" />
-        </div>
-      </div>
+      <!-- Filament Pagination Footer -->
+      <FilamentPagination
+        :total="pagination.total"
+        :current-page="pagination.current_page"
+        :last-page="pagination.last_page"
+        :per-page="pagination.per_page"
+        :per-page-options="[15, 25, 50, 100]"
+        @page-change="fetchSubmissions"
+        @per-page-change="changePerPage"
+      />
     </div>
 
     <!-- Edit Tracking & Status Potong Modal -->
@@ -759,23 +751,156 @@
               <!-- Warning banner if any document is swapped or invalid -->
               <div
                 v-if="hasSwappedOrInvalidDocs(editingSubmission)"
-                class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs"
+                class="p-3.5 bg-gray-50 border border-gray-200 rounded-lg text-xs space-y-2.5"
               >
-                <div class="font-medium flex items-center gap-1.5 text-amber-900 mb-1">
-                  <AlertTriangleIcon class="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  <span>Peringatan Kelayakan Dokumen:</span>
+                <div class="flex items-center gap-1.5 font-medium text-gray-900">
+                  <AlertCircleIcon class="w-3.5 h-3.5 text-gray-600 shrink-0" />
+                  <span>Pengecekan Dokumen</span>
                 </div>
-                <ul class="list-disc list-inside text-[11px] text-amber-800 space-y-0.5 pl-1">
+                <ul class="list-disc list-inside text-xs text-gray-600 space-y-1 pl-1">
                   <li v-if="editingSubmission.doc_validation?.cn?.status !== 'valid' && editingSubmission.doc_validation?.cn">
-                    <span class="font-medium">CN:</span> {{ editingSubmission.doc_validation.cn.message || 'File tidak sesuai atau tertukar' }}
+                    <span class="font-medium text-gray-800">Credit Note:</span> {{ editingSubmission.doc_validation.cn.message || 'File tidak sesuai atau tertukar' }}
                   </li>
                   <li v-if="editingSubmission.doc_validation?.agr?.status !== 'valid' && editingSubmission.doc_validation?.agr">
-                    <span class="font-medium">Agr:</span> {{ editingSubmission.doc_validation.agr.message || 'File tidak sesuai atau tertukar' }}
+                    <span class="font-medium text-gray-800">Agreement:</span> {{ editingSubmission.doc_validation.agr.message || 'File tidak sesuai atau tertukar' }}
                   </li>
                   <li v-if="editingSubmission.doc_validation?.faktur?.status !== 'valid' && editingSubmission.doc_validation?.faktur">
-                    <span class="font-medium">Faktur:</span> {{ editingSubmission.doc_validation.faktur.message || 'File tidak sesuai atau tertukar' }}
+                    <span class="font-medium text-gray-800">Faktur Pajak:</span> {{ editingSubmission.doc_validation.faktur.message || 'File tidak sesuai atau tertukar' }}
                   </li>
                 </ul>
+
+                <!-- Tombol Aksi Cepat Tukar Dokumen Tertukar -->
+                <div class="pt-2 border-t border-gray-200 flex flex-wrap items-center gap-2">
+                  <span class="text-xs text-gray-500">Tukar Posisi:</span>
+                  <button
+                    type="button"
+                    @click="handleQuickSwap('agr_faktur')"
+                    :disabled="isSwappingDocs"
+                    class="h-7 px-2.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 text-xs font-normal transition cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
+                    title="Tukar posisi link Agreement dan Faktur Pajak"
+                  >
+                    <RefreshCwIcon v-if="isSwappingDocs" class="w-3 h-3 animate-spin text-gray-500" />
+                    <ArrowLeftRightIcon v-else class="w-3.5 h-3.5 text-gray-500" />
+                    <span>Tukar Agr ↔ Faktur</span>
+                  </button>
+                  <button
+                    type="button"
+                    @click="handleQuickSwap('cn_agr')"
+                    :disabled="isSwappingDocs"
+                    class="h-7 px-2.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 text-xs font-normal transition cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
+                    title="Tukar posisi link Credit Note dan Agreement"
+                  >
+                    <RefreshCwIcon v-if="isSwappingDocs" class="w-3 h-3 animate-spin text-gray-500" />
+                    <ArrowLeftRightIcon v-else class="w-3.5 h-3.5 text-gray-500" />
+                    <span>Tukar CN ↔ Agr</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 0. Data Utama Pengajuan (Dealer, Program, Sales & Dokumen) -->
+              <div>
+                <h4 class="text-xs font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-100 flex items-center justify-between">
+                  <span>Data Dealer, Program & Link Dokumen</span>
+                  <span v-if="editForm.is_manual_edit" class="text-[10px] text-gray-600 bg-gray-100 px-2 py-0.5 rounded font-normal border border-gray-200">
+                    Diedit Manual
+                  </span>
+                </h4>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+                  <!-- Nama Dealer -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Nama Dealer</label>
+                    <input
+                      v-model="editForm.dealer_name"
+                      type="text"
+                      placeholder="Masukkan nama dealer..."
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                    />
+                  </div>
+
+                  <!-- ID Real -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">ID Real (Kode BT)</label>
+                    <input
+                      v-model="editForm.id_real"
+                      type="text"
+                      placeholder="Contoh: IDME00652"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                    />
+                  </div>
+
+                  <!-- Nama Program -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Nama Program</label>
+                    <input
+                      v-model="editForm.program_name"
+                      type="text"
+                      placeholder="Nama program pengajuan..."
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                    />
+                  </div>
+
+                  <!-- Nama Sales -->
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Nama Sales</label>
+                    <input
+                      v-model="editForm.sales_name"
+                      type="text"
+                      placeholder="Nama sales pengaju..."
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                    />
+                  </div>
+
+                  <!-- Link Dokumen Credit Note -->
+                  <div class="sm:col-span-2">
+                    <div class="flex items-center justify-between mb-1">
+                      <label class="text-xs font-medium text-gray-700">Link Dokumen Credit Note (CN)</label>
+                      <a v-if="isValidUrl(editForm.credit_note_url)" :href="editForm.credit_note_url" target="_blank" rel="noopener noreferrer" class="text-xs text-gray-500 hover:text-gray-900 inline-flex items-center gap-1 transition">
+                        <span>Buka Link</span>
+                        <ExternalLinkIcon class="w-3 h-3" />
+                      </a>
+                    </div>
+                    <input
+                      v-model="editForm.credit_note_url"
+                      type="text"
+                      placeholder="https://drive.google.com/..."
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                    />
+                  </div>
+
+                  <!-- Link Dokumen Agreement -->
+                  <div>
+                    <div class="flex items-center justify-between mb-1">
+                      <label class="text-xs font-medium text-gray-700">Link Agreement (Agr)</label>
+                      <a v-if="isValidUrl(editForm.agreement_url)" :href="editForm.agreement_url" target="_blank" rel="noopener noreferrer" class="text-xs text-gray-500 hover:text-gray-900 inline-flex items-center gap-1 transition">
+                        <span>Buka Link</span>
+                        <ExternalLinkIcon class="w-3 h-3" />
+                      </a>
+                    </div>
+                    <input
+                      v-model="editForm.agreement_url"
+                      type="text"
+                      placeholder="https://drive.google.com/..."
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                    />
+                  </div>
+
+                  <!-- Link Faktur Pajak -->
+                  <div>
+                    <div class="flex items-center justify-between mb-1">
+                      <label class="text-xs font-medium text-gray-700">Link Faktur Pajak (FP)</label>
+                      <a v-if="isValidUrl(editForm.tax_invoice_url)" :href="editForm.tax_invoice_url" target="_blank" rel="noopener noreferrer" class="text-xs text-gray-500 hover:text-gray-900 inline-flex items-center gap-1 transition">
+                        <span>Buka Link</span>
+                        <ExternalLinkIcon class="w-3 h-3" />
+                      </a>
+                    </div>
+                    <input
+                      v-model="editForm.tax_invoice_url"
+                      type="text"
+                      placeholder="https://drive.google.com/..."
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                    />
+                  </div>
+                </div>
               </div>
 
               <!-- 1. Tracking & Status Potong -->
@@ -791,7 +916,7 @@
                       v-model="editForm.no_po_sj"
                       type="text"
                       placeholder="Contoh: PO/2026/09/123"
-                      class="h-8.5 w-full px-3 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
 
@@ -802,7 +927,7 @@
                       v-model="editForm.no_transaksi"
                       type="text"
                       placeholder="Contoh: TRX-998822"
-                      class="h-8.5 w-full px-3 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
 
@@ -833,7 +958,7 @@
                       v-model="editForm.lama_pending"
                       type="text"
                       placeholder="Contoh: 1 Hari / Kurang dari 30 Hari"
-                      class="h-8.5 w-full px-3 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
 
@@ -852,7 +977,7 @@
                     <label class="block text-xs font-medium text-gray-700 mb-1">Status Potong Purchase</label>
                     <select
                       v-model="editForm.status_potong_purchase"
-                      class="h-8.5 w-full px-3 rounded-md border border-gray-300 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition cursor-pointer"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition cursor-pointer"
                     >
                       <option value="">- Belum Ditentukan -</option>
                       <option value="BELUM BISA POTONG">BELUM BISA POTONG</option>
@@ -869,7 +994,7 @@
                       v-model="editForm.status_potong_ar"
                       type="text"
                       placeholder="Contoh: DEALER SETUJU / DONE / PENDING"
-                      class="h-8.5 w-full px-3 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
 
@@ -880,7 +1005,7 @@
                       v-model="editForm.cek_dokumen"
                       type="text"
                       placeholder="Contoh: LENGKAP, AGR BELUM ADA, FP KURANG..."
-                      class="h-8.5 w-full px-3 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
 
@@ -889,7 +1014,7 @@
                     <label class="block text-xs font-medium text-gray-700 mb-1">Keterangan</label>
                     <select
                       v-model="editForm.keterangan"
-                      class="h-8.5 w-full px-3 rounded-md border border-gray-300 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition cursor-pointer"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition cursor-pointer"
                     >
                       <option value="">- Pilih Keterangan -</option>
                       <option v-for="opt in keteranganOptions" :key="opt" :value="opt">
@@ -900,11 +1025,10 @@
                 </div>
               </div>
 
-              <!-- 2. Data Finansial & Pajak (Sesuai OneDrive) -->
+              <!-- 2. Data Finansial & Pajak -->
               <div class="pt-2">
-                <h4 class="text-xs font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-100 flex items-center gap-1.5">
-                  <FileSpreadsheetIcon class="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Data Finansial & Pajak (OneDrive)</span>
+                <h4 class="text-xs font-semibold text-gray-900 mb-3 pb-1 border-b border-gray-100">
+                  Data Finansial & Pajak (OneDrive)
                 </h4>
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2.5">
                   <div>
@@ -914,7 +1038,7 @@
                       type="number"
                       step="any"
                       placeholder="0"
-                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
@@ -924,7 +1048,7 @@
                       type="number"
                       step="any"
                       placeholder="0"
-                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
@@ -934,7 +1058,7 @@
                       type="number"
                       step="any"
                       placeholder="0"
-                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
@@ -944,7 +1068,7 @@
                       type="number"
                       step="any"
                       placeholder="0"
-                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
@@ -954,7 +1078,7 @@
                       type="number"
                       step="any"
                       placeholder="0"
-                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
@@ -964,7 +1088,7 @@
                       type="number"
                       step="any"
                       placeholder="0"
-                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
@@ -974,7 +1098,7 @@
                       type="number"
                       step="any"
                       placeholder="0"
-                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
@@ -984,7 +1108,7 @@
                       type="number"
                       step="any"
                       placeholder="0"
-                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div class="col-span-2">
@@ -993,7 +1117,7 @@
                       v-model="editForm.note_pph"
                       type="text"
                       placeholder="Contoh: ok, CAP?, TTD?, NPWP?"
-                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
@@ -1002,7 +1126,7 @@
                       v-model="editForm.no_faktur"
                       type="text"
                       placeholder="010.xxx-xx.xxxxxxxx"
-                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                   <div>
@@ -1011,7 +1135,7 @@
                       v-model="editForm.tgl_faktur"
                       type="text"
                       placeholder="DD/MM/YYYY"
-                      class="h-8.5 w-full px-2.5 rounded-md border border-gray-300 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
                     />
                   </div>
                 </div>
@@ -1020,26 +1144,38 @@
 
             <!-- Modal Footer -->
             <div class="px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
-              <button
-                v-if="editingSubmission && editForm.status_potong_purchase === 'BISA DI POTONG'"
-                type="button"
-                @click="sendWaToTelemarketing(editingSubmission)"
-                :disabled="isSendingWaModal"
-                class="px-3 py-1.5 rounded-md border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-medium transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-                title="Kirim info klaim ini ke WhatsApp Telemarketing"
-              >
-                <RefreshCwIcon v-if="isSendingWaModal" class="w-3.5 h-3.5 animate-spin text-blue-600" />
-                <SendIcon v-else class="w-3.5 h-3.5 text-blue-600" />
-                <span>{{ isSendingWaModal ? 'Mengirim...' : 'Kirim WA ke Telemarketing' }}</span>
-              </button>
-              <div v-else></div>
+              <div class="flex items-center gap-2">
+                <button
+                  v-if="editingSubmission && editForm.status_potong_purchase === 'BISA DI POTONG'"
+                  type="button"
+                  @click="sendWaToTelemarketing(editingSubmission)"
+                  :disabled="isSendingWaModal"
+                  class="h-8 px-3 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 text-xs font-normal transition cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
+                  title="Kirim info klaim ini ke WhatsApp Telemarketing"
+                >
+                  <RefreshCwIcon v-if="isSendingWaModal" class="w-3.5 h-3.5 animate-spin text-gray-500" />
+                  <SendIcon v-else class="w-3.5 h-3.5 text-gray-500" />
+                  <span>{{ isSendingWaModal ? 'Mengirim...' : 'Kirim WA Telemarketing' }}</span>
+                </button>
+
+                <button
+                  v-if="editingSubmission"
+                  type="button"
+                  @click="confirmDeleteSubmission(editingSubmission)"
+                  class="h-8 px-3 rounded-md border border-gray-200 bg-white hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 text-gray-600 text-xs font-normal transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                  title="Hapus baris pengajuan program ini"
+                >
+                  <Trash2Icon class="w-3.5 h-3.5 text-gray-400" />
+                  <span>Hapus Pengajuan</span>
+                </button>
+              </div>
 
               <div class="flex items-center gap-2">
                 <button
                   type="button"
                   @click="showEditModal = false"
                   :disabled="isSaving"
-                  class="px-3.5 py-1.5 rounded-md border border-gray-300 bg-white hover:bg-gray-100 text-xs text-gray-700 font-medium transition cursor-pointer"
+                  class="h-8 px-3.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-xs text-gray-700 font-normal transition cursor-pointer shadow-2xs"
                 >
                   Batal
                 </button>
@@ -1047,7 +1183,7 @@
                   type="button"
                   @click="saveEditModal"
                   :disabled="isSaving"
-                  class="px-4 py-1.5 rounded-md bg-gray-900 hover:bg-black text-white text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-xs"
+                  class="h-8 px-4 rounded-md bg-gray-900 hover:bg-black text-white text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-xs"
                 >
                   <RefreshCwIcon v-if="isSaving" class="w-3.5 h-3.5 animate-spin" />
                   <span>{{ isSaving ? 'Menyimpan...' : 'Simpan Perubahan' }}</span>
@@ -1346,9 +1482,14 @@ import {
   EyeOff as EyeOffIcon,
   Bot as BotIcon,
   ChevronDown as ChevronDownIcon,
+  ChevronRight as ChevronRightIcon,
+  Filter as FilterIcon,
   Send as SendIcon,
   AlertTriangle as AlertTriangleIcon,
   XCircle as XCircleIcon,
+  Trash2 as Trash2Icon,
+  ArrowLeftRight as ArrowLeftRightIcon,
+  Building as BuildingIcon,
 } from 'lucide-vue-next';
 import {
   Table,
@@ -1360,6 +1501,9 @@ import {
   TableEmpty,
 } from '@/components/ui/table';
 import DatePicker from '@/components/ui/DatePicker.vue';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import FilamentPagination from '@/components/ui/FilamentPagination.vue';
+import FilamentBadge from '@/components/ui/FilamentBadge.vue';
 
 const googleSheetUrl = 'https://docs.google.com/spreadsheets/d/1jf_i5r4Nn3q0RE6n_gIyCFn1XPlAWjYdqQOvWXewfXs/edit#gid=2012509458';
 
@@ -1377,6 +1521,7 @@ const autoRefresh = ref(true);
 const lastUpdatedText = ref('');
 const sendingWaId = ref(null);
 const isSendingWaModal = ref(false);
+const isSwappingDocs = ref(false);
 
 // Dropdown Spreadsheet state
 const showSpreadsheetDropdown = ref(false);
@@ -1553,6 +1698,14 @@ const editingSubmission = ref(null);
 const isSaving = ref(false);
 
 const editForm = reactive({
+  dealer_name: '',
+  id_real: '',
+  program_name: '',
+  sales_name: '',
+  credit_note_url: '',
+  agreement_url: '',
+  tax_invoice_url: '',
+  is_manual_edit: false,
   no_po_sj: '',
   no_transaksi: '',
   tgl_input: '',
@@ -1583,6 +1736,20 @@ const filters = reactive({
   status_purchase: '',
   keterangan: '',
 });
+
+const isFilterOpen = ref(false);
+
+const activeFilterCount = computed(() => {
+  let count = 0;
+  if (filters.region) count++;
+  if (filters.program) count++;
+  return count;
+});
+
+const changePerPage = (newPerPage) => {
+  pagination.per_page = Number(newPerPage);
+  fetchSubmissions(1);
+};
 
 const pagination = reactive({
   current_page: 1,
@@ -1621,10 +1788,6 @@ const formatTimestamp = (ts) => {
     // ignore
   }
   return { date: ts, time: '' };
-};
-
-const changePerPage = () => {
-  fetchSubmissions(1);
 };
 
 const onPageInputEnter = (event) => {
@@ -2153,9 +2316,70 @@ const hasSwappedOrInvalidDocs = (submission) => {
   );
 };
 
+// Quick Swap swapped documents
+const handleQuickSwap = async (type = 'agr_faktur') => {
+  if (!editingSubmission.value) return;
+  isSwappingDocs.value = true;
+  try {
+    const res = await axios.post(`/api/program-submissions/${editingSubmission.value.id}/swap-docs`, { type });
+    const updated = res.data.submission;
+    if (updated) {
+      Object.assign(editingSubmission.value, updated);
+      editForm.credit_note_url = updated.credit_note_url || '';
+      editForm.agreement_url = updated.agreement_url || '';
+      editForm.tax_invoice_url = updated.tax_invoice_url || '';
+      editForm.doc_validation = updated.doc_validation || null;
+      editForm.cek_dokumen = updated.cek_dokumen || editForm.cek_dokumen;
+      editForm.status_potong_purchase = updated.status_potong_purchase || editForm.status_potong_purchase;
+      editForm.is_manual_edit = true;
+
+      const foundIdx = submissions.value.findIndex((s) => s.id === updated.id);
+      if (foundIdx !== -1) {
+        submissions.value[foundIdx] = { ...submissions.value[foundIdx], ...updated };
+      }
+    }
+    syncMessage.value = res.data.message || 'Dokumen berhasil ditukar posisinya.';
+    syncError.value = false;
+  } catch (err) {
+    alert('Gagal menukar dokumen: ' + (err.response?.data?.message || err.message));
+  } finally {
+    isSwappingDocs.value = false;
+  }
+};
+
+// Confirm delete submission
+const confirmDeleteSubmission = async (row) => {
+  if (!row) return;
+  const dealer = row.dealer_name || row.id_real || 'pengajuan ini';
+  if (!confirm(`Apakah Anda yakin ingin menghapus data pengajuan "${dealer}"?\n\nCatatan: Data yang dihapus tidak akan dimunculkan lagi saat sinkronisasi spreadsheet.`)) {
+    return;
+  }
+
+  try {
+    await axios.delete(`/api/program-submissions/${row.id}`);
+    submissions.value = submissions.value.filter((s) => s.id !== row.id);
+    pagination.total = Math.max(0, pagination.total - 1);
+    if (editingSubmission.value && editingSubmission.value.id === row.id) {
+      showEditModal.value = false;
+    }
+    syncMessage.value = `Pengajuan "${dealer}" berhasil dihapus.`;
+    syncError.value = false;
+  } catch (err) {
+    alert('Gagal menghapus pengajuan: ' + (err.response?.data?.message || err.message));
+  }
+};
+
 // Edit Modal logic
 const openEditModal = (row) => {
   editingSubmission.value = row;
+  editForm.dealer_name = row.dealer_name || '';
+  editForm.id_real = row.id_real || '';
+  editForm.program_name = row.program_name || '';
+  editForm.sales_name = row.sales_name || '';
+  editForm.credit_note_url = row.credit_note_url || '';
+  editForm.agreement_url = row.agreement_url || '';
+  editForm.tax_invoice_url = row.tax_invoice_url || '';
+  editForm.is_manual_edit = Boolean(row.is_manual_edit);
   editForm.no_po_sj = row.no_po_sj || '';
   editForm.no_transaksi = row.no_transaksi || '';
   editForm.tgl_input = row.tgl_input || '';
@@ -2189,13 +2413,19 @@ const saveEditModal = async () => {
     const res = await axios.patch(`/api/program-submissions/${editingSubmission.value.id}`, { ...editForm });
 
     // Update row locally
-    Object.assign(editingSubmission.value, res.data.submission || editForm);
+    const updated = res.data.submission || editForm;
+    Object.assign(editingSubmission.value, updated);
 
-    syncMessage.value = `Data tracking "${editingSubmission.value.dealer_name || editingSubmission.value.id_real}" berhasil disimpan.`;
+    const foundIdx = submissions.value.findIndex((s) => s.id === editingSubmission.value.id);
+    if (foundIdx !== -1) {
+      submissions.value[foundIdx] = { ...submissions.value[foundIdx], ...updated };
+    }
+
+    syncMessage.value = `Data pengajuan "${editingSubmission.value.dealer_name || editingSubmission.value.id_real}" berhasil disimpan.`;
     syncError.value = false;
     showEditModal.value = false;
   } catch (err) {
-    alert('Gagal menyimpan data tracking: ' + (err.response?.data?.message || err.message));
+    alert('Gagal menyimpan data pengajuan: ' + (err.response?.data?.message || err.message));
   } finally {
     isSaving.value = false;
   }

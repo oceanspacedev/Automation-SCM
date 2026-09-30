@@ -99,7 +99,7 @@
                         />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent align="start" class="w-44 p-1 rounded-lg border border-gray-200 bg-white shadow-lg text-xs space-y-0.5">
+                    <PopoverContent align="start" class="w-48 p-1 rounded-lg border border-gray-200 bg-white shadow-lg text-xs space-y-0.5">
                       <router-link
                         to="/dashboard"
                         @click="isRiwayatOpen = false"

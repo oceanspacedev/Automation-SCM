@@ -72,7 +72,7 @@ class ProgramSubmissionController extends Controller
             'net_pay', 'cek_pajak_tarif_pph', 'selisih', 'note_pph', 'no_faktur',
             'tgl_faktur', 'no_po_sj', 'no_transaksi', 'tgl_input',
             'tgl_share_cn', 'lama_pending', 'keterangan', 'cek_dokumen',
-            'status_potong_purchase', 'status_potong_ar', 'tgl_potong_tf', 'doc_validation', 'updated_at',
+            'status_potong_purchase', 'status_potong_ar', 'tgl_potong_tf', 'doc_validation', 'is_manual_edit', 'updated_at',
         ];
 
         $perPage = min((int) $request->input('per_page', 15), 100);
@@ -311,6 +311,13 @@ class ProgramSubmissionController extends Controller
         $submission = ProgramSubmission::findOrFail($id);
 
         $validated = $request->validate([
+            'dealer_name' => 'nullable|string|max:255',
+            'id_real' => 'nullable|string|max:255',
+            'program_name' => 'nullable|string|max:255',
+            'sales_name' => 'nullable|string|max:255',
+            'credit_note_url' => 'nullable|string',
+            'agreement_url' => 'nullable|string',
+            'tax_invoice_url' => 'nullable|string',
             'no_po_sj' => 'nullable|string|max:255',
             'no_transaksi' => 'nullable|string|max:255',
             'tgl_input' => 'nullable|string|max:255',
@@ -333,7 +340,16 @@ class ProgramSubmissionController extends Controller
             'no_faktur' => 'nullable|string|max:100',
             'tgl_faktur' => 'nullable|string|max:50',
             'doc_validation' => 'nullable|array',
+            'is_manual_edit' => 'nullable|boolean',
         ]);
+
+        $manualFields = ['dealer_name', 'id_real', 'program_name', 'sales_name', 'credit_note_url', 'agreement_url', 'tax_invoice_url'];
+        foreach ($manualFields as $field) {
+            if ($request->has($field)) {
+                $validated['is_manual_edit'] = true;
+                break;
+            }
+        }
 
         if (isset($validated['nilai_pph']) && isset($validated['cek_pajak_tarif_pph']) && ! array_key_exists('selisih', $validated)) {
             $validated['selisih'] = round((float) $validated['nilai_pph'] - (float) $validated['cek_pajak_tarif_pph'], 2);
@@ -392,8 +408,101 @@ class ProgramSubmissionController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Data tracking & keuangan program berhasil diperbarui.',
+            'message' => 'Data pengajuan program berhasil diperbarui.',
             'submission' => $submission,
+        ]);
+    }
+
+    /**
+     * Swap swapped documents (e.g. Agr <-> Faktur).
+     */
+    public function swapDocs(Request $request, int|string $id): JsonResponse
+    {
+        $submission = ProgramSubmission::findOrFail($id);
+        $type = $request->input('type', 'agr_faktur');
+
+        $docValidation = $submission->doc_validation ?? [];
+
+        if ($type === 'agr_faktur') {
+            $temp = $submission->agreement_url;
+            $submission->agreement_url = $submission->tax_invoice_url;
+            $submission->tax_invoice_url = $temp;
+
+            if (isset($docValidation['agr'])) {
+                $docValidation['agr']['status'] = 'valid';
+                $docValidation['agr']['message'] = 'Posisi file telah ditukar menjadi Agreement';
+            }
+            if (isset($docValidation['faktur'])) {
+                $docValidation['faktur']['status'] = 'valid';
+                $docValidation['faktur']['message'] = 'Posisi file telah ditukar menjadi Faktur Pajak';
+            }
+        } elseif ($type === 'cn_agr') {
+            $temp = $submission->credit_note_url;
+            $submission->credit_note_url = $submission->agreement_url;
+            $submission->agreement_url = $temp;
+
+            if (isset($docValidation['cn'])) {
+                $docValidation['cn']['status'] = 'valid';
+                $docValidation['cn']['message'] = 'Posisi file telah ditukar menjadi Credit Note';
+            }
+            if (isset($docValidation['agr'])) {
+                $docValidation['agr']['status'] = 'valid';
+                $docValidation['agr']['message'] = 'Posisi file telah ditukar menjadi Agreement';
+            }
+        } elseif ($type === 'cn_faktur') {
+            $temp = $submission->credit_note_url;
+            $submission->credit_note_url = $submission->tax_invoice_url;
+            $submission->tax_invoice_url = $temp;
+
+            if (isset($docValidation['cn'])) {
+                $docValidation['cn']['status'] = 'valid';
+                $docValidation['cn']['message'] = 'Posisi file telah ditukar menjadi Credit Note';
+            }
+            if (isset($docValidation['faktur'])) {
+                $docValidation['faktur']['status'] = 'valid';
+                $docValidation['faktur']['message'] = 'Posisi file telah ditukar menjadi Faktur Pajak';
+            }
+        }
+
+        $submission->doc_validation = $docValidation;
+        $submission->is_manual_edit = true;
+
+        if (! empty($submission->credit_note_url) && ! empty($submission->agreement_url) && ! empty($submission->tax_invoice_url)) {
+            $allValid = true;
+            foreach (['cn', 'agr', 'faktur'] as $docKey) {
+                if (isset($docValidation[$docKey]) && in_array($docValidation[$docKey]['status'] ?? '', ['swapped', 'invalid'])) {
+                    $allValid = false;
+                }
+            }
+            if ($allValid) {
+                $submission->cek_dokumen = 'LENGKAP';
+                if ($submission->status_potong_purchase === 'BELUM BISA POTONG' || empty($submission->status_potong_purchase)) {
+                    $submission->status_potong_purchase = 'BISA DI POTONG';
+                }
+            }
+        }
+
+        $submission->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Dokumen berhasil ditukar posisinya.',
+            'submission' => $submission->fresh(),
+        ]);
+    }
+
+    /**
+     * Delete a program submission.
+     */
+    public function destroy(int|string $id): JsonResponse
+    {
+        $submission = ProgramSubmission::findOrFail($id);
+        $dealerName = $submission->dealer_name ?: $submission->id_real ?: 'Pengajuan';
+        $submission->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Pengajuan program '{$dealerName}' berhasil dihapus.",
         ]);
     }
 

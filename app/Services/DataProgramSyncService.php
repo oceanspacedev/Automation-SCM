@@ -164,16 +164,24 @@ class DataProgramSyncService
                         $payload = [
                             'start_row' => 2,
                             'rows' => $dataRows,
+                            'is_full_sync' => ($limit === 0),
                         ];
 
                         $result = $this->saveWebhookPayload($payload);
+
+                        $msg = "Sinkronisasi berhasil ({$result['saved_count']} baris data diproses";
+                        if (! empty($result['deleted_count'])) {
+                            $msg .= ", {$result['deleted_count']} baris dihapus";
+                        }
+                        $msg .= ' dari Google Apps Script).';
 
                         return [
                             'total_rows' => count($dataRows),
                             'synced_count' => $result['saved_count'],
                             'new_count' => $result['saved_count'],
+                            'deleted_count' => $result['deleted_count'] ?? 0,
                             'updated_count' => 0,
-                            'message' => "Sinkronisasi berhasil ({$result['saved_count']} baris data diproses dari Google Apps Script).",
+                            'message' => $msg,
                         ];
                     }
                 }
@@ -331,14 +339,20 @@ class DataProgramSyncService
         $syncTimestamp = now()->subSecond()->toDateTimeString();
         $now = now()->toDateTimeString();
 
+        $maxRowProcessed = 1;
+        $emptyRowHashes = [];
+
         try {
             DB::beginTransaction();
 
             while (($row = fgetcsv($handle, 0, ',', '"', '\\')) !== false) {
                 $rowIdx++;
+                $maxRowProcessed = $rowIdx;
 
                 $mapped = $this->mapRowToData($row, $rowIdx, $now);
                 if (! $mapped) {
+                    $emptyRowHashes[] = sprintf('row_%d', $rowIdx);
+
                     continue;
                 }
 
@@ -359,9 +373,15 @@ class DataProgramSyncService
                 $this->upsertBatch($batch);
             }
 
-            // Hapus data di database yang barisnya sudah dihapus dari Spreadsheet (termasuk duplikat hash lama)
-            if ($limit === 0 && $totalProcessed > 0) {
-                DataProgram::where('updated_at', '<', $syncTimestamp)->delete();
+            // Hapus baris yang dikosongkan di dalam spreadsheet
+            if (! empty($emptyRowHashes)) {
+                DataProgram::whereIn('row_hash', $emptyRowHashes)->delete();
+            }
+
+            // Hapus data di database yang barisnya sudah dihapus dari Spreadsheet (melebihi jumlah baris sheet)
+            if ($limit === 0 && $maxRowProcessed >= 2) {
+                DataProgram::whereRaw('CAST(SUBSTRING(row_hash, 5) AS UNSIGNED) > ?', [$maxRowProcessed])->delete();
+                DataProgram::where('row_hash', 'not like', 'row_%')->delete();
             }
 
             DB::commit();
@@ -481,35 +501,86 @@ class DataProgramSyncService
     {
         $batch = [];
         $now = now()->toDateTimeString();
+        $deletedCount = 0;
+
+        // Support explicit action === 'delete' from Webhook
+        if (isset($payload['action']) && $payload['action'] === 'delete') {
+            $rowIdx = (int) ($payload['row_index'] ?? ($payload['rowNumber'] ?? 0));
+            if ($rowIdx > 0) {
+                $deleted = DataProgram::where('row_hash', sprintf('row_%d', $rowIdx))->delete();
+
+                return [
+                    'saved_count' => 0,
+                    'deleted_count' => $deleted ? 1 : 0,
+                    'message' => "Baris row_{$rowIdx} berhasil dihapus dari Data Program.",
+                ];
+            }
+        }
 
         if (isset($payload['values']) && is_array($payload['values'])) {
             $rowIdx = (int) ($payload['row_index'] ?? ($payload['rowNumber'] ?? 2));
             $mapped = $this->mapRowToData($payload['values'], $rowIdx, $now);
             if ($mapped) {
                 $batch[] = $mapped;
+            } else {
+                // Baris dikosongkan/dihapus di spreadsheet -> hapus dari database
+                $deleted = DataProgram::where('row_hash', sprintf('row_%d', $rowIdx))->delete();
+
+                return [
+                    'saved_count' => 0,
+                    'deleted_count' => $deleted ? 1 : 0,
+                    'message' => "Baris row_{$rowIdx} berhasil dihapus karena data dikosongkan di spreadsheet.",
+                ];
             }
         } elseif (isset($payload['row']) && is_array($payload['row'])) {
             $rowIdx = (int) ($payload['row_index'] ?? ($payload['rowNumber'] ?? 2));
             $mapped = $this->mapRowToData($payload['row'], $rowIdx, $now);
             if ($mapped) {
                 $batch[] = $mapped;
+            } else {
+                $deleted = DataProgram::where('row_hash', sprintf('row_%d', $rowIdx))->delete();
+
+                return [
+                    'saved_count' => 0,
+                    'deleted_count' => $deleted ? 1 : 0,
+                    'message' => "Baris row_{$rowIdx} berhasil dihapus karena data dikosongkan di spreadsheet.",
+                ];
             }
         } elseif (isset($payload['rows']) && is_array($payload['rows'])) {
             $startRow = (int) ($payload['start_row'] ?? ($payload['startRow'] ?? 2));
+            $isFullSync = (bool) ($payload['is_full_sync'] ?? false);
+            $emptyRowHashes = [];
+
             foreach ($payload['rows'] as $i => $row) {
                 if (is_array($row)) {
-                    $mapped = $this->mapRowToData($row, $startRow + $i, $now);
+                    $rowIdx = $startRow + $i;
+                    $mapped = $this->mapRowToData($row, $rowIdx, $now);
                     if ($mapped) {
                         $batch[] = $mapped;
+                    } else {
+                        $emptyRowHashes[] = sprintf('row_%d', $rowIdx);
                     }
                 }
+            }
+
+            if (! empty($emptyRowHashes)) {
+                $deletedCount += DataProgram::whereIn('row_hash', $emptyRowHashes)->delete();
+            }
+
+            if ($isFullSync && count($payload['rows']) > 0) {
+                $maxRowIdx = $startRow + count($payload['rows']) - 1;
+                $deletedCount += DataProgram::whereRaw('CAST(SUBSTRING(row_hash, 5) AS UNSIGNED) > ?', [$maxRowIdx])->delete();
+                $deletedCount += DataProgram::where('row_hash', 'not like', 'row_%')->delete();
             }
         } elseif (array_is_list($payload) && ! empty($payload) && is_array($payload[0])) {
             foreach ($payload as $i => $row) {
                 if (is_array($row)) {
-                    $mapped = $this->mapRowToData($row, 2 + $i, $now);
+                    $rowIdx = 2 + $i;
+                    $mapped = $this->mapRowToData($row, $rowIdx, $now);
                     if ($mapped) {
                         $batch[] = $mapped;
+                    } else {
+                        $deletedCount += DataProgram::where('row_hash', sprintf('row_%d', $rowIdx))->delete();
                     }
                 }
             }
@@ -518,7 +589,10 @@ class DataProgramSyncService
         if (empty($batch)) {
             return [
                 'saved_count' => 0,
-                'message' => 'Tidak ada baris data valid yang diproses dari webhook.',
+                'deleted_count' => $deletedCount,
+                'message' => $deletedCount > 0
+                    ? "Berhasil menghapus {$deletedCount} baris data yang kosong/dihapus di spreadsheet."
+                    : 'Tidak ada baris data valid yang diproses dari webhook.',
             ];
         }
 

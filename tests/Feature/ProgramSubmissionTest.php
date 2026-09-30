@@ -757,8 +757,8 @@ class ProgramSubmissionTest extends TestCase
         $this->assertEquals(11261.0, $submission->nilai_pph);
         // Net pay: 450450 - 11261 = 439189
         $this->assertEquals(439189.0, $submission->net_pay);
-        // Cek pajak: 450450 * 2.5% = 11261.25 => round 11261.25
-        $this->assertEquals(11261.25, $submission->cek_pajak_tarif_pph);
+        // Cek pajak diset 0.0 karena verifikasi pajak dilakukan oleh tim pajak internal
+        $this->assertEquals(0.0, $submission->cek_pajak_tarif_pph);
         $this->assertEquals(0.0, $submission->selisih);
         $this->assertEquals('TTD?', $submission->note_pph);
     }
@@ -893,5 +893,203 @@ class ProgramSubmissionTest extends TestCase
         $this->assertEquals('FAKTUR BELUM ADA', $submission->cek_dokumen);
         $this->assertEquals('BELUM BISA POTONG', $submission->status_potong_purchase);
         $this->assertEquals('empty', $submission->doc_validation['faktur']['status']);
+    }
+
+    public function test_sync_deletes_submissions_removed_from_spreadsheet(): void
+    {
+        $service = app(ProgramSubmissionService::class);
+
+        // Pre-create 2 submissions
+        $sub1 = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:35:41',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME00652',
+            'dealer_name' => 'Abadi Cell',
+            'program_name' => 'Program SO C11',
+            'row_hash' => sha1('10/10/2022 12:35:41|BIG KARAWANG|IDME00652|Abadi Cell|Program SO C11'),
+        ]);
+
+        $sub2 = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:38:05',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME01412',
+            'dealer_name' => 'DMS Cell',
+            'program_name' => 'Refund C30',
+            'row_hash' => sha1('10/10/2022 12:38:05|BIG KARAWANG|IDME01412|DMS Cell|Refund C30'),
+        ]);
+
+        // Sheet now only contains Abadi Cell (DMS Cell was deleted in spreadsheet)
+        $rows = [
+            ['Timestamp', 'REGION', 'ID REAL', 'NAMA DEALER', 'NAMA PROGRAM', 'NAMA SALES', 'DOKUMEN CREDIT NOTE', 'AGREEMENT', 'FAKTUR PAJAK'],
+            ['10/10/2022 12:35:41', 'BIG KARAWANG', 'IDME00652', 'Abadi Cell', 'Program SO C11', 'M RISWAN', 'https://drive.google.com/cn1', 'https://drive.google.com/agr1', 'https://drive.google.com/tax1'],
+        ];
+
+        $result = $service->processSheetRows($rows, 0);
+
+        $this->assertEquals(1, $result['total_rows']);
+        $this->assertEquals(1, $result['deleted_count']);
+        $this->assertDatabaseHas('program_submissions', ['id' => $sub1->id]);
+        $this->assertDatabaseMissing('program_submissions', ['id' => $sub2->id]);
+    }
+
+    public function test_service_imports_submissions_with_empty_dealer_name_if_documents_exist(): void
+    {
+        $service = app(ProgramSubmissionService::class);
+
+        $rows = [
+            ['Timestamp', 'REGION', 'ID REAL', 'NAMA DEALER', 'NAMA PROGRAM', 'NAMA SALES', 'DOKUMEN CREDIT NOTE', 'AGREEMENT', 'FAKTUR PAJAK'],
+            ['10/10/2022 12:35:41', 'BIG KARAWANG', '', '', '', 'M RISWAN', 'https://drive.google.com/cn_anon', 'https://drive.google.com/agr_anon', null],
+        ];
+
+        $result = $service->processSheetRows($rows, 0);
+
+        $this->assertEquals(1, $result['total_rows']);
+        $this->assertEquals(1, $result['new_count']);
+
+        $submission = ProgramSubmission::where('sales_name', 'M RISWAN')->first();
+        $this->assertNotNull($submission);
+        $this->assertEquals('[Belum Ada Nama Dealer]', $submission->dealer_name);
+        $this->assertEquals('[Belum Ada Nama Program]', $submission->program_name);
+        $this->assertEquals('https://drive.google.com/cn_anon', $submission->credit_note_url);
+    }
+
+    public function test_can_update_dealer_name_and_document_urls_and_sets_manual_edit_flag(): void
+    {
+        $user = User::factory()->create();
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:35:41',
+            'region' => 'BIG KARAWANG',
+            'id_real' => '',
+            'dealer_name' => '[Belum Ada Nama Dealer]',
+            'program_name' => 'Program C11',
+            'credit_note_url' => 'https://drive.google.com/cn_old',
+            'row_hash' => 'hash_test_manual_1',
+            'is_manual_edit' => false,
+        ]);
+
+        $payload = [
+            'dealer_name' => 'Bintang Terang Cell',
+            'id_real' => 'IDME00999',
+            'credit_note_url' => 'https://drive.google.com/cn_new',
+        ];
+
+        $response = $this->actingAs($user)->patchJson("/api/program-submissions/{$submission->id}", $payload);
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        $submission->refresh();
+        $this->assertEquals('Bintang Terang Cell', $submission->dealer_name);
+        $this->assertEquals('IDME00999', $submission->id_real);
+        $this->assertEquals('https://drive.google.com/cn_new', $submission->credit_note_url);
+        $this->assertTrue($submission->is_manual_edit);
+    }
+
+    public function test_sync_preserves_admin_manual_edits_from_spreadsheet_overwrite(): void
+    {
+        $service = app(ProgramSubmissionService::class);
+
+        $rowHash = sha1('10/10/2022 12:35:41|BIG KARAWANG|IDME00652|Abadi Cell|Program SO C11');
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:35:41',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME00652_FIXED',
+            'dealer_name' => 'Abadi Cell (Nama Benar Hasil Edit Admin)',
+            'program_name' => 'Program SO C11 (Diperbaiki)',
+            'credit_note_url' => 'https://drive.google.com/cn_fixed',
+            'row_hash' => $rowHash,
+            'is_manual_edit' => true,
+        ]);
+
+        // Incoming sheet row still has the old/broken data
+        $rows = [
+            ['Timestamp', 'REGION', 'ID REAL', 'NAMA DEALER', 'NAMA PROGRAM', 'NAMA SALES', 'DOKUMEN CREDIT NOTE', 'AGREEMENT', 'FAKTUR PAJAK'],
+            ['10/10/2022 12:35:41', 'BIG KARAWANG', 'IDME00652', 'Abadi Cell', 'Program SO C11', 'M RISWAN', 'https://drive.google.com/cn_broken', 'https://drive.google.com/agr1', 'https://drive.google.com/tax1'],
+        ];
+
+        $service->processSheetRows($rows, 0);
+
+        $submission->refresh();
+        // Admin's manual corrections MUST NOT be overwritten by the sheet sync
+        $this->assertEquals('Abadi Cell (Nama Benar Hasil Edit Admin)', $submission->dealer_name);
+        $this->assertEquals('IDME00652_FIXED', $submission->id_real);
+        $this->assertEquals('Program SO C11 (Diperbaiki)', $submission->program_name);
+        $this->assertEquals('https://drive.google.com/cn_fixed', $submission->credit_note_url);
+    }
+
+    public function test_can_delete_submission_and_sync_does_not_resurrect_it(): void
+    {
+        $user = User::factory()->create();
+        $service = app(ProgramSubmissionService::class);
+
+        $rowHash = sha1('10/10/2022 12:35:41|BIG KARAWANG|IDME00652|Spam Toko|Program SO C11');
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:35:41',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME00652',
+            'dealer_name' => 'Spam Toko',
+            'program_name' => 'Program SO C11',
+            'row_hash' => $rowHash,
+        ]);
+
+        // 1. Delete via API
+        $response = $this->actingAs($user)->deleteJson("/api/program-submissions/{$submission->id}");
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        $this->assertSoftDeleted('program_submissions', ['id' => $submission->id]);
+
+        // 2. Run sync where spreadsheet still contains the deleted spam row
+        $rows = [
+            ['Timestamp', 'REGION', 'ID REAL', 'NAMA DEALER', 'NAMA PROGRAM', 'NAMA SALES', 'DOKUMEN CREDIT NOTE', 'AGREEMENT', 'FAKTUR PAJAK'],
+            ['10/10/2022 12:35:41', 'BIG KARAWANG', 'IDME00652', 'Spam Toko', 'Program SO C11', 'M RISWAN', 'https://drive.google.com/cn1', 'https://drive.google.com/agr1', 'https://drive.google.com/tax1'],
+        ];
+
+        $service->processSheetRows($rows, 0);
+
+        // It should still be soft-deleted, not resurrected in active submissions!
+        $this->assertSoftDeleted('program_submissions', ['id' => $submission->id]);
+        $this->assertEquals(0, ProgramSubmission::count());
+    }
+
+    public function test_can_swap_swapped_documents(): void
+    {
+        $user = User::factory()->create();
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:35:41',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME00652',
+            'dealer_name' => 'Abadi Cell',
+            'program_name' => 'Program SO C11',
+            'credit_note_url' => 'https://drive.google.com/cn_url',
+            'agreement_url' => 'https://drive.google.com/faktur_in_agr_col',
+            'tax_invoice_url' => 'https://drive.google.com/agr_in_faktur_col',
+            'doc_validation' => [
+                'agr' => ['status' => 'swapped', 'detected_type' => 'faktur', 'message' => 'File di kolom Agr terdeteksi berisi Faktur Pajak'],
+                'faktur' => ['status' => 'swapped', 'detected_type' => 'agr', 'message' => 'File di kolom Faktur terdeteksi berisi Agreement'],
+            ],
+            'cek_dokumen' => 'DOKUMEN TIDAK SESUAI',
+            'status_potong_purchase' => 'BELUM BISA POTONG',
+            'row_hash' => 'hash_test_swap_1',
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/api/program-submissions/{$submission->id}/swap-docs", [
+            'type' => 'agr_faktur',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        $submission->refresh();
+        $this->assertEquals('https://drive.google.com/agr_in_faktur_col', $submission->agreement_url);
+        $this->assertEquals('https://drive.google.com/faktur_in_agr_col', $submission->tax_invoice_url);
+        $this->assertEquals('valid', $submission->doc_validation['agr']['status']);
+        $this->assertEquals('valid', $submission->doc_validation['faktur']['status']);
+        $this->assertEquals('LENGKAP', $submission->cek_dokumen);
+        $this->assertEquals('BISA DI POTONG', $submission->status_potong_purchase);
+        $this->assertTrue($submission->is_manual_edit);
     }
 }

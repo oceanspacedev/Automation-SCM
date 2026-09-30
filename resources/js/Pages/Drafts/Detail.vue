@@ -1,56 +1,56 @@
 <template>
-  <div class="space-y-6">
+  <div class="space-y-4 font-sans">
     <!-- Top Bar -->
-    <div class="flex items-center justify-between pb-4 border-b border-gray-200">
-      <div class="flex items-center space-x-3">
-        <router-link to="/drafts" class="text-sm font-medium text-gray-500 hover:text-black">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-200">
+      <div class="flex items-center space-x-2.5">
+        <router-link to="/drafts" class="text-xs font-medium text-gray-500 hover:text-gray-900 transition">
           ← Kembali ke Draft
         </router-link>
         <span class="text-gray-300">|</span>
-        <h1 class="text-xl font-bold tracking-tight text-gray-900">Detail Draft #{{ id }}</h1>
+        <h1 class="text-lg font-bold tracking-tight text-gray-950">Detail Draft #{{ id }}</h1>
       </div>
 
-      <div class="flex items-center space-x-2">
+      <div class="flex flex-wrap items-center gap-2">
         <!-- Status Badges -->
         <span
           v-if="draft.status === 'ready'"
-          class="h-9 px-3.5 bg-gray-50 text-gray-700 border border-gray-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-gray-50 text-gray-700 border border-gray-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
           title="Draft siap untuk digenerate menjadi invoice"
         >
-          <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
           <span>Ready</span>
         </span>
 
         <span
           v-else-if="draft.status === 'invoiced'"
-          class="h-9 px-3.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
           title="Invoice telah diterbitkan"
         >
-          <CheckCircleIcon class="h-4 w-4 text-emerald-600" />
+          <CheckCircleIcon class="h-3.5 w-3.5 text-emerald-600" />
           <span>Invoiced</span>
         </span>
 
         <span
           v-else-if="draft.status === 'error'"
-          class="h-9 px-3.5 bg-rose-50 text-rose-700 border border-rose-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-rose-50 text-rose-700 border border-rose-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
           title="Draft memiliki ketidaksesuaian rumus"
         >
-          <AlertCircleIcon class="h-4 w-4 text-rose-600" />
+          <AlertCircleIcon class="h-3.5 w-3.5 text-rose-600" />
           <span>Error</span>
         </span>
 
         <span
           v-else-if="draft.status"
-          class="h-9 px-3.5 bg-gray-50 text-gray-700 border border-gray-200 text-sm font-medium rounded-md inline-flex items-center gap-1.5 select-none capitalize"
+          class="h-8 px-2.5 bg-gray-50 text-gray-700 border border-gray-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none capitalize"
         >
-          <span class="w-2 h-2 rounded-full bg-gray-400"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
           <span>{{ draft.status }}</span>
         </span>
         <button
           v-if="draft.status !== 'invoiced'"
           @click="validateDraft"
           :disabled="validating"
-          class="h-9 px-3.5 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-md transition cursor-pointer"
+          class="h-8 px-3 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition cursor-pointer shadow-2xs"
         >
           {{ validating ? 'Memvalidasi...' : 'Validasi Ulang Rumus' }}
         </button>
@@ -59,7 +59,7 @@
           v-if="draft.status === 'ready'"
           @click="showGenerateModal = true"
           :disabled="generating"
-          class="h-9 px-4 bg-[#1D70F5] text-white text-sm font-medium rounded-md hover:bg-blue-600 disabled:opacity-50 transition cursor-pointer shadow-xs"
+          class="h-8 px-3.5 bg-[#1D70F5] text-white text-xs font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 transition cursor-pointer shadow-2xs"
         >
           {{ generating ? 'Membuat Invoice...' : 'Generate Invoice' }}
         </button>
@@ -67,7 +67,7 @@
         <router-link
           v-if="draft.invoice"
           :to="`/invoices/${draft.invoice.id}`"
-          class="h-9 px-4 bg-[#1D70F5] text-white text-sm font-medium rounded-md hover:bg-blue-600 transition inline-flex items-center shadow-xs"
+          class="h-8 px-3.5 bg-[#1D70F5] text-white text-xs font-medium rounded-lg hover:bg-blue-600 transition inline-flex items-center shadow-2xs"
         >
           Lihat Invoice ({{ draft.invoice.invoice_number }}) →
         </router-link>
@@ -75,52 +75,52 @@
     </div>
 
     <!-- Alert -->
-    <Alert v-if="alertMessage" :variant="alertSuccess ? 'default' : 'destructive'">
+    <Alert v-if="alertMessage" :variant="alertSuccess ? 'default' : 'destructive'" class="text-xs py-2.5">
       <CheckCircleIcon v-if="alertSuccess" class="h-4 w-4" />
       <AlertCircleIcon v-else class="h-4 w-4" />
-      <AlertDescription class="flex items-center justify-between">
+      <AlertDescription class="flex items-center justify-between text-xs">
         <span>{{ alertMessage }}</span>
-        <button @click="alertMessage = null" class="ml-4 text-sm opacity-60 hover:opacity-100 cursor-pointer">&times;</button>
+        <button @click="alertMessage = null" class="ml-4 text-xs opacity-60 hover:opacity-100 cursor-pointer">&times;</button>
       </AlertDescription>
     </Alert>
 
-    <div v-if="loading" class="py-8 text-center text-sm text-gray-500">
+    <div v-if="loading" class="py-8 text-center text-xs text-gray-500">
       Memuat data detail draft...
     </div>
 
-    <div v-else class="space-y-6">
+    <div v-else class="space-y-4">
       <!-- Info Grid (3 Columns) -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <!-- 1. Dealer Information -->
-        <div class="rounded-xl border border-gray-200 bg-white p-4">
-          <h2 class="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2 mb-3">
+        <div class="rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xs">
+          <h2 class="text-xs font-semibold text-gray-950 border-b border-gray-100 pb-2 mb-2.5">
             Dealer Information
           </h2>
-          <table class="w-full text-sm">
+          <table class="w-full text-xs">
             <tbody>
               <tr>
-                <td class="py-1 text-gray-500 w-32">Dealer Code</td>
+                <td class="py-1 text-gray-500 w-28">Dealer Code</td>
                 <td class="py-1 font-medium text-gray-900">{{ draft.dealer_code || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Dealer Name</td>
-                <td class="py-1 text-gray-900">{{ draft.dealer_name || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ draft.dealer_name || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Customer</td>
-                <td class="py-1 text-gray-900">{{ draft.customer_name || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ draft.customer_name || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Region / RSM</td>
-                <td class="py-1 text-gray-900">{{ draft.region || '-' }} / {{ draft.rsm || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ draft.region || '-' }} / {{ draft.rsm || '-' }}</td>
               </tr>
               <tr>
-                <td class="py-1 text-gray-500">Alamat</td>
-                <td class="py-1 text-gray-700">{{ draft.address || '-' }}</td>
+                <td class="py-1 text-gray-500 align-top">Alamat</td>
+                <td class="py-1 text-gray-700 leading-relaxed">{{ draft.address || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Email</td>
-                <td class="py-1 text-gray-900 font-medium">{{ draft.email || '-' }}</td>
+                <td class="py-1 text-gray-900 font-medium break-all">{{ draft.email || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">WhatsApp</td>
@@ -131,31 +131,31 @@
         </div>
 
         <!-- 2. Tax Information -->
-        <div class="rounded-xl border border-gray-200 bg-white p-4">
-          <h2 class="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2 mb-3">
+        <div class="rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xs">
+          <h2 class="text-xs font-semibold text-gray-950 border-b border-gray-100 pb-2 mb-2.5">
             Tax Information
           </h2>
-          <table class="w-full text-sm">
+          <table class="w-full text-xs">
             <tbody>
               <tr>
-                <td class="py-1 text-gray-500 w-32">NPWP</td>
-                <td class="py-1 text-gray-900">{{ draft.npwp || '-' }}</td>
+                <td class="py-1 text-gray-500 w-28">NPWP</td>
+                <td class="py-1 text-gray-800 font-mono">{{ draft.npwp || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Nama NPWP</td>
-                <td class="py-1 text-gray-900">{{ draft.npwp_name || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ draft.npwp_name || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Jenis NPWP</td>
-                <td class="py-1 text-gray-900">{{ draft.npwp_type || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ draft.npwp_type || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Jenis PPh</td>
-                <td class="py-1 text-gray-900">{{ draft.pph_type || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ draft.pph_type || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Tarif PPh Sistem</td>
-                <td class="py-1 text-gray-900">
+                <td class="py-1 text-gray-800">
                   {{ (comparison?.calculated?.pph_rate ? comparison.calculated.pph_rate * 100 : 2.5) }}%
                 </td>
               </tr>
@@ -164,15 +164,15 @@
         </div>
 
         <!-- 3. Program & Item Information -->
-        <div class="rounded-xl border border-gray-200 bg-white p-4">
-          <h2 class="text-sm font-semibold text-gray-900 border-b border-gray-100 pb-2 mb-3">
+        <div class="rounded-xl border border-gray-200 bg-white p-3.5 shadow-2xs">
+          <h2 class="text-xs font-semibold text-gray-950 border-b border-gray-100 pb-2 mb-2.5">
             Program & Invoice Type
           </h2>
-          <table class="w-full text-sm">
+          <table class="w-full text-xs">
             <tbody>
               <tr>
-                <td class="py-1 text-gray-500 w-32">Invoice Type</td>
-                <td class="py-1 text-gray-900">
+                <td class="py-1 text-gray-500 w-28">Invoice Type</td>
+                <td class="py-1 text-gray-800 font-medium">
                   {{ draft.invoice_type || 'N/A' }}
                 </td>
               </tr>
@@ -184,19 +184,19 @@
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Nama Program</td>
-                <td class="py-1 text-gray-900">{{ draft.program_name || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ draft.program_name || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Periode Program</td>
-                <td class="py-1 text-gray-900">{{ draft.program_period || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ draft.program_period || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">No CN / Ref</td>
-                <td class="py-1 text-gray-900">{{ draft.cn_number || '-' }}</td>
+                <td class="py-1 text-gray-800 font-mono">{{ draft.cn_number || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Item (Qty)</td>
-                <td class="py-1 text-gray-900">{{ draft.item_name || draft.item_code || '-' }} ({{ draft.real_qty || 1 }})</td>
+                <td class="py-1 text-gray-800">{{ draft.item_name || draft.item_code || '-' }} ({{ draft.real_qty || 1 }})</td>
               </tr>
             </tbody>
           </table>
@@ -204,21 +204,21 @@
       </div>
 
       <!-- Calculation Comparison Table -->
-      <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
-        <div class="px-4 py-3 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
-          <h3 class="text-sm font-medium text-gray-900">
+      <div class="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-2xs">
+        <div class="px-4 py-2.5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+          <h3 class="text-xs font-semibold text-gray-950">
             Perbandingan Nilai Excel VS Hasil Perhitungan Sistem
           </h3>
           <div>
             <span
               v-if="comparison?.is_matched"
-              class="text-xs font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200"
+              class="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200"
             >
               Semua Rumus Match
             </span>
             <span
               v-else
-              class="text-xs font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200"
+              class="text-[11px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200"
             >
               Terdapat Perbedaan
             </span>
@@ -236,23 +236,23 @@
             </TableRow>
           </TableHeader>
           <TableBody>
-            <TableRow>
-              <TableCell class="font-medium">Support Amount</TableCell>
-              <TableCell class="text-right">{{ formatCurrency(draft.support_amount) }}</TableCell>
-              <TableCell class="text-right">{{ formatCurrency(comparison?.calculated?.support_amount ?? draft.support_amount) }}</TableCell>
-              <TableCell class="text-right">Rp 0</TableCell>
-              <TableCell class="text-center text-green-700 font-medium">MATCH</TableCell>
+            <TableRow class="hover:bg-transparent">
+              <TableCell class="font-medium text-xs text-gray-900 py-2">Support Amount</TableCell>
+              <TableCell class="text-right text-xs text-gray-800 py-2">{{ formatCurrency(draft.support_amount) }}</TableCell>
+              <TableCell class="text-right text-xs text-gray-800 py-2">{{ formatCurrency(comparison?.calculated?.support_amount ?? draft.support_amount) }}</TableCell>
+              <TableCell class="text-right text-xs text-gray-500 py-2">Rp 0</TableCell>
+              <TableCell class="text-center text-emerald-700 font-medium text-xs py-2">MATCH</TableCell>
             </TableRow>
 
-            <TableRow v-for="(field, key) in comparisonFields" :key="key">
-              <TableCell class="font-medium capitalize">{{ key.replace('_', ' ') }}</TableCell>
-              <TableCell class="text-right">{{ formatCurrency(field.excel) }}</TableCell>
-              <TableCell class="text-right">{{ formatCurrency(field.system) }}</TableCell>
-              <TableCell class="text-right" :class="field.diff > 0 ? 'text-amber-700 font-medium' : ''">
+            <TableRow v-for="(field, key) in comparisonFields" :key="key" class="hover:bg-transparent">
+              <TableCell class="font-medium text-xs text-gray-900 py-2 capitalize">{{ key.replace('_', ' ') }}</TableCell>
+              <TableCell class="text-right text-xs text-gray-800 py-2">{{ formatCurrency(field.excel) }}</TableCell>
+              <TableCell class="text-right text-xs text-gray-800 py-2">{{ formatCurrency(field.system) }}</TableCell>
+              <TableCell class="text-right text-xs py-2" :class="field.diff > 0 ? 'text-amber-700 font-medium' : 'text-gray-500'">
                 {{ formatCurrency(field.diff) }}
               </TableCell>
-              <TableCell class="text-center">
-                <span :class="field.status === 'MATCH' ? 'text-green-700 font-medium' : 'text-red-700 font-medium'">
+              <TableCell class="text-center text-xs py-2">
+                <span :class="field.status === 'MATCH' ? 'text-emerald-700 font-medium' : 'text-rose-700 font-medium'">
                   {{ field.status }}
                 </span>
               </TableCell>

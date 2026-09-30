@@ -91,13 +91,13 @@ class ProgramSubmissionService
             ];
         }
 
-        return $this->processSheetRows($rows);
+        return $this->processSheetRows($rows, $limit);
     }
 
     /**
      * Process 2D array of rows from Google Sheet (Row 0 is Header).
      */
-    public function processSheetRows(array $rows): array
+    public function processSheetRows(array $rows, int $limit = 0): array
     {
         $headerRow = array_map(fn ($col) => strtolower(trim((string) $col)), $rows[0]);
         $dataRows = array_slice($rows, 1);
@@ -118,6 +118,7 @@ class ProgramSubmissionService
         $totalRows = count($dataRows);
         $newCount = 0;
         $updatedCount = 0;
+        $currentSheetHashes = [];
 
         foreach ($dataRows as $row) {
             if (empty(array_filter($row, fn ($v) => ! is_null($v) && trim((string) $v) !== ''))) {
@@ -138,45 +139,91 @@ class ProgramSubmissionService
                 $idReal = trim($m[1]);
             }
 
-            if (empty($dealerName) && empty($idReal) && empty($programName)) {
+            $hasDocuments = ! empty($creditNoteUrl) || ! empty($agreementUrl) || ! empty($taxInvoiceUrl);
+
+            if (empty($dealerName) && empty($idReal) && empty($programName) && ! $hasDocuments) {
                 continue;
             }
 
+            $normalizedDealer = ! empty($dealerName) ? $dealerName : '[Belum Ada Nama Dealer]';
+            $normalizedProgram = ! empty($programName) ? $programName : '[Belum Ada Nama Program]';
+
             // Generate deterministic unique hash
-            $hashString = "{$timestamp}|{$region}|{$idReal}|{$dealerName}|{$programName}";
+            if (empty($dealerName) && empty($idReal)) {
+                $hashString = "{$timestamp}|{$region}|[Belum Ada Nama Dealer]|{$normalizedProgram}|{$creditNoteUrl}|{$agreementUrl}|{$taxInvoiceUrl}";
+            } else {
+                $hashString = "{$timestamp}|{$region}|{$idReal}|{$dealerName}|{$programName}";
+            }
             $rowHash = sha1($hashString);
+            $currentSheetHashes[] = $rowHash;
 
-            $existing = ProgramSubmission::where('row_hash', $rowHash)->first();
+            $existing = ProgramSubmission::withTrashed()->where('row_hash', $rowHash)->first();
 
-            $data = [
+            // Jika baris ini sudah pernah dihapus oleh admin di aplikasi web, jangan dimunculkan lagi
+            if ($existing && $existing->trashed()) {
+                continue;
+            }
+
+            $baseData = [
                 'submission_timestamp' => $timestamp,
                 'region' => $region,
-                'id_real' => $idReal,
-                'dealer_name' => $dealerName,
-                'program_name' => $programName,
-                'sales_name' => $salesName,
-                'credit_note_url' => $creditNoteUrl,
-                'agreement_url' => $agreementUrl,
-                'tax_invoice_url' => $taxInvoiceUrl,
                 'raw_data' => $row,
             ];
 
             if ($existing) {
-                $existing->update($data);
+                // Pertahankan editan manual admin jika sudah pernah diperbaiki di web
+                if (! $existing->is_manual_edit) {
+                    $baseData['id_real'] = $idReal;
+                    $baseData['dealer_name'] = $normalizedDealer;
+                    $baseData['program_name'] = $normalizedProgram;
+                    $baseData['sales_name'] = $salesName;
+                    $baseData['credit_note_url'] = $creditNoteUrl;
+                    $baseData['agreement_url'] = $agreementUrl;
+                    $baseData['tax_invoice_url'] = $taxInvoiceUrl;
+                }
+                $existing->update($baseData);
                 $updatedCount++;
             } else {
-                $data['row_hash'] = $rowHash;
-                ProgramSubmission::create($data);
+                $baseData['id_real'] = $idReal;
+                $baseData['dealer_name'] = $normalizedDealer;
+                $baseData['program_name'] = $normalizedProgram;
+                $baseData['sales_name'] = $salesName;
+                $baseData['credit_note_url'] = $creditNoteUrl;
+                $baseData['agreement_url'] = $agreementUrl;
+                $baseData['tax_invoice_url'] = $taxInvoiceUrl;
+                $baseData['row_hash'] = $rowHash;
+                ProgramSubmission::create($baseData);
                 $newCount++;
             }
         }
+
+        // Hapus data di database yang barisnya sudah dihapus dari spreadsheet
+        $deletedCount = 0;
+        if ($limit === 0 && ! empty($currentSheetHashes)) {
+            $hashesMap = array_flip($currentSheetHashes);
+            ProgramSubmission::chunkById(500, function ($submissions) use ($hashesMap, &$deletedCount) {
+                foreach ($submissions as $sub) {
+                    if (! isset($hashesMap[$sub->row_hash])) {
+                        $sub->forceDelete();
+                        $deletedCount++;
+                    }
+                }
+            });
+        }
+
+        $msg = "Sinkronisasi berhasil ({$newCount} data baru, {$updatedCount} data diperbarui";
+        if ($deletedCount > 0) {
+            $msg .= ", {$deletedCount} data dihapus";
+        }
+        $msg .= ').';
 
         return [
             'total_rows' => $totalRows,
             'synced_count' => $newCount + $updatedCount,
             'new_count' => $newCount,
             'updated_count' => $updatedCount,
-            'message' => "Sinkronisasi berhasil ({$newCount} data baru, {$updatedCount} data diperbarui).",
+            'deleted_count' => $deletedCount,
+            'message' => $msg,
         ];
     }
 
@@ -223,23 +270,46 @@ class ProgramSubmissionService
             $taxInvoiceUrl = $values[8] ?? null;
         }
 
-        $hashString = "{$timestamp}|{$region}|{$idReal}|{$dealerName}|{$programName}";
+        $normalizedDealer = ! empty($dealerName) ? $dealerName : '[Belum Ada Nama Dealer]';
+        $normalizedProgram = ! empty($programName) ? $programName : '[Belum Ada Nama Program]';
+
+        if (empty($dealerName) && empty($idReal)) {
+            $hashString = "{$timestamp}|{$region}|[Belum Ada Nama Dealer]|{$normalizedProgram}|{$creditNoteUrl}|{$agreementUrl}|{$taxInvoiceUrl}";
+        } else {
+            $hashString = "{$timestamp}|{$region}|{$idReal}|{$dealerName}|{$programName}";
+        }
         $rowHash = sha1($hashString);
+
+        if (isset($payload['action']) && $payload['action'] === 'delete') {
+            ProgramSubmission::where('row_hash', $rowHash)->forceDelete();
+
+            return new ProgramSubmission(['row_hash' => $rowHash]);
+        }
+
+        $existing = ProgramSubmission::withTrashed()->where('row_hash', $rowHash)->first();
+        if ($existing && $existing->trashed()) {
+            return $existing;
+        }
+
+        $updateData = [
+            'submission_timestamp' => $timestamp ?: date('d/m/Y H:i:s'),
+            'region' => $region,
+            'raw_data' => $payload,
+        ];
+
+        if (! $existing || ! $existing->is_manual_edit) {
+            $updateData['id_real'] = $idReal;
+            $updateData['dealer_name'] = $normalizedDealer;
+            $updateData['program_name'] = $normalizedProgram;
+            $updateData['sales_name'] = $salesName;
+            $updateData['credit_note_url'] = $creditNoteUrl ?: null;
+            $updateData['agreement_url'] = $agreementUrl ?: null;
+            $updateData['tax_invoice_url'] = $taxInvoiceUrl ?: null;
+        }
 
         $submission = ProgramSubmission::updateOrCreate(
             ['row_hash' => $rowHash],
-            [
-                'submission_timestamp' => $timestamp ?: date('d/m/Y H:i:s'),
-                'region' => $region,
-                'id_real' => $idReal,
-                'dealer_name' => $dealerName,
-                'program_name' => $programName,
-                'sales_name' => $salesName,
-                'credit_note_url' => $creditNoteUrl ?: null,
-                'agreement_url' => $agreementUrl ?: null,
-                'tax_invoice_url' => $taxInvoiceUrl ?: null,
-                'raw_data' => $payload,
-            ]
+            $updateData
         );
 
         // Otomatis cocokkan dengan Data Program & kirim ke Google Spreadsheet realtime

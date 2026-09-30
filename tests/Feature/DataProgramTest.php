@@ -989,4 +989,88 @@ class DataProgramTest extends TestCase
             ->assertJsonPath('stats.matched', 1)
             ->assertJsonPath('stats.nominal_mismatch', 1);
     }
+
+    public function test_sync_deletes_rows_that_are_removed_or_emptied_in_spreadsheet(): void
+    {
+        DataProgram::create([
+            'row_hash' => 'row_2',
+            'dealer_name' => 'DEALER TO KEEP',
+            'program_name' => 'PROGRAM 1',
+        ]);
+
+        DataProgram::create([
+            'row_hash' => 'row_3',
+            'dealer_name' => 'DEALER TO DELETE',
+            'program_name' => 'PROGRAM 2',
+        ]);
+
+        DataProgram::create([
+            'row_hash' => 'row_4',
+            'dealer_name' => 'OLD TAIL DEALER',
+            'program_name' => 'PROGRAM 3',
+        ]);
+
+        Http::fake([
+            'script.google.com/macros/s/*' => Http::response([
+                'success' => true,
+                'rows' => [
+                    ['Header Dealer', 'Header Program', 'Header BT', 'Header Prog Name'],
+                    ['DEALER TO KEEP', 'Program 1', 'BT01', 'Prog Name 1'],
+                    // Row 3 is empty/cleared in spreadsheet:
+                    ['', '', '', ''],
+                ],
+            ], 200),
+        ]);
+
+        $service = app(DataProgramSyncService::class);
+        $result = $service->sync('https://script.google.com/macros/s/AKfycbzXBZOrWjaxN2F_JYslnurQB3FMgbZNysW3ZhXZRqyQMcmUTIIYWghFln43o6iU7YhW/exec');
+
+        $this->assertDatabaseHas('data_programs', [
+            'row_hash' => 'row_2',
+            'dealer_name' => 'DEALER TO KEEP',
+        ]);
+
+        // Row 3 (cleared) and Row 4 (beyond sheet length) should be deleted!
+        $this->assertDatabaseMissing('data_programs', [
+            'row_hash' => 'row_3',
+        ]);
+        $this->assertDatabaseMissing('data_programs', [
+            'row_hash' => 'row_4',
+        ]);
+    }
+
+    public function test_webhook_deletes_row_when_emptied_or_action_delete(): void
+    {
+        DataProgram::create([
+            'row_hash' => 'row_5',
+            'dealer_name' => 'DEALER TO BE EMPTIED',
+            'program_name' => 'PROGRAM X',
+        ]);
+
+        DataProgram::create([
+            'row_hash' => 'row_6',
+            'dealer_name' => 'DEALER EXPLICIT DELETE',
+            'program_name' => 'PROGRAM Y',
+        ]);
+
+        $service = app(DataProgramSyncService::class);
+
+        // 1. Cleared row via webhook values
+        $res1 = $service->saveWebhookPayload([
+            'row_index' => 5,
+            'values' => ['', '', '', ''],
+        ]);
+
+        $this->assertEquals(1, $res1['deleted_count']);
+        $this->assertDatabaseMissing('data_programs', ['row_hash' => 'row_5']);
+
+        // 2. Explicit action delete
+        $res2 = $service->saveWebhookPayload([
+            'action' => 'delete',
+            'row_index' => 6,
+        ]);
+
+        $this->assertEquals(1, $res2['deleted_count']);
+        $this->assertDatabaseMissing('data_programs', ['row_hash' => 'row_6']);
+    }
 }

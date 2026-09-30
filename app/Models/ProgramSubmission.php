@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ProgramSubmission extends Model
 {
+    use SoftDeletes;
+
     public const STATUS_PURCHASE_OPTIONS = [
         'BELUM BISA POTONG',
         'BISA DI POTONG',
@@ -32,6 +35,7 @@ class ProgramSubmission extends Model
         'cek_pajak_tarif_pph' => 'float',
         'selisih' => 'float',
         'doc_validation' => 'array',
+        'is_manual_edit' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];

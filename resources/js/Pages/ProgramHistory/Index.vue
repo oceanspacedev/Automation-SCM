@@ -1,24 +1,31 @@
 <template>
   <div class="space-y-4">
+    <!-- Breadcrumbs (Filament style) -->
+    <div class="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
+      <span>Riwayat</span>
+      <ChevronRightIcon class="w-4 h-4 text-gray-400" />
+      <span class="text-gray-800 font-medium">Riwayat Program</span>
+    </div>
+
     <!-- Header Page -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-xl font-bold tracking-tight text-gray-900">Riwayat Program</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Riwayat Program</h1>
         <p class="text-xs text-gray-500 mt-0.5">
           Audit dan histori pencocokan antara Form Program dengan Data Program.
         </p>
       </div>
 
-      <!-- Action Buttons -->
+      <!-- Action Buttons (Filament style) -->
       <div class="flex flex-wrap items-center gap-2">
         <button
           type="button"
           @click="fetchLogs(1)"
           :disabled="loading"
-          class="h-8 px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-xs font-normal text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer disabled:opacity-50"
+          class="h-9 px-3 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer disabled:opacity-50"
           title="Muat ulang data riwayat"
         >
-          <RefreshCwIcon :class="['w-3.5 h-3.5 text-gray-500', loading && 'animate-spin text-emerald-600']" />
+          <RefreshCwIcon :class="['w-3.5 h-3.5 text-gray-500', loading && 'animate-spin text-gray-900']" />
           <span>{{ loading ? 'Memuat...' : 'Refresh' }}</span>
         </button>
 
@@ -26,7 +33,7 @@
           type="button"
           @click="handleTriggerBatchReconcile"
           :disabled="isReconciling"
-          class="h-8 px-2.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-white text-xs font-normal text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition shadow-2xs cursor-pointer disabled:opacity-50"
+          class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer disabled:opacity-50"
           title="Jalankan pencocokan batch"
         >
           <RefreshCwIcon v-if="isReconciling" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
@@ -56,109 +63,173 @@
       </button>
     </div>
 
-    <!-- Toolbar Filters (Persis Form Program) -->
-    <div class="flex flex-wrap items-center justify-between gap-2.5 py-1">
-      <div class="flex flex-wrap items-center gap-2">
-        <!-- Search Input -->
-        <div class="relative">
-          <SearchIcon class="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
-          <input
-            v-model="filters.search"
-            @input="debounceFetch"
-            type="text"
-            placeholder="Cari dealer, ID Real, program, status..."
-            class="h-9 w-64 sm:w-80 pl-9 pr-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black"
-          />
+    <!-- Filament Table Card -->
+    <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <!-- Toolbar (Search & Filter like Filament) -->
+      <div class="p-3 sm:px-4 sm:py-3.5 border-b border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <!-- Left: Realtime Auto-Refresh & Update info -->
+        <div class="flex items-center gap-3 text-xs text-gray-500">
+          <label class="inline-flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              v-model="autoRefresh"
+              class="rounded border-gray-300 text-gray-900 focus:ring-0 w-3.5 h-3.5 cursor-pointer"
+            />
+            <span class="text-xs text-gray-600">Auto-Refresh (30s)</span>
+          </label>
+          <span v-if="lastUpdatedText" class="text-xs text-gray-400 hidden sm:inline">
+            &bull; Update: {{ lastUpdatedText }}
+          </span>
         </div>
 
-        <!-- Filter Status -->
-        <select
-          v-model="filters.status"
-          @change="fetchLogs(1)"
-          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-        >
-          <option value="ALL">Semua Status</option>
-          <option value="MATCHED">Sesuai</option>
-          <option value="DOC_INCOMPLETE">Dokumen Kurang</option>
-          <option value="NOMINAL_MISMATCH">Selisih Nominal</option>
-          <option value="NO_MATCH">Belum Ada Form</option>
-        </select>
+        <!-- Right: Search Box & Filter Popover -->
+        <div class="flex items-center gap-2 self-end sm:self-auto w-full sm:w-auto">
+          <!-- Search box with Magnifying glass -->
+          <div class="relative flex-1 sm:w-64">
+            <SearchIcon class="w-4 h-4 text-gray-400 absolute left-3 top-2.5 pointer-events-none" />
+            <input
+              v-model="filters.search"
+              @input="debounceFetch"
+              type="text"
+              placeholder="Search"
+              class="h-9 w-full pl-9 pr-3 text-xs text-gray-900 bg-white border border-gray-300 rounded-lg placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-950 focus:border-gray-950 transition"
+            />
+          </div>
 
-        <!-- Filter Pemicu -->
-        <select
-          v-model="filters.triggered_by"
-          @change="fetchLogs(1)"
-          class="h-9 rounded-md border border-gray-200 bg-white px-3 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-        >
-          <option value="">Semua Pemicu</option>
-          <option value="manual_batch">Pencocokan Batch</option>
-          <option value="manual_row">Per Baris</option>
-          <option value="auto_submission">Form AI</option>
-        </select>
+          <!-- Filter Popover with Active Badge Count (funnel with badge) -->
+          <Popover v-model:open="isFilterOpen">
+            <PopoverTrigger as-child>
+              <button
+                type="button"
+                :class="[
+                  'h-9 px-2.5 rounded-lg border text-xs font-medium inline-flex items-center gap-1.5 transition shadow-2xs cursor-pointer',
+                  activeFilterCount > 0
+                    ? 'border-gray-900 bg-gray-50 text-gray-950'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                ]"
+                title="Buka Filter"
+              >
+                <FilterIcon class="w-4 h-4 text-gray-600" />
+                <span
+                  :class="[
+                    'w-4 h-4 rounded-full text-[10px] font-semibold flex items-center justify-center',
+                    activeFilterCount > 0 ? 'bg-gray-950 text-white' : 'bg-gray-100 text-gray-600'
+                  ]"
+                >
+                  {{ activeFilterCount }}
+                </span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent class="w-72 p-3 space-y-3" align="end">
+              <div class="text-xs font-semibold text-gray-900 border-b border-gray-100 pb-2 flex items-center justify-between">
+                <span>Filter Riwayat Program</span>
+                <button
+                  v-if="activeFilterCount > 0"
+                  @click="resetFilters"
+                  class="text-[11px] font-normal text-rose-600 hover:underline cursor-pointer"
+                >
+                  Reset
+                </button>
+              </div>
 
-        <!-- Reset Button -->
-        <button
-          v-if="filters.search || filters.status !== 'ALL' || filters.triggered_by"
-          type="button"
-          @click="resetFilters"
-          class="h-9 px-2.5 text-xs text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-md transition cursor-pointer"
-        >
-          Reset Filter
-        </button>
+              <!-- Status Filter -->
+              <div class="space-y-1">
+                <label class="text-[11px] font-medium text-gray-700">Status Pencocokan</label>
+                <select
+                  v-model="filters.status"
+                  @change="fetchLogs(1)"
+                  class="w-full h-8 px-2.5 text-xs rounded-lg border border-gray-300 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-950 cursor-pointer"
+                >
+                  <option value="ALL">Semua Status</option>
+                  <option value="MATCHED">Sesuai</option>
+                  <option value="DOC_INCOMPLETE">Dokumen Kurang</option>
+                  <option value="NOMINAL_MISMATCH">Selisih Nominal</option>
+                  <option value="NO_MATCH">Belum Ada Form</option>
+                </select>
+              </div>
+
+              <!-- Filter Pemicu -->
+              <div class="space-y-1">
+                <label class="text-[11px] font-medium text-gray-700">Pemicu</label>
+                <select
+                  v-model="filters.triggered_by"
+                  @change="fetchLogs(1)"
+                  class="w-full h-8 px-2.5 text-xs rounded-lg border border-gray-300 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-950 cursor-pointer"
+                >
+                  <option value="">Semua Pemicu</option>
+                  <option value="manual_batch">Pencocokan Batch</option>
+                  <option value="manual_row">Per Baris</option>
+                  <option value="auto_submission">Form AI</option>
+                </select>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
-      <!-- Realtime Auto-Refresh & Status -->
-      <div class="flex flex-wrap items-center gap-3">
-        <label class="inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            v-model="autoRefresh"
-            class="rounded border-gray-300 text-black focus:ring-black cursor-pointer"
-          />
-          <span>Auto-Refresh (30d)</span>
-        </label>
-
-        <span v-if="lastUpdatedText" class="text-xs text-gray-400">
-          Update: {{ lastUpdatedText }}
-        </span>
-      </div>
-    </div>
-
-    <!-- Official Shadcn Table Card -->
-    <div class="rounded-xl border border-gray-200 bg-white overflow-hidden">
+      <!-- Filament Table -->
       <Table>
         <TableHeader>
-          <TableRow class="border-b border-gray-200 text-xs hover:bg-transparent">
-            <TableHead class="w-[44px] text-center font-medium text-gray-500">No</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">Waktu</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500">ID Real</TableHead>
-            <TableHead class="min-w-[170px] font-medium text-gray-500">Nama Dealer</TableHead>
-            <TableHead class="min-w-[200px] font-medium text-gray-500">Nama Program</TableHead>
-            <TableHead class="whitespace-nowrap text-center font-medium text-gray-500">Status</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Data Program</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Form Program</TableHead>
-            <TableHead class="whitespace-nowrap font-medium text-gray-500 text-right">Selisih</TableHead>
-            <TableHead class="min-w-[110px] text-center font-medium text-gray-500">Dokumen Form</TableHead>
-            <TableHead class="min-w-[200px] font-medium text-gray-500">Keterangan</TableHead>
-            <TableHead class="w-[80px] text-center font-medium text-gray-500 sticky right-0 bg-white border-b border-gray-200">Aksi</TableHead>
+          <TableRow>
+            <TableHead class="w-[44px] text-center">No</TableHead>
+            <TableHead class="min-w-[130px]">
+              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                Waktu
+                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+              </span>
+            </TableHead>
+            <TableHead class="min-w-[130px]">
+              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                ID Real
+                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+              </span>
+            </TableHead>
+            <TableHead class="min-w-[160px]">
+              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                Nama Dealer
+                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+              </span>
+            </TableHead>
+            <TableHead class="min-w-[180px]">
+              <span>Nama Program</span>
+            </TableHead>
+            <TableHead class="min-w-[120px] text-center">
+              <span>Status</span>
+            </TableHead>
+            <TableHead class="text-right min-w-[120px]">
+              <span>Data Program</span>
+            </TableHead>
+            <TableHead class="text-right min-w-[120px]">
+              <span>Form Program</span>
+            </TableHead>
+            <TableHead class="text-right min-w-[110px]">
+              <span>Selisih</span>
+            </TableHead>
+            <TableHead class="min-w-[120px] text-center">
+              <span>Dokumen Form</span>
+            </TableHead>
+            <TableHead class="min-w-[160px]">
+              <span>Keterangan</span>
+            </TableHead>
+            <TableHead class="text-right w-[90px] sticky right-0 bg-white">
+              <span>Action</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
+
         <TableBody>
           <!-- Loading State -->
           <TableEmpty v-if="loading && logs.length === 0" :colspan="12">
-            <div class="inline-flex items-center gap-2 text-gray-500 py-8">
-              <RefreshCwIcon class="w-4 h-4 animate-spin text-gray-400" />
-              <span>Memuat data riwayat program...</span>
+            <div class="py-8 flex flex-col items-center justify-center gap-2 text-gray-500">
+              <span class="inline-block w-5 h-5 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></span>
+              <span class="text-xs">Memuat data riwayat program...</span>
             </div>
           </TableEmpty>
 
           <!-- Empty State -->
           <TableEmpty v-else-if="logs.length === 0" :colspan="12">
-            <div class="max-w-md mx-auto py-8 space-y-1.5 text-center text-gray-500">
-              <p class="font-medium text-gray-800">Belum ada data riwayat yang tersimpan.</p>
-              <p class="text-xs text-gray-500">
-                Klik tombol <strong>"Cocokkan Form Program"</strong> di atas untuk menjalankan pencocokan data.
-              </p>
+            <div class="py-8 text-center text-gray-400 text-xs">
+              Belum ada data riwayat yang tersimpan. Silakan klik tombol <strong>Cocokkan Form Program</strong> di atas.
             </div>
           </TableEmpty>
 
@@ -167,104 +238,103 @@
             v-else
             v-for="(row, idx) in logs"
             :key="row.id"
-            class="hover:bg-gray-50/80 transition text-xs"
+            class="hover:bg-gray-50 transition text-xs"
           >
             <!-- No -->
-            <TableCell class="text-center text-gray-500 py-2.5">
+            <TableCell class="text-center text-gray-500 text-xs">
               {{ (pagination.current_page - 1) * pagination.per_page + idx + 1 }}
             </TableCell>
 
-            <!-- Waktu (Persis Form Program) -->
-            <TableCell class="whitespace-nowrap text-gray-700 py-2.5 leading-tight">
+            <!-- Waktu -->
+            <TableCell class="whitespace-nowrap text-xs text-gray-800">
               <div>{{ formatTimestamp(row.created_at).date }}</div>
-              <div class="text-[11px] text-gray-400">{{ formatTimestamp(row.created_at).time }}</div>
+              <div class="text-xs text-gray-400">{{ formatTimestamp(row.created_at).time }}</div>
             </TableCell>
 
-            <!-- ID Real / Kode BT -->
-            <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
-              {{ row.kode_bt || row.program_submission?.id_real || '-' }}
+            <!-- ID Real (Bold like SJ-xxxx) -->
+            <TableCell>
+              <span class="text-gray-950 text-xs">
+                {{ row.kode_bt || row.program_submission?.id_real || '-' }}
+              </span>
             </TableCell>
 
             <!-- Nama Dealer -->
-            <TableCell class="text-gray-700 py-2.5 leading-snug">
-              <div class="line-clamp-2 text-gray-800" :title="row.dealer_name">{{ row.dealer_name || '-' }}</div>
+            <TableCell class="text-xs text-gray-800" :title="row.dealer_name">
+              <div class="line-clamp-2">{{ row.dealer_name || '-' }}</div>
             </TableCell>
 
             <!-- Nama Program -->
-            <TableCell class="text-gray-700 py-2.5 leading-snug">
-              <div class="line-clamp-2" :title="row.program_name">{{ row.program_name || '-' }}</div>
+            <TableCell class="text-xs text-gray-600" :title="row.program_name">
+              <div class="line-clamp-2">{{ row.program_name || '-' }}</div>
             </TableCell>
 
-            <!-- Status Pencocokan -->
-            <TableCell class="text-center py-2.5 whitespace-nowrap">
-              <span
+            <!-- Status Pencocokan (Filament Badge) -->
+            <TableCell class="text-center whitespace-nowrap">
+              <FilamentBadge
                 v-if="row.status === 'MATCHED'"
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-semibold"
+                color="success"
               >
-                <CheckIcon class="w-3 h-3" />
-                <span>Sesuai</span>
-              </span>
-              <span
+                SESUAI
+              </FilamentBadge>
+              <FilamentBadge
                 v-else-if="row.status === 'DOC_INCOMPLETE'"
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-medium"
+                color="warning"
               >
-                <AlertCircleIcon class="w-3 h-3 text-amber-600 shrink-0" />
-                <span>Dokumen Kurang</span>
-              </span>
-              <span
+                DOKUMEN KURANG
+              </FilamentBadge>
+              <FilamentBadge
                 v-else-if="row.status === 'NOMINAL_MISMATCH'"
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-medium"
+                color="danger"
               >
-                <AlertCircleIcon class="w-3 h-3 text-rose-600 shrink-0" />
-                <span>Selisih Nominal</span>
-              </span>
-              <span
+                SELISIH
+              </FilamentBadge>
+              <FilamentBadge
                 v-else-if="row.status === 'NO_MATCH'"
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 text-gray-700 border border-gray-200 text-[11px] font-medium"
+                color="gray"
               >
-                <span>Belum Ada Form</span>
-              </span>
-              <span
+                BELUM ADA FORM
+              </FilamentBadge>
+              <FilamentBadge
                 v-else
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-50 text-gray-700 border border-gray-200 text-[11px] font-medium"
+                color="gray"
               >
-                <span>{{ row.status }}</span>
-              </span>
+                {{ row.status }}
+              </FilamentBadge>
             </TableCell>
 
-            <!-- Data Program (DPP / Net Pay) -->
-            <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+            <!-- Data Program -->
+            <TableCell class="whitespace-nowrap text-right text-xs text-gray-800">
               {{ formatRupiah(row.dp_amount) }}
             </TableCell>
 
-            <!-- Form Program (Nominal) -->
-            <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+            <!-- Form Program -->
+            <TableCell class="whitespace-nowrap text-right text-xs text-gray-800">
               {{ row.submission_amount ? formatRupiah(row.submission_amount) : (row.program_submission_id ? '0' : '-') }}
             </TableCell>
 
-            <!-- Selisih (Persis Form Program baris 553) -->
-            <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+            <!-- Selisih -->
+            <TableCell class="whitespace-nowrap text-right text-xs">
               <span v-if="row.selisih === 0 || row.selisih === '0' || row.selisih === 0.0" class="text-gray-400">
                 0
               </span>
-              <span v-else-if="row.selisih !== null && row.selisih !== undefined && row.selisih !== ''">
+              <span v-else-if="row.selisih !== null && row.selisih !== undefined && row.selisih !== ''" class="font-medium text-rose-600">
                 {{ formatRupiah(row.selisih) }}
               </span>
-              <span v-else class="text-gray-300">-</span>
+              <span v-else class="text-gray-400">-</span>
             </TableCell>
 
-            <!-- Dokumen Form (CN, Agr, Faktur) -->
-            <TableCell class="text-center py-2.5 whitespace-nowrap">
-              <div v-if="row.program_submission" class="inline-flex items-center justify-center gap-1">
+            <!-- Dokumen Form -->
+            <TableCell class="text-center whitespace-nowrap">
+              <div v-if="row.program_submission" class="inline-flex items-center justify-center gap-1.5">
                 <a
                   v-if="isValidUrl(row.program_submission.credit_note_url)"
                   :href="row.program_submission.credit_note_url"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer"
-                  title="Buka Dokumen Credit Note"
+                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 bg-white text-gray-700 hover:text-gray-950 text-xs font-medium hover:bg-gray-50 transition cursor-pointer"
+                  title="Credit Note"
                 >
-                  <FileTextIcon class="w-3 h-3 text-gray-500 shrink-0" />
+                  <FileTextIcon class="w-3.5 h-3.5 text-gray-500" />
                   <span>CN</span>
                 </a>
                 <a
@@ -272,10 +342,10 @@
                   :href="row.program_submission.agreement_url"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer"
-                  title="Buka Dokumen Agreement"
+                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 bg-white text-gray-700 hover:text-gray-950 text-xs font-medium hover:bg-gray-50 transition cursor-pointer"
+                  title="Agreement"
                 >
-                  <FileTextIcon class="w-3 h-3 text-gray-500 shrink-0" />
+                  <FileTextIcon class="w-3.5 h-3.5 text-gray-500" />
                   <span>Agr</span>
                 </a>
                 <a
@@ -283,36 +353,36 @@
                   :href="row.program_submission.tax_invoice_url"
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer"
-                  title="Buka Dokumen Faktur Pajak"
+                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 bg-white text-gray-700 hover:text-gray-950 text-xs font-medium hover:bg-gray-50 transition cursor-pointer"
+                  title="Faktur Pajak"
                 >
-                  <FileTextIcon class="w-3 h-3 text-gray-500 shrink-0" />
+                  <FileTextIcon class="w-3.5 h-3.5 text-gray-500" />
                   <span>Faktur</span>
                 </a>
                 <span
                   v-if="!isValidUrl(row.program_submission.credit_note_url) && !isValidUrl(row.program_submission.agreement_url) && !isValidUrl(row.program_submission.tax_invoice_url)"
-                  class="text-gray-300 text-xs"
+                  class="text-gray-400 text-xs"
                 >
                   -
                 </span>
               </div>
-              <span v-else class="text-gray-300 text-xs">-</span>
+              <span v-else class="text-gray-400 text-xs">-</span>
             </TableCell>
 
             <!-- Keterangan -->
-            <TableCell class="text-gray-700 py-2.5 leading-snug">
+            <TableCell class="text-xs text-gray-600">
               <div class="line-clamp-2" :title="row.notes">{{ row.notes || '-' }}</div>
             </TableCell>
 
-            <!-- Aksi -->
-            <TableCell class="text-center py-2.5 whitespace-nowrap sticky right-0 bg-white">
+            <!-- Action -->
+            <TableCell class="text-right whitespace-nowrap sticky right-0 bg-white">
               <button
                 type="button"
                 @click="openDetailModal(row)"
-                class="h-7 px-2.5 inline-flex items-center gap-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs transition cursor-pointer shadow-2xs"
+                class="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-950 hover:underline cursor-pointer"
                 title="Lihat Detail Komparasi"
               >
-                <EyeIcon class="w-3.5 h-3.5 text-gray-500" />
+                <EyeIcon class="w-4 h-4 text-gray-500" />
                 <span>Detail</span>
               </button>
             </TableCell>
@@ -320,84 +390,15 @@
         </TableBody>
       </Table>
 
-      <!-- Pagination Footer (Persis Form Program) -->
-      <div
-        v-if="pagination.total > 0"
-        class="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-gray-200 bg-white text-xs text-gray-500"
-      >
-        <div class="flex items-center gap-3">
-          <div>
-            Menampilkan <span class="font-semibold text-gray-900">{{ logs.length }}</span> dari
-            <span class="font-semibold text-gray-900">{{ Number(pagination.total).toLocaleString('id-ID') }}</span> total respon
-          </div>
-          <div class="flex items-center gap-1.5 ml-2 pl-3 border-l border-gray-200">
-            <span>Per halaman:</span>
-            <select
-              v-model="pagination.per_page"
-              @change="changePerPage"
-              class="h-7 px-1.5 rounded border border-gray-200 bg-white text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-            >
-              <option :value="15">15</option>
-              <option :value="25">25</option>
-              <option :value="50">50</option>
-              <option :value="100">100</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-1.5">
-          <button
-            type="button"
-            :disabled="pagination.current_page <= 1 || loading"
-            @click="fetchLogs(1)"
-            class="px-2 py-1.5 rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-            title="Halaman Pertama"
-          >
-            &laquo; Pertama
-          </button>
-          <button
-            type="button"
-            :disabled="pagination.current_page <= 1 || loading"
-            @click="fetchLogs(pagination.current_page - 1)"
-            class="px-2.5 py-1.5 rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-          >
-            Sebelumnya
-          </button>
-
-          <div class="flex items-center gap-1 px-1">
-            <span>Halaman</span>
-            <input
-              type="number"
-              min="1"
-              :max="pagination.last_page"
-              :value="pagination.current_page"
-              @keydown.enter="onPageInputEnter($event)"
-              @blur="onPageInputBlur($event)"
-              class="w-14 h-7 text-center rounded border border-gray-200 bg-white text-xs font-semibold text-gray-900 focus:outline-none focus:ring-1 focus:ring-black"
-              title="Ketik nomor halaman lalu tekan Enter"
-            />
-            <span>dari {{ pagination.last_page || 1 }}</span>
-          </div>
-
-          <button
-            type="button"
-            :disabled="pagination.current_page >= pagination.last_page || loading"
-            @click="fetchLogs(pagination.current_page + 1)"
-            class="px-2.5 py-1.5 rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-          >
-            Selanjutnya
-          </button>
-          <button
-            type="button"
-            :disabled="pagination.current_page >= pagination.last_page || loading"
-            @click="fetchLogs(pagination.last_page)"
-            class="px-2 py-1.5 rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-            title="Halaman Terakhir"
-          >
-            Terakhir &raquo;
-          </button>
-        </div>
-      </div>
+      <!-- Filament Pagination Footer -->
+      <FilamentPagination
+        :total="pagination.total"
+        :current-page="pagination.current_page"
+        :last-page="pagination.last_page"
+        :per-page="pagination.per_page"
+        @page-change="fetchLogs"
+        @per-page-change="(p) => { pagination.per_page = p; fetchLogs(1); }"
+      />
     </div>
 
     <!-- Detail Komparasi Modal (Polos & Rapi, Tanpa Slop) -->
@@ -566,7 +567,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import {
   Search as SearchIcon,
@@ -577,7 +578,13 @@ import {
   Eye as EyeIcon,
   X as XIcon,
   FileText as FileTextIcon,
+  ChevronRight as ChevronRightIcon,
+  ChevronDown as ChevronDownIcon,
+  Filter as FilterIcon,
 } from 'lucide-vue-next';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import FilamentBadge from '@/components/ui/FilamentBadge.vue';
+import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 import {
   Table,
   TableHeader,
@@ -595,6 +602,7 @@ const statusMessage = ref('');
 const statusError = ref(false);
 const autoRefresh = ref(true);
 const lastUpdatedText = ref('');
+const isFilterOpen = ref(false);
 
 const showDetailModal = ref(false);
 const selectedLog = ref(null);
@@ -603,6 +611,13 @@ const filters = reactive({
   search: '',
   status: 'ALL',
   triggered_by: '',
+});
+
+const activeFilterCount = computed(() => {
+  let count = 0;
+  if (filters.status && filters.status !== 'ALL') count++;
+  if (filters.triggered_by) count++;
+  return count;
 });
 
 const pagination = reactive({
@@ -626,6 +641,7 @@ const resetFilters = () => {
   filters.search = '';
   filters.status = 'ALL';
   filters.triggered_by = '';
+  isFilterOpen.value = false;
   fetchLogs(1);
 };
 
