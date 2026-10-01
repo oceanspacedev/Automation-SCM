@@ -1,6 +1,8 @@
 <?php
 
+use App\Models\ProgramSubmission;
 use App\Services\DataProgramSyncService;
+use App\Services\ProgramReconciliationService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -35,3 +37,43 @@ if (! app()->environment('local') || env('ENABLE_AUTO_AI_SCHEDULE', false)) {
         ->withoutOverlapping()
         ->runInBackground();
 }
+
+Artisan::command('program:refresh-completeness', function () {
+    $this->info('Memperbarui status kelengkapan dokumen Non-PKP...');
+    $reconciler = app(ProgramReconciliationService::class);
+
+    $updated = 0;
+    ProgramSubmission::where(function ($q) {
+        $q->whereNull('tax_invoice_url')
+            ->orWhere('tax_invoice_url', '')
+            ->orWhere('tax_invoice_url', '-');
+    })
+        ->whereNotNull('credit_note_url')->where('credit_note_url', '!=', '')
+        ->whereNotNull('agreement_url')->where('agreement_url', '!=', '')
+        ->chunkById(200, function ($subs) use ($reconciler, &$updated) {
+            foreach ($subs as $sub) {
+                $isPkp = ((float) ($sub->ppn ?? 0) > 0) || $reconciler->isPkpFromSubmission($sub);
+                if (! $isPkp) {
+                    // Non-PKP with both CN and Agr
+                    $hasIssue = false;
+                    if ($sub->doc_validation) {
+                        $cn = $sub->doc_validation['cn'] ?? [];
+                        $agr = $sub->doc_validation['agr'] ?? [];
+                        if (($cn['status'] ?? '') === 'invalid' || ($cn['status'] ?? '') === 'swapped' ||
+                            ($agr['status'] ?? '') === 'invalid' || ($agr['status'] ?? '') === 'swapped') {
+                            $hasIssue = true;
+                        }
+                    }
+                    if (! $hasIssue && $sub->status_potong_purchase !== 'BISA DI POTONG' && $sub->status_potong_purchase !== 'SUDAH POTONG') {
+                        $sub->update([
+                            'status_potong_purchase' => 'BISA DI POTONG',
+                            'cek_dokumen' => 'LENGKAP',
+                        ]);
+                        $updated++;
+                    }
+                }
+            }
+        });
+
+    $this->info("Selesai! Sebanyak {$updated} pengajuan Non-PKP diperbarui menjadi BISA DI POTONG.");
+})->purpose('Refresh status potong purchase untuk pengajuan Non-PKP yang memiliki CN dan Agreement');

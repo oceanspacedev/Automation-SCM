@@ -246,7 +246,7 @@
                 <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
               </span>
             </TableHead>
-            <TableHead class="text-right w-[210px] min-w-[210px]">
+            <TableHead class="text-center w-[120px] min-w-[120px]">
               <span>Action</span>
             </TableHead>
           </TableRow>
@@ -308,13 +308,9 @@
               {{ inv.invoice_type || '-' }}
             </TableCell>
 
-            <!-- Status (Filament Pill Badge) -->
-            <TableCell>
-              <FilamentBadge
-                :color="inv.status === 'sent' ? 'success' : (inv.status === 'paid' ? 'success' : 'info')"
-              >
-                {{ inv.status === 'sent' ? 'DELIVERED' : (inv.status || 'GENERATED') }}
-              </FilamentBadge>
+            <!-- Status (Plain text netral, seperti form program) -->
+            <TableCell class="text-xs text-gray-700 whitespace-nowrap">
+              <span>{{ inv.status === 'sent' ? 'DELIVERED' : (inv.status ? inv.status.toUpperCase() : 'GENERATED') }}</span>
             </TableCell>
 
             <!-- Tanggal -->
@@ -327,47 +323,44 @@
               {{ formatCurrency(inv.netpay) }}
             </TableCell>
 
-            <!-- Filament Action Buttons (View, PDF, Kirim/Sent) -->
-            <TableCell class="text-right whitespace-nowrap">
-              <div class="flex items-center justify-end gap-1.5">
+            <!-- Action Buttons: Toolbar Terpadu (Icon-only persis Form Program) -->
+            <TableCell class="text-center py-2 whitespace-nowrap">
+              <div class="inline-flex items-center rounded-md border border-gray-200 bg-white shadow-2xs divide-x divide-gray-200 overflow-hidden">
                 <!-- 1. View Button -->
                 <router-link
                   :to="`/invoices/${inv.id}`"
-                  class="h-7 px-2 inline-flex items-center justify-center gap-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium transition shadow-2xs cursor-pointer"
+                  class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
                   title="Lihat Detail Invoice"
                 >
-                  <EyeIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                  <span>View</span>
+                  <EyeIcon class="w-3.5 h-3.5 text-gray-600" />
                 </router-link>
 
                 <!-- 2. PDF Link Button -->
                 <a
                   :href="`/invoices/${inv.id}/pdf`"
                   target="_blank"
-                  class="h-7 px-2 inline-flex items-center justify-center gap-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium transition shadow-2xs cursor-pointer"
+                  class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
                   title="Unduh PDF"
                 >
-                  <FileTextIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                  <span>PDF</span>
+                  <FileTextIcon class="w-3.5 h-3.5 text-gray-600" />
                 </a>
 
-                <!-- 3. Kirim / Sent Action -->
+                <!-- 3. Kirim / Sent Action (Netral) -->
                 <span
                   v-if="isAlreadySent(inv)"
-                  class="h-7 w-[72px] inline-flex items-center justify-center gap-1 rounded-md border border-emerald-200/80 bg-emerald-50/70 text-emerald-700 text-xs font-medium transition shadow-2xs select-none"
+                  class="h-7 w-7.5 inline-flex items-center justify-center bg-gray-50 text-gray-400 select-none"
                   title="Invoice ini sudah terkirim"
                 >
-                  <CheckCircleIcon class="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Sent</span>
+                  <CheckCircleIcon class="w-3.5 h-3.5 text-gray-400" />
                 </span>
                 <button
                   v-else
+                  type="button"
                   @click="openEmailModal(inv)"
-                  class="h-7 w-[72px] inline-flex items-center justify-center gap-1 rounded-md border border-blue-200/80 bg-blue-50/70 hover:bg-blue-100 text-blue-700 text-xs font-medium transition shadow-2xs cursor-pointer"
+                  class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
                   title="Kirim Invoice via Email/WhatsApp"
                 >
-                  <SendIcon class="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  <span>Kirim</span>
+                  <SendIcon class="w-3.5 h-3.5 text-gray-600" />
                 </button>
               </div>
             </TableCell>
@@ -463,7 +456,6 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import SendEmailModal from '@/components/SendEmailModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
-import FilamentBadge from '@/components/ui/FilamentBadge.vue';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 import {
   Table,

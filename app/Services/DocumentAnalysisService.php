@@ -140,7 +140,7 @@ class DocumentAnalysisService
         $hasAgr = ! empty($submission->agreement_url) && str_starts_with(trim((string) $submission->agreement_url), 'http');
         $hasFaktur = ! empty($submission->tax_invoice_url) && str_starts_with(trim((string) $submission->tax_invoice_url), 'http');
 
-        $isPkp = app(ProgramReconciliationService::class)->isPkpFromSubmission($submission);
+        $isPkp = ((float) ($submission->ppn ?? 0) > 0) || app(ProgramReconciliationService::class)->isPkpFromSubmission($submission);
 
         $missing = [];
         if (! $hasCn) {
@@ -469,6 +469,8 @@ class DocumentAnalysisService
                 'faktur' => ! empty($submission->tax_invoice_url) && str_starts_with(trim((string) $submission->tax_invoice_url), 'http'),
             ];
 
+            $isPkp = ((float) $ppn > 0) || app(ProgramReconciliationService::class)->isPkpFromSubmission($submission);
+
             $missingDocs = [];
             if (! $slotHasUrl['cn']) {
                 $missingDocs[] = 'CN';
@@ -476,7 +478,7 @@ class DocumentAnalysisService
             if (! $slotHasUrl['agr']) {
                 $missingDocs[] = 'AGR';
             }
-            if (! $slotHasUrl['faktur']) {
+            if ($isPkp && ! $slotHasUrl['faktur']) {
                 $missingDocs[] = 'FAKTUR';
             }
 
@@ -579,17 +581,24 @@ class DocumentAnalysisService
                 }
             } elseif (! empty($missingDocs)) {
                 $statusPurchase = 'BELUM BISA POTONG';
-                if (count($missingDocs) === 3) {
+                $totalExpected = $isPkp ? 3 : 2;
+                if (count($missingDocs) === $totalExpected) {
                     $cekDokumen = 'SEMUA DOKUMEN BELUM ADA';
-                } elseif (count($missingDocs) === 2) {
+                } elseif (count($missingDocs) >= 2) {
                     $cekDokumen = implode(' & ', $missingDocs).' BELUM ADA';
                 } else {
                     $cekDokumen = $missingDocs[0].' BELUM ADA';
                 }
+            } else {
+                // All required documents (CN & AGR for Non-PKP, or CN, AGR & Faktur for PKP) are valid!
+                $statusPurchase = 'BISA DI POTONG';
+                if (empty($cekDokumen) || str_contains(strtoupper($cekDokumen), 'BELUM ADA') || (! $isPkp && str_contains(strtoupper($cekDokumen), 'FAKTUR'))) {
+                    $cekDokumen = 'LENGKAP';
+                }
             }
 
             if (! in_array($statusPurchase, ProgramSubmission::STATUS_PURCHASE_OPTIONS, true)) {
-                $statusPurchase = ($parsed['is_complete'] ?? false) && ! $hasSwapped && ! $hasInvalid && empty($missingDocs)
+                $statusPurchase = ! $hasSwapped && ! $hasInvalid && empty($missingDocs)
                     ? 'BISA DI POTONG'
                     : 'BELUM BISA POTONG';
             }
@@ -733,16 +742,18 @@ Ketentuan Penentuan Output:
      * Jika ketiga dokumen lengkap & valid: "is_complete": true, "status_potong_purchase": "BISA DI POTONG", "cek_dokumen": "LENGKAP".
 
    - JIKA STATUS PAJAK ADALAH "NON PKP" (Orang Pribadi, Non PKP, PPN = 0):
-     * TIDAK WAJIB FAKTUR PAJAK. Dokumen yang wajib hanya: CN dan Agreement (AGR).
-     * Jika CN dan Agreement (AGR) ada & valid (walaupun Faktur Pajak kosong): "is_complete": true, "status_potong_purchase": "BISA DI POTONG", "cek_dokumen": "LENGKAP".
-     * Jika CN atau AGR belum ada: "is_complete": false, "status_potong_purchase": "BELUM BISA POTONG", "cek_dokumen" mencatat dokumen yang kurang (misal "AGR BELUM ADA", tidak perlu menyebut Faktur).
+     * TIDAK WAJIB FAKTUR PAJAK. Dokumen yang wajib hanya 2: CN dan Agreement (AGR).
+     * Meskipun CUMA DUA dokumen (CN dan AGR) yang diunggah dan valid, status TETAP "BISA DI POTONG", "is_complete": true, "cek_dokumen": "LENGKAP". Faktur Pajak TIDAK DIPERLUKAN untuk dealer Non-PKP dan JANGAN PERNAH dicatat sebagai kekurangan / "FAKTUR BELUM ADA".
+     * Hanya jika CN atau AGR belum ada / salah: "is_complete": false, "status_potong_purchase": "BELUM BISA POTONG", "cek_dokumen" mencatat dokumen yang kurang (misal "AGR BELUM ADA", tidak perlu menyebut Faktur).
 
 2. PENTING - JIKA ADA DOKUMEN YANG BELUM DIUNGGAH / KOSONG (URL kosong atau bernilai "-"):
    - Slot tersebut diberi status "empty" (BUKAN "invalid"!).
-   - "is_complete": false
-   - "cek_dokumen": Wajib menyebutkan dokumen yang belum ada (contoh: "FAKTUR BELUM ADA", "AGR BELUM ADA", dsb).
-   - "status_potong_purchase": "BELUM BISA POTONG"
-   - "keterangan": Penjelasan ringkas dokumen mana yang belum diunggah.
+   - Untuk dealer NON-PKP: Jika slot Faktur Pajak kosong, hal ini NORMAL dan DIBOLEHKAN. Jangan anggap dokumen kurang! Jika CN & AGR ada dan valid -> "status_potong_purchase": "BISA DI POTONG", "cek_dokumen": "LENGKAP".
+   - Untuk dealer PKP (atau jika CN/AGR kosong pada Non-PKP):
+     * "is_complete": false
+     * "status_potong_purchase": "BELUM BISA POTONG"
+     * "cek_dokumen": Wajib menyebutkan dokumen wajib yang belum ada (contoh: "FAKTUR BELUM ADA", "AGR BELUM ADA", "CN BELUM ADA", dsb).
+     * "keterangan": Penjelasan ringkas dokumen wajib mana yang belum diunggah.
 
 3. DOKUMEN TERTUKAR (swapped):
    (HANYA berlaku jika ADA file yang diunggah tetapi tertukar posisi antar slot):

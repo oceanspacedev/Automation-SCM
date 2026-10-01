@@ -75,6 +75,7 @@ Route::prefix('api')->group(function () {
     Route::post('/program-submissions/ai-test', [ProgramSubmissionController::class, 'testAiConnection']);
     Route::post('/program-submissions/{id}/send-wa-ar', [ProgramSubmissionController::class, 'sendWaToAr']);
     Route::post('/program-submissions/{id}/send-wa-telemarketing', [ProgramSubmissionController::class, 'sendWaToTelemarketing']);
+    Route::post('/program-submissions/{id}/send-wa-doc-error', [ProgramSubmissionController::class, 'sendWaDocError']);
     Route::post('/webhooks/form-program', [ProgramSubmissionController::class, 'webhook']);
 
     // Data Program (56 Kolom Google Spreadsheet)

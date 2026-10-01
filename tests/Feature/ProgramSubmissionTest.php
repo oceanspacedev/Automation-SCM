@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Console\Commands\AutoAnalyzeProgramAiCommand;
 use App\Models\ProgramSubmission;
 use App\Models\User;
+use App\Services\DocumentAnalysisService;
 use App\Services\ProgramSubmissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -305,7 +306,9 @@ class ProgramSubmissionTest extends TestCase
         $submission = ProgramSubmission::create([
             'submission_timestamp' => '10/10/2022 12:32:55',
             'region' => 'BIG KARAWANG',
-            'dealer_name' => 'Incomplete Dealer Cell',
+            'id_real' => 'IDME00652',
+            'dealer_name' => 'PT Incomplete Dealer',
+            'ppn' => 50000,
             'credit_note_url' => 'https://drive.google.com/cn1',
             'agreement_url' => '',
             'tax_invoice_url' => '',
@@ -846,9 +849,10 @@ class ProgramSubmissionTest extends TestCase
             'submission_timestamp' => '10/10/2026 10:00:00',
             'region' => 'CIREBON',
             'id_real' => 'B100971',
-            'dealer_name' => 'MANDIRI CELL',
+            'dealer_name' => 'PT MANDIRI CELL PKP',
             'program_name' => 'PROGRAM DSA AGUSTUS 2026',
             'sales_name' => 'AAB ABDURAHMAN',
+            'ppn' => 100000,
             'credit_note_url' => 'https://drive.google.com/open?id=test_cn',
             'agreement_url' => 'https://drive.google.com/open?id=test_agr',
             'tax_invoice_url' => '',
@@ -1091,5 +1095,143 @@ class ProgramSubmissionTest extends TestCase
         $this->assertEquals('LENGKAP', $submission->cek_dokumen);
         $this->assertEquals('BISA DI POTONG', $submission->status_potong_purchase);
         $this->assertTrue($submission->is_manual_edit);
+    }
+
+    public function test_can_update_whatsapp_number_on_program_submission(): void
+    {
+        $user = User::factory()->create();
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:35:41',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME00652',
+            'dealer_name' => 'Abadi Cell',
+            'program_name' => 'Program SO C11',
+            'row_hash' => 'hash_test_update_wa',
+        ]);
+
+        $response = $this->actingAs($user)->patchJson("/api/program-submissions/{$submission->id}", [
+            'dealer_name' => 'Abadi Cell',
+            'program_name' => 'Program SO C11',
+            'whatsapp' => '081224290502',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        $submission->refresh();
+        $this->assertEquals('081224290502', $submission->whatsapp);
+        $this->assertEquals('081224290502', $submission->effective_whatsapp);
+    }
+
+    public function test_can_send_wa_doc_error_notification(): void
+    {
+        config([
+            'services.wag.token' => 'fake-test-token',
+        ]);
+
+        $user = User::factory()->create();
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2022 12:35:41',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME00652',
+            'dealer_name' => 'CV. PRIMA PRESTASI ABADI',
+            'program_name' => 'PROGRAM PROMOTION NOTE 80',
+            'sales_name' => 'MUHAMMAD RISWAN',
+            'whatsapp' => '081224290502',
+            'credit_note_url' => 'https://drive.google.com/cn_ok',
+            'agreement_url' => 'https://drive.google.com/agr_salah',
+            'doc_validation' => [
+                'cn' => ['status' => 'valid'],
+                'agr' => [
+                    'status' => 'invalid',
+                    'message' => 'Dokumen Agreement tidak sesuai atau salah file',
+                    'detected_type' => 'unknown',
+                ],
+            ],
+            'row_hash' => 'hash_test_send_wa_doc_err',
+        ]);
+
+        Http::fake([
+            'https://waghub.mekayastudio.com/api/v1/messages' => Http::response([
+                'status' => 'success',
+                'data' => [
+                    'id' => 'msg-doc-err-12345',
+                    'provider_message_id' => 'wamid-doc-err-12345',
+                ],
+            ], 200),
+        ]);
+
+        $response = $this->actingAs($user)->postJson("/api/program-submissions/{$submission->id}/send-wa-doc-error", [
+            'phone' => '081224290502',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'recipient_phone' => '6281224290502',
+        ]);
+        $this->assertNotEmpty($response->json('wa_url'));
+        $this->assertStringContainsString('6281224290502', $response->json('wa_url'));
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/api/v1/messages') &&
+                $request['recipient']['value'] === '6281224290502' &&
+                str_contains($request['message']['text'], 'perbaikan dokumen') &&
+                str_contains($request['message']['text'], 'CV. PRIMA PRESTASI ABADI') &&
+                str_contains($request['message']['text'], 'Agreement') &&
+                str_contains($request['message']['text'], 'sesuaikan nama program dengan isi CN') &&
+                str_contains($request['message']['text'], 'upload dokumen ulang yang sesuai') &&
+                str_contains($request['message']['text'], 'Catatan Dokumen') &&
+                str_contains($request['message']['text'], 'dipisah satu per satu') &&
+                ! str_contains($request['message']['text'], '*');
+        });
+    }
+
+    public function test_non_pkp_with_only_cn_and_agr_is_bisa_di_potong(): void
+    {
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2026 12:35:41',
+            'region' => 'BIG CIREBON',
+            'id_real' => 'NEWCO CELL',
+            'dealer_name' => 'NEWCO CELL',
+            'program_name' => 'PROGRAM PROMOTION NOTE 80 4+128 JUNI 2026',
+            'sales_name' => 'AAB ABDURAHMAN',
+            'credit_note_url' => 'https://drive.google.com/open?id=test_cn_valid',
+            'agreement_url' => 'https://drive.google.com/open?id=test_agr_valid',
+            'tax_invoice_url' => '',
+            'ppn' => 0,
+            'row_hash' => 'hash_test_non_pkp_two_docs',
+        ]);
+
+        $eval = app(DocumentAnalysisService::class)->evaluateCompleteness($submission);
+
+        $this->assertTrue($eval['is_complete']);
+        $this->assertEquals('BISA DI POTONG', $eval['status_potong_purchase']);
+        $this->assertEquals('LENGKAP', $eval['cek_dokumen']);
+    }
+
+    public function test_pkp_with_only_cn_and_agr_cannot_be_cut_without_faktur(): void
+    {
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2026 12:35:41',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME00652',
+            'dealer_name' => 'PT KOSAMBI DISTRINDO',
+            'program_name' => 'PROGRAM PROMOTION NOTE 80 4+128 JUNI 2026',
+            'sales_name' => 'MUHAMMAD RISWAN',
+            'credit_note_url' => 'https://drive.google.com/open?id=test_cn_valid',
+            'agreement_url' => 'https://drive.google.com/open?id=test_agr_valid',
+            'tax_invoice_url' => '',
+            'ppn' => 148649, // PKP because PPN > 0
+            'row_hash' => 'hash_test_pkp_without_faktur',
+        ]);
+
+        $eval = app(DocumentAnalysisService::class)->evaluateCompleteness($submission);
+
+        $this->assertFalse($eval['is_complete']);
+        $this->assertEquals('BELUM BISA POTONG', $eval['status_potong_purchase']);
+        $this->assertEquals('FAKTUR BELUM ADA', $eval['cek_dokumen']);
     }
 }

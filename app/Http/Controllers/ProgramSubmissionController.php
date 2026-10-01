@@ -67,7 +67,7 @@ class ProgramSubmissionController extends Controller
 
         $cols = [
             'id', 'submission_timestamp', 'region', 'id_real', 'dealer_name',
-            'program_name', 'sales_name', 'credit_note_url', 'agreement_url',
+            'program_name', 'sales_name', 'whatsapp', 'credit_note_url', 'agreement_url',
             'tax_invoice_url', 'incentive', 'dpp', 'dpp_lain', 'ppn', 'nilai_pph',
             'net_pay', 'cek_pajak_tarif_pph', 'selisih', 'note_pph', 'no_faktur',
             'tgl_faktur', 'no_po_sj', 'no_transaksi', 'tgl_input',
@@ -179,7 +179,7 @@ class ProgramSubmissionController extends Controller
 
         $cols = [
             'id', 'submission_timestamp', 'region', 'id_real', 'dealer_name',
-            'program_name', 'sales_name', 'credit_note_url', 'agreement_url',
+            'program_name', 'sales_name', 'whatsapp', 'credit_note_url', 'agreement_url',
             'tax_invoice_url', 'incentive', 'dpp', 'dpp_lain', 'ppn', 'nilai_pph',
             'net_pay', 'cek_pajak_tarif_pph', 'selisih', 'note_pph', 'no_faktur',
             'tgl_faktur', 'no_po_sj', 'no_transaksi', 'tgl_input',
@@ -199,6 +199,7 @@ class ProgramSubmissionController extends Controller
             'Nama Dealer',
             'Nama Program',
             'Nama Sales',
+            'No. WhatsApp',
             'Link CN',
             'Link Agreement',
             'Link Faktur Pajak',
@@ -247,6 +248,7 @@ class ProgramSubmissionController extends Controller
                     $item->dealer_name ?? '',
                     $item->program_name ?? '',
                     $item->sales_name ?? '',
+                    $item->whatsapp ?? ($item->effective_whatsapp ?? ''),
                     $item->credit_note_url ?? '',
                     $item->agreement_url ?? '',
                     $item->tax_invoice_url ?? '',
@@ -339,11 +341,12 @@ class ProgramSubmissionController extends Controller
             'note_pph' => 'nullable|string|max:100',
             'no_faktur' => 'nullable|string|max:100',
             'tgl_faktur' => 'nullable|string|max:50',
+            'whatsapp' => 'nullable|string|max:50',
             'doc_validation' => 'nullable|array',
             'is_manual_edit' => 'nullable|boolean',
         ]);
 
-        $manualFields = ['dealer_name', 'id_real', 'program_name', 'sales_name', 'credit_note_url', 'agreement_url', 'tax_invoice_url'];
+        $manualFields = ['dealer_name', 'id_real', 'program_name', 'sales_name', 'whatsapp', 'credit_note_url', 'agreement_url', 'tax_invoice_url'];
         foreach ($manualFields as $field) {
             if ($request->has($field)) {
                 $validated['is_manual_edit'] = true;
@@ -912,6 +915,34 @@ class ProgramSubmissionController extends Controller
             'success' => true,
             'message' => $result['message'],
             'provider_id' => $result['provider_id'] ?? null,
+        ]);
+    }
+
+    /**
+     * Send WhatsApp notification to sales for incorrect/invalid documents.
+     */
+    public function sendWaDocError(Request $request, int|string $id): JsonResponse
+    {
+        $submission = ProgramSubmission::findOrFail($id);
+        $phone = $request->input('phone');
+
+        $result = $this->waService->sendProgramDocumentErrorNotification($submission, $phone);
+
+        if (! $result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+                'wa_url' => $result['wa_url'] ?? null,
+                'recipient_phone' => $result['recipient_phone'] ?? null,
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+            'provider_id' => $result['provider_id'] ?? null,
+            'wa_url' => $result['wa_url'] ?? null,
+            'recipient_phone' => $result['recipient_phone'] ?? null,
         ]);
     }
 }

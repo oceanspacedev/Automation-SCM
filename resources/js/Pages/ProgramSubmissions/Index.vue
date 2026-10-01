@@ -358,6 +358,7 @@
                 <span class="inline-flex items-center gap-1">Nama Program <ChevronDownIcon class="w-3 h-3 text-gray-400" /></span>
               </TableHead>
               <TableHead class="whitespace-nowrap font-semibold text-gray-950">Nama Sales</TableHead>
+              <TableHead class="min-w-[130px] font-semibold text-gray-950">No. WA</TableHead>
               <TableHead class="min-w-[65px] text-center font-semibold text-gray-950">CN</TableHead>
               <TableHead class="min-w-[65px] text-center font-semibold text-gray-950">Agr</TableHead>
               <TableHead class="min-w-[70px] text-center font-semibold text-gray-950">Faktur</TableHead>
@@ -375,12 +376,12 @@
               <TableHead class="min-w-[140px] font-semibold text-gray-950">No Faktur</TableHead>
               <TableHead class="whitespace-nowrap font-semibold text-gray-950">Tgl Faktur</TableHead>
 
-              <TableHead class="w-[90px] text-center font-semibold text-gray-950 sticky top-0 right-0 z-30 bg-white border-b border-gray-200">Aksi</TableHead>
+              <TableHead class="min-w-[105px] w-[105px] text-center font-semibold text-gray-950 sticky top-0 right-0 z-30 bg-white border-b border-gray-200">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             <!-- Loading State -->
-            <TableEmpty v-if="loading && submissions.length === 0" :colspan="22">
+            <TableEmpty v-if="loading && submissions.length === 0" :colspan="23">
               <div class="inline-flex items-center gap-2 text-gray-500 py-8">
                 <RefreshCwIcon class="w-4 h-4 animate-spin text-gray-400" />
                 <span class="text-xs">Memuat data form program...</span>
@@ -388,7 +389,7 @@
             </TableEmpty>
 
             <!-- Empty State -->
-            <TableEmpty v-else-if="submissions.length === 0" :colspan="22">
+            <TableEmpty v-else-if="submissions.length === 0" :colspan="23">
               <div class="max-w-md mx-auto py-8 space-y-1.5 text-center text-gray-500">
                 <p class="font-medium text-gray-800 text-xs">Belum ada data form program yang tersimpan.</p>
                 <p class="text-xs text-gray-500">
@@ -445,6 +446,22 @@
               <!-- Nama Sales -->
               <TableCell class="whitespace-nowrap text-gray-700 py-2 text-xs">
                 {{ row.sales_name || '-' }}
+              </TableCell>
+
+              <!-- No. WA (WhatsApp) -->
+              <TableCell class="whitespace-nowrap text-gray-700 py-2 text-xs">
+                <div class="flex items-center gap-1.5">
+                  <span :title="row.whatsapp ? 'Nomor WhatsApp Sales' : 'Nomor WhatsApp Uji Coba: 081224290502'">
+                    {{ row.whatsapp || '081224290502' }}
+                  </span>
+                  <span
+                    v-if="!row.whatsapp"
+                    class="text-gray-400 font-normal shrink-0"
+                    title="Nomor uji coba Anda (081224290502)"
+                  >
+                    (tes)
+                  </span>
+                </div>
               </TableCell>
 
               <!-- Dokumen Credit Note -->
@@ -573,6 +590,7 @@
                 <span v-else class="text-gray-300 text-xs">-</span>
               </TableCell>
 
+
               <!-- 11 Kolom Finansial & Audit Pajak (Format OneDrive) -->
               <!-- Incentive -->
               <TableCell class="whitespace-nowrap text-right text-xs text-gray-800 py-2.5">
@@ -621,22 +639,11 @@
               </TableCell>
 
               <!-- Note PPh -->
-              <TableCell class="text-center py-2.5 whitespace-nowrap">
-                <span
-                  v-if="row.note_pph === 'ok'"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50/70 text-emerald-700 border border-emerald-200/80 text-xs font-normal"
-                >
-                  <CheckIcon class="w-3.5 h-3.5 text-emerald-600" />
-                  <span>ok</span>
+              <TableCell class="text-center whitespace-nowrap text-xs py-2.5">
+                <span v-if="row.note_pph" class="text-gray-700 font-normal">
+                  {{ row.note_pph }}
                 </span>
-                <span
-                  v-else-if="row.note_pph"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50/70 text-amber-700 border border-amber-200/80 text-xs font-normal"
-                >
-                  <AlertCircleIcon class="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  <span>{{ row.note_pph }}</span>
-                </span>
-                <span v-else class="text-gray-300 text-xs">-</span>
+                <span v-else class="text-gray-300">-</span>
               </TableCell>
 
               <!-- No Faktur -->
@@ -649,44 +656,58 @@
                 {{ row.tgl_faktur || '-' }}
               </TableCell>
 
-              <!-- Aksi: Tombol AI Baris, WA AR, & Lihat Detail / Edit Row Modal -->
-              <TableCell class="text-center py-2.5 whitespace-nowrap sticky right-0 bg-white">
-                <div class="inline-flex items-center justify-center gap-1.5">
+              <!-- Aksi: Toolbar Terpadu (AI, Kirim WA / Info, & Detail) -->
+              <TableCell class="text-center py-2 whitespace-nowrap sticky right-0 bg-white border-b border-gray-200">
+                <div class="inline-flex items-center rounded-md border border-gray-200 bg-white shadow-2xs divide-x divide-gray-200 overflow-hidden">
                   <!-- Tombol Analisis AI Khusus Baris Ini -->
                   <button
                     type="button"
                     @click="analyzeRowWithAi(row)"
                     :disabled="analyzingRowId === row.id"
-                    class="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition shadow-2xs cursor-pointer disabled:opacity-50"
-                    title="Analisis AI untuk Baris Ini (Baca Dokumen & Finansial)"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer disabled:opacity-40"
+                    title="Analisis AI (Baca Dokumen & Finansial)"
                   >
-                    <RefreshCwIcon v-if="analyzingRowId === row.id" class="w-3.5 h-3.5 animate-spin text-gray-500" />
+                    <RefreshCwIcon v-if="analyzingRowId === row.id" class="w-3.5 h-3.5 animate-spin text-gray-400" />
                     <BotIcon v-else class="w-3.5 h-3.5 text-gray-600" />
                   </button>
 
+                  <!-- Kirim Info Klaim ke WhatsApp Telemarketing (Netral, Tanpa Hijau Mencolok) -->
                   <button
                     v-if="row.status_potong_purchase === 'BISA DI POTONG'"
                     type="button"
                     @click="sendWaToTelemarketing(row)"
                     :disabled="sendingWaId === row.id"
-                    class="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-emerald-200/80 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-700 transition shadow-2xs cursor-pointer disabled:opacity-50"
-                    title="Kirim Info Klaim ke WhatsApp Telemarketing (Tawarkan Potong Order ke Dealer)"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer disabled:opacity-40"
+                    title="Kirim Info Klaim ke WhatsApp Telemarketing"
                   >
-                    <RefreshCwIcon v-if="sendingWaId === row.id" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
-                    <SendIcon v-else class="w-3.5 h-3.5 text-emerald-600" />
+                    <RefreshCwIcon v-if="sendingWaId === row.id" class="w-3.5 h-3.5 animate-spin text-gray-400" />
+                    <SendIcon v-else class="w-3.5 h-3.5 text-gray-600" />
+                  </button>
+
+                  <!-- Tombol WhatsApp Notifikasi Dokumen Salah -->
+                  <button
+                    v-if="hasDocIssue(row)"
+                    type="button"
+                    @click="openSendWaModal(row)"
+                    :disabled="sendingWaDocRowId === row.id"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer disabled:opacity-40"
+                    title="Kirim Notifikasi Dokumen Salah ke WhatsApp"
+                  >
+                    <RefreshCwIcon v-if="sendingWaDocRowId === row.id" class="w-3.5 h-3.5 animate-spin text-gray-400" />
+                    <svg v-else class="w-3.5 h-3.5 fill-current text-gray-600 hover:text-gray-900" viewBox="0 0 24 24">
+                      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+                    </svg>
                   </button>
 
                   <!-- Icon Lihat: Lihat Detail Data Tracking & Status Potong -->
                   <button
                     type="button"
                     @click="openEditModal(row)"
-                    class="w-8 h-8 shrink-0 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition shadow-2xs cursor-pointer"
-                    title="Lihat Detail & Edit Pengajuan (Nama Dealer, Dokumen, Status, dll)"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
+                    title="Lihat Detail & Edit Pengajuan"
                   >
                     <EyeIcon class="w-3.5 h-3.5 text-gray-600" />
                   </button>
-
-
                 </div>
               </TableCell>
             </TableRow>
@@ -847,6 +868,27 @@
                       type="text"
                       placeholder="Nama sales pengaju..."
                       class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition"
+                    />
+                  </div>
+
+                  <!-- Nomor WhatsApp (Sales / Kontak) -->
+                  <div>
+                    <div class="flex items-center justify-between mb-1">
+                      <label class="block text-xs font-medium text-gray-700">Nomor WhatsApp (Sales / Kontak)</label>
+                      <button
+                        type="button"
+                        @click="editForm.whatsapp = '081224290502'"
+                        class="text-[10px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-200 cursor-pointer"
+                        title="Klik untuk isi dengan nomor tes Anda"
+                      >
+                        Gunakan Tes: 081224290502
+                      </button>
+                    </div>
+                    <input
+                      v-model="editForm.whatsapp"
+                      type="text"
+                      placeholder="081224290502"
+                      class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition font-mono"
                     />
                   </div>
 
@@ -1159,6 +1201,21 @@
                 </button>
 
                 <button
+                  v-if="editingSubmission && hasDocIssue(editingSubmission)"
+                  type="button"
+                  @click="openSendWaModal(editingSubmission)"
+                  :disabled="sendingWaDocRowId === editingSubmission.id"
+                  class="h-8 px-3 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 text-xs font-normal transition cursor-pointer flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
+                  title="Kirim Notifikasi Dokumen Salah ke WhatsApp"
+                >
+                  <RefreshCwIcon v-if="sendingWaDocRowId === editingSubmission.id" class="w-3.5 h-3.5 animate-spin text-gray-500" />
+                  <svg v-else class="w-3.5 h-3.5 fill-current text-gray-500" viewBox="0 0 24 24">
+                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+                  </svg>
+                  <span>Kirim WA Dokumen Salah</span>
+                </button>
+
+                <button
                   v-if="editingSubmission"
                   type="button"
                   @click="confirmDeleteSubmission(editingSubmission)"
@@ -1459,6 +1516,154 @@
         </div>
       </Transition>
     </Teleport>
+
+    <!-- Modal Kirim Notifikasi Dokumen Salah ke WhatsApp -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition duration-150 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition duration-100 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="showSendWaModal"
+          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs font-sans"
+          @click.self="showSendWaModal = false"
+        >
+          <div class="bg-white rounded-xl shadow-xl border border-gray-200 max-w-lg w-full overflow-hidden text-xs">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-white">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-700">
+                  <svg class="w-4 h-4 fill-current text-gray-700" viewBox="0 0 24 24">
+                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="text-sm font-semibold text-gray-900">Kirim Notifikasi Dokumen</h3>
+                  <p class="text-[11px] text-gray-500 mt-0.5">
+                    {{ selectedWaRow?.dealer_name || selectedWaRow?.id_real }} • Sales: {{ selectedWaRow?.sales_name || '-' }}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                @click="showSendWaModal = false"
+                class="w-8 h-8 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition cursor-pointer"
+              >
+                <XIcon class="w-4 h-4" />
+              </button>
+            </div>
+
+            <!-- Modal Content -->
+            <div class="p-5 space-y-3.5 text-xs">
+              <!-- Field Nomor WhatsApp Penerima -->
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block text-xs font-medium text-gray-700">
+                    Nomor WhatsApp Penerima
+                  </label>
+                  <button
+                    type="button"
+                    @click="waDocForm.phone = '081224290502'"
+                    class="text-[11px] text-gray-600 bg-gray-100 hover:bg-gray-200 px-2 py-0.5 rounded border border-gray-200 cursor-pointer transition font-normal"
+                    title="Gunakan nomor tes 081224290502"
+                  >
+                    No. Tes (081224290502)
+                  </button>
+                </div>
+                <input
+                  v-model="waDocForm.phone"
+                  type="text"
+                  placeholder="081224290502"
+                  class="w-full h-8.5 px-3 rounded-md border border-gray-300 text-xs text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition font-mono"
+                />
+              </div>
+
+              <!-- Daftar Masalah Dokumen yang Terdeteksi -->
+              <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">
+                  Catatan Dokumen
+                </label>
+                <div class="p-2.5 bg-gray-50 rounded-md border border-gray-200 space-y-1">
+                  <div
+                    v-for="(issue, i) in getDocIssuesList(selectedWaRow)"
+                    :key="i"
+                    class="flex items-start gap-1.5 text-[11px]"
+                  >
+                    <span class="text-gray-400 shrink-0">•</span>
+                    <div class="text-gray-700">
+                      <strong class="text-gray-900">{{ issue.label }}:</strong>
+                      <span class="ml-1">{{ issue.desc }}</span>
+                      <a v-if="issue.url" :href="issue.url" target="_blank" class="text-gray-500 hover:text-gray-900 underline ml-1 inline-flex items-center gap-0.5">
+                        <span>(File)</span>
+                        <ExternalLinkIcon class="w-2.5 h-2.5" />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pratinjau Pesan WhatsApp -->
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block text-xs font-medium text-gray-700">
+                    Pesan WhatsApp
+                  </label>
+                  <span class="text-[10px] text-gray-400">Dapat diedit sebelum dikirim</span>
+                </div>
+                <textarea
+                  v-model="waDocForm.message"
+                  rows="7"
+                  class="w-full p-2.5 rounded-md border border-gray-200 text-xs text-gray-800 leading-relaxed bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition resize-none font-sans"
+                  placeholder="Isi pesan WhatsApp..."
+                ></textarea>
+              </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-5 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                @click="showSendWaModal = false"
+                class="h-8.5 px-3.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-xs text-gray-700 font-normal transition cursor-pointer shadow-2xs"
+              >
+                Batal
+              </button>
+
+              <div class="flex items-center gap-2">
+                <!-- Buka WhatsApp Web / Direct wa.me -->
+                <button
+                  type="button"
+                  @click="openWaWebDirect"
+                  class="h-8.5 px-3 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-xs font-normal text-gray-700 transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                  title="Buka langsung di WhatsApp Web"
+                >
+                  <ExternalLinkIcon class="w-3.5 h-3.5 text-gray-500" />
+                  <span>Buka WhatsApp Web</span>
+                </button>
+
+                <!-- Kirim Otomatis via Gateway -->
+                <button
+                  type="button"
+                  @click="submitSendWaDoc"
+                  :disabled="isSendingWaDoc"
+                  class="h-8.5 px-4 rounded-md bg-gray-900 hover:bg-black text-white text-xs font-medium transition cursor-pointer flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                >
+                  <RefreshCwIcon v-if="isSendingWaDoc" class="w-3.5 h-3.5 animate-spin text-white" />
+                  <svg v-else class="w-3.5 h-3.5 fill-current text-white" viewBox="0 0 24 24">
+                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+                  </svg>
+                  <span>{{ isSendingWaDoc ? 'Mengirim...' : 'Kirim via Gateway' }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -1522,6 +1727,17 @@ const lastUpdatedText = ref('');
 const sendingWaId = ref(null);
 const isSendingWaModal = ref(false);
 const isSwappingDocs = ref(false);
+
+// WhatsApp Document Error modal state
+const showSendWaModal = ref(false);
+const selectedWaRow = ref(null);
+const sendingWaDocRowId = ref(null);
+const isSendingWaDoc = ref(false);
+const waDocForm = reactive({
+  phone: '081224290502',
+  targetDoc: '',
+  message: '',
+});
 
 // Dropdown Spreadsheet state
 const showSpreadsheetDropdown = ref(false);
@@ -1702,6 +1918,7 @@ const editForm = reactive({
   id_real: '',
   program_name: '',
   sales_name: '',
+  whatsapp: '',
   credit_note_url: '',
   agreement_url: '',
   tax_invoice_url: '',
@@ -2026,6 +2243,182 @@ const sendWaToTelemarketing = async (row) => {
 // Backward-compatible alias for AR send
 const sendWaToAr = sendWaToTelemarketing;
 
+// WhatsApp Document Issues Helpers
+const hasDocIssue = (row) => {
+  if (!row) return false;
+  const dv = row.doc_validation;
+  if (!dv) return false;
+  return ['cn', 'agr', 'faktur'].some((k) => dv[k] && (dv[k].status === 'invalid' || dv[k].status === 'swapped'));
+};
+
+const getDocIssuesList = (row) => {
+  if (!row) return [];
+  const dv = row.doc_validation || {};
+  const issues = [];
+  if (dv.cn && (dv.cn.status === 'invalid' || dv.cn.status === 'swapped')) {
+    issues.push({
+      label: 'Credit Note (CN)',
+      isSwapped: dv.cn.status === 'swapped',
+      desc: dv.cn.message || (dv.cn.status === 'swapped' ? `File tertukar (berisi ${formatDocTypeName(dv.cn.actual_type)})` : 'Dokumen tidak sesuai / bukan CN'),
+      url: row.credit_note_url,
+    });
+  }
+  if (dv.agr && (dv.agr.status === 'invalid' || dv.agr.status === 'swapped')) {
+    issues.push({
+      label: 'Agreement (Agr)',
+      isSwapped: dv.agr.status === 'swapped',
+      desc: dv.agr.message || (dv.agr.status === 'swapped' ? `File tertukar (berisi ${formatDocTypeName(dv.agr.actual_type)})` : 'Dokumen tidak sesuai / bukan Agreement'),
+      url: row.agreement_url,
+    });
+  }
+  if (dv.faktur && (dv.faktur.status === 'invalid' || dv.faktur.status === 'swapped')) {
+    issues.push({
+      label: 'Faktur Pajak (FP)',
+      isSwapped: dv.faktur.status === 'swapped',
+      desc: dv.faktur.message || (dv.faktur.status === 'swapped' ? `File tertukar (berisi ${formatDocTypeName(dv.faktur.actual_type)})` : 'Dokumen tidak sesuai / bukan Faktur Pajak'),
+      url: row.tax_invoice_url,
+    });
+  }
+  if (issues.length === 0) {
+    issues.push({
+      label: 'Dokumen Program',
+      isSwapped: false,
+      desc: 'Dokumen pengajuan program perlu verifikasi dan perbaikan.',
+      url: null,
+    });
+  }
+  return issues;
+};
+
+const generateDocErrorMessage = (row, docType = '') => {
+  if (!row) return '';
+  const salesGreeting = row.sales_name ? `Halo Kak ${row.sales_name},` : 'Halo Rekan Sales / Dealer,';
+  const dealerName = row.dealer_name || '-';
+  const idReal = row.id_real || '-';
+  const programName = row.program_name || '-';
+  const region = row.region || '-';
+
+  const dv = row.doc_validation || {};
+  const issues = [];
+
+  const checkDoc = (key, name) => {
+    if (dv[key]) {
+      if (dv[key].status === 'invalid') {
+        const msg = dv[key].message || `Dokumen tidak sesuai / bukan ${name}`;
+        if (key === 'cn') {
+          issues.push(`- ${name}: ${msg} Mohon sesuaikan nama program dengan isi CN.`);
+        } else {
+          issues.push(`- ${name}: ${msg} Begitu juga dengan ${name}, mohon sesuaikan dengan program yang diajukan.`);
+        }
+      } else if (dv[key].status === 'swapped') {
+        const actual = formatDocTypeName(dv[key].actual_type);
+        if (key === 'cn') {
+          issues.push(`- ${name}: File tertukar di kolom ${name} (terdeteksi berisi ${actual}). Mohon sesuaikan nama program dengan isi CN dan unggah file CN yang benar.`);
+        } else {
+          issues.push(`- ${name}: File tertukar di kolom ${name} (terdeteksi berisi ${actual}). Begitu juga dengan ${name}, mohon unggah file ${name} yang sesuai.`);
+        }
+      }
+    }
+  };
+
+  if (docType === 'cn') {
+    checkDoc('cn', 'Credit Note (CN)');
+  } else if (docType === 'agr') {
+    checkDoc('agr', 'Agreement (Agr)');
+  } else if (docType === 'faktur') {
+    checkDoc('faktur', 'Faktur Pajak (FP)');
+  } else {
+    checkDoc('cn', 'Credit Note (CN)');
+    checkDoc('agr', 'Agreement (Agr)');
+    checkDoc('faktur', 'Faktur Pajak (FP)');
+  }
+
+  if (issues.length === 0) {
+    issues.push('- Dokumen pengajuan program tidak sesuai. Mohon sesuaikan nama program dengan isi CN, begitu juga dengan Agreement & Faktur Pajak.');
+  }
+
+  const lines = [
+    salesGreeting,
+    '',
+    'Mohon bantuannya untuk perbaikan dokumen pada pengajuan klaim program berikut:',
+    '',
+    'Data Pengajuan:',
+    `- Dealer: ${dealerName} (${idReal})`,
+    `- Program: ${programName}`,
+    `- Region: ${region}`,
+    '',
+    'Catatan Dokumen:',
+    ...issues,
+    '',
+    'Ketentuan Upload Dokumen:',
+    '- File dokumen wajib dipisah satu per satu sesuai kolomnya (jangan digabung menjadi satu file atau ditumpuk dalam satu kolom).',
+    '- Kolom CN diisi khusus untuk file Credit Note.',
+    '- Kolom Agr diisi khusus untuk file Agreement.',
+    '- Kolom Faktur Pajak diisi khusus untuk file Faktur Pajak.',
+    '- Mohon sesuaikan nama program dengan isi CN, begitu juga dengan Agreement & Faktur Pajak.',
+    '',
+    'Mohon upload dokumen ulang yang sesuai agar proses verifikasi klaim dapat segera diproses.',
+    '',
+    'Terima kasih atas kerja samanya.',
+  ];
+
+  return lines.join('\n');
+};
+
+const formatPhoneForWa = (phone) => {
+  if (!phone) return '6281224290502';
+  let cleaned = String(phone).replace(/[^\d+]/g, '');
+  if (cleaned.startsWith('+')) cleaned = cleaned.substring(1);
+  if (cleaned.startsWith('08')) cleaned = '628' + cleaned.substring(2);
+  else if (cleaned.startsWith('8')) cleaned = '628' + cleaned.substring(1);
+  return cleaned.length >= 9 ? cleaned : '6281224290502';
+};
+
+const openSendWaModal = (row, docType = '') => {
+  if (!row) return;
+  selectedWaRow.value = row;
+  waDocForm.phone = row.whatsapp || '081224290502';
+  waDocForm.targetDoc = docType;
+  waDocForm.message = generateDocErrorMessage(row, docType);
+  showSendWaModal.value = true;
+};
+
+const openWaWebDirect = () => {
+  const targetPhone = formatPhoneForWa(waDocForm.phone);
+  const text = encodeURIComponent(waDocForm.message);
+  const url = `https://api.whatsapp.com/send?phone=${targetPhone}&text=${text}`;
+  window.open(url, '_blank');
+};
+
+const submitSendWaDoc = async () => {
+  if (!selectedWaRow.value) return;
+  isSendingWaDoc.value = true;
+  sendingWaDocRowId.value = selectedWaRow.value.id;
+
+  try {
+    const res = await axios.post(`/api/program-submissions/${selectedWaRow.value.id}/send-wa-doc-error`, {
+      phone: waDocForm.phone,
+    });
+
+    // Update locally
+    selectedWaRow.value.whatsapp = waDocForm.phone;
+    const foundIdx = submissions.value.findIndex((s) => s.id === selectedWaRow.value.id);
+    if (foundIdx !== -1) {
+      submissions.value[foundIdx].whatsapp = waDocForm.phone;
+    }
+
+    syncMessage.value = res.data.message || `Notifikasi dokumen salah berhasil dikirim ke WhatsApp (${waDocForm.phone})!`;
+    syncError.value = false;
+    showSendWaModal.value = false;
+  } catch (err) {
+    const errMsg = err.response?.data?.message || err.message;
+    alert('Gagal mengirim WhatsApp: ' + errMsg);
+  } finally {
+    isSendingWaDoc.value = false;
+    sendingWaDocRowId.value = null;
+  }
+};
+
 // Auto-select Keterangan based on lama_pending or tgl_share_cn in edit modal
 watch(
   () => editForm.lama_pending,
@@ -2141,6 +2534,7 @@ const analyzeCurrentRowWithAi = async () => {
         note_pph: data.submission.note_pph || '',
         no_faktur: data.submission.no_faktur || '',
         tgl_faktur: data.submission.tgl_faktur || '',
+        whatsapp: data.submission.whatsapp || editForm.whatsapp || '',
       });
 
       // Update row in table list too
@@ -2376,6 +2770,7 @@ const openEditModal = (row) => {
   editForm.id_real = row.id_real || '';
   editForm.program_name = row.program_name || '';
   editForm.sales_name = row.sales_name || '';
+  editForm.whatsapp = row.whatsapp || '';
   editForm.credit_note_url = row.credit_note_url || '';
   editForm.agreement_url = row.agreement_url || '';
   editForm.tax_invoice_url = row.tax_invoice_url || '';

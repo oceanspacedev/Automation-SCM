@@ -245,7 +245,7 @@
                 <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
               </span>
             </TableHead>
-            <TableHead class="text-right w-[175px] min-w-[175px]">
+            <TableHead class="text-center w-[90px] min-w-[90px]">
               <span>Action</span>
             </TableHead>
           </TableRow>
@@ -307,13 +307,9 @@
               {{ draft.invoice_type || '-' }}
             </TableCell>
 
-            <!-- Status (Filament Pill Badge) -->
-            <TableCell>
-              <FilamentBadge
-                :color="draft.status === 'ready' ? 'success' : (draft.status === 'invoiced' ? 'info' : 'danger')"
-              >
-                {{ draft.status === 'ready' ? 'READY' : (draft.status === 'invoiced' ? 'INVOICED' : 'ERROR') }}
-              </FilamentBadge>
+            <!-- Status (Plain text netral, seperti form program & invoice) -->
+            <TableCell class="text-xs text-gray-700 whitespace-nowrap">
+              <span>{{ draft.status === 'ready' ? 'READY' : (draft.status === 'invoiced' ? 'INVOICED' : (draft.status ? draft.status.toUpperCase() : 'ERROR')) }}</span>
             </TableCell>
 
             <!-- Tanggal -->
@@ -331,52 +327,50 @@
               {{ formatCurrency(draft.netpay) }}
             </TableCell>
 
-            <!-- Filament Action Buttons (View, Generate, Invoiced) -->
-            <TableCell class="text-right whitespace-nowrap">
-              <div class="flex items-center justify-end gap-1.5">
+            <!-- Action Buttons: Toolbar Terpadu (Icon-only persis Form Program) -->
+            <TableCell class="text-center py-2 whitespace-nowrap">
+              <div class="inline-flex items-center rounded-md border border-gray-200 bg-white shadow-2xs divide-x divide-gray-200 overflow-hidden">
                 <!-- 1. View Button -->
                 <router-link
                   :to="`/drafts/${draft.id}`"
-                  class="h-7 w-[68px] inline-flex items-center justify-center gap-1 rounded-md border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium transition shadow-2xs cursor-pointer"
+                  class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
                   title="Lihat Detail Draft"
                 >
-                  <EyeIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                  <span>View</span>
+                  <EyeIcon class="w-3.5 h-3.5 text-gray-600" />
                 </router-link>
 
                 <!-- 2. Generate Action (Ready) -->
                 <button
                   v-if="draft.status === 'ready'"
+                  type="button"
                   @click="askGenerateSingle(draft)"
                   :disabled="generatingId === draft.id"
-                  class="h-7 w-[92px] inline-flex items-center justify-center gap-1.5 rounded-md border border-blue-200/80 bg-blue-50/70 hover:bg-blue-100 text-blue-700 text-xs font-medium transition shadow-2xs cursor-pointer disabled:opacity-50"
+                  class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
                   title="Generate Invoice"
                 >
-                  <span v-if="generatingId === draft.id" class="inline-block w-3.5 h-3.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0"></span>
-                  <CheckSquareIcon v-else class="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  <span>Generate</span>
+                  <span v-if="generatingId === draft.id" class="inline-block w-3.5 h-3.5 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin shrink-0"></span>
+                  <CheckSquareIcon v-else class="w-3.5 h-3.5 text-gray-600" />
                 </button>
 
                 <!-- 3. Validasi Action (Error) -->
                 <button
                   v-else-if="draft.status === 'error'"
+                  type="button"
                   @click="validateDraft(draft.id)"
-                  class="h-7 w-[92px] inline-flex items-center justify-center gap-1.5 rounded-md border border-amber-200/80 bg-amber-50/70 hover:bg-amber-100 text-amber-700 text-xs font-medium transition shadow-2xs cursor-pointer"
+                  class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
                   title="Validasi Ulang Rumus Draft"
                 >
-                  <RefreshCwIcon class="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  <span>Validasi</span>
+                  <RefreshCwIcon class="w-3.5 h-3.5 text-gray-600" />
                 </button>
 
                 <!-- 4. Invoiced Action (Invoiced) -->
                 <router-link
                   v-else-if="draft.status === 'invoiced' && draft.invoice"
                   :to="`/invoices/${draft.invoice.id}`"
-                  class="h-7 w-[92px] inline-flex items-center justify-center gap-1.5 rounded-md border border-emerald-200/80 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-700 text-xs font-medium transition shadow-2xs cursor-pointer"
-                  title="Lihat Invoice yang Sudah Dibuat"
+                  class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
+                  :title="`Lihat Invoice (${draft.invoice.invoice_number})`"
                 >
-                  <CheckCircleIcon class="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Invoice</span>
+                  <FileTextIcon class="w-3.5 h-3.5 text-gray-600" />
                 </router-link>
               </div>
             </TableCell>
@@ -456,6 +450,7 @@ import {
   Search as SearchIcon,
   Filter as FilterIcon,
   RefreshCw as RefreshCwIcon,
+  FileText as FileTextIcon,
 } from '@lucide/vue';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -463,7 +458,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import ImportModal from '@/components/ImportModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import GenerateInvoiceModal from '@/components/GenerateInvoiceModal.vue';
-import FilamentBadge from '@/components/ui/FilamentBadge.vue';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 import {
   Table,

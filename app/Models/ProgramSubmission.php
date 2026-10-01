@@ -47,4 +47,12 @@ class ProgramSubmission extends Model
     {
         return $this->hasMany(ProgramReconciliationLog::class, 'program_submission_id')->orderByDesc('id');
     }
+
+    /**
+     * Get effective WhatsApp recipient phone, defaulting to testing number if not set.
+     */
+    public function getEffectiveWhatsappAttribute(): string
+    {
+        return $this->whatsapp ?: config('services.wag.ar_phone', '081224290502');
+    }
 }

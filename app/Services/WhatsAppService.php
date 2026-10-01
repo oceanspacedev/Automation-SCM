@@ -923,4 +923,200 @@ class WhatsAppService
 
         return implode("\n", $lines);
     }
+
+    /**
+     * Send notification to sales via WhatsApp regarding invalid or swapped documents.
+     *
+     * @return array{success: bool, message: string, provider_id: ?string, wa_url: ?string, recipient_phone: ?string}
+     */
+    public function sendProgramDocumentErrorNotification(ProgramSubmission $submission, ?string $overridePhone = null): array
+    {
+        $phone = $overridePhone ?: ($submission->whatsapp ?: config('services.wag.ar_phone', '081224290502'));
+        $cleanPhone = $this->formatPhone($phone);
+
+        if (empty($cleanPhone)) {
+            return [
+                'success' => false,
+                'message' => 'Nomor WhatsApp penerima tidak valid atau belum disetel.',
+                'provider_id' => null,
+                'wa_url' => null,
+                'recipient_phone' => null,
+            ];
+        }
+
+        $messageText = $this->buildProgramDocumentErrorMessage($submission);
+        $encodedText = rawurlencode($messageText);
+        $waUrl = "https://api.whatsapp.com/send?phone={$cleanPhone}&text={$encodedText}";
+
+        $apiUrl = rtrim(config('services.wag.url', 'https://waghub.mekayastudio.com'), '/').'/api/v1/messages';
+        $token = config('services.wag.token');
+
+        if (empty($token)) {
+            return [
+                'success' => false,
+                'message' => 'WAG_TOKEN belum dikonfigurasi pada sistem.',
+                'provider_id' => null,
+                'wa_url' => $waUrl,
+                'recipient_phone' => $cleanPhone,
+            ];
+        }
+
+        $uuid = Str::uuid()->toString();
+        $payload = [
+            'idempotency_key' => $uuid,
+            'recipient' => [
+                'type' => 'phone',
+                'value' => $cleanPhone,
+            ],
+            'message' => [
+                'type' => 'text',
+                'text' => $messageText,
+            ],
+            'purpose' => 'transactional',
+            'mode' => 'async',
+            'route_key' => 'default',
+            'client_reference' => "DOC-ERROR-SUB-{$submission->id}",
+        ];
+
+        try {
+            $client = Http::withToken($token)
+                ->acceptJson()
+                ->asJson()
+                ->withHeaders([
+                    'Idempotency-Key' => $uuid,
+                ])
+                ->timeout(25)
+                ->retry(2, 500, throw: false);
+
+            if (! config('services.wag.verify_ssl', false)) {
+                $client = $client->withoutVerifying();
+            }
+
+            $response = $client->post($apiUrl, $payload);
+            $data = $response->json();
+            $providerMessageId = $data['data']['provider_message_id'] ?? ($data['data']['id'] ?? null);
+
+            if ($response->successful() && ($response->status() === 200 || $response->status() === 201)) {
+                Log::info("WA Notifikasi Dokumen Salah berhasil dikirim untuk Submission ID {$submission->id} ke {$cleanPhone}. Provider ID: {$providerMessageId}");
+
+                return [
+                    'success' => true,
+                    'message' => "Notifikasi dokumen salah untuk {$submission->dealer_name} berhasil dikirim ke WhatsApp ({$cleanPhone}).",
+                    'provider_id' => $providerMessageId,
+                    'wa_url' => $waUrl,
+                    'recipient_phone' => $cleanPhone,
+                ];
+            }
+
+            $errorMessage = $data['message'] ?? ('HTTP Error '.$response->status());
+            if (! empty($data['errors'])) {
+                $errorMessage .= ' ('.json_encode($data['errors']).')';
+            }
+
+            Log::warning("Gagal mengirim WA dokumen salah untuk Submission ID {$submission->id} ke {$cleanPhone}: {$errorMessage}");
+
+            return [
+                'success' => false,
+                'message' => 'Gagal mengirim pesan WhatsApp: '.$errorMessage,
+                'provider_id' => null,
+                'wa_url' => $waUrl,
+                'recipient_phone' => $cleanPhone,
+            ];
+        } catch (Exception $e) {
+            Log::error("Exception pengiriman WA dokumen salah Submission ID {$submission->id}: {$e->getMessage()}");
+
+            return [
+                'success' => false,
+                'message' => 'Exception pengiriman WhatsApp: '.$e->getMessage(),
+                'provider_id' => null,
+                'wa_url' => $waUrl,
+                'recipient_phone' => $cleanPhone,
+            ];
+        }
+    }
+
+    /**
+     * Build formatted Indonesian WhatsApp message for incorrect/invalid program documents.
+     */
+    public function buildProgramDocumentErrorMessage(ProgramSubmission $submission): string
+    {
+        $salesGreeting = ! empty($submission->sales_name)
+            ? "Halo Kak {$submission->sales_name},"
+            : 'Halo Rekan Sales / Dealer,';
+
+        $dealerName = $submission->dealer_name ?: '-';
+        $idReal = $submission->id_real ?: '-';
+        $programName = $submission->program_name ?: '-';
+        $region = $submission->region ?: '-';
+
+        $docValidation = $submission->doc_validation ?? [];
+        $issues = [];
+
+        // Check CN
+        if (isset($docValidation['cn'])) {
+            $cn = $docValidation['cn'];
+            if (($cn['status'] ?? '') === 'invalid') {
+                $msg = $cn['message'] ?? 'Dokumen tidak sesuai.';
+                $issues[] = "- Credit Note (CN): {$msg} Mohon sesuaikan nama program dengan isi CN.";
+            } elseif (($cn['status'] ?? '') === 'swapped') {
+                $actual = strtoupper($cn['actual_type'] ?? 'dokumen lain');
+                $issues[] = "- Credit Note (CN): File di kolom CN tertukar (terdeteksi berisi {$actual}). Mohon sesuaikan nama program dengan isi CN dan unggah file CN yang benar.";
+            }
+        }
+
+        // Check Agr
+        if (isset($docValidation['agr'])) {
+            $agr = $docValidation['agr'];
+            if (($agr['status'] ?? '') === 'invalid') {
+                $msg = $agr['message'] ?? 'Dokumen tidak sesuai.';
+                $issues[] = "- Agreement (Agr): {$msg} Begitu juga dengan Agreement, mohon sesuaikan dengan program yang diajukan.";
+            } elseif (($agr['status'] ?? '') === 'swapped') {
+                $actual = strtoupper($agr['actual_type'] ?? 'dokumen lain');
+                $issues[] = "- Agreement (Agr): File di kolom Agr tertukar (terdeteksi berisi {$actual}). Begitu juga dengan Agreement, mohon unggah file Agreement yang sesuai.";
+            }
+        }
+
+        // Check Faktur
+        if (isset($docValidation['faktur'])) {
+            $faktur = $docValidation['faktur'];
+            if (($faktur['status'] ?? '') === 'invalid') {
+                $msg = $faktur['message'] ?? 'Dokumen tidak sesuai.';
+                $issues[] = "- Faktur Pajak (FP): {$msg} Begitu juga dengan Faktur Pajak, mohon sesuaikan dengan program yang diajukan.";
+            } elseif (($faktur['status'] ?? '') === 'swapped') {
+                $actual = strtoupper($faktur['actual_type'] ?? 'dokumen lain');
+                $issues[] = "- Faktur Pajak (FP): File di kolom Faktur Pajak tertukar (terdeteksi berisi {$actual}). Begitu juga dengan Faktur Pajak, mohon unggah file Faktur Pajak yang sesuai.";
+            }
+        }
+
+        if (empty($issues)) {
+            $issues[] = '- Dokumen pengajuan program tidak sesuai. Mohon sesuaikan nama program dengan isi CN, begitu juga dengan Agreement & Faktur Pajak.';
+        }
+
+        $lines = [
+            $salesGreeting,
+            '',
+            'Mohon bantuannya untuk perbaikan dokumen pada pengajuan klaim program berikut:',
+            '',
+            'Data Pengajuan:',
+            "- Dealer: {$dealerName} ({$idReal})",
+            "- Program: {$programName}",
+            "- Region: {$region}",
+            '',
+            'Catatan Dokumen:',
+            implode("\n", $issues),
+            '',
+            'Ketentuan Upload Dokumen:',
+            '- File dokumen wajib dipisah satu per satu sesuai kolomnya (jangan digabung menjadi satu file atau ditumpuk dalam satu kolom).',
+            '- Kolom CN diisi khusus untuk file Credit Note.',
+            '- Kolom Agr diisi khusus untuk file Agreement.',
+            '- Kolom Faktur Pajak diisi khusus untuk file Faktur Pajak.',
+            '- Mohon sesuaikan nama program dengan isi CN, begitu juga dengan Agreement & Faktur Pajak.',
+            '',
+            'Mohon upload dokumen ulang yang sesuai agar proses verifikasi klaim dapat segera diproses.',
+            '',
+            'Terima kasih atas kerja samanya.',
+        ];
+
+        return implode("\n", $lines);
+    }
 }
