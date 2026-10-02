@@ -354,6 +354,11 @@ class ProgramReconciliationService
             $score += 25; // Complete documents for Non-PKP
         }
 
+        // Prioritize Test Program submissions (web_form) over other sources
+        if (($sub->raw_data['source'] ?? '') === 'web_form') {
+            $score += 50;
+        }
+
         // Candidate must meet strict confidence score threshold >= 70
         if ($score < 70) {
             return null;
@@ -365,6 +370,7 @@ class ProgramReconciliationService
     /**
      * Find best candidate ProgramSubmission for a given DataProgram.
      * Strictly requires Region, Kode BT/ID Real, Dealer Name, and Program Name compatibility.
+     * Prioritizes Test Program (web_form) submissions.
      */
     public function findMatchingSubmission(DataProgram $dataProgram, ?Collection $preloadedSubmissions = null): ?ProgramSubmission
     {
@@ -398,10 +404,17 @@ class ProgramReconciliationService
             return null;
         }
 
+        // Prioritize candidates from Test Program (source: web_form)
+        $testProgramCandidates = $candidates->filter(function ($sub) {
+            return ($sub->raw_data['source'] ?? '') === 'web_form';
+        });
+
+        $evalPool = $testProgramCandidates->isNotEmpty() ? $testProgramCandidates : $candidates;
+
         $bestCandidate = null;
         $bestScore = 0;
 
-        foreach ($candidates as $sub) {
+        foreach ($evalPool as $sub) {
             $score = $this->evaluateMatchScore($dataProgram, $sub);
             if ($score === null) {
                 continue;
@@ -420,6 +433,21 @@ class ProgramReconciliationService
                     + ($this->isValidUrl($bestCandidate->tax_invoice_url) ? 1 : 0);
 
                 if ($currentDocs > $bestDocs) {
+                    $bestScore = $score;
+                    $bestCandidate = $sub;
+                }
+            }
+        }
+
+        // If no candidate from Test Program met the threshold, fallback to full pool
+        if ($bestCandidate === null && $testProgramCandidates->isNotEmpty() && $candidates->count() > $testProgramCandidates->count()) {
+            foreach ($candidates as $sub) {
+                $score = $this->evaluateMatchScore($dataProgram, $sub);
+                if ($score === null) {
+                    continue;
+                }
+
+                if ($bestCandidate === null || $score > $bestScore) {
                     $bestScore = $score;
                     $bestCandidate = $sub;
                 }
@@ -449,10 +477,11 @@ class ProgramReconciliationService
         ?ProgramSubmission $submission = null,
         bool $force = false,
         ?string $batchId = null,
-        string $triggeredBy = 'manual_row'
+        string $triggeredBy = 'manual_row',
+        ?Collection $preloadedSubmissions = null
     ): array {
         if ($submission === null) {
-            $submission = $this->findMatchingSubmission($dataProgram);
+            $submission = $this->findMatchingSubmission($dataProgram, $preloadedSubmissions);
         }
 
         if (! $submission) {
@@ -468,10 +497,10 @@ class ProgramReconciliationService
                 'submission_amount' => null,
                 'selisih' => 0.0,
                 'status_potong_purchase' => $dataProgram->status_potong_purchase ?? 'BELUM BISA POTONG',
-                'cek_dokumen' => $dataProgram->cek_dokumen ?? 'BELUM MATCH FORM',
+                'cek_dokumen' => $dataProgram->cek_dokumen ?? 'BELUM MATCH TEST',
                 'missing_docs' => null,
                 'drive_transferred' => null,
-                'notes' => 'Belum ditemukan data matching di Form Program.',
+                'notes' => 'Belum ditemukan data matching di Test Program.',
                 'triggered_by' => $triggeredBy,
             ]);
 
@@ -480,8 +509,8 @@ class ProgramReconciliationService
                 'data_program_id' => $dataProgram->id,
                 'submission_id' => null,
                 'status' => $dataProgram->status_potong_purchase ?? 'BELUM BISA POTONG',
-                'cek_dokumen' => $dataProgram->cek_dokumen ?? 'BELUM MATCH FORM',
-                'keterangan' => 'Belum ditemukan data matching di Form Program.',
+                'cek_dokumen' => $dataProgram->cek_dokumen ?? 'BELUM MATCH TEST',
+                'keterangan' => 'Belum ditemukan data matching di Test Program.',
                 'drive_transferred' => ['cn' => false, 'agrement' => false, 'cek_fp' => false],
                 'selisih' => 0.0,
                 'is_financial_match' => false,
@@ -589,7 +618,7 @@ class ProgramReconciliationService
             $statusPurchase = 'BISA DI POTONG';
             $cekDokumen = 'LENGKAP';
             $keterangan = sprintf(
-                'MATCH Form Program #%d (Finansial Sesuai: Net Pay Rp %s, Dokumen Lengkap%s)',
+                'MATCH Test Program #%d (Finansial Sesuai: Net Pay Rp %s, Dokumen Lengkap%s)',
                 $submission->id,
                 number_format($dataProgram->net_pay, 0, ',', '.'),
                 $isPkp ? '' : ' - NON PKP'
@@ -598,7 +627,7 @@ class ProgramReconciliationService
             $statusPurchase = 'BELUM BISA POTONG';
             $cekDokumen = 'SELISIH NOMINAL';
             $keterangan = sprintf(
-                'SELISIH Form Program #%d (Data: Rp %s vs Form: Rp %s, Selisih: Rp %s)',
+                'SELISIH Test Program #%d (Data: Rp %s vs Test: Rp %s, Selisih: Rp %s)',
                 $submission->id,
                 number_format($dpNet, 0, ',', '.'),
                 number_format($subNet, 0, ',', '.'),
@@ -609,7 +638,7 @@ class ProgramReconciliationService
             $missingStr = implode(' & ', $missingDocs).' BELUM ADA';
             $cekDokumen = $missingStr;
             $keterangan = sprintf(
-                'MATCH Form Program #%d (Finansial Sesuai, Dokumen Belum Lengkap: %s%s)',
+                'MATCH Test Program #%d (Finansial Sesuai, Dokumen Belum Lengkap: %s%s)',
                 $submission->id,
                 $missingStr,
                 $isPkp ? ' [PKP]' : ' [NON PKP]'
@@ -793,8 +822,8 @@ class ProgramReconciliationService
         foreach ($dataPrograms as $dp) {
             try {
                 // Auto-retry up to 3 times on transient MySQL deadlocks/locks with 100ms delay
-                $res = retry(3, function () use ($dp, $force, $batchId) {
-                    return $this->reconcileSingle($dp, null, $force, $batchId, 'manual_batch');
+                $res = retry(3, function () use ($dp, $force, $batchId, $submissionsPool) {
+                    return $this->reconcileSingle($dp, null, $force, $batchId, 'manual_batch', $submissionsPool);
                 }, 100);
 
                 if ($res['success']) {

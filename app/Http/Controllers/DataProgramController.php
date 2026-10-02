@@ -406,13 +406,13 @@ class DataProgramController extends Controller
 
             if ($result['success']) {
                 $message = sprintf(
-                    'Berhasil dicocokkan dengan Form Program #%d. Status: %s, Cek Dokumen: %s.',
+                    'Berhasil dicocokkan dengan Test Program #%d. Status: %s, Cek Dokumen: %s.',
                     $result['submission_id'],
                     $result['status'],
                     $result['cek_dokumen']
                 );
             } else {
-                $message = 'Belum ditemukan data Form Program yang cocok (Region, Kode BT, Nama Dealer, Program, atau Finansial tidak sesuai).';
+                $message = 'Belum ditemukan data Test Program yang cocok (Region, Kode BT, Nama Dealer, Program, atau Finansial tidak sesuai).';
             }
 
             return response()->json([

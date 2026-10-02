@@ -1710,7 +1710,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 import FilamentBadge from '@/components/ui/FilamentBadge.vue';
 
-const googleSheetUrl = 'https://docs.google.com/spreadsheets/d/1jf_i5r4Nn3q0RE6n_gIyCFn1XPlAWjYdqQOvWXewfXs/edit#gid=2012509458';
+const googleSheetUrl = 'https://docs.google.com/spreadsheets/d/1rDYiHsNR43H44g2xyV-igyp1Ijv_jp8v8FblAMHqof8/edit?gid=0#gid=0';
 
 const submissions = ref([]);
 const regionOptions = ref([]);

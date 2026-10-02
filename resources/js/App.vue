@@ -1,8 +1,8 @@
 <template>
   <div class="min-h-screen bg-white text-gray-900 flex flex-col font-sans">
-    <!-- Header (Hidden on Login Page) -->
+    <!-- Header (Hidden on Login Page & Standalone Public Pages) -->
     <header
-      v-if="!isLoginPage"
+      v-if="!isStandalonePage"
       class="border-b border-gray-200 bg-white sticky top-0 z-30"
     >
       <div class="w-full mx-auto px-4 sm:px-6">
@@ -50,22 +50,7 @@
                   </NavigationMenuLink>
                 </NavigationMenuItem>
 
-                <!-- 3. Form Program -->
-                <NavigationMenuItem>
-                  <NavigationMenuLink as-child>
-                    <router-link
-                      to="/form-program"
-                      :class="[
-                        navigationMenuTriggerStyle(),
-                        isActive('/form-program') && 'bg-gray-100 text-gray-900 font-semibold'
-                      ]"
-                    >
-                      Form Program
-                    </router-link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-
-                <!-- 4. Data Program -->
+                <!-- 2. Data Program -->
                 <NavigationMenuItem>
                   <NavigationMenuLink as-child>
                     <router-link
@@ -80,7 +65,22 @@
                   </NavigationMenuLink>
                 </NavigationMenuItem>
 
-                <!-- 5. Dropdown Riwayat (Dashboard, Riwayat Program & Riwayat Email) -->
+                <!-- 3. Test Program -->
+                <NavigationMenuItem>
+                  <NavigationMenuLink as-child>
+                    <router-link
+                      to="/test-program"
+                      :class="[
+                        navigationMenuTriggerStyle(),
+                        isActive('/test-program') && 'bg-gray-100 text-gray-900 font-semibold'
+                      ]"
+                    >
+                      Test Program
+                    </router-link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+
+                <!-- 4. Dropdown Riwayat (Form Program, Riwayat Program, Riwayat Email, Dashboard) -->
                 <NavigationMenuItem>
                   <Popover v-model:open="isRiwayatOpen">
                     <PopoverTrigger as-child>
@@ -88,7 +88,7 @@
                         type="button"
                         :class="[
                           navigationMenuTriggerStyle(),
-                          (isActive('/dashboard') || isActive('/riwayat-program') || isActive('/email-logs')) && 'bg-gray-100 text-gray-900 font-semibold',
+                          (isActive('/dashboard') || isActive('/riwayat-program') || isActive('/email-logs') || isActive('/form-program')) && 'bg-gray-100 text-gray-900 font-semibold',
                           'gap-1.5'
                         ]"
                       >
@@ -101,14 +101,14 @@
                     </PopoverTrigger>
                     <PopoverContent align="start" class="w-48 p-1 rounded-lg border border-gray-200 bg-white shadow-lg text-xs space-y-0.5">
                       <router-link
-                        to="/dashboard"
+                        to="/form-program"
                         @click="isRiwayatOpen = false"
                         :class="[
                           'block px-3 py-2 rounded-md transition-colors text-xs font-medium',
-                          isActive('/dashboard') ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                          isActive('/form-program') ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
                         ]"
                       >
-                        Dashboard
+                        Form Program
                       </router-link>
 
                       <router-link
@@ -131,6 +131,17 @@
                         ]"
                       >
                         Riwayat Email
+                      </router-link>
+
+                      <router-link
+                        to="/dashboard"
+                        @click="isRiwayatOpen = false"
+                        :class="[
+                          'block px-3 py-2 rounded-md transition-colors text-xs font-medium',
+                          isActive('/dashboard') ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                        ]"
+                      >
+                        Dashboard
                       </router-link>
                     </PopoverContent>
                   </Popover>
@@ -280,7 +291,7 @@
     </header>
 
     <!-- Main Content -->
-    <main :class="['flex-1 w-full', isLoginPage ? '' : 'mx-auto px-4 sm:px-6 py-5']">
+    <main :class="['flex-1 w-full', isStandalonePage ? 'p-0 m-0' : 'mx-auto px-4 sm:px-6 py-5']">
       <router-view />
     </main>
   </div>
@@ -316,6 +327,15 @@ const { user, logout } = useAuth();
 const isRiwayatOpen = ref(false);
 
 const isLoginPage = computed(() => route.path === '/login');
+const isStandalonePage = computed(() => {
+  return (
+    route.meta?.isStandalone === true ||
+    route.path === '/login' ||
+    route.path === '/form-submission' ||
+    route.path === '/form-realme' ||
+    route.path === '/form'
+  );
+});
 
 const isActive = (path) => {
   if (path === '/dashboard') {
@@ -348,7 +368,7 @@ const progressPercentage = computed(() => {
 });
 
 const checkAiStatus = async () => {
-  if (isLoginPage.value) return;
+  if (isStandalonePage.value) return;
   try {
     const res = await axios.get('/api/program-submissions/ai-status');
     const data = res.data;
@@ -373,9 +393,15 @@ const checkAiStatus = async () => {
 };
 
 onMounted(() => {
-  checkAiStatus();
+  if (!isStandalonePage.value) {
+    checkAiStatus();
+  }
   // Poll every 4 seconds for responsive background progress tracking
-  pollTimer = setInterval(checkAiStatus, 4000);
+  pollTimer = setInterval(() => {
+    if (!isStandalonePage.value) {
+      checkAiStatus();
+    }
+  }, 4000);
 });
 
 onUnmounted(() => {

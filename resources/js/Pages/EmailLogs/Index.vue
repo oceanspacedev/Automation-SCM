@@ -119,149 +119,156 @@
         </div>
       </div>
 
-      <!-- Filament Table -->
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead class="w-[44px] text-center">
-              <input
-                type="checkbox"
-                :checked="isAllSelected"
-                :indeterminate="isIndeterminate"
-                @change="toggleSelectAll"
-                :disabled="logs.length === 0"
-                class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer disabled:opacity-30"
-              />
-            </TableHead>
-            <TableHead class="min-w-[140px]">
-              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
-                Nomor Invoice
-                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
-              </span>
-            </TableHead>
-            <TableHead class="min-w-[160px]">
-              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
-                Dealer Tujuan
-                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
-              </span>
-            </TableHead>
-            <TableHead class="min-w-[150px]">
-              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
-                Pengirim
-                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
-              </span>
-            </TableHead>
-            <TableHead class="min-w-[110px]">
-              <span>Status</span>
-            </TableHead>
-            <TableHead class="min-w-[160px]">
-              <span>Penerima</span>
-            </TableHead>
-            <TableHead class="min-w-[150px]">
-              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
-                Waktu Terkirim
-                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
-              </span>
-            </TableHead>
-            <TableHead class="text-right w-[140px]">
-              <span>Action</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
+      <!-- Table: Styled identically to Test Program for clean spreadsheet look -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-gray-900 border-collapse">
+          <thead>
+            <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">
+              <th scope="col" class="py-2.5 px-3 text-center w-[44px] border-r border-gray-200">
+                <input
+                  type="checkbox"
+                  :checked="isAllSelected"
+                  :indeterminate="isIndeterminate"
+                  @change="toggleSelectAll"
+                  :disabled="logs.length === 0"
+                  class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer disabled:opacity-30"
+                  title="Pilih semua log di halaman ini"
+                />
+              </th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">
+                <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                  Nomor Invoice
+                  <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+                </span>
+              </th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">
+                <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                  Dealer Tujuan
+                  <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+                </span>
+              </th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">
+                <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                  Pengirim
+                  <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+                </span>
+              </th>
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Penerima</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">
+                <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                  Waktu Terkirim
+                  <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+                </span>
+              </th>
+              <th scope="col" class="py-2.5 px-3 text-center">Action</th>
+            </tr>
+          </thead>
 
-        <TableBody>
-          <TableEmpty v-if="loading" :colspan="8">
-            <div class="py-8 flex flex-col items-center justify-center gap-2 text-gray-500">
-              <span class="inline-block w-5 h-5 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></span>
-              <span class="text-xs">Memuat data email logs...</span>
-            </div>
-          </TableEmpty>
+          <tbody class="divide-y divide-gray-200 bg-white">
+            <tr v-if="loading">
+              <td colspan="8" class="py-8 text-center text-gray-500">
+                <div class="inline-flex items-center gap-2">
+                  <span class="inline-block w-4 h-4 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></span>
+                  <span>Memuat data riwayat email...</span>
+                </div>
+              </td>
+            </tr>
 
-          <TableEmpty v-else-if="logs.length === 0" :colspan="8">
-            <div class="py-8 text-center text-gray-400 text-xs">
-              Belum ada riwayat pengiriman email.
-            </div>
-          </TableEmpty>
+            <tr v-else-if="logs.length === 0">
+              <td colspan="8" class="py-8 text-center text-gray-400 text-xs">
+                Belum ada riwayat pengiriman email.
+              </td>
+            </tr>
 
-          <TableRow
-            v-for="log in logs"
-            :key="log.id"
-            :class="selectedIds.includes(log.id) ? 'bg-gray-50' : ''"
-          >
-            <!-- Checkbox -->
-            <TableCell class="w-[44px] text-center">
-              <input
-                type="checkbox"
-                :value="log.id"
-                v-model="selectedIds"
-                class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer"
-              />
-            </TableCell>
+            <tr
+              v-else
+              v-for="log in logs"
+              :key="log.id"
+              :class="[selectedIds.includes(log.id) ? 'bg-gray-50' : 'hover:bg-gray-50/70', 'text-gray-700 font-normal transition']"
+            >
+              <!-- Checkbox -->
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  :value="log.id"
+                  v-model="selectedIds"
+                  class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer"
+                />
+              </td>
 
-            <!-- Nomor Invoice (Bold Primary Key like SJ-xxxx in photo) -->
-            <TableCell>
-              <router-link
-                :to="`/invoices/${log.invoice_id}`"
-                class="font-semibold text-gray-950 text-xs hover:underline inline-flex items-center gap-1"
-              >
-                {{ log.invoice_number || '-' }}
-              </router-link>
-            </TableCell>
-
-            <!-- Dealer Tujuan -->
-            <TableCell class="text-xs text-gray-800" :title="log.invoice?.dealer_name">
-              {{ log.invoice?.dealer_name || '-' }}
-            </TableCell>
-
-            <!-- Pengirim -->
-            <TableCell class="text-xs">
-              <div class="text-gray-900 font-medium">{{ log.sender_name || 'Rebate MSI' }}</div>
-              <div class="text-xs text-gray-400">{{ log.sender_email || '-' }}</div>
-            </TableCell>
-
-            <!-- Status (Filament pill badge) -->
-            <TableCell>
-              <FilamentBadge :color="log.status === 'sent' ? 'success' : 'danger'">
-                {{ log.status === 'sent' ? 'DELIVERED' : 'FAILED' }}
-              </FilamentBadge>
-            </TableCell>
-
-            <!-- Penerima -->
-            <TableCell class="text-xs text-gray-700">
-              {{ log.recipient_email || '-' }}
-            </TableCell>
-
-            <!-- Waktu Terkirim (Formatted like '29 Sep 2026, 03:10') -->
-            <TableCell class="text-xs text-gray-700 whitespace-nowrap">
-              {{ formatDateTimeFilament(log.created_at) }}
-            </TableCell>
-
-            <!-- Action column (View, PDF with Filament icons) -->
-            <TableCell class="text-right whitespace-nowrap">
-              <div class="flex items-center justify-end gap-3">
+              <!-- Nomor Invoice -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 <router-link
                   :to="`/invoices/${log.invoice_id}`"
-                  class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-950 hover:underline cursor-pointer"
-                  title="Lihat Detail Invoice"
+                  class="font-semibold text-gray-900 text-xs hover:underline inline-flex items-center gap-1"
                 >
-                  <EyeIcon class="w-4 h-4 text-gray-500" />
-                  <span>View</span>
+                  {{ log.invoice_number || '-' }}
                 </router-link>
+              </td>
 
-                <a
-                  :href="`/invoices/${log.invoice_id}/pdf`"
-                  target="_blank"
-                  class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-600 hover:text-gray-950 hover:underline cursor-pointer"
-                  title="Unduh Dokumen PDF"
+              <!-- Dealer Tujuan -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[200px] truncate text-gray-800" :title="log.invoice?.dealer_name">
+                {{ log.invoice?.dealer_name || '-' }}
+              </td>
+
+              <!-- Pengirim -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
+                <div class="text-gray-900 font-medium">{{ log.sender_name || 'Rebate MSI' }}</div>
+                <div class="text-[11px] text-gray-400">{{ log.sender_email || '-' }}</div>
+              </td>
+
+              <!-- Status -->
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+                <span
+                  :class="[
+                    'inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border',
+                    log.status === 'sent'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-rose-50 text-rose-700 border-rose-200'
+                  ]"
                 >
-                  <FileTextIcon class="w-4 h-4 text-gray-500" />
-                  <span>PDF</span>
-                </a>
-              </div>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
+                  {{ log.status === 'sent' ? 'DELIVERED' : 'FAILED' }}
+                </span>
+              </td>
+
+              <!-- Penerima -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+                {{ log.recipient_email || '-' }}
+              </td>
+
+              <!-- Waktu Terkirim -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+                {{ formatDateTimeFilament(log.created_at) }}
+              </td>
+
+              <!-- Action -->
+              <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                <div class="flex items-center justify-center gap-1.5">
+                  <router-link
+                    :to="`/invoices/${log.invoice_id}`"
+                    class="h-7 px-2 inline-flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium transition cursor-pointer shadow-2xs"
+                    title="Lihat Detail Invoice"
+                  >
+                    <EyeIcon class="w-3.5 h-3.5 text-gray-500" />
+                    <span>View</span>
+                  </router-link>
+
+                  <a
+                    :href="`/invoices/${log.invoice_id}/pdf`"
+                    target="_blank"
+                    class="h-7 px-2 inline-flex items-center gap-1 rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium transition cursor-pointer shadow-2xs"
+                    title="Unduh Dokumen PDF"
+                  >
+                    <FileTextIcon class="w-3.5 h-3.5 text-gray-500" />
+                    <span>PDF</span>
+                  </a>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <!-- Filament Pagination Footer -->
       <FilamentPagination
@@ -288,17 +295,7 @@ import {
   FileTextIcon,
   MailIcon,
 } from 'lucide-vue-next';
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-  TableEmpty,
-} from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import FilamentBadge from '@/components/ui/FilamentBadge.vue';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 
 const logs = ref([]);

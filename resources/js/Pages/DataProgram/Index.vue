@@ -70,17 +70,17 @@
           </div>
         </div>
 
-        <!-- Dropdown Pencocokan & Sinkronisasi Form Program -->
+        <!-- Dropdown Pencocokan & Sinkronisasi Test Program -->
         <div class="relative" ref="reconcileDropdownRef">
           <button
             type="button"
             @click="showReconcileDropdown = !showReconcileDropdown"
             class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer"
-            title="Menu sinkronisasi & pencocokan Form Program"
+            title="Menu sinkronisasi & pencocokan Test Program"
           >
             <RefreshCwIcon v-if="isSyncing || isReconciling" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
             <CheckCircleIcon v-else class="w-3.5 h-3.5 text-gray-500" />
-            <span>{{ isSyncing ? 'Menyinkronkan...' : (isReconciling ? 'Mencocokkan...' : 'Cocokkan Form Program') }}</span>
+            <span>{{ isSyncing ? 'Menyinkronkan...' : (isReconciling ? 'Mencocokkan...' : 'Cocokkan Test Program') }}</span>
             <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 ml-0.5 transition-transform duration-150" :class="showReconcileDropdown && 'rotate-180'" />
           </button>
 
@@ -100,7 +100,7 @@
               <span>Sinkronkan Sekarang</span>
             </button>
 
-            <!-- 2. Cocokkan Form Program -->
+            <!-- 2. Cocokkan Test Program -->
             <button
               type="button"
               @click="handleOpenReconcileFromDropdown"
@@ -108,7 +108,7 @@
               class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <CheckCircleIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-              <span>Cocokkan Form Program</span>
+              <span>Cocokkan Test Program</span>
             </button>
 
             <div class="my-1 border-t border-gray-100"></div>
@@ -338,544 +338,538 @@
         </div>
       </div>
 
-      <Table container-class="max-h-[calc(100vh-240px)]">
-        <TableHeader>
-          <TableRow class="border-b border-gray-200 text-xs hover:bg-transparent bg-white">
-            <!-- 1. No (Frozen) -->
-            <TableHead class="w-[50px] min-w-[50px] max-w-[50px] text-center font-semibold text-gray-950 sticky top-0 z-30 bg-white border-b border-gray-200" style="left: 0px;">No</TableHead>
-            <!-- 2. Nama Dealer (Frozen) -->
-            <TableHead class="w-[180px] min-w-[180px] max-w-[180px] font-semibold text-gray-950 sticky top-0 z-30 bg-white border-b border-gray-200" style="left: 50px;">
-              <span class="inline-flex items-center gap-1">Nama Dealer <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
-            </TableHead>
-            <!-- 3. Program (Frozen) -->
-            <TableHead class="w-[150px] min-w-[150px] max-w-[150px] font-semibold text-gray-950 sticky top-0 z-30 bg-white border-b border-gray-200" style="left: 230px;">
-              <span class="inline-flex items-center gap-1">Program <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
-            </TableHead>
-            <!-- 4. Kode BT (Frozen) -->
-            <TableHead class="w-[110px] min-w-[110px] max-w-[110px] font-semibold text-gray-950 sticky top-0 z-30 bg-white border-b border-gray-200" style="left: 380px;">
-              <span class="inline-flex items-center gap-1">Kode BT <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
-            </TableHead>
-            <!-- 5. Nama Program (Frozen) -->
-            <TableHead class="w-[300px] min-w-[300px] max-w-[300px] font-semibold text-gray-950 sticky top-0 z-30 bg-white border-b border-gray-200" style="left: 490px;">
-              <span class="inline-flex items-center gap-1">Nama Program <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
-            </TableHead>
-            <!-- 6. Aksi (Frozen with divider shadow) -->
-            <TableHead class="w-[90px] min-w-[90px] max-w-[90px] text-center font-semibold text-gray-950 sticky top-0 z-30 bg-white border-b border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08),0_1px_0_0_#e5e7eb]" style="left: 790px;">Aksi</TableHead>
+      <!-- Table: Styled identically to Test Program for clean spreadsheet look -->
+      <div class="overflow-x-auto max-h-[calc(100vh-240px)]">
+        <table class="w-full text-left text-xs text-gray-900 border-collapse">
+          <thead>
+            <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap sticky top-0 z-10 shadow-2xs">
+              <!-- 1. No (Locked) -->
+              <th scope="col" class="py-2.5 px-3 text-center w-[50px] min-w-[50px] max-w-[50px] border-r border-gray-200 bg-gray-50 sticky left-0 z-30" style="left: 0px;">No</th>
+              <!-- 2. Nama Dealer (Locked) -->
+              <th scope="col" class="py-2.5 px-3 w-[180px] min-w-[180px] max-w-[180px] border-r border-gray-200 bg-gray-50 sticky z-30" style="left: 50px;">
+                <span class="inline-flex items-center gap-1">Nama Dealer <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
+              </th>
+              <!-- 3. Program (Locked) -->
+              <th scope="col" class="py-2.5 px-3 w-[130px] min-w-[130px] max-w-[130px] border-r border-gray-200 bg-gray-50 sticky z-30" style="left: 230px;">
+                <span class="inline-flex items-center gap-1">Program <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
+              </th>
+              <!-- 4. Kode BT (Locked) -->
+              <th scope="col" class="py-2.5 px-3 w-[100px] min-w-[100px] max-w-[100px] border-r border-gray-200 bg-gray-50 sticky z-30" style="left: 360px;">
+                <span class="inline-flex items-center gap-1">Kode BT <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
+              </th>
+              <!-- 5. Nama Program (Locked with divider shadow) -->
+              <th scope="col" class="py-2.5 px-3 w-[240px] min-w-[240px] max-w-[240px] border-r border-gray-200 bg-gray-50 sticky z-30 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.08)]" style="left: 460px;">
+                <span class="inline-flex items-center gap-1">Nama Program <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
+              </th>
+              <!-- 6. Aksi -->
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200 bg-gray-50">Lihat</th>
               <!-- 7. Periode -->
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Periode</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Region</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">No PO</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">ID GS</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Kode Supplier</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Status DL</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Sales Person</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Telemarketing</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Wajib Pajak</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">TRF PPh</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">Incentive</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">DPP</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">DPP Lain</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">PPN</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">Nilai PPh</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">Net Pay</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">Cek Pajak</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-right">Selisih</TableHead>
-              <TableHead class="min-w-[100px] text-center font-semibold text-gray-950">Note PPh</TableHead>
-              <TableHead class="min-w-[140px] font-semibold text-gray-950">No Faktur</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Ket Faktur</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">No PO/SJ</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">No Transaksi</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Tgl Input</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Tgl Share CN</TableHead>
-              <TableHead class="w-[80px] text-center font-semibold text-gray-950">Pending</TableHead>
-              <TableHead class="min-w-[150px] font-semibold text-gray-950">Keterangan</TableHead>
-              <TableHead class="min-w-[150px] font-semibold text-gray-950">Cek Dokumen</TableHead>
-              <TableHead class="min-w-[190px] font-semibold text-gray-950">Status Potong Purchase</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Status AR</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Tgl Potong/TF</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">No. UID</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">No. Pembayaran</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Tgl Bank PPh</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">T/F</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Tgl Proses</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Tgl SJ</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">No. SJ</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Info Bank</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Pending Potongan</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">NPWP</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Nama NPWP</TableHead>
-              <TableHead class="min-w-[150px] font-semibold text-gray-950">Program 2</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-center">CN</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-center">Agrement</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-center">Cek FP</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950 text-center">Cek Evidance</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Noted</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Norek</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Namrek</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Bank</TableHead>
-              <TableHead class="whitespace-nowrap font-semibold text-gray-950">Big Region</TableHead>
-            </TableRow>
-          </TableHeader>
-        <TableBody>
-          <!-- Loading State -->
-          <TableEmpty v-if="isLoading && items.length === 0" :colspan="58">
-            <div class="inline-flex items-center gap-2 text-gray-500 py-8">
-              <RefreshCwIcon class="w-4 h-4 animate-spin text-gray-400" />
-              <span class="text-xs">Memuat data program...</span>
-            </div>
-          </TableEmpty>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Periode</th>
+              <!-- 8. Region -->
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Region</th>
+              <!-- 9. No PO -->
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">No PO</th>
+              <!-- 10. ID GS -->
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">ID GS</th>
+              <!-- 11. Kode Supplier -->
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Kode Supplier</th>
+              <!-- 12. Status DL -->
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Status DL</th>
+              <!-- 13. Sales Person -->
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Sales Person</th>
+              <!-- 14. Telemarketing -->
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Telemarketing</th>
+              <!-- 15. Wajib Pajak -->
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Wajib Pajak</th>
+              <!-- 16. TRF PPh -->
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">TRF PPh</th>
+              <!-- 17-27. Finansial & Pajak -->
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200 bg-gray-50">Incentive</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200 bg-gray-50">DPP</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200 bg-gray-50">DPP Lain</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200 bg-gray-50">PPN</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200 bg-gray-50">Nilai PPh</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200 bg-gray-50">Net Pay</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200 bg-gray-50">Cek Pajak</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200 bg-gray-50">Selisih</th>
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200 bg-gray-50">Note PPh</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">No Faktur</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Ket Faktur</th>
+              <!-- 28-34. Administrasi & Status -->
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">No PO/SJ</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">No Transaksi</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Tgl Input</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Tgl Share CN</th>
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200 bg-gray-50">Pending</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Keterangan</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Cek Dokumen</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Status Potong Purchase</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Status AR</th>
+              <!-- 37-46. Tanggal, Bank & Rekening -->
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Tgl Potong/TF</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">No. UID</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">No. Pembayaran</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Tgl Bank PPh</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">T/F</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Tgl Proses</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Tgl SJ</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">No. SJ</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Info Bank</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Pending Potongan</th>
+              <!-- 47-49. NPWP & Program 2 -->
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">NPWP</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Nama NPWP</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Program 2</th>
+              <!-- 50-53. Dokumen Lampiran -->
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200 bg-gray-50">CN</th>
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200 bg-gray-50">Agr</th>
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200 bg-gray-50">FP</th>
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200 bg-gray-50">Evid</th>
+              <!-- 54-58. Catatan, Bank & Big Region -->
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Noted</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Norek</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Namrek</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Bank</th>
+              <th scope="col" class="py-2.5 px-3 bg-gray-50">Big Region</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200 bg-white">
+            <!-- Loading State -->
+            <tr v-if="isLoading && items.length === 0">
+              <td colspan="58" class="py-8 text-center text-gray-500">
+                <div class="inline-flex items-center gap-2">
+                  <RefreshCwIcon class="w-4 h-4 animate-spin text-gray-400" />
+                  <span>Memuat data program...</span>
+                </div>
+              </td>
+            </tr>
 
-          <!-- Empty State -->
-          <TableEmpty v-else-if="items.length === 0" :colspan="58">
-            <div class="max-w-md mx-auto py-8 space-y-1.5 text-center text-gray-500">
-              <p class="font-medium text-gray-800 text-xs">Belum ada data program yang tersimpan.</p>
-              <p class="text-xs text-gray-500">
-                Klik tombol <strong>"Sinkronkan Sekarang"</strong> di atas untuk memuat data dari spreadsheet Anda.
-              </p>
-            </div>
-          </TableEmpty>
+            <!-- Empty State -->
+            <tr v-else-if="items.length === 0">
+              <td colspan="58" class="py-8 text-center text-gray-500">
+                <div class="max-w-md mx-auto space-y-1.5 text-center">
+                  <p class="font-medium text-gray-800 text-xs">Belum ada data program yang tersimpan.</p>
+                  <p class="text-xs text-gray-500">
+                    Klik tombol <strong>"Sinkronkan Sekarang"</strong> di atas untuk memuat data dari spreadsheet Anda.
+                  </p>
+                </div>
+              </td>
+            </tr>
 
-          <!-- Data Rows (All typography exactly matches Filament standard: text-xs, text-gray-800, Inter sans) -->
-          <TableRow
-            v-else
-            v-for="(row, idx) in items"
-            :key="row.id"
-            class="group hover:bg-gray-50/80 transition text-xs"
-          >
-            <!-- 1. No (Frozen) -->
-            <TableCell class="w-[50px] min-w-[50px] max-w-[50px] text-center text-xs text-gray-500 py-2.5 sticky z-10 bg-white group-hover:bg-gray-50/80 transition-colors border-b border-gray-200" style="left: 0px;">
-              {{ (pagination.current_page - 1) * pagination.per_page + idx + 1 }}
-            </TableCell>
+            <!-- Data Rows (Exact Test Program aesthetic) -->
+            <tr
+              v-else
+              v-for="(row, idx) in items"
+              :key="row.id"
+              class="group hover:bg-gray-50/70 text-gray-700 font-normal"
+            >
+              <!-- 1. No (Locked) -->
+              <td class="py-2.5 px-3 text-center w-[50px] min-w-[50px] max-w-[50px] border-r border-gray-100 whitespace-nowrap sticky left-0 z-20 bg-white group-hover:bg-gray-50 transition-colors" style="left: 0px;">
+                {{ (pagination.current_page - 1) * pagination.per_page + idx + 1 }}
+              </td>
 
-            <!-- 2. Nama Dealer (Frozen) -->
-            <TableCell class="w-[180px] min-w-[180px] max-w-[180px] text-xs text-gray-700 py-2.5 leading-snug sticky z-10 bg-white group-hover:bg-gray-50/80 transition-colors border-b border-gray-200" style="left: 50px;">
-              <div class="line-clamp-2 text-gray-700 break-words" :title="row.dealer_name">{{ row.dealer_name || '-' }}</div>
-            </TableCell>
+              <!-- 2. Nama Dealer (Locked) -->
+              <td class="py-2.5 px-3 w-[180px] min-w-[180px] max-w-[180px] border-r border-gray-100 whitespace-nowrap sticky z-20 bg-white group-hover:bg-gray-50 transition-colors" style="left: 50px;">
+                <div class="line-clamp-2 text-gray-700 break-words" :title="row.dealer_name">{{ row.dealer_name || '-' }}</div>
+              </td>
 
-            <!-- 3. Program (Frozen) -->
-            <TableCell class="w-[150px] min-w-[150px] max-w-[150px] text-xs text-gray-700 py-2.5 sticky z-10 bg-white group-hover:bg-gray-50/80 transition-colors border-b border-gray-200" style="left: 230px;">
-              <div class="truncate" :title="row.program">{{ row.program || '-' }}</div>
-            </TableCell>
+              <!-- 3. Program (Locked) -->
+              <td class="py-2.5 px-3 w-[130px] min-w-[130px] max-w-[130px] border-r border-gray-100 whitespace-nowrap sticky z-20 bg-white group-hover:bg-gray-50 transition-colors" style="left: 230px;">
+                <div class="truncate" :title="row.program">{{ row.program || '-' }}</div>
+              </td>
 
-            <!-- 4. Kode BT (Frozen) -->
-            <TableCell class="w-[110px] min-w-[110px] max-w-[110px] text-xs text-gray-700 py-2.5 sticky z-10 bg-white group-hover:bg-gray-50/80 transition-colors border-b border-gray-200" style="left: 380px;">
-              <div class="truncate" :title="row.kode_bt">{{ row.kode_bt || '-' }}</div>
-            </TableCell>
+              <!-- 4. Kode BT (Locked) -->
+              <td class="py-2.5 px-3 w-[100px] min-w-[100px] max-w-[100px] border-r border-gray-100 whitespace-nowrap sticky z-20 bg-white group-hover:bg-gray-50 transition-colors" style="left: 360px;">
+                <div class="truncate" :title="row.kode_bt">{{ row.kode_bt || '-' }}</div>
+              </td>
 
-            <!-- 5. Nama Program (Frozen) -->
-            <TableCell class="w-[300px] min-w-[300px] max-w-[300px] text-xs text-gray-700 py-2.5 leading-snug sticky z-10 bg-white group-hover:bg-gray-50/80 transition-colors border-b border-gray-200" style="left: 490px;">
-              {{ row.program_name || '-' }}
-            </TableCell>
+              <!-- 5. Nama Program (Locked with divider shadow) -->
+              <td class="py-2.5 px-3 w-[240px] min-w-[240px] max-w-[240px] border-r border-gray-100 whitespace-nowrap sticky z-20 bg-white group-hover:bg-gray-50 transition-colors shadow-[3px_0_6px_-2px_rgba(0,0,0,0.08)]" style="left: 460px;">
+                <div class="truncate text-gray-700" :title="row.program_name">{{ row.program_name || '-' }}</div>
+              </td>
 
-            <!-- 6. Aksi / Cek Data (Frozen with divider shadow) -->
-            <TableCell class="w-[90px] min-w-[90px] max-w-[90px] text-center text-xs py-2 sticky z-10 bg-white group-hover:bg-gray-50/80 transition-colors border-b border-r border-gray-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]" style="left: 790px;">
-              <div class="flex items-center justify-center gap-1.5">
-                <button
-                  type="button"
-                  @click.stop="testMatchSingleRow(row)"
-                  :disabled="reconcilingRowId === row.id"
-                  class="w-7 h-7 shrink-0 inline-flex items-center justify-center rounded-md border border-gray-200 bg-white hover:bg-gray-100 hover:border-gray-300 text-gray-700 transition shadow-2xs cursor-pointer disabled:opacity-50"
-                  title="Cek kecocokan data dengan Form Program"
-                >
-                  <RefreshCwIcon v-if="reconcilingRowId === row.id" class="w-3.5 h-3.5 animate-spin text-gray-500" />
-                  <CheckCircleIcon v-else class="w-3.5 h-3.5 text-gray-700 hover:text-black" />
-                </button>
+              <!-- 6. Aksi (Lihat & WA) -->
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+                <div class="flex items-center justify-center gap-1.5">
+                  <button
+                    type="button"
+                    @click.stop="testMatchSingleRow(row)"
+                    :disabled="reconcilingRowId === row.id"
+                    class="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium transition cursor-pointer shadow-2xs disabled:opacity-50"
+                    title="Cek kecocokan data dengan Test Program"
+                  >
+                    <RefreshCwIcon v-if="reconcilingRowId === row.id" class="w-3 h-3 animate-spin text-gray-400" />
+                    <EyeIcon v-else class="w-3.5 h-3.5 text-gray-500" />
+                    <span>Lihat</span>
+                  </button>
 
-                <button
-                  v-if="row.status_potong_purchase === 'BISA DI POTONG'"
-                  type="button"
-                  @click.stop="sendWaToTelemarketing(row)"
-                  :disabled="sendingWaId === row.id"
-                  class="w-7 h-7 shrink-0 inline-flex items-center justify-center rounded-md border border-emerald-200/80 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-700 transition shadow-2xs cursor-pointer disabled:opacity-50"
-                  title="Kirim ke WhatsApp Telemarketing (Tawarkan Potong Order ke Dealer)"
-                >
-                  <RefreshCwIcon v-if="sendingWaId === row.id" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
-                  <SendIcon v-else class="w-3.5 h-3.5 text-emerald-600" />
-                </button>
-              </div>
-            </TableCell>
+                  <button
+                    v-if="row.status_potong_purchase === 'BISA DI POTONG'"
+                    type="button"
+                    @click.stop="sendWaToTelemarketing(row)"
+                    :disabled="sendingWaId === row.id"
+                    class="h-7 px-2 inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium transition cursor-pointer shadow-2xs disabled:opacity-50"
+                    title="Kirim ke WhatsApp Telemarketing"
+                  >
+                    <RefreshCwIcon v-if="sendingWaId === row.id" class="w-3 h-3 animate-spin text-emerald-600" />
+                    <SendIcon v-else class="w-3.5 h-3.5 text-emerald-600" />
+                    <span>WA</span>
+                  </button>
+                </div>
+              </td>
 
-              <!-- 6. Periode -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 7. Periode -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.periode || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 7. Region -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 8. Region -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.region || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 8. No PO -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 9. No PO -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.no_po || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 9. ID GS -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 10. ID GS -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.id_gs || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 10. Kode Supplier -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 11. Kode Supplier -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.kode_supplier || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 11. Status DL -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 12. Status DL -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.status_dl || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 12. Sales Person -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 13. Sales Person -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.sales_person || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 13. Telemarketing -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 14. Telemarketing -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.telemarketing || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 14. Wajib Pajak -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 15. Wajib Pajak -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.wajib_pajak || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 15. TRF PPH -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 16. TRF PPH -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.trf_pph || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 16. Incentive -->
-              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+              <!-- 17. Incentive -->
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap font-medium text-gray-900">
                 {{ formatRupiah(row.incentive) }}
-              </TableCell>
+              </td>
 
-              <!-- 17. DPP -->
-              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+              <!-- 18. DPP -->
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ formatRupiah(row.dpp) }}
-              </TableCell>
+              </td>
 
-              <!-- 18. DPP Lain -->
-              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+              <!-- 19. DPP Lain -->
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ formatRupiah(row.dpp_lain) }}
-              </TableCell>
+              </td>
 
-              <!-- 19. PPN -->
-              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+              <!-- 20. PPN -->
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ formatRupiah(row.ppn) }}
-              </TableCell>
+              </td>
 
-              <!-- 20. Nilai PPh -->
-              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+              <!-- 21. Nilai PPh -->
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ formatRupiah(row.nilai_pph) }}
-              </TableCell>
+              </td>
 
-              <!-- 21. Net Pay -->
-              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+              <!-- 22. Net Pay -->
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap font-bold text-gray-950">
                 {{ formatRupiah(row.net_pay) }}
-              </TableCell>
+              </td>
 
-              <!-- 22. Cek Pajak Tarif PPh -->
-              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
+              <!-- 23. Cek Pajak Tarif PPh -->
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ formatRupiah(row.cek_pajak_tarif) }}
-              </TableCell>
+              </td>
 
-              <!-- 23. Selisih -->
-              <TableCell class="whitespace-nowrap text-right text-xs text-gray-700 py-2.5">
-                <span v-if="row.selisih === 0 || row.selisih === '0' || row.selisih === 0.0" class="text-gray-400">
-                  0
-                </span>
-                <span v-else-if="row.selisih !== null && row.selisih !== undefined && row.selisih !== ''">
+              <!-- 24. Selisih -->
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap">
+                <span v-if="row.selisih === 0 || row.selisih === '0' || row.selisih === 0.0" class="text-gray-400">0</span>
+                <span v-else-if="row.selisih !== null && row.selisih !== undefined && row.selisih !== ''" class="font-medium text-rose-600">
                   {{ formatRupiah(row.selisih) }}
                 </span>
                 <span v-else class="text-gray-300">-</span>
-              </TableCell>
+              </td>
 
-              <!-- 24. Note PPh -->
-              <TableCell class="text-center py-2.5 whitespace-nowrap">
-                <span
-                  v-if="row.note_pph === 'ok'"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50/70 text-emerald-700 border border-emerald-200/80 text-xs font-normal"
-                >
-                  <CheckIcon class="w-3.5 h-3.5 text-emerald-600" />
-                  <span>ok</span>
-                </span>
-                <span
-                  v-else-if="row.note_pph"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50/70 text-amber-700 border border-amber-200/80 text-xs font-normal"
-                >
-                  <AlertCircleIcon class="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  <span>{{ row.note_pph }}</span>
-                </span>
-                <span v-else class="text-gray-300 text-xs">-</span>
-              </TableCell>
+              <!-- 25. Note PPh -->
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap text-gray-700">
+                <span v-if="row.note_pph === 'ok'" class="text-emerald-700 font-medium">ok</span>
+                <span v-else-if="row.note_pph" class="text-amber-700">{{ row.note_pph }}</span>
+                <span v-else class="text-gray-300">-</span>
+              </td>
 
-              <!-- 25. No Faktur Pajak -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 26. No Faktur Pajak -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800 font-mono text-[11px]">
                 {{ row.no_faktur_pajak || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 26. Ket Faktur Pajak -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 27. Ket Faktur Pajak -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ row.ket_faktur_pajak || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 27. No PO/SJ -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 28. No PO/SJ -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ row.no_po_sj || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 28. No Transaksi -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 29. No Transaksi -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ row.no_transaksi || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 29. Tgl Input -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 30. Tgl Input -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ row.tgl_input || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 30. Tgl Share CN -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 31. Tgl Share CN -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ row.tgl_share_cn || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 31. Lama Pending -->
-              <TableCell class="text-center text-xs text-gray-700 py-2.5 whitespace-nowrap">
-                <span v-if="row.lama_pending" class="px-2 py-0.5 rounded bg-white border border-gray-200 text-xs text-gray-700">
-                  {{ row.lama_pending }}
-                </span>
-                <span v-else class="text-gray-300 text-xs">-</span>
-              </TableCell>
+              <!-- 32. Lama Pending -->
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap text-gray-700">
+                {{ row.lama_pending || '-' }}
+              </td>
 
-              <!-- 32. Keterangan -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 33. Keterangan -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[200px] truncate text-gray-700" :title="row.keterangan">
                 {{ row.keterangan || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 33. Cek Dokumen -->
-              <TableCell class="text-xs text-gray-700 py-2.5 leading-snug whitespace-nowrap">
-                <div
+              <!-- 34. Cek Dokumen -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+                <span
                   v-if="row.cek_dokumen"
                   :class="[
-                    'line-clamp-2 max-w-[160px] text-xs px-2 py-0.5 rounded inline-block border',
+                    'px-2 py-0.5 rounded text-xs font-medium border inline-block',
                     row.cek_dokumen === 'LENGKAP' || row.cek_dokumen === 'OK'
-                      ? 'bg-emerald-50/70 text-emerald-700 border-emerald-200/80'
-                      : 'bg-amber-50/70 text-amber-700 border-amber-200/80'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
                   ]"
-                  :title="row.cek_dokumen"
                 >
                   {{ row.cek_dokumen }}
-                </div>
-                <span v-else class="text-gray-300 text-xs">-</span>
-              </TableCell>
+                </span>
+                <span v-else class="text-gray-300">-</span>
+              </td>
 
-              <!-- 34. Status Potong By Purchase -->
-              <TableCell class="py-2.5 whitespace-nowrap">
+              <!-- 35. Status Potong By Purchase -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 <span
                   v-if="row.status_potong_purchase"
                   :class="[
                     'px-2 py-0.5 rounded text-xs font-normal border inline-block',
                     row.status_potong_purchase === 'BISA DI POTONG'
-                      ? 'bg-emerald-50/70 text-emerald-700 border-emerald-200/80'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : row.status_potong_purchase === 'SUDAH POTONG'
-                      ? 'bg-sky-50/70 text-sky-700 border-sky-200/80'
+                      ? 'bg-sky-50 text-sky-700 border-sky-200'
                       : row.status_potong_purchase === 'DONE TRANSFER'
-                      ? 'bg-violet-50/70 text-violet-700 border-violet-200/80'
+                      ? 'bg-violet-50 text-violet-700 border-violet-200'
                       : row.status_potong_purchase === 'BELUM BISA POTONG'
-                      ? 'bg-rose-50/70 text-rose-700 border-rose-200/80'
+                      ? 'bg-rose-50 text-rose-700 border-rose-200'
                       : 'bg-gray-50 text-gray-600 border-gray-200'
                   ]"
                 >
                   {{ row.status_potong_purchase }}
                 </span>
-                <span v-else class="text-gray-300 text-xs">-</span>
-              </TableCell>
+                <span v-else class="text-gray-300">-</span>
+              </td>
 
-              <!-- 35. Status Potong By AR -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 36. Status Potong By AR -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 <span
                   v-if="row.status_potong_ar"
                   :class="[
                     'px-2 py-0.5 rounded text-xs font-normal border inline-block',
                     row.status_potong_ar.includes('DEALER SETUJU')
-                      ? 'bg-sky-50/70 text-sky-700 border-sky-200/80'
+                      ? 'bg-sky-50 text-sky-700 border-sky-200'
                       : row.status_potong_ar === 'DONE'
-                      ? 'bg-emerald-50/70 text-emerald-700 border-emerald-200/80'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : row.status_potong_ar.includes('PENDING')
-                      ? 'bg-amber-50/70 text-amber-700 border-amber-200/80'
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
                       : 'bg-gray-50 text-gray-600 border-gray-200'
                   ]"
                 >
                   {{ row.status_potong_ar }}
                 </span>
-                <span v-else class="text-gray-300 text-xs">-</span>
-              </TableCell>
+                <span v-else class="text-gray-300">-</span>
+              </td>
 
-              <!-- 36. Tanggal Potong/TF -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 37. Tanggal Potong/TF -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.tgl_potong_tf || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 37. No. UID -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 38. No. UID -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.no_uid || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 38. No. Pembayaran -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 39. No. Pembayaran -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.no_pembayaran || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 39. Tgl Input Bank PPh -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 40. Tgl Input Bank PPh -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.tgl_input_bank_pph || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 40. T/F -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 41. T/F -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.tf_status || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 41. Tgl Proses -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 42. Tgl Proses -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.tgl_proses || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 42. Tgl SJ -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 43. Tgl SJ -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.tgl_sj || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 43. No. SJ -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 44. No. SJ -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.no_sj || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 44. Info Bank -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 45. Info Bank -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.info_bank || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 45. Pending Potongan -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 46. Pending Potongan -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.pending_potongan || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 46. NPWP -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 47. NPWP -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700 font-mono text-[11px]">
                 {{ row.npwp || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 47. Nama NPWP -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 48. Nama NPWP -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[180px] truncate text-gray-700" :title="row.nama_npwp">
                 {{ row.nama_npwp || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 48. Program 2 -->
-              <TableCell class="text-xs text-gray-700 py-2.5 leading-snug">
-                <div class="line-clamp-2 min-w-[150px]" :title="row.program_2">{{ row.program_2 || '-' }}</div>
-              </TableCell>
+              <!-- 49. Program 2 -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[180px] truncate text-gray-700" :title="row.program_2">
+                {{ row.program_2 || '-' }}
+              </td>
 
-              <!-- 49. CN -->
-              <TableCell class="text-center py-2.5 whitespace-nowrap">
-                <template v-if="isValidUrl(row.cn)">
-                  <a
-                    :href="row.cn"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer shadow-2xs"
-                    title="Buka Dokumen Credit Note di Google Drive"
-                  >
-                    <FileTextIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                    <span>CN</span>
-                  </a>
-                </template>
+              <!-- 50. CN -->
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+                <a
+                  v-if="isValidUrl(row.cn)"
+                  :href="row.cn"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-gray-700 underline hover:text-gray-900"
+                >
+                  CN
+                </a>
                 <span v-else-if="row.cn" class="text-xs text-gray-700">{{ row.cn }}</span>
-                <span v-else class="text-gray-300 text-xs">-</span>
-              </TableCell>
+                <span v-else class="text-gray-400">-</span>
+              </td>
 
-              <!-- 50. Agrement -->
-              <TableCell class="text-center py-2.5 whitespace-nowrap">
-                <template v-if="isValidUrl(row.agrement)">
-                  <a
-                    :href="row.agrement"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer shadow-2xs"
-                    title="Buka Dokumen Agreement di Google Drive"
-                  >
-                    <FileTextIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                    <span>Agr</span>
-                  </a>
-                </template>
+              <!-- 51. Agrement -->
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+                <a
+                  v-if="isValidUrl(row.agrement)"
+                  :href="row.agrement"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-gray-700 underline hover:text-gray-900"
+                >
+                  Agr
+                </a>
                 <span v-else-if="row.agrement" class="text-xs text-gray-700">{{ row.agrement }}</span>
-                <span v-else class="text-gray-300 text-xs">-</span>
-              </TableCell>
+                <span v-else class="text-gray-400">-</span>
+              </td>
 
-              <!-- 51. Cek FP -->
-              <TableCell class="text-center py-2.5 whitespace-nowrap">
-                <template v-if="isValidUrl(row.cek_fp)">
-                  <a
-                    :href="row.cek_fp"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer shadow-2xs"
-                    title="Buka Dokumen Faktur Pajak di Google Drive"
-                  >
-                    <FileTextIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                    <span>FP</span>
-                  </a>
-                </template>
+              <!-- 52. Cek FP -->
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+                <a
+                  v-if="isValidUrl(row.cek_fp)"
+                  :href="row.cek_fp"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-gray-700 underline hover:text-gray-900"
+                >
+                  FP
+                </a>
                 <span v-else-if="row.cek_fp" class="text-xs text-gray-700">{{ row.cek_fp }}</span>
-                <span v-else class="text-gray-300 text-xs">-</span>
-              </TableCell>
+                <span v-else class="text-gray-400">-</span>
+              </td>
 
-              <!-- 52. Cek Evidance -->
-              <TableCell class="text-center py-2.5 whitespace-nowrap">
-                <template v-if="isValidUrl(row.cek_evidance)">
-                  <a
-                    :href="row.cek_evidance"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-xs transition cursor-pointer shadow-2xs"
-                    title="Buka Dokumen Evidance di Google Drive"
-                  >
-                    <FileTextIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-                    <span>Evidance</span>
-                  </a>
-                </template>
+              <!-- 53. Cek Evidance -->
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+                <a
+                  v-if="isValidUrl(row.cek_evidance)"
+                  :href="row.cek_evidance"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-gray-700 underline hover:text-gray-900"
+                >
+                  Evid
+                </a>
                 <span v-else-if="row.cek_evidance" class="text-xs text-gray-700">{{ row.cek_evidance }}</span>
-                <span v-else class="text-gray-300 text-xs">-</span>
-              </TableCell>
+                <span v-else class="text-gray-400">-</span>
+              </td>
 
-              <!-- 53. Noted -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 54. Noted -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[200px] truncate text-gray-700" :title="row.noted">
                 {{ row.noted || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 54. Norek -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 55. Norek -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700 font-mono text-[11px]">
                 {{ row.norek || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 55. Namrek -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 56. Namrek -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[180px] truncate text-gray-700" :title="row.namrek">
                 {{ row.namrek || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 56. Bank -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 57. Bank -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.bank || '-' }}
-              </TableCell>
+              </td>
 
-              <!-- 57. Big Region -->
-              <TableCell class="whitespace-nowrap text-xs text-gray-700 py-2.5">
+              <!-- 58. Big Region -->
+              <td class="py-2.5 px-3 whitespace-nowrap text-gray-700">
                 {{ row.big_region || '-' }}
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <!-- Filament Pagination Footer -->
       <FilamentPagination
@@ -889,7 +883,7 @@
       />
     </div>
 
-    <!-- Modal Rekonsiliasi & Pencocokan Form Program -->
+    <!-- Modal Rekonsiliasi & Pencocokan Test Program -->
     <Teleport to="body">
       <Transition name="fade">
         <div
@@ -905,9 +899,9 @@
                   <CheckCircleIcon class="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 class="text-sm font-bold text-gray-900">Cocokkan dengan Form Program</h3>
+                  <h3 class="text-sm font-bold text-gray-900">Cocokkan dengan Test Program</h3>
                   <p class="text-[11px] text-gray-500">
-                    Otomatisasi pencocokan identitas, finansial, dan pemindahan link Drive
+                    Otomatisasi pencocokan identitas, finansial, dan pemindahan link dokumen
                   </p>
                 </div>
               </div>
@@ -930,7 +924,7 @@
                 </div>
                 <ul class="list-disc list-inside space-y-1 text-[11px] text-gray-600 pl-1 leading-relaxed">
                   <li><strong>Identitas & Finansial:</strong> Sistem mencari Dealer & Program yang cocok, lalu memvalidasi nominal DPP & Net Pay (toleransi selisih &le; Rp 10).</li>
-                  <li><strong>Pemindahan Dokumen:</strong> Link Google Drive (CN, Agreement, Faktur Pajak) dari Form Program otomatis disalin ke kolom <code>cn</code>, <code>agrement</code>, <code>cek_fp</code>.</li>
+                  <li><strong>Pemindahan Dokumen:</strong> Link Dokumen (CN, Agreement, Faktur Pajak) dari Test Program otomatis disalin ke kolom <code>cn</code>, <code>agrement</code>, <code>cek_fp</code>.</li>
                   <li><strong>Penentuan Status:</strong> Jika data finansial cocok dan ketiga dokumen lengkap, status diset <strong>BISA DI POTONG</strong>. Jika ada selisih nominal atau dokumen belum lengkap, status diset <strong>BELUM BISA POTONG</strong> dengan rincian selisih di kolom keterangan.</li>
                 </ul>
               </div>
@@ -1134,7 +1128,7 @@
               <div class="p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 flex items-center justify-between">
                 <div>
                   <span class="font-medium text-gray-900">
-                    {{ testResult?.matched ? 'Berhasil dicocokkan dengan Form Program #' + testResult.details?.submission_id : 'Belum ditemukan data Form Program yang cocok' }}
+                    {{ testResult?.matched ? 'Berhasil dicocokkan dengan Test Program #' + testResult.details?.submission_id : 'Belum ditemukan data Test Program yang cocok' }}
                   </span>
                   <div class="text-[11px] text-gray-500 mt-0.5">
                     Status Potong: <strong class="text-gray-800">{{ testResult?.details?.status_potong_purchase || testRow?.status_potong_purchase || '-' }}</strong>
@@ -1165,7 +1159,7 @@
                     <tr>
                       <th class="px-3.5 py-2.5 w-1/4">Parameter</th>
                       <th class="px-3.5 py-2.5 w-1/3">Data Program (Master)</th>
-                      <th class="px-3.5 py-2.5 w-1/3">Form Program (Respon)</th>
+                      <th class="px-3.5 py-2.5 w-1/3">Test Program (Respon Web)</th>
                       <th class="px-3.5 py-2.5 w-[85px] text-center">Hasil</th>
                     </tr>
                   </thead>
@@ -1236,7 +1230,7 @@
                         <span v-else class="text-gray-400">-</span>
                       </td>
                       <td class="px-3.5 py-2">
-                        <a v-if="isValidUrl(testResult?.details?.submission?.credit_note_url)" :href="testResult.details.submission.credit_note_url" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas Form</a>
+                        <a v-if="isValidUrl(testResult?.details?.submission?.credit_note_url)" :href="testResult.details.submission.credit_note_url" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas</a>
                         <span v-else class="text-gray-400">-</span>
                       </td>
                       <td class="px-3.5 py-2 text-center">
@@ -1253,7 +1247,7 @@
                         <span v-else class="text-gray-400">-</span>
                       </td>
                       <td class="px-3.5 py-2">
-                        <a v-if="isValidUrl(testResult?.details?.submission?.agreement_url)" :href="testResult.details.submission.agreement_url" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas Form</a>
+                        <a v-if="isValidUrl(testResult?.details?.submission?.agreement_url)" :href="testResult.details.submission.agreement_url" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas</a>
                         <span v-else class="text-gray-400">-</span>
                       </td>
                       <td class="px-3.5 py-2 text-center">
@@ -1271,7 +1265,7 @@
                         <span v-else class="text-gray-400">-</span>
                       </td>
                       <td class="px-3.5 py-2">
-                        <a v-if="isValidUrl(testResult?.details?.submission?.tax_invoice_url)" :href="testResult.details.submission.tax_invoice_url" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas Form</a>
+                        <a v-if="isValidUrl(testResult?.details?.submission?.tax_invoice_url)" :href="testResult.details.submission.tax_invoice_url" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas</a>
                         <span v-else-if="!testResult?.details?.is_pkp" class="text-gray-500">Bebas FP (Non-PKP)</span>
                         <span v-else class="text-gray-400">-</span>
                       </td>
@@ -1355,7 +1349,7 @@
       </Transition>
     </Teleport>
 
-    <!-- Modal Riwayat Pencocokan Form Program -->
+    <!-- Modal Riwayat Pencocokan Test Program -->
     <ReconciliationHistoryModal
       v-model="showHistoryModal"
       :initial-data-program-id="historyInitialRowId"
@@ -1388,19 +1382,10 @@ import {
   ArrowRight as ArrowRightIcon,
   ShieldCheck as ShieldCheckIcon,
   History as HistoryIcon,
+  Eye as EyeIcon,
 } from 'lucide-vue-next';
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableEmpty,
-} from '@/components/ui/table';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
-import FilamentBadge from '@/components/ui/FilamentBadge.vue';
 import ReconciliationHistoryModal from '@/components/ReconciliationHistoryModal.vue';
 
 const isValidUrl = (url) => {

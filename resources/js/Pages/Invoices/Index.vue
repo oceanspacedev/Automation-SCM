@@ -198,187 +198,198 @@
         </div>
       </div>
 
-      <!-- Filament Table -->
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead class="w-[44px] text-center">
-              <input
-                type="checkbox"
-                :checked="isAllSelected"
-                :indeterminate="isIndeterminate"
-                @change="toggleSelectAll"
-                :disabled="selectableInvoices.length === 0"
-                class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer disabled:opacity-30"
-                title="Pilih semua yang belum dikirim di halaman ini"
-              />
-            </TableHead>
-            <TableHead class="min-w-[150px]">
-              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
-                Nomor Invoice
-                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
-              </span>
-            </TableHead>
-            <TableHead class="min-w-[170px]">
-              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
-                Dealer Tujuan
-                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
-              </span>
-            </TableHead>
-            <TableHead class="min-w-[140px]">
-              <span>Customer</span>
-            </TableHead>
-            <TableHead class="min-w-[100px]">
-              <span>Tipe</span>
-            </TableHead>
-            <TableHead class="min-w-[110px]">
-              <span>Status</span>
-            </TableHead>
-            <TableHead class="min-w-[120px]">
-              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
-                Tanggal
-                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
-              </span>
-            </TableHead>
-            <TableHead class="text-right min-w-[130px]">
-              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer justify-end w-full">
-                Total Netpay
-                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
-              </span>
-            </TableHead>
-            <TableHead class="text-center w-[120px] min-w-[120px]">
-              <span>Action</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
+      <!-- Table: Styled identically to Test Program for clean spreadsheet look -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-gray-900 border-collapse">
+          <thead>
+            <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">
+              <th scope="col" class="py-2.5 px-3 text-center w-[44px] border-r border-gray-200">
+                <input
+                  type="checkbox"
+                  :checked="isAllSelected"
+                  :indeterminate="isIndeterminate"
+                  @change="toggleSelectAll"
+                  :disabled="selectableInvoices.length === 0"
+                  class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer disabled:opacity-30"
+                  title="Pilih semua yang belum dikirim di halaman ini"
+                />
+              </th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">
+                <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                  Nomor Invoice
+                  <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+                </span>
+              </th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">
+                <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                  Dealer Tujuan
+                  <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+                </span>
+              </th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Customer</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Tipe</th>
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">
+                <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                  Tanggal
+                  <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+                </span>
+              </th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200">
+                <span class="inline-flex items-center gap-1.5 select-none cursor-pointer justify-end w-full">
+                  Total Netpay
+                  <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+                </span>
+              </th>
+              <th scope="col" class="py-2.5 px-3 text-center">Action</th>
+            </tr>
+          </thead>
 
-        <TableBody>
-          <TableEmpty v-if="loading" :colspan="9">
-            <div class="py-8 flex flex-col items-center justify-center gap-2 text-gray-500">
-              <span class="inline-block w-5 h-5 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></span>
-              <span class="text-xs">Memuat data invoice...</span>
-            </div>
-          </TableEmpty>
+          <tbody class="divide-y divide-gray-200 bg-white">
+            <tr v-if="loading">
+              <td colspan="9" class="py-8 text-center text-gray-500">
+                <div class="inline-flex items-center gap-2">
+                  <span class="inline-block w-4 h-4 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></span>
+                  <span>Memuat data invoice...</span>
+                </div>
+              </td>
+            </tr>
 
-          <TableEmpty v-else-if="invoices.length === 0" :colspan="9">
-            <div class="py-8 text-center text-gray-400 text-xs">
-              Belum ada invoice yang dibuat. Silakan generate invoice dari menu <strong>Draft</strong>.
-            </div>
-          </TableEmpty>
+            <tr v-else-if="invoices.length === 0">
+              <td colspan="9" class="py-8 text-center text-gray-400 text-xs">
+                Belum ada invoice yang dibuat. Silakan generate invoice dari menu <strong>Draft</strong>.
+              </td>
+            </tr>
 
-          <TableRow
-            v-for="inv in invoices"
-            :key="inv.id"
-            :class="selectedIds.includes(inv.id) ? 'bg-gray-50' : ''"
-          >
-            <!-- Checkbox Selection -->
-            <TableCell class="w-[44px] text-center">
-              <input
-                type="checkbox"
-                :value="inv.id"
-                v-model="selectedIds"
-                :disabled="isAlreadySent(inv) || !hasDestination(inv)"
-                class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer disabled:opacity-30"
-                :title="isAlreadySent(inv) ? 'Sudah dikirim' : (!hasDestination(inv) ? 'Tidak ada email atau nomor WhatsApp' : 'Pilih invoice ini')"
-              />
-            </TableCell>
+            <tr
+              v-else
+              v-for="inv in invoices"
+              :key="inv.id"
+              :class="[selectedIds.includes(inv.id) ? 'bg-gray-50' : 'hover:bg-gray-50/70', 'text-gray-700 font-normal transition']"
+            >
+              <!-- Checkbox Selection -->
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  :value="inv.id"
+                  v-model="selectedIds"
+                  :disabled="isAlreadySent(inv) || !hasDestination(inv)"
+                  class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer disabled:opacity-30"
+                  :title="isAlreadySent(inv) ? 'Sudah dikirim' : (!hasDestination(inv) ? 'Tidak ada email atau nomor WhatsApp' : 'Pilih invoice ini')"
+                />
+              </td>
 
-            <!-- Nomor Invoice (Bold like SJ-xxxx) -->
-            <TableCell>
-              <router-link
-                :to="`/invoices/${inv.id}`"
-                class="text-gray-950 text-xs hover:underline"
-              >
-                {{ inv.invoice_number }}
-              </router-link>
-            </TableCell>
-
-            <!-- Dealer Tujuan -->
-            <TableCell class="text-xs text-gray-800" :title="`${inv.dealer_code} - ${inv.dealer_name}`">
-              {{ inv.dealer_code }} - {{ inv.dealer_name }}
-            </TableCell>
-
-            <!-- Customer -->
-            <TableCell class="text-xs text-gray-600" :title="inv.customer_name">
-              {{ inv.customer_name || '-' }}
-            </TableCell>
-
-            <!-- Tipe -->
-            <TableCell class="text-xs text-gray-600">
-              {{ inv.invoice_type || '-' }}
-            </TableCell>
-
-            <!-- Status (Plain text netral, seperti form program) -->
-            <TableCell class="text-xs text-gray-700 whitespace-nowrap">
-              <span>{{ inv.status === 'sent' ? 'DELIVERED' : (inv.status ? inv.status.toUpperCase() : 'GENERATED') }}</span>
-            </TableCell>
-
-            <!-- Tanggal -->
-            <TableCell class="text-xs text-gray-600 whitespace-nowrap">
-              {{ inv.invoice_date || '-' }}
-            </TableCell>
-
-            <!-- Netpay -->
-            <TableCell class="text-right text-xs text-gray-950 whitespace-nowrap">
-              {{ formatCurrency(inv.netpay) }}
-            </TableCell>
-
-            <!-- Action Buttons: Toolbar Terpadu (Icon-only persis Form Program) -->
-            <TableCell class="text-center py-2 whitespace-nowrap">
-              <div class="inline-flex items-center rounded-md border border-gray-200 bg-white shadow-2xs divide-x divide-gray-200 overflow-hidden">
-                <!-- 1. View Button -->
+              <!-- Nomor Invoice -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 <router-link
                   :to="`/invoices/${inv.id}`"
-                  class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
-                  title="Lihat Detail Invoice"
+                  class="font-semibold text-gray-950 text-xs hover:underline inline-flex items-center gap-1"
                 >
-                  <EyeIcon class="w-3.5 h-3.5 text-gray-600" />
+                  {{ inv.invoice_number }}
                 </router-link>
+              </td>
 
-                <!-- 2. PDF Link Button -->
-                <a
-                  :href="`/invoices/${inv.id}/pdf`"
-                  target="_blank"
-                  class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
-                  title="Unduh PDF"
-                >
-                  <FileTextIcon class="w-3.5 h-3.5 text-gray-600" />
-                </a>
+              <!-- Dealer Tujuan -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[200px] truncate text-gray-800" :title="`${inv.dealer_code} - ${inv.dealer_name}`">
+                {{ inv.dealer_code }} - {{ inv.dealer_name }}
+              </td>
 
-                <!-- 3. Kirim / Sent Action (Netral) -->
+              <!-- Customer -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[180px] truncate text-gray-600" :title="inv.customer_name">
+                {{ inv.customer_name || '-' }}
+              </td>
+
+              <!-- Tipe -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-600">
+                {{ inv.invoice_type || '-' }}
+              </td>
+
+              <!-- Status -->
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
                 <span
-                  v-if="isAlreadySent(inv)"
-                  class="h-7 w-7.5 inline-flex items-center justify-center bg-gray-50 text-gray-400 select-none"
-                  title="Invoice ini sudah terkirim"
+                  :class="[
+                    'inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border',
+                    inv.status === 'sent'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : (inv.status === 'paid'
+                        ? 'bg-blue-50 text-blue-700 border-blue-200'
+                        : (inv.status === 'cancelled'
+                          ? 'bg-rose-50 text-rose-700 border-rose-200'
+                          : 'bg-gray-100 text-gray-700 border-gray-200'))
+                  ]"
                 >
-                  <CheckCircleIcon class="w-3.5 h-3.5 text-gray-400" />
+                  {{ inv.status === 'sent' ? 'DELIVERED' : (inv.status ? inv.status.toUpperCase() : 'GENERATED') }}
                 </span>
-                <button
-                  v-else
-                  type="button"
-                  @click="openEmailModal(inv)"
-                  class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
-                  title="Kirim Invoice via Email/WhatsApp"
-                >
-                  <SendIcon class="w-3.5 h-3.5 text-gray-600" />
-                </button>
-              </div>
-            </TableCell>
-          </TableRow>
-        </TableBody>
+              </td>
 
-        <TableFooter v-if="invoices.length > 0">
-          <TableRow>
-            <TableCell :colspan="7" class="text-xs font-semibold text-gray-950">
-              Total Netpay
-            </TableCell>
-            <TableCell class="text-right whitespace-nowrap text-xs font-bold text-gray-950">
-              {{ formatCurrency(totalNetpay) }}
-            </TableCell>
-            <TableCell></TableCell>
-          </TableRow>
-        </TableFooter>
-      </Table>
+              <!-- Tanggal -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-600">
+                {{ inv.invoice_date || '-' }}
+              </td>
+
+              <!-- Total Netpay -->
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap font-bold text-gray-950">
+                {{ formatCurrency(inv.netpay) }}
+              </td>
+
+              <!-- Action Buttons -->
+              <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                <div class="inline-flex items-center rounded-md border border-gray-200 bg-white shadow-2xs divide-x divide-gray-200 overflow-hidden">
+                  <!-- 1. View Button -->
+                  <router-link
+                    :to="`/invoices/${inv.id}`"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
+                    title="Lihat Detail Invoice"
+                  >
+                    <EyeIcon class="w-3.5 h-3.5 text-gray-600" />
+                  </router-link>
+
+                  <!-- 2. PDF Link Button -->
+                  <a
+                    :href="`/invoices/${inv.id}/pdf`"
+                    target="_blank"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
+                    title="Unduh PDF"
+                  >
+                    <FileTextIcon class="w-3.5 h-3.5 text-gray-600" />
+                  </a>
+
+                  <!-- 3. Kirim / Sent Action -->
+                  <span
+                    v-if="isAlreadySent(inv)"
+                    class="h-7 w-7.5 inline-flex items-center justify-center bg-gray-50 text-gray-400 select-none"
+                    title="Invoice ini sudah terkirim"
+                  >
+                    <CheckCircleIcon class="w-3.5 h-3.5 text-gray-400" />
+                  </span>
+                  <button
+                    v-else
+                    type="button"
+                    @click="openEmailModal(inv)"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
+                    title="Kirim Invoice via Email/WhatsApp"
+                  >
+                    <SendIcon class="w-3.5 h-3.5 text-gray-600" />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+
+          <!-- Semantic Table Footer -->
+          <tfoot v-if="invoices.length > 0" class="border-t-2 border-gray-300 bg-gray-50/80 font-semibold text-gray-900">
+            <tr>
+              <td colspan="7" class="py-2.5 px-3 text-xs text-gray-700 border-r border-gray-200">
+                Total Netpay (Halaman ini)
+              </td>
+              <td class="py-2.5 px-3 text-right whitespace-nowrap text-xs font-bold text-gray-950 border-r border-gray-200">
+                {{ formatCurrency(totalNetpay) }}
+              </td>
+              <td class="py-2.5 px-3"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
 
       <!-- Filament Pagination Footer -->
       <FilamentPagination
@@ -457,16 +468,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import SendEmailModal from '@/components/SendEmailModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableFooter,
-  TableRow,
-  TableHead,
-  TableCell,
-  TableEmpty,
-} from '@/components/ui/table';
 
 const invoices = ref([]);
 const loading = ref(false);

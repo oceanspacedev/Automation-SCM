@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ProgramSubmission;
 use Exception;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -182,11 +183,6 @@ class DocumentAnalysisService
     }
 
     /**
-     * Analyze a single ProgramSubmission row with AI and update tracking columns.
-     *
-     * @return array{
-     *     submission: ProgramSubmission,
-    /**
      * Download a document from Google Drive or direct URL and convert to base64 data URI.
      */
     public function fetchDocumentAsDataUri(?string $url): ?string
@@ -250,6 +246,612 @@ class DocumentAnalysisService
     }
 
     /**
+     * Convert an UploadedFile, local storage path, data URI, or URL to a base64 data URI string.
+     */
+    public function fileOrUrlToDataUri(mixed $fileOrUrl): ?string
+    {
+        if (empty($fileOrUrl)) {
+            return null;
+        }
+
+        if ($fileOrUrl instanceof UploadedFile) {
+            if (! $fileOrUrl->isValid()) {
+                return null;
+            }
+            $bytes = file_get_contents($fileOrUrl->getRealPath());
+            if (empty($bytes)) {
+                return null;
+            }
+            $mime = $fileOrUrl->getMimeType() ?: 'application/octet-stream';
+
+            return "data:{$mime};base64,".base64_encode($bytes);
+        }
+
+        if (is_string($fileOrUrl)) {
+            $trimmed = trim($fileOrUrl);
+            if (str_starts_with($trimmed, 'data:')) {
+                return $trimmed;
+            }
+
+            if (str_starts_with($trimmed, '/storage/') || str_starts_with($trimmed, 'storage/')) {
+                $localPath = public_path(ltrim($trimmed, '/'));
+                if (file_exists($localPath)) {
+                    $bytes = file_get_contents($localPath);
+                    if ($bytes) {
+                        $mime = mime_content_type($localPath) ?: 'application/pdf';
+
+                        return "data:{$mime};base64,".base64_encode($bytes);
+                    }
+                }
+            }
+
+            return $this->fetchDocumentAsDataUri($trimmed);
+        }
+
+        return null;
+    }
+
+    /**
+     * Extract readable plain text from PDF binary data.
+     */
+    public function extractPdfText(string $binary): string
+    {
+        $text = '';
+
+        if (preg_match_all('/\((.*?)\)\s*Tj/s', $binary, $matches)) {
+            $text .= implode(' ', $matches[1]).' ';
+        }
+        if (preg_match_all('/\[(.*?)\]\s*TJ/s', $binary, $matches)) {
+            foreach ($matches[1] as $chunk) {
+                if (preg_match_all('/\((.*?)\)/s', $chunk, $sub)) {
+                    $text .= implode(' ', $sub[1]).' ';
+                }
+            }
+        }
+
+        if (preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $binary, $streams)) {
+            foreach ($streams[1] as $stream) {
+                $decomp = @gzuncompress($stream);
+                if ($decomp) {
+                    if (preg_match_all('/\((.*?)\)\s*Tj/s', $decomp, $m)) {
+                        $text .= implode(' ', $m[1]).' ';
+                    }
+                    if (preg_match_all('/\[(.*?)\]\s*TJ/s', $decomp, $m)) {
+                        foreach ($m[1] as $chunk) {
+                            if (preg_match_all('/\((.*?)\)/s', $chunk, $sub)) {
+                                $text .= implode(' ', $sub[1]).' ';
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        $text = str_replace(['\\(', '\\)', '\\\\', "\r", "\n"], ['(', ')', '\\', ' ', ' '], $text);
+
+        return trim(preg_replace('/\s+/', ' ', $text));
+    }
+
+    /**
+     * Extract name, mime, text, and binary details from a file or URL.
+     *
+     * @return array{name: string, mime: string, text: string, data_uri: ?string, has_file: bool}
+     */
+    public function extractFileContentInfo(mixed $fileOrUrl): array
+    {
+        $result = [
+            'name' => '',
+            'mime' => '',
+            'text' => '',
+            'data_uri' => null,
+            'has_file' => false,
+        ];
+
+        if (empty($fileOrUrl)) {
+            return $result;
+        }
+
+        if ($fileOrUrl instanceof UploadedFile) {
+            if ($fileOrUrl->isValid()) {
+                $result['name'] = $fileOrUrl->getClientOriginalName();
+                $result['mime'] = $fileOrUrl->getMimeType() ?: 'application/octet-stream';
+                $bytes = file_get_contents($fileOrUrl->getRealPath());
+                if (! empty($bytes)) {
+                    $result['has_file'] = true;
+                    $result['data_uri'] = "data:{$result['mime']};base64,".base64_encode($bytes);
+                    if (str_contains($result['mime'], 'pdf') || str_ends_with(strtolower($result['name']), '.pdf')) {
+                        $result['text'] = $this->extractPdfText($bytes);
+                    }
+                }
+            }
+
+            return $result;
+        }
+
+        if (is_string($fileOrUrl)) {
+            $trimmed = trim($fileOrUrl);
+            $result['name'] = basename(parse_url($trimmed, PHP_URL_PATH) ?: '');
+
+            $isHttp = str_starts_with($trimmed, 'http://') || str_starts_with($trimmed, 'https://');
+            if ($isHttp) {
+                $result['has_file'] = true;
+            }
+
+            if (str_starts_with($trimmed, '/storage/') || str_starts_with($trimmed, 'storage/')) {
+                $localPath = public_path(ltrim($trimmed, '/'));
+                if (file_exists($localPath)) {
+                    $bytes = file_get_contents($localPath);
+                    if ($bytes) {
+                        $result['mime'] = mime_content_type($localPath) ?: 'application/pdf';
+                        $result['has_file'] = true;
+                        $result['data_uri'] = "data:{$result['mime']};base64,".base64_encode($bytes);
+                        if (str_contains($result['mime'], 'pdf') || str_ends_with(strtolower($result['name']), '.pdf')) {
+                            $result['text'] = $this->extractPdfText($bytes);
+                        }
+
+                        return $result;
+                    }
+                }
+            }
+
+            $dataUri = $this->fetchDocumentAsDataUri($trimmed);
+            if ($dataUri) {
+                $result['has_file'] = true;
+                $result['data_uri'] = $dataUri;
+                if (preg_match('/^data:([^;]+);base64,(.*)$/', $dataUri, $m)) {
+                    $result['mime'] = $m[1];
+                    $bytes = base64_decode($m[2]);
+                    if (str_contains($result['mime'], 'pdf')) {
+                        $result['text'] = $this->extractPdfText($bytes);
+                    }
+                }
+            }
+
+            return $result;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Smart local heuristic document inspection when AI router is offline or for instant validation.
+     */
+    public function heuristicDocumentInspection(array $formData, array $filesOrUrls): array
+    {
+        $infos = [
+            'cn' => $this->extractFileContentInfo($filesOrUrls['cn'] ?? null),
+            'agr' => $this->extractFileContentInfo($filesOrUrls['agr'] ?? null),
+            'faktur' => $this->extractFileContentInfo($filesOrUrls['faktur'] ?? null),
+        ];
+
+        $classifySlot = function (array $info): string {
+            if (! $info['has_file']) {
+                return 'none';
+            }
+            $haystack = strtoupper($info['name'].' '.$info['text']);
+
+            $hasCnKw = (bool) preg_match('/credit[\s_\-]*note|nota[\s_\-]*kredit|potongan|incentive|\bcn[_\-\s0-9]|^cn\./i', $haystack);
+            $hasAgrKw = (bool) preg_match('/agreement|perjanjian|kesepakatan|pihak[\s_\-]*pertama/i', $haystack);
+            $hasFakturKw = (bool) preg_match('/faktur[\s_\-]*pajak|pengusaha[\s_\-]*kena[\s_\-]*pajak|010\.\d{3}/i', $haystack);
+
+            if ($hasFakturKw && ! $hasCnKw) {
+                return 'faktur';
+            }
+            if ($hasAgrKw && ! $hasCnKw) {
+                return 'agr';
+            }
+            if ($hasCnKw && ! $hasAgrKw) {
+                return 'cn';
+            }
+            if ($hasCnKw) {
+                return 'cn';
+            }
+            if ($hasAgrKw) {
+                return 'agr';
+            }
+
+            return 'unknown';
+        };
+
+        $detectedTypes = [
+            'cn' => $classifySlot($infos['cn']),
+            'agr' => $classifySlot($infos['agr']),
+            'faktur' => $classifySlot($infos['faktur']),
+        ];
+
+        $docValidation = [];
+        $hasSwapped = false;
+        $hasInvalid = false;
+        $swapDetails = [];
+
+        // Validate CN slot
+        if (! $infos['cn']['has_file']) {
+            $docValidation['cn'] = ['status' => 'empty', 'actual_type' => 'none', 'message' => 'Dokumen Credit Note belum diunggah.'];
+        } elseif ($detectedTypes['cn'] === 'agr') {
+            $docValidation['cn'] = ['status' => 'swapped', 'actual_type' => 'agr', 'message' => 'File di slot Credit Note terdeteksi sebagai Dokumen Agreement (Tertukar)!'];
+            $hasSwapped = true;
+            $swapDetails[] = 'CN (AGR)';
+        } elseif ($detectedTypes['cn'] === 'faktur') {
+            $docValidation['cn'] = ['status' => 'swapped', 'actual_type' => 'faktur', 'message' => 'File di slot Credit Note terdeteksi sebagai Faktur Pajak (Tertukar)!'];
+            $hasSwapped = true;
+            $swapDetails[] = 'CN (FAKTUR)';
+        } else {
+            $docValidation['cn'] = ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'Dokumen Credit Note terverifikasi.'];
+        }
+
+        // Validate AGR slot
+        if (! $infos['agr']['has_file']) {
+            $docValidation['agr'] = ['status' => 'empty', 'actual_type' => 'none', 'message' => 'Dokumen Agreement belum diunggah.'];
+        } elseif ($detectedTypes['agr'] === 'cn') {
+            $docValidation['agr'] = ['status' => 'swapped', 'actual_type' => 'cn', 'message' => 'File di slot Agreement terdeteksi sebagai Dokumen Credit Note (Tertukar)!'];
+            $hasSwapped = true;
+            $swapDetails[] = 'AGR (CN)';
+        } elseif ($detectedTypes['agr'] === 'faktur') {
+            $docValidation['agr'] = ['status' => 'swapped', 'actual_type' => 'faktur', 'message' => 'File di slot Agreement terdeteksi sebagai Faktur Pajak (Tertukar)!'];
+            $hasSwapped = true;
+            $swapDetails[] = 'AGR (FAKTUR)';
+        } else {
+            $docValidation['agr'] = ['status' => 'valid', 'actual_type' => 'agr', 'message' => 'Dokumen Agreement terverifikasi.'];
+        }
+
+        // Validate Faktur slot
+        if (! $infos['faktur']['has_file']) {
+            $docValidation['faktur'] = ['status' => 'empty', 'actual_type' => 'none', 'message' => 'Faktur Pajak tidak diunggah.'];
+        } elseif ($detectedTypes['faktur'] === 'cn') {
+            $docValidation['faktur'] = ['status' => 'swapped', 'actual_type' => 'cn', 'message' => 'File di slot Faktur terdeteksi sebagai Credit Note (Tertukar)!'];
+            $hasSwapped = true;
+            $swapDetails[] = 'FAKTUR (CN)';
+        } elseif ($detectedTypes['faktur'] === 'agr') {
+            $docValidation['faktur'] = ['status' => 'swapped', 'actual_type' => 'agr', 'message' => 'File di slot Faktur terdeteksi sebagai Agreement (Tertukar)!'];
+            $hasSwapped = true;
+            $swapDetails[] = 'FAKTUR (AGR)';
+        } else {
+            $docValidation['faktur'] = ['status' => 'valid', 'actual_type' => 'faktur', 'message' => 'Dokumen Faktur Pajak terverifikasi.'];
+        }
+
+        // Extract financial numbers if available in CN text
+        $dpp = null;
+        $ppn = 0.0;
+        $nilaiPph = null;
+        $netPay = null;
+        $noFaktur = null;
+        $tglFaktur = null;
+
+        $cnText = $infos['cn']['text'];
+        if (preg_match('/(?:dpp|dasar\s*pengenaan\s*pajak)\s*[:=]?\s*(?:rp\.?\s*)?([\d\.,]+)/i', $cnText, $m)) {
+            $dpp = (float) str_replace(['.', ','], ['', '.'], $m[1]);
+        }
+        if (preg_match('/(?:ppn|pajak\s*pertambahan\s*nilai)\s*[:=]?\s*(?:rp\.?\s*)?([\d\.,]+)/i', $cnText, $m)) {
+            $ppn = (float) str_replace(['.', ','], ['', '.'], $m[1]);
+        }
+        if (preg_match('/(?:pph|pajak\s*penghasilan)\s*[:=]?\s*(?:rp\.?\s*)?([\d\.,]+)/i', $cnText, $m)) {
+            $nilaiPph = (float) str_replace(['.', ','], ['', '.'], $m[1]);
+        }
+        if (preg_match('/(?:net\s*pay|total\s*bayar|diterima)\s*[:=]?\s*(?:rp\.?\s*)?([\d\.,]+)/i', $cnText, $m)) {
+            $netPay = (float) str_replace(['.', ','], ['', '.'], $m[1]);
+        }
+
+        $fakturText = $infos['faktur']['text'].' '.$cnText;
+        if (preg_match('/(010\.\d{3}[-\.]\d{2}[-\.]\d{8})/', $fakturText, $m)) {
+            $noFaktur = $m[1];
+        }
+
+        $isPkp = (! empty($formData['is_pkp'])) || ($ppn > 0) || (! empty($noFaktur));
+        $missing = [];
+        if (! $infos['cn']['has_file']) {
+            $missing[] = 'CN';
+        }
+        if (! $infos['agr']['has_file']) {
+            $missing[] = 'AGR';
+        }
+        if ($isPkp && ! $infos['faktur']['has_file']) {
+            $missing[] = 'FAKTUR';
+        }
+
+        if ($hasSwapped) {
+            $statusPurchase = 'BELUM BISA POTONG';
+            $cekDokumen = 'DOKUMEN TERTUKAR ('.implode(', ', $swapDetails).')';
+            $keterangan = 'Dokumen tertukar posisi upload. Harap perbaiki posisi slot Credit Note dan Agreement.';
+        } elseif (! empty($missing)) {
+            $statusPurchase = 'BELUM BISA POTONG';
+            $cekDokumen = implode(' & ', $missing).' BELUM ADA';
+            $keterangan = 'Dokumen belum lengkap ('.$cekDokumen.').';
+        } else {
+            $statusPurchase = 'BISA DI POTONG';
+            $cekDokumen = 'LENGKAP';
+            $keterangan = $isPkp
+                ? 'Semua dokumen (CN, Agreement, Faktur Pajak) lengkap dan terverifikasi.'
+                : 'Dokumen (CN dan Agreement) lengkap untuk dealer Non PKP dan siap diproses potong.';
+        }
+
+        return [
+            'cek_dokumen' => $cekDokumen,
+            'status_potong_purchase' => $statusPurchase,
+            'keterangan' => $keterangan,
+            'is_complete' => ($statusPurchase === 'BISA DI POTONG'),
+            'dpp' => $dpp,
+            'dpp_lain' => 0.0,
+            'ppn' => $ppn,
+            'nilai_pph' => $nilaiPph,
+            'net_pay' => $netPay,
+            'incentive' => $dpp !== null ? ($isPkp ? round($dpp + $ppn) : round($dpp * 1.11, -3)) : null,
+            'no_faktur' => $noFaktur,
+            'tgl_faktur' => $tglFaktur,
+            'has_stamp' => true,
+            'has_signature' => true,
+            'has_npwp' => true,
+            'note_pph' => 'ok',
+            'doc_validation' => $docValidation,
+        ];
+    }
+
+    /**
+     * Comprehensive inspection of document files or URLs with AI vision & smart fallback.
+     *
+     * @param  array  $formData  Form values (dealer_name, program_name, id_real, region, sales_name, whatsapp, is_pkp)
+     * @param  array  $filesOrUrls  Slot mapping ('cn' => ..., 'agr' => ..., 'faktur' => ...)
+     * @return array{
+     *     success: bool,
+     *     is_clean: bool,
+     *     has_swapped: bool,
+     *     has_invalid: bool,
+     *     swap_details: array,
+     *     cek_dokumen: string,
+     *     status_potong_purchase: string,
+     *     keterangan: string,
+     *     doc_validation: array,
+     *     financial: array,
+     *     audit: array,
+     *     raw_analysis: array
+     * }
+     */
+    public function inspectDocumentFiles(array $formData, array $filesOrUrls): array
+    {
+        $config = $this->getConfig();
+        $cnDataUri = $this->fileOrUrlToDataUri($filesOrUrls['cn'] ?? null);
+        $agrDataUri = $this->fileOrUrlToDataUri($filesOrUrls['agr'] ?? null);
+        $taxDataUri = $this->fileOrUrlToDataUri($filesOrUrls['faktur'] ?? null);
+
+        $hasDoc = function ($val): bool {
+            if (empty($val)) {
+                return false;
+            }
+            if ($val instanceof UploadedFile) {
+                return $val->isValid();
+            }
+            if (is_string($val)) {
+                $trimmed = trim($val);
+
+                return $trimmed !== '' && $trimmed !== '-' && (
+                    str_starts_with($trimmed, 'http://') ||
+                    str_starts_with($trimmed, 'https://') ||
+                    str_starts_with($trimmed, '/storage/') ||
+                    str_starts_with($trimmed, 'storage/') ||
+                    str_starts_with($trimmed, 'data:')
+                );
+            }
+
+            return false;
+        };
+
+        $slotHasUrl = [
+            'cn' => $hasDoc($filesOrUrls['cn'] ?? null),
+            'agr' => $hasDoc($filesOrUrls['agr'] ?? null),
+            'faktur' => $hasDoc($filesOrUrls['faktur'] ?? null),
+        ];
+
+        $parsed = null;
+
+        // Try AI Vision Router if API key is configured
+        if (! empty($config['api_key'])) {
+            try {
+                $userParts = [
+                    [
+                        'type' => 'text',
+                        'text' => json_encode([
+                            'id_real' => $formData['id_real'] ?? '-',
+                            'dealer_name' => $formData['dealer_name'] ?? '-',
+                            'program_name' => $formData['program_name'] ?? '-',
+                            'sales_name' => $formData['sales_name'] ?? '-',
+                            'status_pajak' => ! empty($formData['is_pkp']) ? 'PKP' : 'NON PKP',
+                            'has_cn_file' => $slotHasUrl['cn'],
+                            'has_agr_file' => $slotHasUrl['agr'],
+                            'has_faktur_file' => $slotHasUrl['faktur'],
+                        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                    ],
+                ];
+
+                if ($cnDataUri) {
+                    $userParts[] = ['type' => 'text', 'text' => '--- LAMPIRAN DOKUMEN CREDIT NOTE (CN) ---'];
+                    $userParts[] = ['type' => 'image_url', 'image_url' => ['url' => $cnDataUri]];
+                }
+                if ($taxDataUri) {
+                    $userParts[] = ['type' => 'text', 'text' => '--- LAMPIRAN DOKUMEN FAKTUR PAJAK ---'];
+                    $userParts[] = ['type' => 'image_url', 'image_url' => ['url' => $taxDataUri]];
+                }
+                if ($agrDataUri) {
+                    $userParts[] = ['type' => 'text', 'text' => '--- LAMPIRAN DOKUMEN AGREEMENT (AGR) ---'];
+                    $userParts[] = ['type' => 'image_url', 'image_url' => ['url' => $agrDataUri]];
+                }
+
+                $payload = [
+                    'model' => $config['model'] ?: 'ag/gemini-3.7-flash-low',
+                    'messages' => [
+                        ['role' => 'system', 'content' => $this->getSystemPrompt()],
+                        ['role' => 'user', 'content' => $userParts],
+                    ],
+                    'stream' => false,
+                    'temperature' => 0.1,
+                ];
+
+                $response = Http::withoutVerifying()
+                    ->withToken($config['api_key'])
+                    ->timeout(30)
+                    ->post("{$config['base_url']}/chat/completions", $payload);
+
+                if ($response->successful()) {
+                    $content = $response->json('choices.0.message.content');
+                    if (! empty($content)) {
+                        $parsed = $this->parseJsonResponse($content);
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::info('AI vision call failed, using heuristic fallback: '.$e->getMessage());
+            }
+        }
+
+        // Fallback to intelligent local heuristics if AI call didn't yield valid parsed result
+        if (! is_array($parsed)) {
+            $parsed = $this->heuristicDocumentInspection($formData, $filesOrUrls);
+        }
+
+        // Process financial numbers
+        $dpp = isset($parsed['dpp']) && is_numeric($parsed['dpp']) ? (float) $parsed['dpp'] : ($formData['dpp'] ?? null);
+        $dppLain = isset($parsed['dpp_lain']) && is_numeric($parsed['dpp_lain']) ? (float) $parsed['dpp_lain'] : ($formData['dpp_lain'] ?? 0.0);
+        $ppn = isset($parsed['ppn']) && is_numeric($parsed['ppn']) ? (float) $parsed['ppn'] : ($formData['ppn'] ?? 0.0);
+        $nilaiPph = isset($parsed['nilai_pph']) && is_numeric($parsed['nilai_pph']) ? (float) $parsed['nilai_pph'] : ($formData['nilai_pph'] ?? null);
+        $netPay = isset($parsed['net_pay']) && is_numeric($parsed['net_pay']) ? (float) $parsed['net_pay'] : ($formData['net_pay'] ?? null);
+
+        $hasPpn = ! empty($ppn) && (float) $ppn > 0;
+        $hasFaktur = (! empty($parsed['no_faktur']) && trim((string) $parsed['no_faktur']) !== '-') || $slotHasUrl['faktur'];
+        $isPkp = $hasPpn || $hasFaktur || (! empty($formData['is_pkp']));
+
+        $incentive = isset($parsed['incentive']) && is_numeric($parsed['incentive']) ? (float) $parsed['incentive'] : ($formData['incentive'] ?? null);
+        if ($dpp !== null && ($incentive === null || abs($incentive - $dpp) < 0.01)) {
+            if ($hasPpn) {
+                $incentive = (float) round($dpp + $ppn);
+            } else {
+                $gross = round($dpp * 1.11);
+                $incentive = (abs($gross - round($gross, -3)) <= 15) ? (float) round($gross, -3) : (float) $gross;
+            }
+        } elseif ($incentive === null && $dpp !== null) {
+            $incentive = $dpp;
+        }
+
+        if ($netPay === null && $dpp !== null) {
+            $netPay = round($dpp + ($ppn ?? 0) - ($nilaiPph ?? 0), 2);
+        }
+
+        $noFaktur = ! empty($parsed['no_faktur']) ? trim((string) $parsed['no_faktur']) : ($formData['no_faktur'] ?? null);
+        $tglFaktur = ! empty($parsed['tgl_faktur']) ? trim((string) $parsed['tgl_faktur']) : ($formData['tgl_faktur'] ?? null);
+
+        // Process doc_validation slot mapping
+        $docValidation = [];
+        $rawDocVal = $parsed['doc_validation'] ?? [];
+        foreach (['cn', 'agr', 'faktur'] as $slot) {
+            if (! $slotHasUrl[$slot]) {
+                $docValidation[$slot] = [
+                    'status' => 'empty',
+                    'actual_type' => 'none',
+                    'message' => ($slot === 'faktur' && ! $isPkp) ? 'Faktur Pajak tidak wajib untuk Non-PKP' : 'Dokumen belum diunggah',
+                ];
+
+                continue;
+            }
+
+            if (isset($rawDocVal[$slot]) && is_array($rawDocVal[$slot])) {
+                $status = in_array($rawDocVal[$slot]['status'] ?? '', ['valid', 'swapped', 'invalid', 'empty'], true)
+                    ? $rawDocVal[$slot]['status']
+                    : 'valid';
+                $docValidation[$slot] = [
+                    'status' => $status,
+                    'actual_type' => (string) ($rawDocVal[$slot]['actual_type'] ?? $slot),
+                    'message' => (string) ($rawDocVal[$slot]['message'] ?? 'Dokumen diunggah'),
+                ];
+            } else {
+                $docValidation[$slot] = [
+                    'status' => 'valid',
+                    'actual_type' => $slot,
+                    'message' => 'Dokumen diunggah',
+                ];
+            }
+        }
+
+        $hasSwapped = false;
+        $hasInvalid = false;
+        $swapDetails = [];
+        $invalidDetails = [];
+
+        foreach ($docValidation as $slot => $info) {
+            if (! empty($slotHasUrl[$slot])) {
+                if (($info['status'] ?? '') === 'swapped') {
+                    $hasSwapped = true;
+                    $swapDetails[$slot] = strtoupper($info['actual_type'] ?? '');
+                } elseif (($info['status'] ?? '') === 'invalid') {
+                    $hasInvalid = true;
+                    $invalidDetails[] = strtoupper($slot);
+                }
+            }
+        }
+
+        $missingDocs = [];
+        if (! $slotHasUrl['cn']) {
+            $missingDocs[] = 'CN';
+        }
+        if (! $slotHasUrl['agr']) {
+            $missingDocs[] = 'AGR';
+        }
+        if ($isPkp && ! $slotHasUrl['faktur']) {
+            $missingDocs[] = 'FAKTUR';
+        }
+
+        if ($hasSwapped) {
+            $statusPurchase = 'BELUM BISA POTONG';
+            $swapLabels = [];
+            foreach ($swapDetails as $k => $v) {
+                $swapLabels[] = strtoupper($k).' ('.$v.')';
+            }
+            $cekDokumen = 'DOKUMEN TERTUKAR ('.implode(', ', $swapLabels).')';
+            $keterangan = 'Dokumen tertukar antar kolom. Harap perbaiki posisi upload dokumen.';
+        } elseif ($hasInvalid) {
+            $statusPurchase = 'BELUM BISA POTONG';
+            $cekDokumen = 'DOKUMEN TIDAK SESUAI ('.implode(', ', $invalidDetails).')';
+            $keterangan = 'File dokumen yang diunggah tidak sesuai atau tidak terbaca.';
+        } elseif (! empty($missingDocs)) {
+            $statusPurchase = 'BELUM BISA POTONG';
+            $cekDokumen = implode(' & ', $missingDocs).' BELUM ADA';
+            $keterangan = 'Dokumen belum lengkap ('.$cekDokumen.').';
+        } else {
+            $statusPurchase = 'BISA DI POTONG';
+            $cekDokumen = 'LENGKAP';
+            $keterangan = $isPkp
+                ? 'Semua dokumen (CN, Agreement, Faktur Pajak) lengkap dan terverifikasi.'
+                : 'Dokumen (CN dan Agreement) lengkap untuk dealer Non PKP dan siap diproses potong.';
+        }
+
+        $isClean = (! $hasSwapped && ! $hasInvalid && empty($missingDocs));
+
+        return [
+            'success' => true,
+            'is_clean' => $isClean,
+            'has_swapped' => $hasSwapped,
+            'has_invalid' => $hasInvalid,
+            'swap_details' => $swapDetails,
+            'cek_dokumen' => $cekDokumen,
+            'status_potong_purchase' => $statusPurchase,
+            'keterangan' => $keterangan,
+            'doc_validation' => $docValidation,
+            'financial' => [
+                'incentive' => $incentive,
+                'dpp' => $dpp,
+                'dpp_lain' => $dppLain,
+                'ppn' => $ppn,
+                'nilai_pph' => $nilaiPph,
+                'net_pay' => $netPay,
+                'no_faktur' => $noFaktur,
+                'tgl_faktur' => $tglFaktur,
+            ],
+            'audit' => [
+                'has_stamp' => $parsed['has_stamp'] ?? true,
+                'has_signature' => $parsed['has_signature'] ?? true,
+                'has_npwp' => $parsed['has_npwp'] ?? true,
+                'note_pph' => $parsed['note_pph'] ?? 'ok',
+            ],
+            'raw_analysis' => $parsed,
+        ];
+    }
+
+    /**
      * Analyze a single ProgramSubmission row with AI and update tracking columns.
      *
      * @return array{
@@ -262,363 +864,45 @@ class DocumentAnalysisService
      */
     public function analyzeSubmission(ProgramSubmission $submission): array
     {
-        $config = $this->getConfig();
-        $fallback = $this->evaluateCompleteness($submission);
-        $parsed = null;
+        $isPkp = ((float) ($submission->ppn ?? 0) > 0) || app(ProgramReconciliationService::class)->isPkpFromSubmission($submission);
 
-        if (! empty($config['api_key'])) {
-            try {
-                // Build multimodal content (Text + Image/PDF parts)
-                $userParts = [
-                    [
-                        'type' => 'text',
-                        'text' => $this->buildUserPrompt($submission),
-                    ],
-                ];
+        $res = $this->inspectDocumentFiles([
+            'id_real' => $submission->id_real,
+            'dealer_name' => $submission->dealer_name,
+            'program_name' => $submission->program_name,
+            'sales_name' => $submission->sales_name,
+            'is_pkp' => $isPkp,
+            'dpp' => $submission->dpp,
+            'ppn' => $submission->ppn,
+            'dpp_lain' => $submission->dpp_lain,
+            'nilai_pph' => $submission->nilai_pph,
+            'net_pay' => $submission->net_pay,
+            'incentive' => $submission->incentive,
+            'no_faktur' => $submission->no_faktur,
+            'tgl_faktur' => $submission->tgl_faktur,
+        ], [
+            'cn' => $submission->credit_note_url,
+            'agr' => $submission->agreement_url,
+            'faktur' => $submission->tax_invoice_url,
+        ]);
 
-                // Fetch and attach Credit Note document if available
-                if ($cnDataUri = $this->fetchDocumentAsDataUri($submission->credit_note_url)) {
-                    $userParts[] = [
-                        'type' => 'text',
-                        'text' => '--- LAMPIRAN DOKUMEN CREDIT NOTE (CN) ---',
-                    ];
-                    $userParts[] = [
-                        'type' => 'image_url',
-                        'image_url' => [
-                            'url' => $cnDataUri,
-                        ],
-                    ];
-                }
+        $financialData = $res['financial'];
+        $financialData['cek_pajak_tarif_pph'] = ($submission->is_manual_edit && $submission->cek_pajak_tarif_pph !== null)
+            ? (float) $submission->cek_pajak_tarif_pph
+            : 0.0;
+        $financialData['selisih'] = ($submission->is_manual_edit && $submission->selisih !== null)
+            ? (float) $submission->selisih
+            : 0.0;
+        $financialData['note_pph'] = $res['audit']['note_pph'] ?? 'ok';
+        $financialData['doc_validation'] = $res['doc_validation'];
 
-                // Fetch and attach Faktur Pajak document if available
-                if ($taxDataUri = $this->fetchDocumentAsDataUri($submission->tax_invoice_url)) {
-                    $userParts[] = [
-                        'type' => 'text',
-                        'text' => '--- LAMPIRAN DOKUMEN FAKTUR PAJAK ---',
-                    ];
-                    $userParts[] = [
-                        'type' => 'image_url',
-                        'image_url' => [
-                            'url' => $taxDataUri,
-                        ],
-                    ];
-                }
-
-                // Fetch and attach Agreement document if available
-                if ($agrDataUri = $this->fetchDocumentAsDataUri($submission->agreement_url)) {
-                    $userParts[] = [
-                        'type' => 'text',
-                        'text' => '--- LAMPIRAN DOKUMEN AGREEMENT (AGR) ---',
-                    ];
-                    $userParts[] = [
-                        'type' => 'image_url',
-                        'image_url' => [
-                            'url' => $agrDataUri,
-                        ],
-                    ];
-                }
-
-                $payload = [
-                    'model' => $config['model'] ?: 'ag/gemini-3-flash',
-                    'messages' => [
-                        [
-                            'role' => 'system',
-                            'content' => $this->getSystemPrompt(),
-                        ],
-                        [
-                            'role' => 'user',
-                            'content' => $userParts,
-                        ],
-                    ],
-                    'stream' => false,
-                    'temperature' => 0.1,
-                ];
-
-                $response = Http::withoutVerifying()
-                    ->withToken($config['api_key'])
-                    ->timeout(45)
-                    ->post("{$config['base_url']}/chat/completions", $payload);
-
-                if ($response->successful()) {
-                    $content = $response->json('choices.0.message.content');
-                    if (! empty($content)) {
-                        $parsed = $this->parseJsonResponse($content);
-                    }
-                } else {
-                    $errorMsg = $response->json('error.message') ?? $response->body();
-                    Log::warning("AI Router returned HTTP {$response->status()} for submission ID {$submission->id}: {$errorMsg}");
-                }
-            } catch (Exception $e) {
-                Log::warning("AI Router call error for submission ID {$submission->id}, using rule evaluation: ".$e->getMessage());
-            }
-        }
-
-        $financialData = [];
-        if (is_array($parsed)) {
-            // Extract or calculate financial and tax values
-            $dpp = isset($parsed['dpp']) && is_numeric($parsed['dpp']) ? (float) $parsed['dpp'] : $submission->dpp;
-            $dppLain = isset($parsed['dpp_lain']) && is_numeric($parsed['dpp_lain']) ? (float) $parsed['dpp_lain'] : ($submission->dpp_lain ?? 0);
-            $ppn = isset($parsed['ppn']) && is_numeric($parsed['ppn']) ? (float) $parsed['ppn'] : ($submission->ppn ?? 0);
-            $nilaiPph = isset($parsed['nilai_pph']) && is_numeric($parsed['nilai_pph']) ? (float) $parsed['nilai_pph'] : $submission->nilai_pph;
-            $netPay = isset($parsed['net_pay']) && is_numeric($parsed['net_pay']) ? (float) $parsed['net_pay'] : $submission->net_pay;
-
-            $incentive = isset($parsed['incentive']) && is_numeric($parsed['incentive'])
-                ? (float) $parsed['incentive']
-                : (isset($parsed['total']) && is_numeric($parsed['total']) ? (float) $parsed['total'] : $submission->incentive);
-
-            // Reconstruct Gross Incentive:
-            // - Untuk dealer PKP (ada PPN): INCENTIVE = DPP + PPN
-            // - Untuk dealer Non-PKP (tanpa PPN): INCENTIVE = DPP * 1.11 (dibulatkan ke ribuan terdekat)
-            $hasPpn = ! empty($ppn) && (float) $ppn > 0;
-            $hasFaktur = (! empty($parsed['no_faktur']) && trim((string) $parsed['no_faktur']) !== '-') ||
-                         (! empty($submission->tax_invoice_url) && trim((string) $submission->tax_invoice_url) !== '-' && str_starts_with(trim((string) $submission->tax_invoice_url), 'http'));
-            $isNonPkp = ! $hasPpn && ! $hasFaktur;
-
-            if ($dpp !== null && ($incentive === null || abs($incentive - $dpp) < 0.01)) {
-                if ($hasPpn) {
-                    $incentive = (float) round($dpp + $ppn);
-                } else {
-                    $grossCandidate = round($dpp * 1.11);
-                    if (abs($grossCandidate - round($grossCandidate, -3)) <= 15) {
-                        $incentive = (float) round($grossCandidate, -3);
-                    } else {
-                        $incentive = (float) $grossCandidate;
-                    }
-                }
-            } elseif ($incentive === null && $dpp !== null) {
-                $incentive = $dpp;
-            }
-
-            if ($dpp === null && $incentive !== null) {
-                $dpp = $incentive;
-            }
-
-            // Auto-calculate Net Pay if missing: Net Pay = DPP + PPN - Nilai PPh
-            if ($netPay === null && $dpp !== null) {
-                $netPay = round($dpp + ($ppn ?? 0) - ($nilaiPph ?? 0), 2);
-            }
-
-            // Deteksi Tarif PPh (2.0% vs 2.5%):
-            // 1. Jika nilai_pph sudah ada, cek apakah potongan mendekati 2.0% atau 2.5% dari DPP
-            $detectedRate = null;
-            if ($dpp !== null && $dpp > 0 && $nilaiPph !== null) {
-                $ratio = $nilaiPph / $dpp;
-                if (abs($ratio - 0.02) <= 0.0025) {
-                    $detectedRate = 0.02; // Tarif PPh 23 (2.0%)
-                } elseif (abs($ratio - 0.025) <= 0.0025) {
-                    $detectedRate = 0.025; // Tarif PPh 21 (2.5%)
-                }
-            }
-
-            // 2. Jika belum bisa dideteksi dari nilai_pph, lihat dari status PPN/Faktur:
-            //    Ada PPN (PKP/Badan Usaha) => default 2.0% (PPh 23)
-            //    Tidak ada PPN (Non-PKP / Perorangan) => default 2.5% (PPh 21)
-            if ($detectedRate === null) {
-                $detectedRate = $hasPpn ? 0.02 : 0.025;
-            }
-
-            // Cek Pajak Tarif PPh:
-            // Penentuan/pengecekan pajak dilakukan oleh Tim Pajak internal, bukan oleh AI.
-            // Dibuat 0 kecuali jika sudah pernah diedit manual oleh admin.
-            $cekPajak = ($submission->is_manual_edit && $submission->cek_pajak_tarif_pph !== null)
-                ? (float) $submission->cek_pajak_tarif_pph
-                : 0.0;
-
-            // Calculate Selisih: 0 jika verifikasi pajak diserahkan ke Tim Pajak
-            if ($submission->is_manual_edit && $submission->selisih !== null) {
-                $selisih = (float) $submission->selisih;
-            } elseif ($submission->is_manual_edit && $nilaiPph !== null && $cekPajak > 0) {
-                $diff = round($nilaiPph - $cekPajak, 2);
-                $selisih = abs($diff) <= 1 ? 0.0 : $diff;
-            } else {
-                $selisih = 0.0;
-            }
-
-            // Physical audit status (CAP?, TTD?, NPWP?, ok)
-            $hasStamp = $parsed['has_stamp'] ?? true;
-            $hasSignature = $parsed['has_signature'] ?? true;
-            $hasNpwp = $parsed['has_npwp'] ?? true;
-
-            $noteParts = [];
-            if (! $hasNpwp) {
-                $noteParts[] = 'NPWP?';
-            }
-            if (! $hasStamp) {
-                $noteParts[] = 'CAP?';
-            }
-            if (! $hasSignature) {
-                $noteParts[] = 'TTD?';
-            }
-
-            if (! empty($parsed['note_pph'])) {
-                $notePph = trim((string) $parsed['note_pph']);
-            } elseif (! empty($noteParts)) {
-                $notePph = implode(' ', $noteParts);
-            } else {
-                $notePph = ($submission->credit_note_url || $submission->tax_invoice_url) ? 'ok' : null;
-            }
-
-            $noFaktur = ! empty($parsed['no_faktur']) ? trim((string) $parsed['no_faktur']) : $submission->no_faktur;
-            $tglFaktur = ! empty($parsed['tgl_faktur']) ? trim((string) $parsed['tgl_faktur']) : $submission->tgl_faktur;
-
-            // Process document classification & swap detection
-            // Track which slots have actual URLs uploaded
-            $slotHasUrl = [
-                'cn' => ! empty($submission->credit_note_url) && str_starts_with(trim((string) $submission->credit_note_url), 'http'),
-                'agr' => ! empty($submission->agreement_url) && str_starts_with(trim((string) $submission->agreement_url), 'http'),
-                'faktur' => ! empty($submission->tax_invoice_url) && str_starts_with(trim((string) $submission->tax_invoice_url), 'http'),
-            ];
-
-            $isPkp = ((float) $ppn > 0) || app(ProgramReconciliationService::class)->isPkpFromSubmission($submission);
-
-            $missingDocs = [];
-            if (! $slotHasUrl['cn']) {
-                $missingDocs[] = 'CN';
-            }
-            if (! $slotHasUrl['agr']) {
-                $missingDocs[] = 'AGR';
-            }
-            if ($isPkp && ! $slotHasUrl['faktur']) {
-                $missingDocs[] = 'FAKTUR';
-            }
-
-            // Process document classification & swap detection
-            $docValidation = $submission->doc_validation;
-            if (isset($parsed['doc_validation']) && is_array($parsed['doc_validation'])) {
-                $cleanValidation = [];
-                foreach (['cn', 'agr', 'faktur'] as $slot) {
-                    if (! $slotHasUrl[$slot]) {
-                        // Slot is not uploaded => status is 'empty', NEVER 'invalid' or 'swapped'
-                        $cleanValidation[$slot] = [
-                            'status' => 'empty',
-                            'actual_type' => 'none',
-                            'message' => 'Dokumen belum diunggah',
-                        ];
-
-                        continue;
-                    }
-
-                    if (isset($parsed['doc_validation'][$slot]) && is_array($parsed['doc_validation'][$slot])) {
-                        $rawSlot = $parsed['doc_validation'][$slot];
-                        $status = in_array($rawSlot['status'] ?? '', ['valid', 'swapped', 'invalid', 'empty'], true)
-                            ? $rawSlot['status']
-                            : 'valid';
-                        $cleanValidation[$slot] = [
-                            'status' => $status,
-                            'actual_type' => (string) ($rawSlot['actual_type'] ?? $slot),
-                            'message' => (string) ($rawSlot['message'] ?? ''),
-                        ];
-                    } else {
-                        $cleanValidation[$slot] = [
-                            'status' => 'valid',
-                            'actual_type' => $slot,
-                            'message' => 'Dokumen diunggah',
-                        ];
-                    }
-                }
-                $docValidation = $cleanValidation;
-            } else {
-                $docValidation = [];
-                foreach (['cn', 'agr', 'faktur'] as $slot) {
-                    $docValidation[$slot] = [
-                        'status' => $slotHasUrl[$slot] ? 'valid' : 'empty',
-                        'actual_type' => $slotHasUrl[$slot] ? $slot : 'none',
-                        'message' => $slotHasUrl[$slot] ? 'Dokumen diunggah' : 'Dokumen belum diunggah',
-                    ];
-                }
-            }
-
-            // Check if any UPLOADED document is swapped or invalid
-            $hasSwapped = false;
-            $hasInvalid = false;
-            $swapDetails = [];
-            $invalidDetails = [];
-
-            if (is_array($docValidation)) {
-                foreach ($docValidation as $slot => $info) {
-                    // Only uploaded slots can be considered swapped or invalid
-                    if (! empty($slotHasUrl[$slot])) {
-                        if (($info['status'] ?? '') === 'swapped') {
-                            $hasSwapped = true;
-                            $swapDetails[] = strtoupper($slot).' ('.strtoupper($info['actual_type'] ?? '').')';
-                        } elseif (($info['status'] ?? '') === 'invalid') {
-                            $hasInvalid = true;
-                            $invalidDetails[] = strtoupper($slot);
-                        }
-                    }
-                }
-            }
-
-            $financialData = [
-                'incentive' => $incentive,
-                'dpp' => $dpp,
-                'dpp_lain' => $dppLain,
-                'ppn' => $ppn,
-                'nilai_pph' => $nilaiPph,
-                'net_pay' => $netPay,
-                'cek_pajak_tarif_pph' => $cekPajak,
-                'selisih' => $selisih,
-                'note_pph' => $notePph,
-                'no_faktur' => $noFaktur,
-                'tgl_faktur' => $tglFaktur,
-                'doc_validation' => $docValidation,
-            ];
-        }
-
-        if (is_array($parsed) && ! empty($parsed['cek_dokumen'])) {
-            $cekDokumen = trim((string) $parsed['cek_dokumen']);
-            $statusPurchase = trim((string) ($parsed['status_potong_purchase'] ?? ''));
-
-            if ($hasSwapped) {
-                $statusPurchase = 'BELUM BISA POTONG';
-                if (! str_contains(strtoupper($cekDokumen), 'TERTUKAR')) {
-                    $cekDokumen = 'DOKUMEN TERTUKAR ('.implode(', ', $swapDetails).')';
-                }
-            } elseif ($hasInvalid) {
-                $statusPurchase = 'BELUM BISA POTONG';
-                if (! str_contains(strtoupper($cekDokumen), 'TIDAK SESUAI') && ! str_contains(strtoupper($cekDokumen), 'SALAH')) {
-                    $cekDokumen = 'DOKUMEN TIDAK SESUAI ('.implode(', ', $invalidDetails).')';
-                }
-            } elseif (! empty($missingDocs)) {
-                $statusPurchase = 'BELUM BISA POTONG';
-                $totalExpected = $isPkp ? 3 : 2;
-                if (count($missingDocs) === $totalExpected) {
-                    $cekDokumen = 'SEMUA DOKUMEN BELUM ADA';
-                } elseif (count($missingDocs) >= 2) {
-                    $cekDokumen = implode(' & ', $missingDocs).' BELUM ADA';
-                } else {
-                    $cekDokumen = $missingDocs[0].' BELUM ADA';
-                }
-            } else {
-                // All required documents (CN & AGR for Non-PKP, or CN, AGR & Faktur for PKP) are valid!
-                $statusPurchase = 'BISA DI POTONG';
-                if (empty($cekDokumen) || str_contains(strtoupper($cekDokumen), 'BELUM ADA') || (! $isPkp && str_contains(strtoupper($cekDokumen), 'FAKTUR'))) {
-                    $cekDokumen = 'LENGKAP';
-                }
-            }
-
-            if (! in_array($statusPurchase, ProgramSubmission::STATUS_PURCHASE_OPTIONS, true)) {
-                $statusPurchase = ! $hasSwapped && ! $hasInvalid && empty($missingDocs)
-                    ? 'BISA DI POTONG'
-                    : 'BELUM BISA POTONG';
-            }
-            $keterangan = trim((string) ($parsed['keterangan'] ?? ''));
-        } else {
-            $cekDokumen = $fallback['cek_dokumen'];
-            $statusPurchase = $fallback['status_potong_purchase'];
-            $keterangan = $fallback['keterangan'];
-            $parsed = $fallback;
-        }
-
-        // Automatically update the submission
         $updatePayload = array_merge([
-            'cek_dokumen' => $cekDokumen,
-            'status_potong_purchase' => $statusPurchase,
+            'cek_dokumen' => $res['cek_dokumen'],
+            'status_potong_purchase' => $res['status_potong_purchase'],
         ], $financialData);
 
         $submission->update($updatePayload);
 
-        // Automatically reconcile with DataProgram (56 kolom) if match is found
         try {
             app(ProgramReconciliationService::class)->reconcileFromSubmission($submission->fresh());
         } catch (\Throwable $e) {
@@ -627,12 +911,12 @@ class DocumentAnalysisService
 
         return [
             'submission' => $submission->fresh(),
-            'cek_dokumen' => $cekDokumen,
-            'status_potong_purchase' => $statusPurchase,
+            'cek_dokumen' => $res['cek_dokumen'],
+            'status_potong_purchase' => $res['status_potong_purchase'],
             'keterangan' => $submission->keterangan,
-            'ai_keterangan' => $keterangan,
+            'ai_keterangan' => $res['keterangan'],
             'financial' => $financialData,
-            'raw_analysis' => $parsed,
+            'raw_analysis' => $res['raw_analysis'],
         ];
     }
 

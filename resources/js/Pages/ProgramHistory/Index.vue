@@ -12,7 +12,7 @@
       <div>
         <h1 class="text-2xl font-bold tracking-tight text-gray-950">Riwayat Program</h1>
         <p class="text-xs text-gray-500 mt-0.5">
-          Audit dan histori pencocokan antara Form Program dengan Data Program.
+          Audit dan histori pencocokan antara Data Program dengan Test Program.
         </p>
       </div>
 
@@ -38,7 +38,7 @@
         >
           <RefreshCwIcon v-if="isReconciling" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
           <CheckCircleIcon v-else class="w-3.5 h-3.5 text-gray-500" />
-          <span>{{ isReconciling ? 'Mencocokkan...' : 'Cocokkan Form Program' }}</span>
+          <span>{{ isReconciling ? 'Mencocokkan...' : 'Cocokkan Test Program' }}</span>
         </button>
       </div>
     </div>
@@ -167,228 +167,211 @@
         </div>
       </div>
 
-      <!-- Filament Table -->
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead class="w-[44px] text-center">No</TableHead>
-            <TableHead class="min-w-[130px]">
-              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
-                Waktu
-                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
-              </span>
-            </TableHead>
-            <TableHead class="min-w-[130px]">
-              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
-                ID Real
-                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
-              </span>
-            </TableHead>
-            <TableHead class="min-w-[160px]">
-              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
-                Nama Dealer
-                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
-              </span>
-            </TableHead>
-            <TableHead class="min-w-[180px]">
-              <span>Nama Program</span>
-            </TableHead>
-            <TableHead class="min-w-[120px] text-center">
-              <span>Status</span>
-            </TableHead>
-            <TableHead class="text-right min-w-[120px]">
-              <span>Data Program</span>
-            </TableHead>
-            <TableHead class="text-right min-w-[120px]">
-              <span>Form Program</span>
-            </TableHead>
-            <TableHead class="text-right min-w-[110px]">
-              <span>Selisih</span>
-            </TableHead>
-            <TableHead class="min-w-[120px] text-center">
-              <span>Dokumen Form</span>
-            </TableHead>
-            <TableHead class="min-w-[160px]">
-              <span>Keterangan</span>
-            </TableHead>
-            <TableHead class="text-right w-[90px] sticky right-0 bg-white">
-              <span>Action</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-
-        <TableBody>
-          <!-- Loading State -->
-          <TableEmpty v-if="loading && logs.length === 0" :colspan="12">
-            <div class="py-8 flex flex-col items-center justify-center gap-2 text-gray-500">
-              <span class="inline-block w-5 h-5 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></span>
-              <span class="text-xs">Memuat data riwayat program...</span>
-            </div>
-          </TableEmpty>
-
-          <!-- Empty State -->
-          <TableEmpty v-else-if="logs.length === 0" :colspan="12">
-            <div class="py-8 text-center text-gray-400 text-xs">
-              Belum ada data riwayat yang tersimpan. Silakan klik tombol <strong>Cocokkan Form Program</strong> di atas.
-            </div>
-          </TableEmpty>
-
-          <!-- Data Rows -->
-          <TableRow
-            v-else
-            v-for="(row, idx) in logs"
-            :key="row.id"
-            class="hover:bg-gray-50 transition text-xs"
-          >
-            <!-- No -->
-            <TableCell class="text-center text-gray-500 text-xs">
-              {{ (pagination.current_page - 1) * pagination.per_page + idx + 1 }}
-            </TableCell>
-
-            <!-- Waktu -->
-            <TableCell class="whitespace-nowrap text-xs text-gray-800">
-              <div>{{ formatTimestamp(row.created_at).date }}</div>
-              <div class="text-xs text-gray-400">{{ formatTimestamp(row.created_at).time }}</div>
-            </TableCell>
-
-            <!-- ID Real (Bold like SJ-xxxx) -->
-            <TableCell>
-              <span class="text-gray-950 text-xs">
-                {{ row.kode_bt || row.program_submission?.id_real || '-' }}
-              </span>
-            </TableCell>
-
-            <!-- Nama Dealer -->
-            <TableCell class="text-xs text-gray-800" :title="row.dealer_name">
-              <div class="line-clamp-2">{{ row.dealer_name || '-' }}</div>
-            </TableCell>
-
-            <!-- Nama Program -->
-            <TableCell class="text-xs text-gray-600" :title="row.program_name">
-              <div class="line-clamp-2">{{ row.program_name || '-' }}</div>
-            </TableCell>
-
-            <!-- Status Pencocokan (Filament Badge) -->
-            <TableCell class="text-center whitespace-nowrap">
-              <FilamentBadge
-                v-if="row.status === 'MATCHED'"
-                color="success"
-              >
-                SESUAI
-              </FilamentBadge>
-              <FilamentBadge
-                v-else-if="row.status === 'DOC_INCOMPLETE'"
-                color="warning"
-              >
-                DOKUMEN KURANG
-              </FilamentBadge>
-              <FilamentBadge
-                v-else-if="row.status === 'NOMINAL_MISMATCH'"
-                color="danger"
-              >
-                SELISIH
-              </FilamentBadge>
-              <FilamentBadge
-                v-else-if="row.status === 'NO_MATCH'"
-                color="gray"
-              >
-                BELUM ADA FORM
-              </FilamentBadge>
-              <FilamentBadge
-                v-else
-                color="gray"
-              >
-                {{ row.status }}
-              </FilamentBadge>
-            </TableCell>
-
-            <!-- Data Program -->
-            <TableCell class="whitespace-nowrap text-right text-xs text-gray-800">
-              {{ formatRupiah(row.dp_amount) }}
-            </TableCell>
-
-            <!-- Form Program -->
-            <TableCell class="whitespace-nowrap text-right text-xs text-gray-800">
-              {{ row.submission_amount ? formatRupiah(row.submission_amount) : (row.program_submission_id ? '0' : '-') }}
-            </TableCell>
-
-            <!-- Selisih -->
-            <TableCell class="whitespace-nowrap text-right text-xs">
-              <span v-if="row.selisih === 0 || row.selisih === '0' || row.selisih === 0.0" class="text-gray-400">
-                0
-              </span>
-              <span v-else-if="row.selisih !== null && row.selisih !== undefined && row.selisih !== ''" class="font-medium text-rose-600">
-                {{ formatRupiah(row.selisih) }}
-              </span>
-              <span v-else class="text-gray-400">-</span>
-            </TableCell>
-
-            <!-- Dokumen Form -->
-            <TableCell class="text-center whitespace-nowrap">
-              <div v-if="row.program_submission" class="inline-flex items-center justify-center gap-1.5">
-                <a
-                  v-if="isValidUrl(row.program_submission.credit_note_url)"
-                  :href="row.program_submission.credit_note_url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 bg-white text-gray-700 hover:text-gray-950 text-xs font-medium hover:bg-gray-50 transition cursor-pointer"
-                  title="Credit Note"
-                >
-                  <FileTextIcon class="w-3.5 h-3.5 text-gray-500" />
-                  <span>CN</span>
-                </a>
-                <a
-                  v-if="isValidUrl(row.program_submission.agreement_url)"
-                  :href="row.program_submission.agreement_url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 bg-white text-gray-700 hover:text-gray-950 text-xs font-medium hover:bg-gray-50 transition cursor-pointer"
-                  title="Agreement"
-                >
-                  <FileTextIcon class="w-3.5 h-3.5 text-gray-500" />
-                  <span>Agr</span>
-                </a>
-                <a
-                  v-if="isValidUrl(row.program_submission.tax_invoice_url)"
-                  :href="row.program_submission.tax_invoice_url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border border-gray-200 bg-white text-gray-700 hover:text-gray-950 text-xs font-medium hover:bg-gray-50 transition cursor-pointer"
-                  title="Faktur Pajak"
-                >
-                  <FileTextIcon class="w-3.5 h-3.5 text-gray-500" />
-                  <span>Faktur</span>
-                </a>
-                <span
-                  v-if="!isValidUrl(row.program_submission.credit_note_url) && !isValidUrl(row.program_submission.agreement_url) && !isValidUrl(row.program_submission.tax_invoice_url)"
-                  class="text-gray-400 text-xs"
-                >
-                  -
+      <!-- Table: Styled identically to Test Program for clean spreadsheet look -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-gray-900 border-collapse">
+          <thead>
+            <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">
+              <th scope="col" class="py-2.5 px-3 text-center w-12 border-r border-gray-200">No</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">
+                <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                  Waktu
+                  <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
                 </span>
-              </div>
-              <span v-else class="text-gray-400 text-xs">-</span>
-            </TableCell>
+              </th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">
+                <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                  ID Real
+                  <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+                </span>
+              </th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">
+                <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                  Nama Dealer
+                  <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+                </span>
+              </th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Nama Program</th>
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200">Data Program</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200">Test Program</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200">Selisih</th>
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Dokumen Test</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Keterangan</th>
+              <th scope="col" class="py-2.5 px-3 text-center">Action</th>
+            </tr>
+          </thead>
 
-            <!-- Keterangan -->
-            <TableCell class="text-xs text-gray-600">
-              <div class="line-clamp-2" :title="row.notes">{{ row.notes || '-' }}</div>
-            </TableCell>
+          <tbody class="divide-y divide-gray-200 bg-white">
+            <!-- Loading State -->
+            <tr v-if="loading && logs.length === 0">
+              <td colspan="12" class="py-8 text-center text-gray-500">
+                <div class="inline-flex items-center gap-2">
+                  <span class="inline-block w-4 h-4 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></span>
+                  <span>Memuat data riwayat program...</span>
+                </div>
+              </td>
+            </tr>
 
-            <!-- Action -->
-            <TableCell class="text-right whitespace-nowrap sticky right-0 bg-white">
-              <button
-                type="button"
-                @click="openDetailModal(row)"
-                class="inline-flex items-center gap-1 text-xs text-gray-600 hover:text-gray-950 hover:underline cursor-pointer"
-                title="Lihat Detail Komparasi"
-              >
-                <EyeIcon class="w-4 h-4 text-gray-500" />
-                <span>Detail</span>
-              </button>
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
+            <!-- Empty State -->
+            <tr v-else-if="logs.length === 0">
+              <td colspan="12" class="py-8 text-center text-gray-500">
+                Belum ada data riwayat yang tersimpan. Silakan klik tombol <strong>Cocokkan Test Program</strong> di atas.
+              </td>
+            </tr>
+
+            <!-- Data Rows -->
+            <tr
+              v-else
+              v-for="(row, idx) in logs"
+              :key="row.id"
+              class="hover:bg-gray-50/70 text-gray-700 font-normal transition"
+            >
+              <!-- No -->
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+                {{ (pagination.current_page - 1) * pagination.per_page + idx + 1 }}
+              </td>
+
+              <!-- Waktu -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800">
+                <div>{{ formatTimestamp(row.created_at).date }}</div>
+                <div class="text-[11px] text-gray-400">{{ formatTimestamp(row.created_at).time }}</div>
+              </td>
+
+              <!-- ID Real -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap font-mono text-[11px] text-gray-900">
+                {{ row.kode_bt || row.program_submission?.id_real || '-' }}
+              </td>
+
+              <!-- Nama Dealer -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[200px] truncate text-gray-800" :title="row.dealer_name">
+                {{ row.dealer_name || '-' }}
+              </td>
+
+              <!-- Nama Program -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[220px] truncate text-gray-700" :title="row.program_name">
+                {{ row.program_name || '-' }}
+              </td>
+
+              <!-- Status Pencocokan -->
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+                <span
+                  v-if="row.status === 'MATCHED'"
+                  class="px-2 py-0.5 rounded text-xs font-medium border bg-emerald-50 text-emerald-700 border-emerald-200 inline-block"
+                >
+                  SESUAI
+                </span>
+                <span
+                  v-else-if="row.status === 'DOC_INCOMPLETE'"
+                  class="px-2 py-0.5 rounded text-xs font-medium border bg-amber-50 text-amber-700 border-amber-200 inline-block"
+                >
+                  DOKUMEN KURANG
+                </span>
+                <span
+                  v-else-if="row.status === 'NOMINAL_MISMATCH'"
+                  class="px-2 py-0.5 rounded text-xs font-medium border bg-rose-50 text-rose-700 border-rose-200 inline-block"
+                >
+                  SELISIH
+                </span>
+                <span
+                  v-else-if="row.status === 'NO_MATCH'"
+                  class="px-2 py-0.5 rounded text-xs font-medium border bg-gray-100 text-gray-700 border-gray-200 inline-block"
+                >
+                  BELUM ADA FORM
+                </span>
+                <span
+                  v-else
+                  class="px-2 py-0.5 rounded text-xs font-medium border bg-gray-50 text-gray-600 border-gray-200 inline-block"
+                >
+                  {{ row.status }}
+                </span>
+              </td>
+
+              <!-- Data Program -->
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800 font-medium">
+                {{ formatRupiah(row.dp_amount) }}
+              </td>
+
+              <!-- Test Program -->
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800 font-medium">
+                {{ row.submission_amount ? formatRupiah(row.submission_amount) : (row.program_submission_id ? '0' : '-') }}
+              </td>
+
+              <!-- Selisih -->
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap">
+                <span v-if="row.selisih === 0 || row.selisih === '0' || row.selisih === 0.0" class="text-gray-400">
+                  0
+                </span>
+                <span v-else-if="row.selisih !== null && row.selisih !== undefined && row.selisih !== ''" class="font-medium text-rose-600">
+                  {{ formatRupiah(row.selisih) }}
+                </span>
+                <span v-else class="text-gray-400">-</span>
+              </td>
+
+              <!-- Dokumen Test -->
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+                <div v-if="row.program_submission" class="inline-flex items-center justify-center gap-2">
+                  <a
+                    v-if="isValidUrl(row.program_submission.credit_note_url)"
+                    :href="row.program_submission.credit_note_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-gray-700 underline hover:text-gray-900"
+                    title="Credit Note"
+                  >
+                    CN
+                  </a>
+                  <a
+                    v-if="isValidUrl(row.program_submission.agreement_url)"
+                    :href="row.program_submission.agreement_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-gray-700 underline hover:text-gray-900"
+                    title="Agreement"
+                  >
+                    Agr
+                  </a>
+                  <a
+                    v-if="isValidUrl(row.program_submission.tax_invoice_url)"
+                    :href="row.program_submission.tax_invoice_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-gray-700 underline hover:text-gray-900"
+                    title="Faktur Pajak"
+                  >
+                    Faktur
+                  </a>
+                  <span
+                    v-if="!isValidUrl(row.program_submission.credit_note_url) && !isValidUrl(row.program_submission.agreement_url) && !isValidUrl(row.program_submission.tax_invoice_url)"
+                    class="text-gray-400"
+                  >
+                    -
+                  </span>
+                </div>
+                <span v-else class="text-gray-400">-</span>
+              </td>
+
+              <!-- Keterangan -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[200px] truncate text-gray-700" :title="row.notes">
+                {{ row.notes || '-' }}
+              </td>
+
+              <!-- Action -->
+              <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                <button
+                  type="button"
+                  @click="openDetailModal(row)"
+                  class="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium transition cursor-pointer shadow-2xs"
+                  title="Lihat Detail Komparasi"
+                >
+                  <EyeIcon class="w-3.5 h-3.5 text-gray-500" />
+                  <span>Detail</span>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
       <!-- Filament Pagination Footer -->
       <FilamentPagination
@@ -473,7 +456,7 @@
                     <tr>
                       <th class="px-3.5 py-2.5 w-1/3">Parameter</th>
                       <th class="px-3.5 py-2.5 w-1/3">Data Program (Master)</th>
-                      <th class="px-3.5 py-2.5 w-1/3">Form Program (Respon)</th>
+                      <th class="px-3.5 py-2.5 w-1/3">Test Program (Respon)</th>
                     </tr>
                   </thead>
                   <tbody class="divide-y divide-gray-100 text-gray-700">
@@ -510,7 +493,7 @@
                         <span v-else class="text-gray-400">-</span>
                       </td>
                       <td class="px-3.5 py-2">
-                        <a v-if="isValidUrl(selectedLog?.program_submission?.credit_note_url)" :href="selectedLog.program_submission.credit_note_url" target="_blank" class="text-blue-600 hover:underline">Buka Berkas Form</a>
+                        <a v-if="isValidUrl(selectedLog?.program_submission?.credit_note_url)" :href="selectedLog.program_submission.credit_note_url" target="_blank" class="text-blue-600 hover:underline">Buka Berkas Test</a>
                         <span v-else class="text-gray-400">-</span>
                       </td>
                     </tr>
@@ -521,7 +504,7 @@
                         <span v-else class="text-gray-400">-</span>
                       </td>
                       <td class="px-3.5 py-2">
-                        <a v-if="isValidUrl(selectedLog?.program_submission?.agreement_url)" :href="selectedLog.program_submission.agreement_url" target="_blank" class="text-blue-600 hover:underline">Buka Berkas Form</a>
+                        <a v-if="isValidUrl(selectedLog?.program_submission?.agreement_url)" :href="selectedLog.program_submission.agreement_url" target="_blank" class="text-blue-600 hover:underline">Buka Berkas Test</a>
                         <span v-else class="text-gray-400">-</span>
                       </td>
                     </tr>
@@ -532,7 +515,7 @@
                         <span v-else class="text-gray-400">-</span>
                       </td>
                       <td class="px-3.5 py-2">
-                        <a v-if="isValidUrl(selectedLog?.program_submission?.tax_invoice_url)" :href="selectedLog.program_submission.tax_invoice_url" target="_blank" class="text-blue-600 hover:underline">Buka Berkas Form</a>
+                        <a v-if="isValidUrl(selectedLog?.program_submission?.tax_invoice_url)" :href="selectedLog.program_submission.tax_invoice_url" target="_blank" class="text-blue-600 hover:underline">Buka Berkas Test</a>
                         <span v-else class="text-gray-400">-</span>
                       </td>
                     </tr>
@@ -583,17 +566,7 @@ import {
   Filter as FilterIcon,
 } from 'lucide-vue-next';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import FilamentBadge from '@/components/ui/FilamentBadge.vue';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableEmpty,
-} from '@/components/ui/table';
 
 const logs = ref([]);
 const loading = ref(false);
@@ -706,7 +679,7 @@ const openDetailModal = (row) => {
 };
 
 const handleTriggerBatchReconcile = async () => {
-  if (!confirm('Jalankan proses pencocokan antara Form Program dan Data Program?')) {
+  if (!confirm('Jalankan proses pencocokan antara Data Program dan Test Program?')) {
     return;
   }
 

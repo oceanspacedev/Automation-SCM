@@ -8,8 +8,10 @@ use App\Models\User;
 use App\Services\DocumentAnalysisService;
 use App\Services\ProgramSubmissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
@@ -1233,5 +1235,295 @@ class ProgramSubmissionTest extends TestCase
         $this->assertFalse($eval['is_complete']);
         $this->assertEquals('BELUM BISA POTONG', $eval['status_potong_purchase']);
         $this->assertEquals('FAKTUR BELUM ADA', $eval['cek_dokumen']);
+    }
+
+    public function test_can_get_public_form_options(): void
+    {
+        ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2026 12:35:41',
+            'region' => 'BIG BANDUNG',
+            'id_real' => 'IDME001',
+            'dealer_name' => 'Dealer Bandung',
+            'program_name' => 'PROGRAM DSA FEBRUARI 2026',
+            'sales_name' => 'JEJE ROHIMAN',
+            'row_hash' => 'hash_test_options_1',
+        ]);
+
+        $response = $this->getJson('/api/program-submissions/form-options');
+        $response->assertStatus(200);
+        $response->assertJsonStructure([
+            'programs',
+            'regions',
+            'sales',
+        ]);
+
+        $this->assertContains('BIG BANDUNG', $response->json('regions'));
+        $this->assertContains('PROGRAM DSA FEBRUARI 2026', $response->json('programs'));
+        $this->assertContains('JEJE ROHIMAN', $response->json('sales'));
+    }
+
+    public function test_can_pre_validate_documents_and_detect_swap(): void
+    {
+        Storage::fake('public');
+
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'is_complete' => false,
+                                'cek_dokumen' => 'DOKUMEN TERTUKAR (CN ↔ AGR)',
+                                'status_potong_purchase' => 'BELUM BISA POTONG',
+                                'keterangan' => 'Dokumen tertukar posisi upload.',
+                                'doc_validation' => [
+                                    'cn' => [
+                                        'status' => 'swapped',
+                                        'actual_type' => 'agr',
+                                        'message' => 'File di slot Credit Note adalah dokumen Agreement',
+                                    ],
+                                    'agr' => [
+                                        'status' => 'swapped',
+                                        'actual_type' => 'cn',
+                                        'message' => 'File di slot Agreement adalah dokumen Credit Note',
+                                    ],
+                                    'faktur' => [
+                                        'status' => 'empty',
+                                        'actual_type' => 'none',
+                                        'message' => 'Faktur Pajak tidak diunggah',
+                                    ],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $fakeAgrFileInCnSlot = UploadedFile::fake()->create('agreement_resmi_2026.pdf', 50, 'application/pdf');
+        $fakeCnFileInAgrSlot = UploadedFile::fake()->create('credit_note_inv_123.pdf', 50, 'application/pdf');
+
+        $response = $this->post('/api/program-submissions/pre-validate', [
+            'program_name' => 'PROGRAM DSA FEBRUARI 2026',
+            'region' => 'BIG KARAWANG',
+            'id_real' => 'IDME00652',
+            'dealer_name' => 'Abadi Cell',
+            'sales_name' => 'M RISWAN',
+            'credit_note_file' => $fakeAgrFileInCnSlot,
+            'agreement_file' => $fakeCnFileInAgrSlot,
+        ], ['Accept' => 'application/json']);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+        $this->assertTrue($response->json('data.has_swapped'));
+        $this->assertEquals('swapped', $response->json('data.doc_validation.cn.status'));
+        $this->assertEquals('swapped', $response->json('data.doc_validation.agr.status'));
+        $this->assertEquals('BELUM BISA POTONG', $response->json('data.status_potong_purchase'));
+    }
+
+    public function test_can_submit_public_program_form(): void
+    {
+        Storage::fake('public');
+
+        $cnFile = UploadedFile::fake()->create('credit_note_toko_jaya.pdf', 50, 'application/pdf');
+        $agrFile = UploadedFile::fake()->create('agreement_toko_jaya.pdf', 50, 'application/pdf');
+
+        $response = $this->postJson('/api/program-submissions/submit-form', [
+            'program_name' => 'PROGRAM DSA FEBRUARI 2026',
+            'region' => 'BIG BANDUNG',
+            'id_real' => 'IDME00789',
+            'dealer_name' => 'Toko Jaya Selular',
+            'sales_name' => 'SANDY ARJAYAN',
+            'whatsapp' => '081234567890',
+            'credit_note_file' => $cnFile,
+            'agreement_file' => $agrFile,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+        $this->assertDatabaseHas('program_submissions', [
+            'dealer_name' => 'Toko Jaya Selular',
+            'id_real' => 'IDME00789',
+            'program_name' => 'PROGRAM DSA FEBRUARI 2026',
+            'region' => 'BIG BANDUNG',
+            'sales_name' => 'SANDY ARJAYAN',
+            'whatsapp' => '081234567890',
+        ]);
+
+        $submission = ProgramSubmission::where('id_real', 'IDME00789')->first();
+        $this->assertNotNull($submission);
+        $this->assertTrue(
+            str_contains($submission->credit_note_url, 'storage.completeselular.com') ||
+            str_contains($submission->credit_note_url, 'storage/program_documents')
+        );
+        $this->assertTrue(
+            str_contains($submission->agreement_url, 'storage.completeselular.com') ||
+            str_contains($submission->agreement_url, 'storage/program_documents')
+        );
+        $this->assertStringContainsString('Toko Jaya Selular', $submission->credit_note_url);
+        $this->assertStringContainsString('PROGRAM DSA FEBRUARI 2026', $submission->credit_note_url);
+    }
+
+    public function test_cannot_submit_public_program_form_with_swapped_or_invalid_documents(): void
+    {
+        Storage::fake('public');
+
+        Http::fake([
+            'https://router.rizqis.com/v1/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'is_complete' => false,
+                                'cek_dokumen' => 'DOKUMEN TERTUKAR (CN (AGR), AGR (CN))',
+                                'status_potong_purchase' => 'BELUM BISA POTONG',
+                                'keterangan' => 'Dokumen tertukar.',
+                                'doc_validation' => [
+                                    'cn' => [
+                                        'status' => 'swapped',
+                                        'actual_type' => 'agr',
+                                        'message' => 'File di slot Credit Note terdeteksi berisi Dokumen Agreement.',
+                                    ],
+                                    'agr' => [
+                                        'status' => 'swapped',
+                                        'actual_type' => 'cn',
+                                        'message' => 'File di slot Agreement terdeteksi berisi Dokumen Credit Note.',
+                                    ],
+                                    'faktur' => [
+                                        'status' => 'empty',
+                                        'actual_type' => 'none',
+                                        'message' => 'Faktur Pajak tidak diunggah',
+                                    ],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        // CN slot contains Agreement, AGR slot contains CN
+        $swappedCnFile = UploadedFile::fake()->create('agreement_toko_jaya.pdf', 50, 'application/pdf');
+        $swappedAgrFile = UploadedFile::fake()->create('credit_note_toko_jaya.pdf', 50, 'application/pdf');
+
+        $response = $this->post('/api/program-submissions/submit-form', [
+            'program_name' => 'PROGRAM DSA FEBRUARI 2026',
+            'region' => 'BIG BANDUNG',
+            'id_real' => 'IDME00789',
+            'dealer_name' => 'Toko Jaya Selular',
+            'sales_name' => 'SANDY ARJAYAN',
+            'whatsapp' => '081234567890',
+            'credit_note_file' => $swappedCnFile,
+            'agreement_file' => $swappedAgrFile,
+        ], ['Accept' => 'application/json']);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('success', false);
+        $this->assertEquals('DOC_SWAPPED', $response->json('error_type'));
+
+        // Ensure database does NOT contain this dirty submission
+        $this->assertDatabaseMissing('program_submissions', [
+            'dealer_name' => 'Toko Jaya Selular',
+            'id_real' => 'IDME00789',
+        ]);
+    }
+
+    public function test_can_filter_submissions_by_web_form_source(): void
+    {
+        $user = User::factory()->create();
+
+        // 1. Spreadsheet source
+        ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2026 12:00:00',
+            'region' => 'BIG BANDUNG',
+            'id_real' => 'IDME_SHEET_1',
+            'dealer_name' => 'Sheet Dealer',
+            'program_name' => 'PROGRAM DSA FEBRUARI 2026',
+            'sales_name' => 'SANDY',
+            'row_hash' => 'hash_sheet_test_1',
+            'raw_data' => null,
+        ]);
+
+        // 2. Web form source
+        ProgramSubmission::create([
+            'submission_timestamp' => '10/10/2026 12:30:00',
+            'region' => 'BIG CIREBON',
+            'id_real' => 'IDME_WEB_1',
+            'dealer_name' => 'Web Form Dealer',
+            'program_name' => 'PROGRAM DSA FEBRUARI 2026',
+            'sales_name' => 'AAB',
+            'row_hash' => 'hash_web_test_1',
+            'raw_data' => [
+                'source' => 'web_form',
+            ],
+        ]);
+
+        $response = $this->actingAs($user)->getJson('/api/program-submissions?source=web_form');
+        $response->assertStatus(200);
+
+        $data = $response->json('submissions.data');
+        $this->assertNotEmpty($data);
+        $ids = array_column($data, 'id_real');
+        $this->assertContains('IDME_WEB_1', $ids);
+        $this->assertNotContains('IDME_SHEET_1', $ids);
+        $this->assertGreaterThanOrEqual(1, $response->json('web_form_total'));
+    }
+
+    public function test_get_and_save_spreadsheet_config(): void
+    {
+        $getRes = $this->getJson('/api/program-submissions/config');
+        $getRes->assertOk()
+            ->assertJsonStructure(['webapp_url', 'spreadsheet_url']);
+
+        $postRes = $this->postJson('/api/program-submissions/config', [
+            'url' => 'https://script.google.com/macros/s/test_custom_token/exec',
+            'spreadsheet_url' => 'https://docs.google.com/spreadsheets/d/1rDYiHsNR43H44g2xyV-igyp1Ijv_jp8v8FblAMHqof8/edit?gid=0#gid=0',
+        ]);
+
+        $postRes->assertOk()
+            ->assertJson([
+                'success' => true,
+                'configured_webapp_url' => 'https://script.google.com/macros/s/test_custom_token/exec',
+                'configured_spreadsheet_url' => 'https://docs.google.com/spreadsheets/d/1rDYiHsNR43H44g2xyV-igyp1Ijv_jp8v8FblAMHqof8/edit?gid=0#gid=0',
+            ]);
+    }
+
+    public function test_push_single_submission_to_spreadsheet(): void
+    {
+        Http::fake([
+            'script.google.com/macros/s/*' => Http::response([
+                'success' => true,
+                'row' => 2,
+            ], 200),
+        ]);
+
+        $sub = ProgramSubmission::create([
+            'row_hash' => 'hash_test_push_sub',
+            'submission_timestamp' => '02/10/2026 14:00:00',
+            'region' => 'BIG BANDUNG',
+            'id_real' => 'REAL-PUSH-1',
+            'dealer_name' => 'DEALER PUSH TEST',
+            'program_name' => 'PROGRAM REALME TEST',
+            'sales_name' => 'SALES TEST',
+            'whatsapp' => '081234567890',
+            'credit_note_url' => 'https://example.com/cn.pdf',
+            'agreement_url' => 'https://example.com/agr.pdf',
+            'tax_invoice_url' => 'https://example.com/fp.pdf',
+        ]);
+
+        $res = $this->postJson("/api/program-submissions/{$sub->id}/push-spreadsheet");
+        $res->assertOk()
+            ->assertJson([
+                'success' => true,
+            ]);
+
+        Http::assertSent(function ($request) use ($sub) {
+            $data = $request->data();
+
+            return str_contains($request->url(), 'script.google.com/macros/s/') &&
+                   $data['id_real'] === $sub->id_real &&
+                   $data['dealer_name'] === $sub->dealer_name &&
+                   count($data['row']) === 11;
+        });
     }
 }

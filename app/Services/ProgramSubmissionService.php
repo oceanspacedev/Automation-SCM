@@ -12,7 +12,11 @@ class ProgramSubmissionService
 {
     public const CACHE_KEY_WEBAPP_URL = 'google_sheet_webapp_url';
 
-    public const DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxzjxTieMwGCiviO05imy29rgiWzeDvgW8Pq6hmzzqPEduWCiVrCn-7G5gyCn1n4-c3sQ/exec';
+    public const DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbz7fKNsgUfZeVtRVXGkZIKTr7PMQJPCcwuJZGkxAW_qSa2n_4m9z-459-FCaaSrxYhq/exec';
+
+    public const CACHE_KEY_SPREADSHEET_URL = 'program_submission_spreadsheet_url';
+
+    public const DEFAULT_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1rDYiHsNR43H44g2xyV-igyp1Ijv_jp8v8FblAMHqof8/edit?gid=0#gid=0';
 
     /**
      * Get configured Google Apps Script Web App URL.
@@ -34,6 +38,120 @@ class ProgramSubmissionService
     public function setWebAppUrl(string $url): void
     {
         Cache::forever(self::CACHE_KEY_WEBAPP_URL, trim($url));
+    }
+
+    /**
+     * Get configured Google Spreadsheet URL.
+     */
+    public function getSpreadsheetUrl(): string
+    {
+        $url = (string) Cache::get(self::CACHE_KEY_SPREADSHEET_URL, env('PROGRAM_SUBMISSION_SPREADSHEET_URL', ''));
+
+        if (! empty($url)) {
+            return $url;
+        }
+
+        return self::DEFAULT_SPREADSHEET_URL;
+    }
+
+    /**
+     * Save configured Google Spreadsheet URL.
+     */
+    public function setSpreadsheetUrl(string $url): void
+    {
+        Cache::forever(self::CACHE_KEY_SPREADSHEET_URL, trim($url));
+    }
+
+    /**
+     * Append a newly submitted form row to the Google Spreadsheet via Google Apps Script Web App.
+     *
+     * @return array{success: bool, message: string}
+     */
+    public function appendSubmissionToSpreadsheet(ProgramSubmission $submission, ?string $customUrl = null): array
+    {
+        $url = trim((string) ($customUrl ?: $this->getWebAppUrl()));
+
+        if (empty($url) || ! str_contains($url, 'script.google.com/macros/s/')) {
+            return [
+                'success' => false,
+                'message' => 'URL Google Apps Script Web App belum diatur atau bukan Web App Apps Script.',
+            ];
+        }
+
+        $formatHyperlink = function (?string $fileUrl, string $label): string {
+            if (empty($fileUrl)) {
+                return '-';
+            }
+
+            return '=HYPERLINK("'.$fileUrl.'"; "'.$label.'")';
+        };
+
+        $cnHyperlink = $formatHyperlink($submission->credit_note_url, 'Lihat CN');
+        $agrHyperlink = $formatHyperlink($submission->agreement_url, 'Lihat Agreement');
+        $taxHyperlink = $formatHyperlink($submission->tax_invoice_url, 'Lihat Faktur');
+
+        $payload = [
+            'action' => 'append_submission',
+            'no' => $submission->id,
+            'timestamp' => $submission->submission_timestamp ?: date('d/m/Y H:i:s'),
+            'region' => $submission->region ?: '',
+            'id_real' => $submission->id_real ?: '',
+            'dealer_name' => $submission->dealer_name ?: '',
+            'program_name' => $submission->program_name ?: '',
+            'sales_name' => $submission->sales_name ?: '',
+            'whatsapp' => $submission->whatsapp ?: '',
+            'credit_note_url' => $submission->credit_note_url ?: '',
+            'agreement_url' => $submission->agreement_url ?: '',
+            'tax_invoice_url' => $submission->tax_invoice_url ?: '',
+            'credit_note_formula' => $cnHyperlink,
+            'agreement_formula' => $agrHyperlink,
+            'tax_invoice_formula' => $taxHyperlink,
+            'row' => [
+                $submission->id,
+                $submission->submission_timestamp ?: date('d/m/Y H:i:s'),
+                $submission->region ?: '',
+                $submission->id_real ?: '',
+                $submission->dealer_name ?: '',
+                $submission->program_name ?: '',
+                $submission->sales_name ?: '',
+                $submission->whatsapp ?: '',
+                $cnHyperlink,
+                $agrHyperlink,
+                $taxHyperlink,
+            ],
+        ];
+
+        try {
+            Log::info("Mengirim data pengajuan #{$submission->id} ke Google Spreadsheet via: {$url}");
+
+            $response = Http::withoutVerifying()
+                ->withOptions(['allow_redirects' => true])
+                ->timeout(15)
+                ->post($url, $payload);
+
+            if ($response->successful()) {
+                Log::info("Berhasil mengirim data pengajuan #{$submission->id} ke Google Spreadsheet (HTTP {$response->status()}).");
+
+                return [
+                    'success' => true,
+                    'message' => 'Berhasil mengirim data ke Google Spreadsheet.',
+                ];
+            }
+
+            Log::warning("Gagal mengirim data pengajuan ke Google Spreadsheet (HTTP {$response->status()}): ".substr($response->body(), 0, 300));
+
+            return [
+                'success' => false,
+                'message' => "Google Apps Script merespon HTTP {$response->status()}",
+            ];
+        } catch (\Throwable $e) {
+            Log::warning("Exception saat mengirim data pengajuan ke Google Spreadsheet: {$e->getMessage()}");
+
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
     }
 
     /**

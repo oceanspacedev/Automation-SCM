@@ -191,207 +191,216 @@
         </div>
       </div>
 
-      <!-- Filament Table -->
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead class="w-[44px] text-center">
-              <input
-                type="checkbox"
-                :checked="isAllSelected"
-                :indeterminate="isIndeterminate"
-                @change="toggleSelectAll"
-                :disabled="selectableDrafts.length === 0"
-                class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer disabled:opacity-30"
-                title="Pilih semua draft Ready di halaman ini"
-              />
-            </TableHead>
-            <TableHead class="min-w-[120px]">
-              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
-                Dealer Code
-                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
-              </span>
-            </TableHead>
-            <TableHead class="min-w-[160px]">
-              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
-                Dealer Name
-                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
-              </span>
-            </TableHead>
-            <TableHead class="min-w-[140px]">
-              <span>Customer</span>
-            </TableHead>
-            <TableHead class="min-w-[100px]">
-              <span>Tipe</span>
-            </TableHead>
-            <TableHead class="min-w-[110px]">
-              <span>Status</span>
-            </TableHead>
-            <TableHead class="min-w-[120px]">
-              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
-                Tanggal
-                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
-              </span>
-            </TableHead>
-            <TableHead class="text-right min-w-[120px]">
-              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer justify-end w-full">
-                Support
-                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
-              </span>
-            </TableHead>
-            <TableHead class="text-right min-w-[120px]">
-              <span class="inline-flex items-center gap-1.5 select-none cursor-pointer justify-end w-full">
-                Netpay
-                <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
-              </span>
-            </TableHead>
-            <TableHead class="text-center w-[90px] min-w-[90px]">
-              <span>Action</span>
-            </TableHead>
-          </TableRow>
-        </TableHeader>
+      <!-- Table: Styled identically to Test Program for clean spreadsheet look -->
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-gray-900 border-collapse">
+          <thead>
+            <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">
+              <th scope="col" class="py-2.5 px-3 text-center w-[44px] border-r border-gray-200">
+                <input
+                  type="checkbox"
+                  :checked="isAllSelected"
+                  :indeterminate="isIndeterminate"
+                  @change="toggleSelectAll"
+                  :disabled="selectableDrafts.length === 0"
+                  class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer disabled:opacity-30"
+                  title="Pilih semua draft Ready di halaman ini"
+                />
+              </th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">
+                <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                  Dealer Code
+                  <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+                </span>
+              </th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">
+                <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                  Dealer Name
+                  <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+                </span>
+              </th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Customer</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Tipe</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Status</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">
+                <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
+                  Tanggal
+                  <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+                </span>
+              </th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200">
+                <span class="inline-flex items-center gap-1.5 select-none cursor-pointer justify-end w-full">
+                  Support
+                  <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+                </span>
+              </th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200">
+                <span class="inline-flex items-center gap-1.5 select-none cursor-pointer justify-end w-full">
+                  Netpay
+                  <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
+                </span>
+              </th>
+              <th scope="col" class="py-2.5 px-3 text-center">Action</th>
+            </tr>
+          </thead>
 
-        <TableBody>
-          <TableEmpty v-if="loading" :colspan="10">
-            <div class="py-8 flex flex-col items-center justify-center gap-2 text-gray-500">
-              <span class="inline-block w-5 h-5 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></span>
-              <span class="text-xs">Memuat data draft...</span>
-            </div>
-          </TableEmpty>
+          <tbody class="divide-y divide-gray-200 bg-white">
+            <tr v-if="loading">
+              <td colspan="10" class="py-8 text-center text-gray-500">
+                <div class="inline-flex items-center gap-2">
+                  <span class="inline-block w-4 h-4 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></span>
+                  <span>Memuat data draft...</span>
+                </div>
+              </td>
+            </tr>
 
-          <TableEmpty v-else-if="drafts.length === 0" :colspan="10">
-            <div class="py-8 text-center text-gray-400 text-xs">
-              Belum ada data draft. Silakan klik tombol <strong>Import Excel</strong>.
-            </div>
-          </TableEmpty>
+            <tr v-else-if="drafts.length === 0">
+              <td colspan="10" class="py-8 text-center text-gray-500">
+                Belum ada data draft. Silakan klik tombol <strong>Import Excel</strong>.
+              </td>
+            </tr>
 
-          <TableRow
-            v-for="draft in drafts"
-            :key="draft.id"
-            :class="selectedIds.includes(draft.id) ? 'bg-gray-50' : ''"
-          >
-            <!-- Checkbox Selection -->
-            <TableCell class="w-[44px] text-center">
-              <input
-                type="checkbox"
-                :value="draft.id"
-                v-model="selectedIds"
-                :disabled="draft.status !== 'ready'"
-                class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer disabled:opacity-30"
-                :title="draft.status === 'ready' ? 'Pilih draft ini untuk digenerate' : (draft.status === 'invoiced' ? 'Invoice sudah diterbitkan' : 'Draft error tidak dapat digenerate')"
-              />
-            </TableCell>
+            <tr
+              v-else
+              v-for="draft in drafts"
+              :key="draft.id"
+              :class="selectedIds.includes(draft.id) ? 'bg-gray-50/90' : 'hover:bg-gray-50/70'"
+              class="text-gray-700 font-normal transition"
+            >
+              <!-- Checkbox Selection -->
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  :value="draft.id"
+                  v-model="selectedIds"
+                  :disabled="draft.status !== 'ready'"
+                  class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer disabled:opacity-30"
+                  :title="draft.status === 'ready' ? 'Pilih draft ini untuk digenerate' : (draft.status === 'invoiced' ? 'Invoice sudah diterbitkan' : 'Draft error tidak dapat digenerate')"
+                />
+              </td>
 
-            <!-- Dealer Code (Bold primary key like SJ-xxxx) -->
-            <TableCell>
-              <router-link
-                :to="`/drafts/${draft.id}`"
-                class="font-semibold text-gray-950 text-xs hover:underline"
-              >
-                {{ draft.dealer_code || '-' }}
-              </router-link>
-            </TableCell>
-
-            <!-- Dealer Name -->
-            <TableCell class="text-xs text-gray-800" :title="draft.dealer_name">
-              {{ draft.dealer_name || '-' }}
-            </TableCell>
-
-            <!-- Customer -->
-            <TableCell class="text-xs text-gray-600" :title="draft.customer_name">
-              {{ draft.customer_name || '-' }}
-            </TableCell>
-
-            <!-- Tipe -->
-            <TableCell class="text-xs text-gray-600">
-              {{ draft.invoice_type || '-' }}
-            </TableCell>
-
-            <!-- Status (Plain text netral, seperti form program & invoice) -->
-            <TableCell class="text-xs text-gray-700 whitespace-nowrap">
-              <span>{{ draft.status === 'ready' ? 'READY' : (draft.status === 'invoiced' ? 'INVOICED' : (draft.status ? draft.status.toUpperCase() : 'ERROR')) }}</span>
-            </TableCell>
-
-            <!-- Tanggal -->
-            <TableCell class="text-xs text-gray-600 whitespace-nowrap">
-              {{ draft.invoice_date || '-' }}
-            </TableCell>
-
-            <!-- Support Amount -->
-            <TableCell class="text-right text-xs text-gray-600 whitespace-nowrap">
-              {{ formatCurrency(draft.support_amount) }}
-            </TableCell>
-
-            <!-- Netpay -->
-            <TableCell class="text-right text-xs font-semibold text-gray-950 whitespace-nowrap">
-              {{ formatCurrency(draft.netpay) }}
-            </TableCell>
-
-            <!-- Action Buttons: Toolbar Terpadu (Icon-only persis Form Program) -->
-            <TableCell class="text-center py-2 whitespace-nowrap">
-              <div class="inline-flex items-center rounded-md border border-gray-200 bg-white shadow-2xs divide-x divide-gray-200 overflow-hidden">
-                <!-- 1. View Button -->
+              <!-- Dealer Code -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 <router-link
                   :to="`/drafts/${draft.id}`"
-                  class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
-                  title="Lihat Detail Draft"
+                  class="font-semibold text-gray-900 text-xs hover:underline"
                 >
-                  <EyeIcon class="w-3.5 h-3.5 text-gray-600" />
+                  {{ draft.dealer_code || '-' }}
                 </router-link>
+              </td>
 
-                <!-- 2. Generate Action (Ready) -->
-                <button
-                  v-if="draft.status === 'ready'"
-                  type="button"
-                  @click="askGenerateSingle(draft)"
-                  :disabled="generatingId === draft.id"
-                  class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
-                  title="Generate Invoice"
+              <!-- Dealer Name -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[200px] truncate text-gray-800" :title="draft.dealer_name">
+                {{ draft.dealer_name || '-' }}
+              </td>
+
+              <!-- Customer -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[160px] truncate text-gray-600" :title="draft.customer_name">
+                {{ draft.customer_name || '-' }}
+              </td>
+
+              <!-- Tipe -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-600">
+                {{ draft.invoice_type || '-' }}
+              </td>
+
+              <!-- Status -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+                <span
+                  :class="[
+                    'px-2 py-0.5 rounded text-xs font-medium border inline-block',
+                    draft.status === 'ready'
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : draft.status === 'invoiced'
+                      ? 'bg-sky-50 text-sky-700 border-sky-200'
+                      : 'bg-rose-50 text-rose-700 border-rose-200'
+                  ]"
                 >
-                  <span v-if="generatingId === draft.id" class="inline-block w-3.5 h-3.5 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin shrink-0"></span>
-                  <CheckSquareIcon v-else class="w-3.5 h-3.5 text-gray-600" />
-                </button>
+                  {{ draft.status === 'ready' ? 'READY' : (draft.status === 'invoiced' ? 'INVOICED' : (draft.status ? draft.status.toUpperCase() : 'ERROR')) }}
+                </span>
+              </td>
 
-                <!-- 3. Validasi Action (Error) -->
-                <button
-                  v-else-if="draft.status === 'error'"
-                  type="button"
-                  @click="validateDraft(draft.id)"
-                  class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
-                  title="Validasi Ulang Rumus Draft"
-                >
-                  <RefreshCwIcon class="w-3.5 h-3.5 text-gray-600" />
-                </button>
+              <!-- Tanggal -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-600">
+                {{ draft.invoice_date || '-' }}
+              </td>
 
-                <!-- 4. Invoiced Action (Invoiced) -->
-                <router-link
-                  v-else-if="draft.status === 'invoiced' && draft.invoice"
-                  :to="`/invoices/${draft.invoice.id}`"
-                  class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
-                  :title="`Lihat Invoice (${draft.invoice.invoice_number})`"
-                >
-                  <FileTextIcon class="w-3.5 h-3.5 text-gray-600" />
-                </router-link>
-              </div>
-            </TableCell>
-          </TableRow>
-        </TableBody>
+              <!-- Support Amount -->
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-700 font-medium">
+                {{ formatCurrency(draft.support_amount) }}
+              </td>
 
-        <TableFooter v-if="drafts.length > 0">
-          <TableRow>
-            <TableCell :colspan="7" class="text-xs font-semibold text-gray-950">
-              Total
-            </TableCell>
-            <TableCell class="text-right whitespace-nowrap text-xs text-gray-700">
-              {{ formatCurrency(totalSupport) }}
-            </TableCell>
-            <TableCell class="text-right whitespace-nowrap text-xs font-bold text-gray-950">
-              {{ formatCurrency(totalNetpay) }}
-            </TableCell>
-            <TableCell></TableCell>
-          </TableRow>
-        </TableFooter>
-      </Table>
+              <!-- Netpay -->
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap font-bold text-gray-950">
+                {{ formatCurrency(draft.netpay) }}
+              </td>
+
+              <!-- Action Buttons -->
+              <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                <div class="inline-flex items-center rounded-md border border-gray-200 bg-white shadow-2xs divide-x divide-gray-200 overflow-hidden">
+                  <!-- 1. View Button -->
+                  <router-link
+                    :to="`/drafts/${draft.id}`"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
+                    title="Lihat Detail Draft"
+                  >
+                    <EyeIcon class="w-3.5 h-3.5 text-gray-600" />
+                  </router-link>
+
+                  <!-- 2. Generate Action (Ready) -->
+                  <button
+                    v-if="draft.status === 'ready'"
+                    type="button"
+                    @click="askGenerateSingle(draft)"
+                    :disabled="generatingId === draft.id"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
+                    title="Generate Invoice"
+                  >
+                    <span v-if="generatingId === draft.id" class="inline-block w-3.5 h-3.5 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin shrink-0"></span>
+                    <CheckSquareIcon v-else class="w-3.5 h-3.5 text-gray-600" />
+                  </button>
+
+                  <!-- 3. Validasi Action (Error) -->
+                  <button
+                    v-else-if="draft.status === 'error'"
+                    type="button"
+                    @click="validateDraft(draft.id)"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
+                    title="Validasi Ulang Rumus Draft"
+                  >
+                    <RefreshCwIcon class="w-3.5 h-3.5 text-gray-600" />
+                  </button>
+
+                  <!-- 4. Invoiced Action (Invoiced) -->
+                  <router-link
+                    v-else-if="draft.status === 'invoiced' && draft.invoice"
+                    :to="`/invoices/${draft.invoice.id}`"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
+                    :title="`Lihat Invoice (${draft.invoice.invoice_number})`"
+                  >
+                    <FileTextIcon class="w-3.5 h-3.5 text-gray-600" />
+                  </router-link>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+
+          <tfoot v-if="drafts.length > 0" class="border-t border-gray-200 bg-gray-50/80 font-medium">
+            <tr>
+              <td colspan="7" class="py-2.5 px-3 text-xs font-semibold text-gray-900 border-r border-gray-200">
+                Total
+              </td>
+              <td class="py-2.5 px-3 text-right whitespace-nowrap text-xs text-gray-800 border-r border-gray-200 font-medium">
+                {{ formatCurrency(totalSupport) }}
+              </td>
+              <td class="py-2.5 px-3 text-right whitespace-nowrap text-xs font-bold text-gray-950 border-r border-gray-200">
+                {{ formatCurrency(totalNetpay) }}
+              </td>
+              <td class="py-2.5 px-3"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
 
       <!-- Filament Pagination Footer -->
       <FilamentPagination
@@ -459,16 +468,6 @@ import ImportModal from '@/components/ImportModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import GenerateInvoiceModal from '@/components/GenerateInvoiceModal.vue';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableFooter,
-  TableRow,
-  TableHead,
-  TableCell,
-  TableEmpty,
-} from '@/components/ui/table';
 
 const drafts = ref([]);
 const loading = ref(false);

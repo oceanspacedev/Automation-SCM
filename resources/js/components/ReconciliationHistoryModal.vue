@@ -22,7 +22,7 @@
               </div>
               <div>
                 <div class="flex items-center gap-2">
-                  <h3 class="text-sm font-bold text-gray-900">Riwayat Pencocokan Form Program</h3>
+                  <h3 class="text-sm font-bold text-gray-900">Riwayat Pencocokan Test Program</h3>
                   <button
                     v-if="filters.data_program_id"
                     type="button"
@@ -35,7 +35,7 @@
                   </button>
                 </div>
                 <p class="text-[11px] text-gray-500 mt-0.5">
-                  Daftar hasil pencocokan data program dengan form pengajuan dealer.
+                  Daftar hasil pencocokan data program dengan pengajuan dealer di Test Program.
                 </p>
               </div>
             </div>
@@ -403,7 +403,7 @@ const getFailLabel = (status) => {
     case 'NOMINAL_MISMATCH':
       return 'Selisih Nominal';
     case 'NO_MATCH':
-      return 'Form Belum Ada';
+      return 'Pengajuan Belum Ada';
     case 'ERROR':
       return 'Error';
     default:
@@ -417,14 +417,14 @@ const getCleanDescription = (log) => {
     return nominal ? `Nominal ${nominal} sesuai • Dokumen lengkap (Siap Potong)` : 'Finansial & Dokumen sesuai';
   }
   if (log.status === 'NOMINAL_MISMATCH') {
-    return `Selisih: ${formatRupiah(log.selisih)} (Data: ${formatRupiah(log.dp_amount)} vs Form: ${formatRupiah(log.submission_amount)})`;
+    return `Selisih: ${formatRupiah(log.selisih)} (Data: ${formatRupiah(log.dp_amount)} vs Test: ${formatRupiah(log.submission_amount)})`;
   }
   if (log.status === 'DOC_INCOMPLETE') {
     const missing = log.missing_docs && log.missing_docs.length > 0 ? log.missing_docs.join(', ') : 'Dokumen';
     return `Finansial cocok, tetapi ${missing} belum diupload`;
   }
   if (log.status === 'NO_MATCH') {
-    return 'Belum ada form pengajuan dari dealer yang cocok';
+    return 'Belum ada data Test Program dari dealer yang cocok';
   }
   return log.notes || 'Pencocokan belum berhasil';
 };

@@ -7,6 +7,7 @@ use App\Models\DataProgram;
 use App\Models\ProgramSubmission;
 use App\Services\DataProgramSyncService;
 use App\Services\DocumentAnalysisService;
+use App\Services\ProgramReconciliationService;
 use App\Services\ProgramSubmissionService;
 use App\Services\WhatsAppService;
 use Exception;
@@ -16,6 +17,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -65,6 +67,17 @@ class ProgramSubmissionController extends Controller
             $query->where('keterangan', $keterangan);
         }
 
+        if ($source = trim((string) $request->input('source'))) {
+            if ($source === 'web_form') {
+                $query->where('raw_data->source', 'web_form');
+            } elseif ($source === 'spreadsheet') {
+                $query->where(function ($q) {
+                    $q->whereNull('raw_data->source')
+                        ->orWhere('raw_data->source', '!=', 'web_form');
+                });
+            }
+        }
+
         $cols = [
             'id', 'submission_timestamp', 'region', 'id_real', 'dealer_name',
             'program_name', 'sales_name', 'whatsapp', 'credit_note_url', 'agreement_url',
@@ -72,7 +85,7 @@ class ProgramSubmissionController extends Controller
             'net_pay', 'cek_pajak_tarif_pph', 'selisih', 'note_pph', 'no_faktur',
             'tgl_faktur', 'no_po_sj', 'no_transaksi', 'tgl_input',
             'tgl_share_cn', 'lama_pending', 'keterangan', 'cek_dokumen',
-            'status_potong_purchase', 'status_potong_ar', 'tgl_potong_tf', 'doc_validation', 'is_manual_edit', 'updated_at',
+            'status_potong_purchase', 'status_potong_ar', 'tgl_potong_tf', 'doc_validation', 'is_manual_edit', 'raw_data', 'created_at', 'updated_at',
         ];
 
         $perPage = min((int) $request->input('per_page', 15), 100);
@@ -131,6 +144,8 @@ class ProgramSubmissionController extends Controller
             return ProgramSubmission::count();
         });
 
+        $webFormTotal = ProgramSubmission::where('raw_data->source', 'web_form')->count();
+
         return response()->json([
             'submissions' => $submissions,
             'regions' => $regions,
@@ -138,6 +153,7 @@ class ProgramSubmissionController extends Controller
             'status_purchase_options' => ProgramSubmission::STATUS_PURCHASE_OPTIONS,
             'keterangan_options' => ProgramSubmission::KETERANGAN_OPTIONS,
             'total_submissions' => $totalSubmissions,
+            'web_form_total' => $webFormTotal,
             'configured_webapp_url' => $this->service->getWebAppUrl(),
             'last_synced_at' => $lastSyncedAt,
         ]);
@@ -542,21 +558,54 @@ class ProgramSubmissionController extends Controller
     }
 
     /**
-     * Save Google Apps Script Web App URL config.
+     * Get Google Spreadsheet and Apps Script Web App config.
+     */
+    public function getConfig(): JsonResponse
+    {
+        return response()->json([
+            'webapp_url' => $this->service->getWebAppUrl(),
+            'spreadsheet_url' => $this->service->getSpreadsheetUrl(),
+        ]);
+    }
+
+    /**
+     * Save Google Apps Script Web App URL and Spreadsheet URL config.
      */
     public function saveConfig(Request $request): JsonResponse
     {
         $request->validate([
-            'url' => 'required|url',
+            'url' => 'nullable|url',
+            'spreadsheet_url' => 'nullable|url',
         ]);
 
-        $this->service->setWebAppUrl($request->input('url'));
+        if ($request->filled('url')) {
+            $this->service->setWebAppUrl($request->input('url'));
+        }
+
+        if ($request->filled('spreadsheet_url')) {
+            $this->service->setSpreadsheetUrl($request->input('spreadsheet_url'));
+        }
 
         return response()->json([
             'success' => true,
-            'message' => 'URL Google Apps Script Web App berhasil disimpan.',
+            'message' => 'Konfigurasi Google Spreadsheet berhasil disimpan.',
             'configured_webapp_url' => $this->service->getWebAppUrl(),
+            'configured_spreadsheet_url' => $this->service->getSpreadsheetUrl(),
         ]);
+    }
+
+    /**
+     * Manually push a single submission to Google Spreadsheet.
+     */
+    public function pushToSpreadsheet(int|string $id): JsonResponse
+    {
+        $submission = ProgramSubmission::findOrFail($id);
+        $result = $this->service->appendSubmissionToSpreadsheet($submission);
+
+        return response()->json([
+            'success' => $result['success'],
+            'message' => $result['message'],
+        ], $result['success'] ? 200 : 422);
     }
 
     /**
@@ -943,6 +992,306 @@ class ProgramSubmissionController extends Controller
             'provider_id' => $result['provider_id'] ?? null,
             'wa_url' => $result['wa_url'] ?? null,
             'recipient_phone' => $result['recipient_phone'] ?? null,
+        ]);
+    }
+
+    /**
+     * Get options for the public submission form (Programs, Regions, Sales names).
+     */
+    public function formOptions(): JsonResponse
+    {
+        $defaultPrograms = [
+            'PROGRAM DSA FEBRUARI 2026',
+            'PROGRAM DSA MARET 2026',
+            'PROGRAM SO R14T MARET 2026',
+            'PROGRAM DSA MEI 2026',
+            'PROGRAM FS PO C100 & C100X MEI 2026',
+            'PROGRAM ST C100 & C100X MEI 2026',
+            'PROGRAM DSA JUNI 2026',
+            'PROGRAM PROMOTION NOTE 80 4+128 JUNI 2026',
+            'PROGRAM PROMOTION C100X SERIES JUNI 2026',
+            'PROGRAM DSA JULI 2026',
+            'PROGRAM DSA AGUSTUS 2026',
+        ];
+
+        $regions = [
+            'BIG BANDUNG',
+            'BIG KARAWANG',
+            'BIG TASIK',
+            'BIG CIREBON',
+        ];
+
+        $sales = Cache::remember('program_submissions_sales_list_v2', 300, function () {
+            return ProgramSubmission::whereNotNull('sales_name')
+                ->where('sales_name', '!=', '')
+                ->distinct()
+                ->orderBy('sales_name')
+                ->pluck('sales_name')
+                ->filter(fn ($s) => trim((string) $s) !== '' && trim((string) $s) !== '-')
+                ->values()
+                ->all();
+        });
+
+        $dbPrograms = ProgramSubmission::whereNotNull('program_name')
+            ->where('program_name', 'like', '%2026%')
+            ->distinct()
+            ->orderBy('program_name')
+            ->pluck('program_name')
+            ->filter(fn ($p) => trim((string) $p) !== '' && trim((string) $p) !== '-')
+            ->values()
+            ->all();
+
+        $allPrograms = array_values(array_unique(array_merge($defaultPrograms, $dbPrograms)));
+
+        return response()->json([
+            'programs' => $allPrograms,
+            'regions' => $regions,
+            'sales' => $sales,
+        ]);
+    }
+
+    /**
+     * Pre-validate uploaded files with AI before final form submission.
+     */
+    public function preValidateForm(Request $request): JsonResponse
+    {
+        $formData = [
+            'program_name' => (string) $request->input('program_name', ''),
+            'region' => (string) $request->input('region', ''),
+            'id_real' => (string) $request->input('id_real', ''),
+            'dealer_name' => (string) $request->input('dealer_name', ''),
+            'sales_name' => (string) $request->input('sales_name', ''),
+            'whatsapp' => (string) $request->input('whatsapp', ''),
+            'is_pkp' => $request->boolean('is_pkp', false),
+        ];
+
+        $files = [
+            'cn' => $request->file('credit_note_file') ?: $request->input('credit_note_url'),
+            'agr' => $request->file('agreement_file') ?: $request->input('agreement_url'),
+            'faktur' => $request->file('tax_invoice_file') ?: $request->input('tax_invoice_url'),
+        ];
+
+        try {
+            $inspection = $this->aiService->inspectDocumentFiles($formData, $files);
+
+            return response()->json([
+                'success' => true,
+                'data' => $inspection,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal memeriksa dokumen: '.$e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Handle public form submission from Sales / Customer.
+     */
+    public function submitForm(Request $request): JsonResponse
+    {
+        $request->validate([
+            'program_name' => ['required', 'string', 'max:255'],
+            'region' => ['required', 'string', 'max:100'],
+            'id_real' => ['required', 'string', 'max:100'],
+            'dealer_name' => ['required', 'string', 'max:255'],
+            'sales_name' => ['required', 'string', 'max:255'],
+            'whatsapp' => ['nullable', 'string', 'max:30'],
+            'credit_note_file' => ['required_without:credit_note_url', 'nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:15360'],
+            'agreement_file' => ['required_without:agreement_url', 'nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:15360'],
+            'tax_invoice_file' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:15360'],
+        ], [
+            'program_name.required' => 'Nama Program wajib dipilih atau diisi.',
+            'region.required' => 'Region wajib dipilih.',
+            'id_real.required' => 'ID REALME wajib diisi.',
+            'dealer_name.required' => 'Nama Dealer wajib diisi.',
+            'sales_name.required' => 'Nama Sales (DM) wajib dipilih atau diisi.',
+            'credit_note_file.required_without' => 'Dokumen Credit Note/Invoice wajib diunggah.',
+            'agreement_file.required_without' => 'Dokumen Agreement wajib diunggah.',
+        ]);
+
+        $formData = [
+            'program_name' => trim((string) $request->input('program_name')),
+            'region' => trim((string) $request->input('region')),
+            'id_real' => trim((string) $request->input('id_real')),
+            'dealer_name' => trim((string) $request->input('dealer_name')),
+            'sales_name' => trim((string) $request->input('sales_name')),
+            'whatsapp' => trim((string) $request->input('whatsapp')),
+            'is_pkp' => $request->boolean('is_pkp', false),
+        ];
+
+        // 1. Inspect documents with AI first before storing or creating submission
+        $inspection = $this->aiService->inspectDocumentFiles($formData, [
+            'cn' => $request->file('credit_note_file') ?: $request->input('credit_note_url'),
+            'agr' => $request->file('agreement_file') ?: $request->input('agreement_url'),
+            'faktur' => $request->file('tax_invoice_file') ?: $request->input('tax_invoice_url'),
+        ]);
+
+        // 2. Strictly block submission if documents are swapped or invalid
+        if (! empty($inspection['has_swapped'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Dokumen terdeteksi tidak sesuai (Credit Note & Agreement terbalik). Silakan unggah dokumen yang benar pada masing-masing kolom sebelum mengirim.',
+                'error_type' => 'DOC_SWAPPED',
+                'doc_validation' => $inspection['doc_validation'],
+            ], 422);
+        }
+
+        if (! empty($inspection['has_invalid'])) {
+            $reason = $inspection['keterangan'] ?: ($inspection['cek_dokumen'] ?: 'Dokumen tidak sesuai / tidak sah');
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Dokumen tidak sesuai: '.$reason.'. Formulir tidak dapat dikirim sebelum dokumen diperbaiki.',
+                'error_type' => 'DOC_INVALID',
+                'doc_validation' => $inspection['doc_validation'],
+                'cek_dokumen' => $inspection['cek_dokumen'],
+            ], 422);
+        }
+
+        if (($inspection['status_potong_purchase'] ?? '') === 'BELUM BISA POTONG') {
+            $reason = $inspection['keterangan'] ?: ($inspection['cek_dokumen'] ?: 'Dokumen belum memenuhi syarat verifikasi');
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Pengajuan belum memenuhi syarat: '.$reason.'. Formulir tidak dapat dikirim.',
+                'error_type' => 'NOT_ELIGIBLE',
+                'doc_validation' => $inspection['doc_validation'],
+                'cek_dokumen' => $inspection['cek_dokumen'],
+            ], 422);
+        }
+
+        // 3. Documents are verified clean - store to SeaweedFS / S3 (Dealer / Program / File)
+        $safeDealer = preg_replace('/[\\\\\/:\*\?"<>\|]/', '_', trim($formData['dealer_name'])) ?: 'DEALER';
+        $safeProgram = preg_replace('/[\\\\\/:\*\?"<>\|]/', '_', trim($formData['program_name'])) ?: 'PROGRAM';
+        $s3Folder = "{$safeDealer}/{$safeProgram}";
+
+        $useS3 = ! empty(config('filesystems.disks.s3.key')) && ! empty(config('filesystems.disks.s3.bucket'));
+
+        $cnUrl = $request->input('credit_note_url');
+        if ($request->hasFile('credit_note_file')) {
+            $file = $request->file('credit_note_file');
+            $filename = 'CN_'.time().'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
+            if ($useS3) {
+                try {
+                    $path = Storage::disk('s3')->putFileAs($s3Folder, $file, $filename);
+                    $cnUrl = Storage::disk('s3')->url($path);
+                } catch (\Throwable $e) {
+                    Log::warning('Upload CN to S3 failed, fallback to local: '.$e->getMessage());
+                    $path = $file->store('program_documents', 'public');
+                    $cnUrl = url('storage/'.$path);
+                }
+            } else {
+                $path = $file->store('program_documents', 'public');
+                $cnUrl = url('storage/'.$path);
+            }
+        }
+
+        $agrUrl = $request->input('agreement_url');
+        if ($request->hasFile('agreement_file')) {
+            $file = $request->file('agreement_file');
+            $filename = 'AGR_'.time().'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
+            if ($useS3) {
+                try {
+                    $path = Storage::disk('s3')->putFileAs($s3Folder, $file, $filename);
+                    $agrUrl = Storage::disk('s3')->url($path);
+                } catch (\Throwable $e) {
+                    Log::warning('Upload AGR to S3 failed, fallback to local: '.$e->getMessage());
+                    $path = $file->store('program_documents', 'public');
+                    $agrUrl = url('storage/'.$path);
+                }
+            } else {
+                $path = $file->store('program_documents', 'public');
+                $agrUrl = url('storage/'.$path);
+            }
+        }
+
+        $taxUrl = $request->input('tax_invoice_url');
+        if ($request->hasFile('tax_invoice_file')) {
+            $file = $request->file('tax_invoice_file');
+            $filename = 'FAKTUR_'.time().'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
+            if ($useS3) {
+                try {
+                    $path = Storage::disk('s3')->putFileAs($s3Folder, $file, $filename);
+                    $taxUrl = Storage::disk('s3')->url($path);
+                } catch (\Throwable $e) {
+                    Log::warning('Upload Faktur to S3 failed, fallback to local: '.$e->getMessage());
+                    $path = $file->store('program_documents', 'public');
+                    $taxUrl = url('storage/'.$path);
+                }
+            } else {
+                $path = $file->store('program_documents', 'public');
+                $taxUrl = url('storage/'.$path);
+            }
+        }
+
+        $timestamp = date('d/m/Y H:i:s');
+        $hashString = "{$timestamp}|{$formData['region']}|{$formData['id_real']}|{$formData['dealer_name']}|{$formData['program_name']}|".uniqid();
+        $rowHash = sha1($hashString);
+
+        $financial = $inspection['financial'];
+
+        $submission = ProgramSubmission::create([
+            'submission_timestamp' => $timestamp,
+            'region' => $formData['region'],
+            'id_real' => $formData['id_real'],
+            'dealer_name' => $formData['dealer_name'],
+            'program_name' => $formData['program_name'],
+            'sales_name' => $formData['sales_name'],
+            'whatsapp' => $formData['whatsapp'] ?: null,
+            'credit_note_url' => $cnUrl,
+            'agreement_url' => $agrUrl,
+            'tax_invoice_url' => $taxUrl,
+            'row_hash' => $rowHash,
+            'cek_dokumen' => $inspection['cek_dokumen'],
+            'status_potong_purchase' => $inspection['status_potong_purchase'],
+            'keterangan' => $inspection['keterangan'],
+            'doc_validation' => $inspection['doc_validation'],
+            'incentive' => $financial['incentive'] ?? null,
+            'dpp' => $financial['dpp'] ?? null,
+            'dpp_lain' => $financial['dpp_lain'] ?? 0.0,
+            'ppn' => $financial['ppn'] ?? 0.0,
+            'nilai_pph' => $financial['nilai_pph'] ?? null,
+            'net_pay' => $financial['net_pay'] ?? null,
+            'cek_pajak_tarif_pph' => $financial['cek_pajak_tarif_pph'] ?? 0.0,
+            'selisih' => $financial['selisih'] ?? 0.0,
+            'no_faktur' => $financial['no_faktur'] ?? null,
+            'tgl_faktur' => $financial['tgl_faktur'] ?? null,
+            'note_pph' => $inspection['audit']['note_pph'] ?? 'ok',
+            'raw_data' => [
+                'source' => 'web_form',
+                'inspection' => $inspection,
+                'client_ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ],
+        ]);
+
+        // Auto-reconcile with DataProgram (56 Kolom)
+        try {
+            app(ProgramReconciliationService::class)->reconcileFromSubmission($submission);
+        } catch (\Throwable $e) {
+            Log::warning('Auto-reconcile after web form submission failed: '.$e->getMessage());
+        }
+
+        // Otomatis push data pengajuan ke Google Spreadsheet
+        $sheetResult = null;
+        try {
+            $sheetResult = $this->service->appendSubmissionToSpreadsheet($submission);
+        } catch (\Throwable $e) {
+            Log::warning('Push submission to Google Spreadsheet failed: '.$e->getMessage());
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pengajuan Program REALME berhasil dikirim dan diverifikasi AI.',
+            'id' => $submission->id,
+            'submission' => $submission,
+            'is_clean' => $inspection['is_clean'],
+            'status_potong_purchase' => $submission->status_potong_purchase,
+            'cek_dokumen' => $submission->cek_dokumen,
+            'doc_validation' => $submission->doc_validation,
+            'spreadsheet_pushed' => $sheetResult['success'] ?? false,
         ]);
     }
 }

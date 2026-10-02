@@ -24,10 +24,14 @@ Route::match(['get', 'post'], '/dp/confirm/{id}', [ProgramClaimConfirmationContr
 
 // API Endpoints
 Route::prefix('api')->group(function () {
-    // Auth
+    // Auth (Email + Password)
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
+
+    // Auth (WhatsApp OTP)
+    Route::post('/auth/wa-otp/send', [AuthController::class, 'sendWaOtp']);
+    Route::post('/auth/wa-otp/verify', [AuthController::class, 'verifyWaOtp']);
 
     // Google OAuth Status & Disconnect
     Route::get('/google/status', [GoogleAuthController::class, 'status']);
@@ -64,7 +68,9 @@ Route::prefix('api')->group(function () {
     Route::patch('/program-submissions/{id}', [ProgramSubmissionController::class, 'update']);
     Route::delete('/program-submissions/{id}', [ProgramSubmissionController::class, 'destroy']);
     Route::post('/program-submissions/{id}/swap-docs', [ProgramSubmissionController::class, 'swapDocs']);
+    Route::post('/program-submissions/{id}/push-spreadsheet', [ProgramSubmissionController::class, 'pushToSpreadsheet']);
     Route::post('/program-submissions/sync', [ProgramSubmissionController::class, 'sync']);
+    Route::get('/program-submissions/config', [ProgramSubmissionController::class, 'getConfig']);
     Route::post('/program-submissions/config', [ProgramSubmissionController::class, 'saveConfig']);
     Route::post('/program-submissions/{id}/analyze-ai', [ProgramSubmissionController::class, 'analyzeAi']);
     Route::post('/program-submissions/analyze-ai-batch', [ProgramSubmissionController::class, 'analyzeAiBatch']);
@@ -77,6 +83,9 @@ Route::prefix('api')->group(function () {
     Route::post('/program-submissions/{id}/send-wa-telemarketing', [ProgramSubmissionController::class, 'sendWaToTelemarketing']);
     Route::post('/program-submissions/{id}/send-wa-doc-error', [ProgramSubmissionController::class, 'sendWaDocError']);
     Route::post('/webhooks/form-program', [ProgramSubmissionController::class, 'webhook']);
+    Route::get('/program-submissions/form-options', [ProgramSubmissionController::class, 'formOptions']);
+    Route::post('/program-submissions/pre-validate', [ProgramSubmissionController::class, 'preValidateForm']);
+    Route::post('/program-submissions/submit-form', [ProgramSubmissionController::class, 'submitForm']);
 
     // Data Program (56 Kolom Google Spreadsheet)
     Route::get('/data-program', [DataProgramController::class, 'index']);
