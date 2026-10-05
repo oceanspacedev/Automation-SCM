@@ -364,9 +364,7 @@
               <th scope="col" class="py-2.5 px-3 w-[240px] min-w-[240px] max-w-[240px] border-r border-gray-200 bg-gray-50 sticky z-30 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.08)]" style="left: 460px;">
                 <span class="inline-flex items-center gap-1">Nama Program <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
               </th>
-              <!-- 6. Aksi -->
-              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200 bg-gray-50">Lihat</th>
-              <!-- 7. Periode -->
+              <!-- 6. Periode -->
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Periode</th>
               <!-- 8. Region -->
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Region</th>
@@ -433,7 +431,9 @@
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Norek</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Namrek</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Bank</th>
-              <th scope="col" class="py-2.5 px-3 bg-gray-50">Big Region</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Big Region</th>
+              <!-- Kolom Aksi / Lihat (Sticky Right di pojok kanan) -->
+              <th scope="col" class="py-2.5 px-3 text-center border-l border-b border-gray-200 bg-gray-50 sticky right-0 top-0 z-30 min-w-[125px] shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.08)]" style="right: 0px;">Lihat</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
@@ -491,37 +491,7 @@
                 <div class="truncate text-gray-700" :title="row.program_name">{{ row.program_name || '-' }}</div>
               </td>
 
-              <!-- 6. Aksi (Lihat & WA) -->
-              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
-                <div class="flex items-center justify-center gap-1.5">
-                  <button
-                    type="button"
-                    @click.stop="testMatchSingleRow(row)"
-                    :disabled="reconcilingRowId === row.id"
-                    class="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium transition cursor-pointer shadow-2xs disabled:opacity-50"
-                    title="Cek kecocokan data dengan Test Program"
-                  >
-                    <RefreshCwIcon v-if="reconcilingRowId === row.id" class="w-3 h-3 animate-spin text-gray-400" />
-                    <EyeIcon v-else class="w-3.5 h-3.5 text-gray-500" />
-                    <span>Lihat</span>
-                  </button>
-
-                  <button
-                    v-if="row.status_potong_purchase === 'BISA DI POTONG'"
-                    type="button"
-                    @click.stop="sendWaToTelemarketing(row)"
-                    :disabled="sendingWaId === row.id"
-                    class="h-7 px-2 inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium transition cursor-pointer shadow-2xs disabled:opacity-50"
-                    title="Kirim ke WhatsApp Telemarketing"
-                  >
-                    <RefreshCwIcon v-if="sendingWaId === row.id" class="w-3 h-3 animate-spin text-emerald-600" />
-                    <SendIcon v-else class="w-3.5 h-3.5 text-emerald-600" />
-                    <span>WA</span>
-                  </button>
-                </div>
-              </td>
-
-              <!-- 7. Periode -->
+              <!-- 6. Periode -->
               <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.periode || '-' }}
               </td>
@@ -866,8 +836,41 @@
               </td>
 
               <!-- 58. Big Region -->
-              <td class="py-2.5 px-3 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.big_region || '-' }}
+              </td>
+
+              <!-- Kolom Aksi / Lihat (Sticky Right di pojok kanan) -->
+              <td
+                class="py-2.5 px-3 text-center border-l border-gray-100 whitespace-nowrap sticky right-0 z-20 bg-white group-hover:bg-gray-50 transition-colors shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.08)] min-w-[125px]"
+                style="right: 0px;"
+              >
+                <div class="flex items-center justify-center gap-1.5">
+                  <button
+                    type="button"
+                    @click.stop="testMatchSingleRow(row)"
+                    :disabled="reconcilingRowId === row.id"
+                    class="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium transition cursor-pointer shadow-2xs disabled:opacity-50"
+                    title="Cek kecocokan data dengan Test Program"
+                  >
+                    <RefreshCwIcon v-if="reconcilingRowId === row.id" class="w-3 h-3 animate-spin text-gray-400" />
+                    <EyeIcon v-else class="w-3.5 h-3.5 text-gray-500" />
+                    <span>Lihat</span>
+                  </button>
+
+                  <button
+                    v-if="row.status_potong_purchase === 'BISA DI POTONG'"
+                    type="button"
+                    @click.stop="sendWaToTelemarketing(row)"
+                    :disabled="sendingWaId === row.id"
+                    class="h-7 px-2 inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium transition cursor-pointer shadow-2xs disabled:opacity-50"
+                    title="Kirim ke WhatsApp Telemarketing"
+                  >
+                    <RefreshCwIcon v-if="sendingWaId === row.id" class="w-3 h-3 animate-spin text-emerald-600" />
+                    <SendIcon v-else class="w-3.5 h-3.5 text-emerald-600" />
+                    <span>WA</span>
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
