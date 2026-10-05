@@ -22,7 +22,7 @@ const routes = [
   { path: '/invoices', name: 'invoices.index', component: InvoicesIndex, meta: { requiresAuth: true } },
   { path: '/invoices/:id', name: 'invoices.detail', component: InvoiceDetail, props: true, meta: { requiresAuth: true } },
   { path: '/email-logs', name: 'email-logs.index', component: EmailLogsIndex, meta: { requiresAuth: true } },
-  { path: '/form-program', name: 'program-submissions.index', component: ProgramSubmissionsIndex, meta: { requiresAuth: true } },
+  { path: '/form-program', redirect: '/test-program' },
   { path: '/form-submission', name: 'program-submissions.public-form', component: ProgramPublicForm, meta: { requiresAuth: false, isStandalone: true } },
   { path: '/form-realme', name: 'program-realme.public-form', component: ProgramPublicForm, meta: { requiresAuth: false, isStandalone: true } },
   { path: '/form', redirect: '/form-realme' },

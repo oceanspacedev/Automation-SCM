@@ -342,98 +342,98 @@
       </div>
 
       <!-- Table: Styled identically to Test Program for clean spreadsheet look -->
-      <div class="overflow-x-auto max-h-[calc(100vh-240px)]">
+      <div class="relative overflow-auto max-h-[calc(100vh-240px)]">
         <table class="w-full text-left text-xs text-gray-900 border-collapse">
           <thead>
-            <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap sticky top-0 z-10 shadow-2xs">
-              <!-- 1. No (Locked) -->
-              <th scope="col" class="py-2.5 px-3 text-center w-[50px] min-w-[50px] max-w-[50px] border-r border-gray-200 bg-gray-50 sticky left-0 z-30" style="left: 0px;">No</th>
-              <!-- 2. Nama Dealer (Locked) -->
-              <th scope="col" class="py-2.5 px-3 w-[180px] min-w-[180px] max-w-[180px] border-r border-gray-200 bg-gray-50 sticky z-30" style="left: 50px;">
+            <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">
+              <!-- 1. No (Locked Top-Left) -->
+              <th scope="col" class="py-2.5 px-3 text-center w-[50px] min-w-[50px] max-w-[50px] border-r border-b border-gray-200 bg-gray-50 sticky left-0 top-0 z-40 shadow-[0_1px_0_0_#e5e7eb]" style="left: 0px; top: 0px;">No</th>
+              <!-- 2. Nama Dealer (Locked Top-Left) -->
+              <th scope="col" class="py-2.5 px-3 w-[180px] min-w-[180px] max-w-[180px] border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-40 shadow-[0_1px_0_0_#e5e7eb]" style="left: 50px; top: 0px;">
                 <span class="inline-flex items-center gap-1">Nama Dealer <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
               </th>
-              <!-- 3. Program (Locked) -->
-              <th scope="col" class="py-2.5 px-3 w-[130px] min-w-[130px] max-w-[130px] border-r border-gray-200 bg-gray-50 sticky z-30" style="left: 230px;">
+              <!-- 3. Program (Locked Top-Left) -->
+              <th scope="col" class="py-2.5 px-3 w-[130px] min-w-[130px] max-w-[130px] border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-40 shadow-[0_1px_0_0_#e5e7eb]" style="left: 230px; top: 0px;">
                 <span class="inline-flex items-center gap-1">Program <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
               </th>
-              <!-- 4. Kode BT (Locked) -->
-              <th scope="col" class="py-2.5 px-3 w-[100px] min-w-[100px] max-w-[100px] border-r border-gray-200 bg-gray-50 sticky z-30" style="left: 360px;">
+              <!-- 4. Kode BT (Locked Top-Left) -->
+              <th scope="col" class="py-2.5 px-3 w-[100px] min-w-[100px] max-w-[100px] border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-40 shadow-[0_1px_0_0_#e5e7eb]" style="left: 360px; top: 0px;">
                 <span class="inline-flex items-center gap-1">Kode BT <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
               </th>
-              <!-- 5. Nama Program (Locked with divider shadow) -->
-              <th scope="col" class="py-2.5 px-3 w-[240px] min-w-[240px] max-w-[240px] border-r border-gray-200 bg-gray-50 sticky z-30 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.08)]" style="left: 460px;">
+              <!-- 5. Nama Program (Locked Top-Left with divider shadow) -->
+              <th scope="col" class="py-2.5 px-3 w-[240px] min-w-[240px] max-w-[240px] border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-40 shadow-[3px_0_6px_-2px_rgba(0,0,0,0.08),0_1px_0_0_#e5e7eb]" style="left: 460px; top: 0px;">
                 <span class="inline-flex items-center gap-1">Nama Program <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" /></span>
               </th>
               <!-- 6. Periode -->
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Periode</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Periode</th>
               <!-- 8. Region -->
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Region</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Region</th>
               <!-- 9. No PO -->
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">No PO</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">No PO</th>
               <!-- 10. ID GS -->
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">ID GS</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">ID GS</th>
               <!-- 11. Kode Supplier -->
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Kode Supplier</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Kode Supplier</th>
               <!-- 12. Status DL -->
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Status DL</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Status DL</th>
               <!-- 13. Sales Person -->
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Sales Person</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Sales Person</th>
               <!-- 14. Telemarketing -->
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Telemarketing</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Telemarketing</th>
               <!-- 15. Wajib Pajak -->
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Wajib Pajak</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Wajib Pajak</th>
               <!-- 16. TRF PPh -->
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">TRF PPh</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">TRF PPh</th>
               <!-- 17-27. Finansial & Pajak -->
-              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200 bg-gray-50">Incentive</th>
-              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200 bg-gray-50">DPP</th>
-              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200 bg-gray-50">DPP Lain</th>
-              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200 bg-gray-50">PPN</th>
-              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200 bg-gray-50">Nilai PPh</th>
-              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200 bg-gray-50">Net Pay</th>
-              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200 bg-gray-50">Cek Pajak</th>
-              <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200 bg-gray-50">Selisih</th>
-              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200 bg-gray-50">Note PPh</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">No Faktur</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Ket Faktur</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Incentive</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">DPP</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">DPP Lain</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">PPN</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Nilai PPh</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Net Pay</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Cek Pajak</th>
+              <th scope="col" class="py-2.5 px-3 text-right border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Selisih</th>
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Note PPh</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">No Faktur</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Ket Faktur</th>
               <!-- 28-34. Administrasi & Status -->
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">No PO/SJ</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">No Transaksi</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Tgl Input</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Tgl Share CN</th>
-              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200 bg-gray-50">Pending</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Keterangan</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Cek Dokumen</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Status Potong Purchase</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Status AR</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">No PO/SJ</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">No Transaksi</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Tgl Input</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Tgl Share CN</th>
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Pending</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Keterangan</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Cek Dokumen</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Status Potong Purchase</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Status AR</th>
               <!-- 37-46. Tanggal, Bank & Rekening -->
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Tgl Potong/TF</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">No. UID</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">No. Pembayaran</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Tgl Bank PPh</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">T/F</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Tgl Proses</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Tgl SJ</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">No. SJ</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Info Bank</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Pending Potongan</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Tgl Potong/TF</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">No. UID</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">No. Pembayaran</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Tgl Bank PPh</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">T/F</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Tgl Proses</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Tgl SJ</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">No. SJ</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Info Bank</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Pending Potongan</th>
               <!-- 47-49. NPWP & Program 2 -->
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">NPWP</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Nama NPWP</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Program 2</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">NPWP</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Nama NPWP</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Program 2</th>
               <!-- 50-53. Dokumen Lampiran -->
-              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200 bg-gray-50">CN</th>
-              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200 bg-gray-50">Agr</th>
-              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200 bg-gray-50">FP</th>
-              <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200 bg-gray-50">Evid</th>
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">CN</th>
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Agr</th>
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">FP</th>
+              <th scope="col" class="py-2.5 px-3 text-center border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Evid</th>
               <!-- 54-58. Catatan, Bank & Big Region -->
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Noted</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Norek</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Namrek</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Bank</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200 bg-gray-50">Big Region</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Noted</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Norek</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Namrek</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Bank</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Big Region</th>
               <!-- Kolom Aksi / Lihat (Sticky Right di pojok kanan) -->
-              <th scope="col" class="py-2.5 px-3 text-center border-l border-b border-gray-200 bg-gray-50 sticky right-0 top-0 z-30 min-w-[125px] shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.08)]" style="right: 0px;">Lihat</th>
+              <th scope="col" class="py-2.5 px-3 text-center border-l border-b border-gray-200 bg-gray-50 sticky right-0 top-0 z-40 min-w-[125px] shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.08),0_1px_0_0_#e5e7eb]" style="right: 0px; top: 0px;">Lihat</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">

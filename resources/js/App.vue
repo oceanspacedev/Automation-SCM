@@ -88,7 +88,7 @@
                         type="button"
                         :class="[
                           navigationMenuTriggerStyle(),
-                          (isActive('/dashboard') || isActive('/riwayat-program') || isActive('/email-logs') || isActive('/form-program')) && 'bg-gray-100 text-gray-900 font-semibold',
+                          (isActive('/dashboard') || isActive('/riwayat-program') || isActive('/email-logs')) && 'bg-gray-100 text-gray-900 font-semibold',
                           'gap-1.5'
                         ]"
                       >
@@ -100,16 +100,6 @@
                       </button>
                     </PopoverTrigger>
                     <PopoverContent align="start" class="w-48 p-1 rounded-lg border border-gray-200 bg-white shadow-lg text-xs space-y-0.5">
-                      <router-link
-                        to="/form-program"
-                        @click="isRiwayatOpen = false"
-                        :class="[
-                          'block px-3 py-2 rounded-md transition-colors text-xs font-medium',
-                          isActive('/form-program') ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-                        ]"
-                      >
-                        Form Program
-                      </router-link>
 
                       <router-link
                         to="/riwayat-program"
@@ -239,10 +229,10 @@
                   <div class="pt-1 border-t border-gray-100 flex items-center justify-between text-[11px]">
                     <span class="text-gray-400 font-mono">Model: {{ aiStatus.currentModel || 'ag/gemini-3-flash' }}</span>
                     <router-link
-                      to="/form-program"
+                      to="/test-program"
                       class="text-gray-900 hover:text-black font-medium hover:underline flex items-center gap-1"
                     >
-                      <span>Ke Form Program</span>
+                      <span>Ke Test Program</span>
                       <ExternalLinkIcon class="w-3 h-3" />
                     </router-link>
                   </div>

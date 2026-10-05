@@ -1428,6 +1428,80 @@ class ProgramSubmissionTest extends TestCase
         ]);
     }
 
+    public function test_cannot_submit_public_program_form_if_id_real_is_hyphen(): void
+    {
+        Storage::fake('public');
+
+        $cnFile = UploadedFile::fake()->createWithContent('credit_note_toko_jaya.pdf', '%PDF-1.4 CN Toko Jaya');
+        $agrFile = UploadedFile::fake()->createWithContent('agreement_toko_jaya.pdf', '%PDF-1.4 Agreement Toko Jaya');
+
+        $response = $this->postJson('/api/program-submissions/submit-form', [
+            'program_name' => 'PROGRAM DSA FEBRUARI 2026',
+            'region' => 'BIG BANDUNG',
+            'id_real' => '-',
+            'dealer_name' => 'Toko Jaya',
+            'sales_name' => 'SANDY ARJAYAN',
+            'credit_note_file' => $cnFile,
+            'agreement_file' => $agrFile,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('id_real');
+    }
+
+    public function test_public_form_autofills_dealer_name_from_credit_note_when_input_is_hyphen(): void
+    {
+        Storage::fake('public');
+        config(['services.ai_router.api_key' => null]);
+
+        $cnFile = UploadedFile::fake()->createWithContent('credit_note_newco_cell.pdf', '%PDF-1.4 CN NEWCO CELL');
+        $agrFile = UploadedFile::fake()->createWithContent('agreement_newco_cell.pdf', '%PDF-1.4 Agreement Newco Cell');
+
+        $response = $this->postJson('/api/program-submissions/submit-form', [
+            'program_name' => 'PROGRAM DSA FEBRUARI 2026',
+            'region' => 'BIG BANDUNG',
+            'id_real' => 'IDME00999',
+            'dealer_name' => '-', // User entered '-' to auto-read from CN
+            'sales_name' => 'SANDY ARJAYAN',
+            'credit_note_file' => $cnFile,
+            'agreement_file' => $agrFile,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+        $this->assertDatabaseHas('program_submissions', [
+            'id_real' => 'IDME00999',
+            'dealer_name' => 'Newco Cell',
+        ]);
+    }
+
+    public function test_public_form_blocks_mismatched_dealer_name_unless_hyphen_is_used(): void
+    {
+        Storage::fake('public');
+        config(['services.ai_router.api_key' => null]);
+
+        $cnFile = UploadedFile::fake()->createWithContent('credit_note_newco_cell.pdf', '%PDF-1.4 CN NEWCO CELL');
+        $agrFile = UploadedFile::fake()->createWithContent('agreement_newco_cell.pdf', '%PDF-1.4 Agreement Newco Cell');
+
+        // 1. Entering a different dealer name 'Ocean Cell' should be blocked
+        $response = $this->postJson('/api/program-submissions/submit-form', [
+            'program_name' => 'PROGRAM DSA FEBRUARI 2026',
+            'region' => 'BIG BANDUNG',
+            'id_real' => 'IDME00998',
+            'dealer_name' => 'Ocean Cell',
+            'sales_name' => 'SANDY ARJAYAN',
+            'credit_note_file' => $cnFile,
+            'agreement_file' => $agrFile,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('success', false);
+        $this->assertEquals('DEALER_MISMATCH', $response->json('error_type'));
+        $this->assertDatabaseMissing('program_submissions', [
+            'id_real' => 'IDME00998',
+        ]);
+    }
+
     public function test_can_filter_submissions_by_web_form_source(): void
     {
         $user = User::factory()->create();
@@ -1525,5 +1599,187 @@ class ProgramSubmissionTest extends TestCase
                    $data['dealer_name'] === $sub->dealer_name &&
                    count($data['row']) === 11;
         });
+    }
+
+    public function test_submit_form_fails_if_agreement_dealer_mismatches(): void
+    {
+        Storage::fake('public');
+        config(['services.ai_router.api_key' => '']);
+        config(['services.openai_compatible.api_key' => '']);
+        Cache::forget(DocumentAnalysisService::CACHE_KEY_CONFIG);
+
+        $cnFile = UploadedFile::fake()->create('CN_NEWCO_CELL.pdf', 100, 'application/pdf');
+        $agrFile = UploadedFile::fake()->create('AGR_OCEAN_CELL.pdf', 100, 'application/pdf');
+
+        $response = $this->post('/api/program-submissions/submit-form', [
+            'program_name' => 'PROGRAM DSA JULI 2026',
+            'region' => 'BIG CIREBON',
+            'id_real' => 'BT2026',
+            'dealer_name' => 'NEWCO CELL',
+            'sales_name' => 'A HASYIM AKBAR',
+            'credit_note_file' => $cnFile,
+            'agreement_file' => $agrFile,
+        ], ['Accept' => 'application/json']);
+
+        $response->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+                'error_type' => 'AGR_DEALER_MISMATCH',
+            ]);
+    }
+
+    public function test_submit_form_fails_if_agreement_program_mismatches(): void
+    {
+        Storage::fake('public');
+        config(['services.ai_router.api_key' => '']);
+        config(['services.openai_compatible.api_key' => '']);
+        Cache::forget(DocumentAnalysisService::CACHE_KEY_CONFIG);
+
+        $cnFile = UploadedFile::fake()->create('CN_NEWCO_CELL.pdf', 100, 'application/pdf');
+        $agrFile = UploadedFile::fake()->create('AGR_PROGRAM_RENO_8.pdf', 100, 'application/pdf');
+
+        $response = $this->post('/api/program-submissions/submit-form', [
+            'program_name' => 'PROGRAM DSA JULI 2026',
+            'region' => 'BIG CIREBON',
+            'id_real' => 'BT2026',
+            'dealer_name' => 'NEWCO CELL',
+            'sales_name' => 'A HASYIM AKBAR',
+            'credit_note_file' => $cnFile,
+            'agreement_file' => $agrFile,
+        ], ['Accept' => 'application/json']);
+
+        $response->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+                'error_type' => 'AGR_PROGRAM_MISMATCH',
+            ]);
+    }
+
+    public function test_submit_form_succeeds_when_agreement_dealer_and_program_match(): void
+    {
+        Storage::fake('public');
+        config(['services.ai_router.api_key' => '']);
+        config(['services.openai_compatible.api_key' => '']);
+        Cache::forget(DocumentAnalysisService::CACHE_KEY_CONFIG);
+
+        $cnFile = UploadedFile::fake()->create('CN_NEWCO_CELL.pdf', 100, 'application/pdf');
+        $agrFile = UploadedFile::fake()->create('AGR_PROGRAM_DSA_JULI_2026_NEWCO_CELL.pdf', 100, 'application/pdf');
+
+        $response = $this->post('/api/program-submissions/submit-form', [
+            'program_name' => 'PROGRAM DSA JULI 2026',
+            'region' => 'BIG CIREBON',
+            'id_real' => 'BT2026',
+            'dealer_name' => 'NEWCO CELL',
+            'sales_name' => 'A HASYIM AKBAR',
+            'credit_note_file' => $cnFile,
+            'agreement_file' => $agrFile,
+        ], ['Accept' => 'application/json']);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+            ]);
+    }
+
+    public function test_submit_form_allows_minor_dealer_name_typos_such_as_newcoo_vs_newco(): void
+    {
+        Storage::fake('public');
+        config(['services.ai_router.api_key' => '']);
+        config(['services.openai_compatible.api_key' => '']);
+        Cache::forget(DocumentAnalysisService::CACHE_KEY_CONFIG);
+
+        $cnFile = UploadedFile::fake()->create('INVOICE-PROGRAM DSA JULI 2026-NEWCO CELL (DLKS2217).pdf', 100, 'application/pdf');
+        $agrFile = UploadedFile::fake()->create('Agreement Realme CV Top-PKP (7) NEWCOO PROGRAM DSA JULI 2026.pdf', 100, 'application/pdf');
+
+        $response = $this->post('/api/program-submissions/submit-form', [
+            'program_name' => 'PROGRAM DSA JULI 2026',
+            'region' => 'BIG CIREBON',
+            'id_real' => 'DLKS2217',
+            'dealer_name' => 'NEWCOO CELL',
+            'sales_name' => 'A HASYIM AKBAR',
+            'credit_note_file' => $cnFile,
+            'agreement_file' => $agrFile,
+        ], ['Accept' => 'application/json']);
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+            ]);
+    }
+
+    public function test_dealer_name_matching_handles_minor_typos_and_extra_letters(): void
+    {
+        $service = app(DocumentAnalysisService::class);
+
+        // Matching cases (missing/extra O, double letters, minor typos)
+        $this->assertTrue($service->isDealerNameMatching('NEWCOO CELL', 'NEWCO CELL'));
+        $this->assertTrue($service->isDealerNameMatching('NEWCO CELL', 'NEWCOO CELL'));
+        $this->assertTrue($service->isDealerNameMatching('NEWCOOOO CELL', 'NEWCO CELL'));
+        $this->assertTrue($service->isDealerNameMatching('NEWCOO', 'NEWCO'));
+        $this->assertTrue($service->isDealerNameMatching('CV NEWCO CELL', 'NEWCO CELL'));
+        $this->assertTrue($service->isDealerNameMatching('NEWCO CELLULAR', 'NEWCO CELL'));
+        $this->assertTrue($service->isDealerNameMatching('SAMSUNG CELL', 'SAMSUN CELL'));
+
+        // Non-matching cases (completely different dealers)
+        $this->assertFalse($service->isDealerNameMatching('NEWCO CELL', 'OCEAN CELL'));
+        $this->assertFalse($service->isDealerNameMatching('OCEAN CELL', 'NEWCO CELL'));
+        $this->assertFalse($service->isDealerNameMatching('BINTANG CELL', 'NEWCO CELL'));
+    }
+
+    public function test_inspect_document_files_overrides_ai_mismatch_when_typo_matches(): void
+    {
+        $service = app(DocumentAnalysisService::class);
+
+        // Simulate AI router returning mismatch due to "NEWCO CELL" vs "NEWCOO CELL"
+        $mock = new class extends DocumentAnalysisService
+        {
+            public function inspectDocumentFiles(array $formData, array $filesOrUrls): array
+            {
+                // Inject AI response containing dealer mismatch
+                $parsed = [
+                    'dealer_name' => 'NEWCO CELL',
+                    'dealer_mismatch' => true,
+                    'agr_dealer_name' => 'NEWCO CELL',
+                    'agr_dealer_mismatch' => true,
+                    'agr_program_name' => 'PROGRAM DSA JULI 2026',
+                    'agr_program_mismatch' => false,
+                    'is_complete' => false,
+                    'cek_dokumen' => 'NAMA DEALER TIDAK SESUAI (CN)',
+                    'status_potong_purchase' => 'BELUM BISA POTONG',
+                    'keterangan' => "Nama dealer di formulir ('NEWCOO CELL') berbeda dengan dokumen Credit Note ('NEWCO CELL').",
+                    'doc_validation' => [
+                        'cn' => [
+                            'status' => 'invalid',
+                            'actual_type' => 'cn',
+                            'message' => "Nama dealer di dokumen ('NEWCO CELL') berbeda dengan Form ('NEWCOO CELL').",
+                        ],
+                        'agr' => [
+                            'status' => 'invalid',
+                            'actual_type' => 'agr',
+                            'message' => "Nama dealer pada dokumen Agreement ('NEWCO CELL') berbeda dengan formulir ('NEWCOO CELL').",
+                        ],
+                    ],
+                ];
+
+                // Calling parent inspect with parsed injected by mocking method or verifying override
+                return parent::inspectDocumentFiles($formData, $filesOrUrls);
+            }
+        };
+
+        $cnFile = UploadedFile::fake()->create('CN_NEWCO_CELL.pdf', 100, 'application/pdf');
+        $agrFile = UploadedFile::fake()->create('AGR_NEWCO_CELL.pdf', 100, 'application/pdf');
+
+        $result = $service->inspectDocumentFiles([
+            'dealer_name' => 'NEWCOO CELL',
+            'program_name' => 'PROGRAM DSA JULI 2026',
+        ], [
+            'cn' => $cnFile,
+            'agr' => $agrFile,
+        ]);
+
+        $this->assertFalse($result['dealer_mismatch']);
+        $this->assertFalse($result['agr_dealer_mismatch']);
+        $this->assertEquals('valid', $result['doc_validation']['cn']['status']);
+        $this->assertEquals('valid', $result['doc_validation']['agr']['status']);
     }
 }

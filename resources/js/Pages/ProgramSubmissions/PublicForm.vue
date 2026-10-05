@@ -179,19 +179,60 @@
           class="bg-white rounded-xl shadow-xs border p-6 space-y-3 transition"
           :class="validationErrors.dealer_name ? 'border-rose-300 ring-1 ring-rose-100' : 'border-gray-200'"
         >
-          <label class="block text-sm sm:text-base font-medium text-gray-900">
-            NAMA DEALER <span class="text-rose-500">*</span>
-          </label>
+          <div class="flex items-center justify-between gap-2">
+            <label class="block text-sm sm:text-base font-medium text-gray-900">
+              NAMA DEALER <span class="text-rose-500">*</span>
+            </label>
+            <span
+              v-if="isAutoFilledDealer"
+              class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+            >
+              <CheckIcon class="w-3 h-3" /> Terisi Otomatis dari Dokumen
+            </span>
+          </div>
 
           <div class="pt-1">
             <input
               type="text"
               v-model="form.dealer_name"
+              @input="isAutoFilledDealer = false"
               @blur="validateField('dealer_name'); triggerAiPreValidationDebounced()"
               placeholder="Jawaban Anda"
               class="w-full text-xs sm:text-sm border-b pb-1.5 focus:outline-none transition bg-transparent placeholder:text-gray-400"
               :class="validationErrors.dealer_name ? 'border-rose-500' : 'border-gray-300 focus:border-orange-500'"
             />
+          </div>
+
+          <!-- Dealer mismatch warning in card -->
+          <div
+            v-if="aiAnalysis.dealerMismatch && form.dealer_name.trim() !== '-'"
+            class="p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-900 space-y-2 animate-in fade-in duration-150"
+          >
+            <div class="flex items-start gap-2">
+              <AlertCircleIcon class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div class="space-y-1">
+                <p class="font-semibold text-amber-950">Nama Dealer Berbeda dengan Dokumen</p>
+                <p>
+                  Nama pada dokumen Credit Note adalah <strong>"{{ aiAnalysis.extractedDealerName }}"</strong>, berbeda dengan isian formulir <strong>"{{ form.dealer_name }}"</strong>.
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                @click="applyDealerFromCn"
+                class="px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-medium transition cursor-pointer"
+              >
+                Gunakan "{{ aiAnalysis.extractedDealerName }}"
+              </button>
+              <button
+                type="button"
+                @click="form.dealer_name = '-'; isAutoFilledDealer = true; aiAnalysis.dealerMismatch = false"
+                class="text-[11px] text-amber-800 underline hover:text-amber-950 cursor-pointer"
+              >
+                Set '-' agar otomatis
+              </button>
+            </div>
           </div>
 
           <div v-if="validationErrors.dealer_name" class="flex items-center gap-1.5 text-xs text-rose-600 pt-1">
@@ -485,6 +526,47 @@
             </div>
           </div>
 
+          <!-- Warning for Agreement Dealer Mismatch -->
+          <div
+            v-if="aiAnalysis.agrDealerMismatch && form.dealer_name.trim() !== '-'"
+            class="p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-900 space-y-2 animate-in fade-in duration-150"
+          >
+            <div class="flex items-start gap-2">
+              <AlertCircleIcon class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div class="space-y-1">
+                <p class="font-semibold text-amber-950">Nama Dealer di Agreement Tidak Sesuai</p>
+                <p>
+                  Nama dealer pada dokumen Agreement adalah <strong>"{{ aiAnalysis.extractedAgrDealerName }}"</strong>, berbeda dengan isian formulir <strong>"{{ form.dealer_name }}"</strong>.
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                @click="applyDealerFromAgr"
+                class="px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-medium transition cursor-pointer"
+              >
+                Gunakan "{{ aiAnalysis.extractedAgrDealerName }}"
+              </button>
+            </div>
+          </div>
+
+          <!-- Warning for Agreement Program Mismatch -->
+          <div
+            v-if="aiAnalysis.agrProgramMismatch"
+            class="p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-900 space-y-1.5 animate-in fade-in duration-150"
+          >
+            <div class="flex items-start gap-2">
+              <AlertCircleIcon class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div class="space-y-1">
+                <p class="font-semibold text-amber-950">Nama Program di Agreement Tidak Sesuai</p>
+                <p>
+                  Nama program pada dokumen Agreement adalah <strong>"{{ aiAnalysis.extractedAgrProgramName }}"</strong>, berbeda dengan program yang dipilih <strong>"{{ form.program_name }}"</strong>.
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div v-if="validationErrors.agreement" class="flex items-center gap-1.5 text-xs text-rose-600 pt-1">
             <AlertCircleIcon class="w-4 h-4 shrink-0" />
             <span>{{ validationErrors.agreement }}</span>
@@ -741,6 +823,8 @@ const validationErrors = reactive({
 });
 
 // AI Inspection State
+const isAutoFilledDealer = ref(false);
+
 const aiAnalysis = reactive({
   isScanning: false,
   hasScanned: false,
@@ -754,8 +838,32 @@ const aiAnalysis = reactive({
   docValidation: null,
   financial: null,
   audit: null,
+  extractedDealerName: '',
+  dealerMismatch: false,
+  extractedAgrDealerName: '',
+  agrDealerMismatch: false,
+  extractedAgrProgramName: '',
+  agrProgramMismatch: false,
   errorMsg: '',
 });
+
+function applyDealerFromCn() {
+  if (aiAnalysis.extractedDealerName) {
+    form.dealer_name = aiAnalysis.extractedDealerName;
+    isAutoFilledDealer.value = true;
+    aiAnalysis.dealerMismatch = false;
+    validationErrors.dealer_name = '';
+  }
+}
+
+function applyDealerFromAgr() {
+  if (aiAnalysis.extractedAgrDealerName) {
+    form.dealer_name = aiAnalysis.extractedAgrDealerName;
+    isAutoFilledDealer.value = true;
+    aiAnalysis.agrDealerMismatch = false;
+    validationErrors.dealer_name = '';
+  }
+}
 
 const isSubmitting = ref(false);
 const submitProgressText = ref('Mengirim...');
@@ -973,6 +1081,49 @@ async function triggerAiPreValidation() {
       aiAnalysis.docValidation = d.doc_validation || {};
       aiAnalysis.financial = d.financial || {};
       aiAnalysis.audit = d.audit || {};
+      aiAnalysis.extractedDealerName = d.dealer_name || '';
+      aiAnalysis.dealerMismatch = !!d.dealer_mismatch;
+      aiAnalysis.extractedAgrDealerName = d.agr_dealer_name || '';
+      aiAnalysis.agrDealerMismatch = !!d.agr_dealer_mismatch;
+      aiAnalysis.extractedAgrProgramName = d.agr_program_name || '';
+      aiAnalysis.agrProgramMismatch = !!d.agr_program_mismatch;
+
+      // Sanitize minor typos (e.g. NEWCOO CELL vs NEWCO CELL)
+      if (d.dealer_name && form.dealer_name.trim() && form.dealer_name.trim() !== '-') {
+        if (isDealerNameSimilar(form.dealer_name, d.dealer_name)) {
+          aiAnalysis.dealerMismatch = false;
+          d.dealer_mismatch = false;
+          if (aiAnalysis.docValidation?.cn?.status === 'invalid') {
+            const cnMsg = (aiAnalysis.docValidation.cn.message || '').toLowerCase();
+            if (cnMsg.includes('dealer') || cnMsg.includes('berbeda') || cnMsg.includes('nama')) {
+              aiAnalysis.docValidation.cn.status = 'valid';
+              aiAnalysis.docValidation.cn.message = 'Dokumen Credit Note terverifikasi.';
+            }
+          }
+        }
+      }
+      if (d.agr_dealer_name && form.dealer_name.trim() && form.dealer_name.trim() !== '-') {
+        if (isDealerNameSimilar(form.dealer_name, d.agr_dealer_name)) {
+          aiAnalysis.agrDealerMismatch = false;
+          d.agr_dealer_mismatch = false;
+          if (aiAnalysis.docValidation?.agr?.status === 'invalid') {
+            const agrMsg = (aiAnalysis.docValidation.agr.message || '').toLowerCase();
+            if (agrMsg.includes('dealer') || agrMsg.includes('berbeda') || agrMsg.includes('nama')) {
+              aiAnalysis.docValidation.agr.status = 'valid';
+              aiAnalysis.docValidation.agr.message = 'Dokumen Agreement terverifikasi.';
+            }
+          }
+        }
+      }
+
+      // Auto-populate dealer name if user entered '-' or left empty
+      if (d.dealer_name && (!form.dealer_name.trim() || form.dealer_name.trim() === '-')) {
+        form.dealer_name = d.dealer_name;
+        isAutoFilledDealer.value = true;
+        aiAnalysis.dealerMismatch = false;
+        aiAnalysis.agrDealerMismatch = false;
+        validationErrors.dealer_name = '';
+      }
     }
   } catch (e) {
     aiAnalysis.errorMsg = e.response?.data?.message || e.message;
@@ -985,16 +1136,23 @@ async function triggerAiPreValidation() {
 }
 
 function validateField(field) {
-  if (field === 'id_real' && !form.id_real.trim()) {
-    validationErrors.id_real = 'Pertanyaan ini wajib diisi';
-  } else if (field === 'id_real') {
-    validationErrors.id_real = '';
+  if (field === 'id_real') {
+    const val = form.id_real.trim();
+    if (!val) {
+      validationErrors.id_real = 'Pertanyaan ini wajib diisi';
+    } else if (val === '-' || /^[-_\s]+$/.test(val)) {
+      validationErrors.id_real = 'ID REALME wajib diisi dan tidak boleh hanya berisi tanda hubung (-)';
+    } else {
+      validationErrors.id_real = '';
+    }
   }
 
-  if (field === 'dealer_name' && !form.dealer_name.trim()) {
-    validationErrors.dealer_name = 'Pertanyaan ini wajib diisi';
-  } else if (field === 'dealer_name') {
-    validationErrors.dealer_name = '';
+  if (field === 'dealer_name') {
+    if (!form.dealer_name.trim()) {
+      validationErrors.dealer_name = 'Pertanyaan ini wajib diisi';
+    } else {
+      validationErrors.dealer_name = '';
+    }
   }
 }
 
@@ -1015,8 +1173,12 @@ function validateAllFields() {
     validationErrors.region = '';
   }
 
-  if (!form.id_real.trim()) {
+  const idVal = form.id_real.trim();
+  if (!idVal) {
     validationErrors.id_real = 'Pertanyaan ini wajib diisi';
+    isValid = false;
+  } else if (idVal === '-' || /^[-_\s]+$/.test(idVal)) {
+    validationErrors.id_real = 'ID REALME wajib diisi dan tidak boleh hanya berisi tanda hubung (-)';
     isValid = false;
   } else {
     validationErrors.id_real = '';
@@ -1097,6 +1259,50 @@ async function handleSubmit() {
       aiAnalysis.keterangan = preValResult.keterangan || '';
       aiAnalysis.docValidation = preValResult.doc_validation || {};
       aiAnalysis.financial = preValResult.financial || {};
+      aiAnalysis.extractedDealerName = preValResult.dealer_name || '';
+      aiAnalysis.dealerMismatch = !!preValResult.dealer_mismatch;
+      aiAnalysis.extractedAgrDealerName = preValResult.agr_dealer_name || '';
+      aiAnalysis.agrDealerMismatch = !!preValResult.agr_dealer_mismatch;
+      aiAnalysis.extractedAgrProgramName = preValResult.agr_program_name || '';
+      aiAnalysis.agrProgramMismatch = !!preValResult.agr_program_mismatch;
+
+      // Auto-adopt dealer name if user entered '-'
+      if (preValResult.dealer_name && (!form.dealer_name.trim() || form.dealer_name.trim() === '-')) {
+        form.dealer_name = preValResult.dealer_name;
+        isAutoFilledDealer.value = true;
+        aiAnalysis.dealerMismatch = false;
+        aiAnalysis.agrDealerMismatch = false;
+        preValResult.dealer_mismatch = false;
+        preValResult.agr_dealer_mismatch = false;
+      }
+
+      // Sanitize minor typos in submit flow (e.g. NEWCOO CELL vs NEWCO CELL)
+      if (preValResult.dealer_name && form.dealer_name.trim() && form.dealer_name.trim() !== '-') {
+        if (isDealerNameSimilar(form.dealer_name, preValResult.dealer_name)) {
+          aiAnalysis.dealerMismatch = false;
+          preValResult.dealer_mismatch = false;
+          if (aiAnalysis.docValidation?.cn?.status === 'invalid') {
+            const cnMsg = (aiAnalysis.docValidation.cn.message || '').toLowerCase();
+            if (cnMsg.includes('dealer') || cnMsg.includes('berbeda') || cnMsg.includes('nama')) {
+              aiAnalysis.docValidation.cn.status = 'valid';
+              aiAnalysis.docValidation.cn.message = 'Dokumen Credit Note terverifikasi.';
+            }
+          }
+        }
+      }
+      if (preValResult.agr_dealer_name && form.dealer_name.trim() && form.dealer_name.trim() !== '-') {
+        if (isDealerNameSimilar(form.dealer_name, preValResult.agr_dealer_name)) {
+          aiAnalysis.agrDealerMismatch = false;
+          preValResult.agr_dealer_mismatch = false;
+          if (aiAnalysis.docValidation?.agr?.status === 'invalid') {
+            const agrMsg = (aiAnalysis.docValidation.agr.message || '').toLowerCase();
+            if (agrMsg.includes('dealer') || agrMsg.includes('berbeda') || agrMsg.includes('nama')) {
+              aiAnalysis.docValidation.agr.status = 'valid';
+              aiAnalysis.docValidation.agr.message = 'Dokumen Agreement terverifikasi.';
+            }
+          }
+        }
+      }
     }
   } catch (err) {
     // If pre-validation endpoint failed network-wise, backend submitForm will still validate
@@ -1116,7 +1322,58 @@ async function handleSubmit() {
     return;
   }
 
-  // 2. BLOCK IF INVALID OR NOT ELIGIBLE (BELUM BISA POTONG)
+  // 2. BLOCK IF CN DEALER NAME MISMATCH
+  const hasMismatch = (preValResult?.dealer_mismatch || aiAnalysis.dealerMismatch) && form.dealer_name.trim() !== '-';
+  if (hasMismatch) {
+    isSubmitting.value = false;
+    const docDealer = preValResult?.dealer_name || aiAnalysis.extractedDealerName || 'Dokumen Credit Note';
+    openValidationModal({
+      title: 'Nama Dealer Tidak Sesuai (CN)',
+      message: `Nama dealer yang diisi ('${form.dealer_name}') berbeda dengan nama pada dokumen Credit Note ('${docDealer}').`,
+      details: [
+        `Nama di formulir: ${form.dealer_name}`,
+        `Nama di dokumen Credit Note: ${docDealer}`,
+        `Solusi: Samakan nama dealer dengan dokumen, atau cukup isi tanda '-' agar sistem membaca otomatis.`,
+      ],
+    });
+    return;
+  }
+
+  // 3. BLOCK IF AGREEMENT DEALER MISMATCH
+  const hasAgrDealerMismatch = (preValResult?.agr_dealer_mismatch || aiAnalysis.agrDealerMismatch) && form.dealer_name.trim() !== '-';
+  if (hasAgrDealerMismatch) {
+    isSubmitting.value = false;
+    const docAgrDealer = preValResult?.agr_dealer_name || aiAnalysis.extractedAgrDealerName || 'Dokumen Agreement';
+    openValidationModal({
+      title: 'Nama Dealer di Agreement Tidak Sesuai',
+      message: `Nama dealer yang diajukan ('${form.dealer_name}') berbeda dengan nama dealer pada dokumen Agreement ('${docAgrDealer}').`,
+      details: [
+        `Nama di formulir: ${form.dealer_name}`,
+        `Nama di dokumen Agreement: ${docAgrDealer}`,
+        `Solusi: Pastikan dokumen Agreement yang diunggah sesuai dengan toko/dealer yang diajukan.`,
+      ],
+    });
+    return;
+  }
+
+  // 4. BLOCK IF AGREEMENT PROGRAM MISMATCH
+  const hasAgrProgMismatch = (preValResult?.agr_program_mismatch || aiAnalysis.agrProgramMismatch);
+  if (hasAgrProgMismatch) {
+    isSubmitting.value = false;
+    const docAgrProg = preValResult?.agr_program_name || aiAnalysis.extractedAgrProgramName || 'Dokumen Agreement';
+    openValidationModal({
+      title: 'Nama Program di Agreement Tidak Sesuai',
+      message: `Nama program yang dipilih ('${form.program_name}') berbeda dengan nama program pada dokumen Agreement ('${docAgrProg}').`,
+      details: [
+        `Program di formulir: ${form.program_name}`,
+        `Program di dokumen Agreement: ${docAgrProg}`,
+        `Solusi: Pastikan dokumen Agreement yang diunggah sesuai dengan program yang dipilih.`,
+      ],
+    });
+    return;
+  }
+
+  // 3. BLOCK IF INVALID OR NOT ELIGIBLE (BELUM BISA POTONG)
   if (preValResult?.has_invalid || preValResult?.status_potong_purchase === 'BELUM BISA POTONG') {
     isSubmitting.value = false;
     const issues = [];
@@ -1195,10 +1452,13 @@ function handleClearForm() {
     filePreviews.tax_invoice = null;
 
     Object.keys(validationErrors).forEach(k => validationErrors[k] = '');
+    isAutoFilledDealer.value = false;
     aiAnalysis.hasScanned = false;
     aiAnalysis.docValidation = null;
     aiAnalysis.hasSwapped = false;
     aiAnalysis.hasInvalid = false;
+    aiAnalysis.dealerMismatch = false;
+    aiAnalysis.extractedDealerName = '';
     isScanningDoc.credit_note = false;
     isScanningDoc.agreement = false;
     isScanningDoc.tax_invoice = false;
@@ -1223,6 +1483,38 @@ function formatFileSize(bytes) {
 function formatNumber(num) {
   if (num === null || num === undefined) return '0';
   return new Intl.NumberFormat('id-ID').format(Math.round(num));
+}
+
+function isDealerNameSimilar(a, b) {
+  if (!a || !b) return true;
+  const cleanA = a.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleanB = b.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!cleanA || !cleanB || cleanA === '-' || cleanB === '-') return true;
+  if (cleanA === cleanB || cleanA.includes(cleanB) || cleanB.includes(cleanA)) return true;
+
+  // Collapse consecutive duplicate characters (e.g. newcoo -> newco)
+  const collapseA = cleanA.replace(/(.)\1+/g, '$1');
+  const collapseB = cleanB.replace(/(.)\1+/g, '$1');
+  if (collapseA === collapseB || collapseA.includes(collapseB) || collapseB.includes(collapseA)) return true;
+
+  // Strip generic corporate / store words
+  const stripWords = (s) => s.toLowerCase().replace(/\b(pt|cv|ud|toko|cell|cellular|selular|store|phone|telemarketing|cirebon)\b/g, '').replace(/[^a-z0-9]/g, '');
+  const coreA = stripWords(a);
+  const coreB = stripWords(b);
+  if (coreA && coreB) {
+    if (coreA === coreB || coreA.includes(coreB) || coreB.includes(coreA)) return true;
+    const collapseCoreA = coreA.replace(/(.)\1+/g, '$1');
+    const collapseCoreB = coreB.replace(/(.)\1+/g, '$1');
+    if (collapseCoreA === collapseCoreB || collapseCoreA.includes(collapseCoreB) || collapseCoreB.includes(collapseCoreA)) return true;
+    if (Math.min(coreA.length, coreB.length) >= 3 && Math.abs(coreA.length - coreB.length) <= 2) {
+      let diff = 0;
+      for (let i = 0; i < Math.min(coreA.length, coreB.length); i++) {
+        if (coreA[i] !== coreB[i]) diff++;
+      }
+      if (diff <= 2) return true;
+    }
+  }
+  return false;
 }
 
 </script>

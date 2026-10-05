@@ -7,7 +7,6 @@ use App\Models\DataProgram;
 use App\Models\ProgramSubmission;
 use App\Services\DataProgramSyncService;
 use App\Services\DocumentAnalysisService;
-use App\Services\ProgramReconciliationService;
 use App\Services\ProgramSubmissionService;
 use App\Services\WhatsAppService;
 use Exception;
@@ -1094,7 +1093,17 @@ class ProgramSubmissionController extends Controller
         $request->validate([
             'program_name' => ['required', 'string', 'max:255'],
             'region' => ['required', 'string', 'max:100'],
-            'id_real' => ['required', 'string', 'max:100'],
+            'id_real' => [
+                'required',
+                'string',
+                'max:100',
+                function ($attribute, $value, $fail) {
+                    $val = trim((string) $value);
+                    if ($val === '' || trim($val, "- \t\n\r\0\x0B") === '') {
+                        $fail('ID REALME wajib diisi dan tidak boleh hanya berisi tanda hubung (-).');
+                    }
+                },
+            ],
             'dealer_name' => ['required', 'string', 'max:255'],
             'sales_name' => ['required', 'string', 'max:255'],
             'whatsapp' => ['nullable', 'string', 'max:30'],
@@ -1127,6 +1136,70 @@ class ProgramSubmissionController extends Controller
             'agr' => $request->file('agreement_file') ?: $request->input('agreement_url'),
             'faktur' => $request->file('tax_invoice_file') ?: $request->input('tax_invoice_url'),
         ]);
+
+        // Auto-fill or validate dealer name from CN or Agreement if input is '-' or empty
+        $isDealerAuto = ($formData['dealer_name'] === '-' || $formData['dealer_name'] === '');
+        if ($isDealerAuto) {
+            if (! empty($inspection['dealer_name'])) {
+                $formData['dealer_name'] = $inspection['dealer_name'];
+            } elseif (! empty($inspection['agr_dealer_name'])) {
+                $formData['dealer_name'] = $inspection['agr_dealer_name'];
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Nama dealer diisi '-', namun sistem tidak dapat membaca nama toko otomatis dari dokumen Credit Note maupun Agreement. Silakan ketik nama dealer secara manual.",
+                    'error_type' => 'DEALER_NAME_REQUIRED',
+                ], 422);
+            }
+
+            if (! empty($inspection['dealer_name']) && ! empty($inspection['agr_dealer_name'])) {
+                if (! $this->aiService->isDealerNameMatching($inspection['dealer_name'], $inspection['agr_dealer_name'])) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Nama dealer pada Credit Note ('{$inspection['dealer_name']}') berbeda dengan nama dealer pada Agreement ('{$inspection['agr_dealer_name']}'). Harap pastikan kedua dokumen berasal dari dealer yang sama.",
+                        'error_type' => 'DOC_DEALER_CONFLICT',
+                        'doc_validation' => $inspection['doc_validation'] ?? [],
+                        'cek_dokumen' => $inspection['cek_dokumen'] ?? '',
+                    ], 422);
+                }
+            }
+        } elseif (! empty($inspection['dealer_mismatch'])) {
+            $extracted = $inspection['dealer_name'] ?? 'Dokumen CN';
+
+            return response()->json([
+                'success' => false,
+                'message' => "Nama dealer di formulir ('{$formData['dealer_name']}') tidak sesuai dengan nama dealer pada dokumen Credit Note ('{$extracted}'). Harap sesuaikan atau isi '-' agar nama dealer otomatis diambil dari dokumen.",
+                'error_type' => 'DEALER_MISMATCH',
+                'doc_validation' => $inspection['doc_validation'] ?? [],
+                'cek_dokumen' => $inspection['cek_dokumen'] ?? '',
+            ], 422);
+        }
+
+        // Agreement Dealer Mismatch
+        if (! empty($inspection['agr_dealer_mismatch'])) {
+            $extractedAgrDealer = $inspection['agr_dealer_name'] ?? 'Dokumen Agreement';
+
+            return response()->json([
+                'success' => false,
+                'message' => "Nama dealer di formulir ('{$formData['dealer_name']}') tidak sesuai dengan nama dealer pada dokumen Agreement ('{$extractedAgrDealer}'). Harap sesuaikan dokumen Agreement Anda.",
+                'error_type' => 'AGR_DEALER_MISMATCH',
+                'doc_validation' => $inspection['doc_validation'] ?? [],
+                'cek_dokumen' => $inspection['cek_dokumen'] ?? '',
+            ], 422);
+        }
+
+        // Agreement Program Mismatch
+        if (! empty($inspection['agr_program_mismatch'])) {
+            $extractedAgrProgram = $inspection['agr_program_name'] ?? 'Dokumen Agreement';
+
+            return response()->json([
+                'success' => false,
+                'message' => "Nama program yang diajukan ('{$formData['program_name']}') tidak sesuai dengan nama program pada dokumen Agreement ('{$extractedAgrProgram}'). Harap sesuaikan dokumen Agreement Anda.",
+                'error_type' => 'AGR_PROGRAM_MISMATCH',
+                'doc_validation' => $inspection['doc_validation'] ?? [],
+                'cek_dokumen' => $inspection['cek_dokumen'] ?? '',
+            ], 422);
+        }
 
         // 2. Strictly block submission if documents are swapped or invalid
         if (! empty($inspection['has_swapped'])) {
@@ -1266,13 +1339,6 @@ class ProgramSubmissionController extends Controller
                 'user_agent' => $request->userAgent(),
             ],
         ]);
-
-        // Auto-reconcile with DataProgram (56 Kolom)
-        try {
-            app(ProgramReconciliationService::class)->reconcileFromSubmission($submission);
-        } catch (\Throwable $e) {
-            Log::warning('Auto-reconcile after web form submission failed: '.$e->getMessage());
-        }
 
         // Otomatis push data pengajuan ke Google Spreadsheet
         $sheetResult = null;

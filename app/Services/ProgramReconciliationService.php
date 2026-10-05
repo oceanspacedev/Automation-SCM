@@ -933,6 +933,10 @@ class ProgramReconciliationService
      */
     public function reconcileFromSubmission(ProgramSubmission $submission): ?DataProgram
     {
+        if (($submission->raw_data['source'] ?? '') === 'web_form') {
+            return null;
+        }
+
         $subDealerNorm = $this->normalizeDealerName($submission->dealer_name);
         $subProgNorm = $this->normalizeProgramName($submission->program_name);
 
