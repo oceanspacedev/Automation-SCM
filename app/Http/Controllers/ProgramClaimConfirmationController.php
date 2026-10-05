@@ -168,11 +168,19 @@ class ProgramClaimConfirmationController extends Controller
                 // Kirim perubahan status_potong_ar ke Google Spreadsheet
                 $this->pushDpToSpreadsheet($dp);
             } elseif ($action === 'potong') {
+                $validated = $request->validate([
+                    'no_pembayaran' => ['required', 'string', 'max:255'],
+                ], [
+                    'no_pembayaran.required' => 'No. Pembayaran wajib diisi sebelum menyelesaikan pemotongan.',
+                    'no_pembayaran.max' => 'No. Pembayaran maksimal 255 karakter.',
+                ]);
+
                 $todayDate = date('n/j/Y');
                 $dp->update([
                     'status_potong_purchase' => 'SUDAH POTONG',
                     'status_potong_ar' => 'DONE',
                     'tgl_potong_tf' => $todayDate,
+                    'no_pembayaran' => trim($validated['no_pembayaran']),
                 ]);
 
                 // Kirim status SUDAH POTONG ke Google Spreadsheet
@@ -218,6 +226,7 @@ class ProgramClaimConfirmationController extends Controller
                 'status_potong_purchase' => $dp->status_potong_purchase,
                 'status_potong_ar' => $dp->status_potong_ar,
                 'tgl_potong_tf' => $dp->tgl_potong_tf,
+                'no_pembayaran' => $dp->no_pembayaran,
                 'cek_dokumen' => $dp->cek_dokumen,
                 'keterangan' => $dp->keterangan,
                 'cn' => $dp->cn,

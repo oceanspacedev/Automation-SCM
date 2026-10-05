@@ -119,7 +119,6 @@ class DataProgramController extends Controller
             ->where('program_name', '!=', '')
             ->distinct()
             ->orderBy('program_name')
-            ->limit(50)
             ->pluck('program_name');
 
         $statusPurchaseOptions = DataProgram::whereNotNull('status_potong_purchase')

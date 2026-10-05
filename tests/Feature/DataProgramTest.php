@@ -886,6 +886,7 @@ class DataProgramTest extends TestCase
         $response = $this->post($signedUrl, [
             'action' => 'potong',
             'role' => 'ar',
+            'no_pembayaran' => 'PAY/2026/10/0001',
         ]);
 
         $response->assertOk()
@@ -896,6 +897,7 @@ class DataProgramTest extends TestCase
         $this->assertEquals('SUDAH POTONG', $fresh->status_potong_purchase);
         $this->assertEquals('DONE', $fresh->status_potong_ar);
         $this->assertNotNull($fresh->tgl_potong_tf);
+        $this->assertEquals('PAY/2026/10/0001', $fresh->no_pembayaran);
 
         // Spreadsheet pushed
         Http::assertSent(function ($request) {
@@ -904,11 +906,45 @@ class DataProgramTest extends TestCase
 
                 return ($payload['action'] ?? '') === 'update_rows'
                     && ($payload['rows'][0]['status_potong_purchase'] ?? '') === 'SUDAH POTONG'
-                    && ($payload['rows'][0]['status_potong_ar'] ?? '') === 'DONE';
+                    && ($payload['rows'][0]['status_potong_ar'] ?? '') === 'DONE'
+                    && ($payload['rows'][0]['no_pembayaran'] ?? '') === 'PAY/2026/10/0001';
             }
 
             return false;
         });
+    }
+
+    public function test_ar_cannot_confirm_potong_without_no_pembayaran(): void
+    {
+        Http::fake();
+
+        $dp = DataProgram::create([
+            'row_hash' => 'hash_confirm_ar_2',
+            'dealer_name' => 'WIJAYA CELL',
+            'kode_bt' => 'DLGM0478',
+            'status_potong_purchase' => 'BISA DI POTONG',
+            'status_potong_ar' => 'DEALER SETUJU (PROSES AR)',
+        ]);
+
+        $signedUrl = URL::temporarySignedRoute(
+            'data-programs.confirm',
+            now()->addDays(7),
+            ['id' => $dp->id, 'role' => 'ar']
+        );
+
+        $response = $this->from($signedUrl)->post($signedUrl, [
+            'action' => 'potong',
+            'role' => 'ar',
+            'no_pembayaran' => '',
+        ]);
+
+        $response->assertRedirect($signedUrl)
+            ->assertSessionHasErrors('no_pembayaran');
+
+        $fresh = $dp->fresh();
+        $this->assertEquals('BISA DI POTONG', $fresh->status_potong_purchase);
+        $this->assertNull($fresh->no_pembayaran);
+        Http::assertNothingSent();
     }
 
     public function test_reconcile_creates_reconciliation_logs(): void

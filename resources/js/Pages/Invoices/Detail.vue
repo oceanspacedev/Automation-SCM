@@ -185,7 +185,7 @@
             <tbody>
               <tr>
                 <td class="py-1 text-gray-500 w-28">NPWP</td>
-                <td class="py-1 text-gray-800 font-mono">{{ invoice.npwp || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ invoice.npwp || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Nama NPWP</td>
@@ -236,11 +236,11 @@
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">No CN</td>
-                <td class="py-1 text-gray-800 font-mono">{{ invoice.cn_number || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ invoice.cn_number || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Kode Item</td>
-                <td class="py-1 text-gray-800 font-mono">{{ invoice.item_code || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ invoice.item_code || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Nama Item</td>

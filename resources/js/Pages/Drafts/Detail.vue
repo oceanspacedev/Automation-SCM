@@ -139,7 +139,7 @@
             <tbody>
               <tr>
                 <td class="py-1 text-gray-500 w-28">NPWP</td>
-                <td class="py-1 text-gray-800 font-mono">{{ draft.npwp || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ draft.npwp || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Nama NPWP</td>
@@ -192,7 +192,7 @@
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">No CN / Ref</td>
-                <td class="py-1 text-gray-800 font-mono">{{ draft.cn_number || '-' }}</td>
+                <td class="py-1 text-gray-800">{{ draft.cn_number || '-' }}</td>
               </tr>
               <tr>
                 <td class="py-1 text-gray-500">Item (Qty)</td>

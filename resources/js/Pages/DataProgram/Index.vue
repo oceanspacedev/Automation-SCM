@@ -204,7 +204,7 @@
                 </span>
               </button>
             </PopoverTrigger>
-            <PopoverContent class="w-80 p-3 space-y-3" align="end">
+            <PopoverContent class="w-80 p-3 space-y-3 max-h-[85vh] overflow-y-auto" align="end">
               <div class="text-xs font-semibold text-gray-900 border-b border-gray-100 pb-2 flex items-center justify-between">
                 <span>Filter Data Program</span>
                 <button
@@ -230,9 +230,9 @@
               </div>
 
               <!-- Program Filter -->
-              <div class="space-y-1">
+              <div class="space-y-1" ref="programDropdownRef">
                 <label class="text-[11px] font-medium text-gray-700">Nama Program</label>
-                <div class="relative" ref="programDropdownRef">
+                <div>
                   <button
                     type="button"
                     @click="toggleProgramDropdown"
@@ -257,10 +257,10 @@
                     </div>
                   </button>
 
-                  <!-- Program Popover Inside Filter -->
+                  <!-- Program List Inside Filter (In-flow to prevent overlap) -->
                   <div
                     v-if="showProgramDropdown"
-                    class="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden text-xs"
+                    class="mt-1.5 w-full bg-white border border-gray-200 rounded-lg shadow-xs overflow-hidden text-xs"
                   >
                     <div class="p-2 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
                       <SearchIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
@@ -289,7 +289,7 @@
                         class="w-full text-left px-3 py-1.5 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer text-xs"
                         :class="!filters.program ? 'bg-gray-50 font-medium text-gray-900' : 'text-gray-600'"
                       >
-                        <span>Semua Program</span>
+                        <span>Semua Program ({{ filterOptions.programs.length }})</span>
                         <CheckIcon v-if="!filters.program" class="w-3.5 h-3.5 text-gray-900 shrink-0" />
                       </button>
                       <button
@@ -303,6 +303,9 @@
                         <span class="truncate pr-2" :title="prog">{{ prog }}</span>
                         <CheckIcon v-if="filters.program === prog" class="w-3.5 h-3.5 text-gray-900 shrink-0" />
                       </button>
+                      <div v-if="filteredProgramOptions.length === 0" class="px-3 py-2 text-center text-gray-400 text-xs">
+                        Tidak ada program yang cocok
+                      </div>
                     </div>
                   </div>
                 </div>
