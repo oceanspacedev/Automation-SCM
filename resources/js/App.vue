@@ -50,7 +50,22 @@
                   </NavigationMenuLink>
                 </NavigationMenuItem>
 
-                <!-- 2. Data Program -->
+                <!-- 2. Form Program -->
+                <NavigationMenuItem>
+                  <NavigationMenuLink as-child>
+                    <router-link
+                      to="/test-program"
+                      :class="[
+                        navigationMenuTriggerStyle(),
+                        isActive('/test-program') && 'bg-gray-100 text-gray-900 font-semibold'
+                      ]"
+                    >
+                      Form Program
+                    </router-link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+
+                <!-- 3. Data Program -->
                 <NavigationMenuItem>
                   <NavigationMenuLink as-child>
                     <router-link
@@ -61,21 +76,6 @@
                       ]"
                     >
                       Data Program
-                    </router-link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-
-                <!-- 3. Test Program -->
-                <NavigationMenuItem>
-                  <NavigationMenuLink as-child>
-                    <router-link
-                      to="/test-program"
-                      :class="[
-                        navigationMenuTriggerStyle(),
-                        isActive('/test-program') && 'bg-gray-100 text-gray-900 font-semibold'
-                      ]"
-                    >
-                      Test Program
                     </router-link>
                   </NavigationMenuLink>
                 </NavigationMenuItem>
@@ -232,7 +232,7 @@
                       to="/test-program"
                       class="text-gray-900 hover:text-black font-medium hover:underline flex items-center gap-1"
                     >
-                      <span>Ke Test Program</span>
+                      <span>Ke Form Program</span>
                       <ExternalLinkIcon class="w-3 h-3" />
                     </router-link>
                   </div>

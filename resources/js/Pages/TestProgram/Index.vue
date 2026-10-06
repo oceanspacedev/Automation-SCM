@@ -2,7 +2,7 @@
   <div class="space-y-4">
     <!-- Breadcrumbs -->
     <div class="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-      <span>Test Program</span>
+      <span>Form Program</span>
       <ChevronRightIcon class="w-3.5 h-3.5 text-gray-400" />
       <span class="text-gray-800">Hasil Input Form</span>
     </div>
@@ -10,7 +10,7 @@
     <!-- Header Page -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Test Program</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Form Program</h1>
         <p class="text-xs text-gray-500 mt-0.5">
           Daftar hasil inputan pengajuan program dari formulir web.
         </p>
@@ -214,12 +214,12 @@
               </td>
 
               <!-- 5. Nama Dealer -->
-              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[200px] truncate" :title="item.dealer_name">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-normal min-w-[180px] max-w-[220px] break-words leading-snug" :title="item.dealer_name">
                 {{ item.dealer_name || '-' }}
               </td>
 
               <!-- 6. Nama Program -->
-              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[220px] truncate" :title="item.program_name">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-normal min-w-[220px] max-w-[260px] break-words leading-snug" :title="item.program_name">
                 {{ item.program_name || '-' }}
               </td>
 

@@ -472,8 +472,8 @@
               </td>
 
               <!-- 2. Nama Dealer (Locked) -->
-              <td class="py-2.5 px-3 w-[180px] min-w-[180px] max-w-[180px] border-r border-gray-100 whitespace-nowrap sticky z-20 bg-white group-hover:bg-gray-50 transition-colors" style="left: 50px;">
-                <div class="line-clamp-2 text-gray-700 break-words" :title="row.dealer_name">{{ row.dealer_name || '-' }}</div>
+              <td class="py-2.5 px-3 w-[180px] min-w-[180px] max-w-[180px] border-r border-gray-100 whitespace-normal sticky z-20 bg-white group-hover:bg-gray-50 transition-colors" style="left: 50px;">
+                <div class="text-gray-700 break-words leading-snug" :title="row.dealer_name">{{ row.dealer_name || '-' }}</div>
               </td>
 
               <!-- 3. Program (Locked) -->
@@ -487,8 +487,8 @@
               </td>
 
               <!-- 5. Nama Program (Locked with divider shadow) -->
-              <td class="py-2.5 px-3 w-[240px] min-w-[240px] max-w-[240px] border-r border-gray-100 whitespace-nowrap sticky z-20 bg-white group-hover:bg-gray-50 transition-colors shadow-[3px_0_6px_-2px_rgba(0,0,0,0.08)]" style="left: 460px;">
-                <div class="truncate text-gray-700" :title="row.program_name">{{ row.program_name || '-' }}</div>
+              <td class="py-2.5 px-3 w-[240px] min-w-[240px] max-w-[240px] border-r border-gray-100 whitespace-normal sticky z-20 bg-white group-hover:bg-gray-50 transition-colors shadow-[3px_0_6px_-2px_rgba(0,0,0,0.08)]" style="left: 460px;">
+                <div class="text-gray-700 break-words leading-snug" :title="row.program_name">{{ row.program_name || '-' }}</div>
               </td>
 
               <!-- 6. Periode -->
