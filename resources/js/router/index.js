@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import Login from '../Pages/Auth/Login.vue';
+import Register from '../Pages/Auth/Register.vue';
 import Dashboard from '../Pages/Dashboard/Index.vue';
 import DraftsIndex from '../Pages/Drafts/Index.vue';
 import DraftDetail from '../Pages/Drafts/Detail.vue';
@@ -11,10 +12,12 @@ import ProgramPublicForm from '../Pages/ProgramSubmissions/PublicForm.vue';
 import DataProgramIndex from '../Pages/DataProgram/Index.vue';
 import ProgramHistoryIndex from '../Pages/ProgramHistory/Index.vue';
 import TestProgramIndex from '../Pages/TestProgram/Index.vue';
+import UsersIndex from '../Pages/Users/Index.vue';
 import { useAuth } from '../composables/useAuth';
 
 const routes = [
   { path: '/login', name: 'login', component: Login, meta: { guestOnly: true } },
+  { path: '/register', name: 'register', component: Register, meta: { guestOnly: true } },
   { path: '/', redirect: '/dashboard' },
   { path: '/dashboard', name: 'dashboard', component: Dashboard, meta: { requiresAuth: true } },
   { path: '/drafts', name: 'drafts.index', component: DraftsIndex, meta: { requiresAuth: true } },
@@ -29,6 +32,7 @@ const routes = [
   { path: '/data-program', name: 'data-program.index', component: DataProgramIndex, meta: { requiresAuth: true } },
   { path: '/test-program', name: 'test-program.index', component: TestProgramIndex, meta: { requiresAuth: true } },
   { path: '/riwayat-program', name: 'program-history.index', component: ProgramHistoryIndex, meta: { requiresAuth: true } },
+  { path: '/users', name: 'users.index', component: UsersIndex, meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({

@@ -8,6 +8,7 @@ use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\ProgramClaimConfirmationController;
 use App\Http\Controllers\ProgramSubmissionController;
+use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
 // Google OAuth Authentication
@@ -24,7 +25,16 @@ Route::match(['get', 'post'], '/dp/confirm/{id}', [ProgramClaimConfirmationContr
 
 // API Endpoints
 Route::prefix('api')->group(function () {
+    // Master Users
+    Route::get('/users', [UserController::class, 'index']);
+    Route::post('/users', [UserController::class, 'store']);
+    Route::put('/users/{id}', [UserController::class, 'update']);
+    Route::delete('/users/{id}', [UserController::class, 'destroy']);
+    Route::patch('/users/{id}/toggle-status', [UserController::class, 'toggleStatus']);
+    Route::patch('/users/{id}/approve', [UserController::class, 'approve']);
+
     // Auth (Email + Password)
+    Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);

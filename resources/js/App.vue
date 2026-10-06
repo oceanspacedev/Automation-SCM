@@ -21,7 +21,7 @@
             <NavigationMenu>
               <NavigationMenuList class="flex items-center gap-1">
                 <!-- 1. Draft -->
-                <NavigationMenuItem>
+                <NavigationMenuItem v-if="canAccess('drafts')">
                   <NavigationMenuLink as-child>
                     <router-link
                       to="/drafts"
@@ -35,8 +35,8 @@
                   </NavigationMenuLink>
                 </NavigationMenuItem>
 
-                <!-- 2. Invoice -->
-                <NavigationMenuItem>
+                <!-- 1. Invoice -->
+                <NavigationMenuItem v-if="canAccess('invoices')">
                   <NavigationMenuLink as-child>
                     <router-link
                       to="/invoices"
@@ -51,7 +51,7 @@
                 </NavigationMenuItem>
 
                 <!-- 2. Form Program -->
-                <NavigationMenuItem>
+                <NavigationMenuItem v-if="canAccess('form_program')">
                   <NavigationMenuLink as-child>
                     <router-link
                       to="/test-program"
@@ -66,7 +66,7 @@
                 </NavigationMenuItem>
 
                 <!-- 3. Data Program -->
-                <NavigationMenuItem>
+                <NavigationMenuItem v-if="canAccess('data_program')">
                   <NavigationMenuLink as-child>
                     <router-link
                       to="/data-program"
@@ -80,8 +80,8 @@
                   </NavigationMenuLink>
                 </NavigationMenuItem>
 
-                <!-- 4. Dropdown Riwayat (Form Program, Riwayat Program, Riwayat Email, Dashboard) -->
-                <NavigationMenuItem>
+                <!-- 4. Dropdown Riwayat -->
+                <NavigationMenuItem v-if="canAccess('riwayat')">
                   <Popover v-model:open="isRiwayatOpen">
                     <PopoverTrigger as-child>
                       <button
@@ -102,6 +102,7 @@
                     <PopoverContent align="start" class="w-48 p-1 rounded-lg border border-gray-200 bg-white shadow-lg text-xs space-y-0.5">
 
                       <router-link
+                        v-if="canAccess('riwayat_program')"
                         to="/riwayat-program"
                         @click="isRiwayatOpen = false"
                         :class="[
@@ -113,6 +114,7 @@
                       </router-link>
 
                       <router-link
+                        v-if="canAccess('email_logs')"
                         to="/email-logs"
                         @click="isRiwayatOpen = false"
                         :class="[
@@ -124,6 +126,7 @@
                       </router-link>
 
                       <router-link
+                        v-if="canAccess('dashboard')"
                         to="/dashboard"
                         @click="isRiwayatOpen = false"
                         :class="[
@@ -135,6 +138,21 @@
                       </router-link>
                     </PopoverContent>
                   </Popover>
+                </NavigationMenuItem>
+
+                <!-- 5. Master User -->
+                <NavigationMenuItem v-if="canAccess('master_user')">
+                  <NavigationMenuLink as-child>
+                    <router-link
+                      to="/users"
+                      :class="[
+                        navigationMenuTriggerStyle(),
+                        isActive('/users') && 'bg-gray-100 text-gray-900 font-semibold'
+                      ]"
+                    >
+                      Master User
+                    </router-link>
+                  </NavigationMenuLink>
                 </NavigationMenuItem>
               </NavigationMenuList>
             </NavigationMenu>
@@ -251,28 +269,37 @@
                   <UserIcon class="w-4 h-4 text-neutral-700" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="end" class="w-56 p-2 rounded-xl border border-neutral-200 bg-white shadow-lg">
+              <PopoverContent align="end" class="w-48 p-1 rounded-lg border border-gray-200 bg-white shadow-lg text-xs space-y-0.5">
                 <!-- Info Akun -->
-                <div class="px-2.5 py-2 border-b border-neutral-100">
-                  <div class="font-semibold text-sm text-neutral-900 leading-tight">
+                <div class="px-3 py-2 border-b border-gray-100">
+                  <div class="font-semibold text-xs text-gray-900 leading-tight">
                     {{ user.name || 'Admin SCM' }}
                   </div>
-                  <div class="text-xs text-neutral-500 truncate mt-0.5">
+                  <div class="text-[11px] text-gray-500 truncate mt-0.5">
                     {{ user.email || 'admin@scm.com' }}
                   </div>
                 </div>
 
-                <!-- Tombol Logout -->
-                <div class="pt-1.5">
-                  <button
-                    @click="handleLogout"
-                    type="button"
-                    class="w-full px-2.5 py-2 rounded-lg text-left text-xs font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 transition cursor-pointer flex items-center gap-2"
-                  >
-                    <LogOutIcon class="w-4 h-4 text-neutral-500" />
-                    <span>Keluar</span>
-                  </button>
-                </div>
+                <!-- Menu Master User -->
+                <router-link
+                  v-if="canAccess('master_user')"
+                  to="/users"
+                  :class="[
+                    'block px-3 py-2 rounded-md transition-colors text-xs font-medium',
+                    isActive('/users') ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                  ]"
+                >
+                  Master User
+                </router-link>
+
+                <!-- Tombol Keluar -->
+                <button
+                  @click="handleLogout"
+                  type="button"
+                  class="w-full text-left block px-3 py-2 rounded-md transition-colors text-xs font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer"
+                >
+                  Keluar
+                </button>
               </PopoverContent>
             </Popover>
           </div>
@@ -308,6 +335,7 @@ import {
   Loader2 as Loader2Icon,
   ExternalLink as ExternalLinkIcon,
   ChevronDown as ChevronDownIcon,
+  Users as UsersIcon,
 } from 'lucide-vue-next';
 
 const route = useRoute();
@@ -321,6 +349,7 @@ const isStandalonePage = computed(() => {
   return (
     route.meta?.isStandalone === true ||
     route.path === '/login' ||
+    route.path === '/register' ||
     route.path === '/form-submission' ||
     route.path === '/form-realme' ||
     route.path === '/form'
@@ -332,6 +361,50 @@ const isActive = (path) => {
     return route.path === '/' || route.path === '/dashboard';
   }
   return route.path.startsWith(path);
+};
+
+// Role & Permission Access Control
+const canAccess = (feature) => {
+  if (!user.value) return true;
+
+  // 1. Jika user memiliki daftar custom permissions
+  if (Array.isArray(user.value.permissions) && user.value.permissions.length > 0) {
+    if (feature === 'drafts') return user.value.permissions.includes('drafts');
+    if (feature === 'invoices') return user.value.permissions.includes('invoices');
+    if (feature === 'form_program') return user.value.permissions.includes('form_program');
+    if (feature === 'data_program') return user.value.permissions.includes('data_program');
+    if (feature === 'riwayat') {
+      return (
+        user.value.permissions.includes('riwayat_program') ||
+        user.value.permissions.includes('email_logs') ||
+        user.value.permissions.includes('dashboard')
+      );
+    }
+    if (feature === 'riwayat_program') return user.value.permissions.includes('riwayat_program');
+    if (feature === 'email_logs') return user.value.permissions.includes('email_logs');
+    if (feature === 'dashboard') return user.value.permissions.includes('dashboard');
+    if (feature === 'master_user') return user.value.permissions.includes('master_user');
+    return user.value.permissions.includes(feature);
+  }
+
+  // 2. Fallback ke default role
+  const role = user.value.role || 'scm';
+  // Admin & SCM default bisa melihat semuanya
+  if (role === 'admin' || role === 'scm') {
+    return true;
+  }
+
+  if (feature === 'drafts') return role === 'ar';
+  if (feature === 'invoices') return role === 'ar';
+  if (feature === 'form_program') return role === 'telemarketing';
+  if (feature === 'data_program') return false;
+  if (feature === 'riwayat') return true;
+  if (feature === 'riwayat_program') return true;
+  if (feature === 'email_logs') return role === 'ar';
+  if (feature === 'dashboard') return role === 'ar';
+  if (feature === 'master_user') return false;
+
+  return false;
 };
 
 const handleLogout = async () => {

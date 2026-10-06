@@ -8,9 +8,55 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class AuthController extends Controller
 {
+    /**
+     * Registrasi pengguna baru mandiri (status default: nonaktif / menunggu ACC admin).
+     */
+    public function register(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'whatsapp' => ['nullable', 'string', 'max:25'],
+            'role' => ['required', Rule::in(['scm', 'ar', 'telemarketing'])],
+            'password' => ['required', 'string', 'min:6', 'confirmed'],
+        ], [
+            'email.unique' => 'Email ini sudah terdaftar di sistem.',
+            'password.confirmed' => 'Konfirmasi password tidak cocok.',
+            'password.min' => 'Password minimal 6 karakter.',
+        ]);
+
+        $normalizedWa = ! empty($validated['whatsapp']) ? $this->normalizePhone($validated['whatsapp']) : null;
+        $role = $validated['role'];
+        $defaultPermissions = User::getDefaultPermissionsForRole($role);
+
+        $user = User::create([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'whatsapp' => $normalizedWa,
+            'role' => $role,
+            'permissions' => $defaultPermissions,
+            'password' => Hash::make($validated['password']),
+            'is_active' => false, // Menunggu persetujuan (ACC) Admin
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Registrasi berhasil. Akun Anda sedang menunggu persetujuan (ACC) dari Administrator sebelum dapat digunakan untuk login.',
+            'data' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'is_active' => $user->is_active,
+            ],
+        ], 201);
+    }
+
     public function login(Request $request): JsonResponse
     {
         $credentials = $request->validate([
@@ -21,12 +67,25 @@ class AuthController extends Controller
         $remember = $request->boolean('remember', false);
 
         if (Auth::attempt($credentials, $remember)) {
+            $user = Auth::user();
+
+            if (! $user->is_active) {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Akun Anda belum aktif atau sedang menunggu persetujuan (ACC) dari Admin.',
+                ], 403);
+            }
+
             $request->session()->regenerate();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Login berhasil.',
-                'user' => Auth::user(),
+                'user' => $user,
             ]);
         }
 
@@ -68,23 +127,36 @@ class AuthController extends Controller
         ]);
 
         $normalized = $this->normalizePhone($request->input('whatsapp'));
+        $raw = preg_replace('/\D/', '', $request->input('whatsapp'));
+        $variants = array_filter(array_unique([
+            $normalized,
+            $raw,
+            $request->input('whatsapp'),
+            '0'.substr($normalized, 2),
+            substr($normalized, 2),
+            '+'.$normalized,
+        ]));
 
-        // Cari user berdasarkan nomor WA
-        $user = User::where('whatsapp', $normalized)
-            ->orWhere('whatsapp', $request->input('whatsapp'))
-            ->first();
+        // Cari user berdasarkan nomor WA (mendukung format 08xxx, 628xxx, 8xxx)
+        $user = User::whereIn('whatsapp', $variants)->first();
 
         if (! $user) {
-            // Respons ambigu agar tidak bocorkan info nomor terdaftar atau tidak
             return response()->json([
-                'success' => true,
-                'message' => 'Jika nomor terdaftar, kode OTP akan segera dikirim via WhatsApp.',
-            ]);
+                'success' => false,
+                'message' => 'Nomor WhatsApp belum terdaftar di sistem SCM.',
+            ], 422);
         }
 
-        // Rate limit: max 3 kali kirim per 10 menit per nomor
+        if (! $user->is_active) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun Anda belum aktif atau sedang menunggu persetujuan (ACC) dari Admin.',
+            ], 403);
+        }
+
+        // Rate limit: max 10 kali kirim per 15 menit per nomor
         $rateLimitKey = "wa_otp_rate:{$normalized}";
-        if (Cache::get($rateLimitKey, 0) >= 3) {
+        if (Cache::get($rateLimitKey, 0) >= 10) {
             return response()->json([
                 'success' => false,
                 'message' => 'Terlalu banyak permintaan OTP. Coba lagi dalam beberapa menit.',
@@ -95,29 +167,29 @@ class AuthController extends Controller
         $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $cacheKey = "wa_otp:{$normalized}";
 
-        // Simpan OTP di cache selama 5 menit
-        Cache::put($cacheKey, [
-            'otp' => $otp,
-            'user_id' => $user->id,
-            'attempts' => 0,
-        ], now()->addMinutes(5));
-
-        // Increment rate limit counter
-        Cache::put($rateLimitKey, Cache::get($rateLimitKey, 0) + 1, now()->addMinutes(10));
-
         // Kirim OTP via WAGhub
         $waService = new WaGatewayService;
         $sent = $waService->sendText(
             $normalized,
-            "🔐 *Kode OTP Login SCM*\n\nKode Anda: *{$otp}*\n\nBerlaku 5 menit. Jangan bagikan kode ini kepada siapa pun."
+            "🔐 *Kode OTP Login SCM*\n\nKode Anda: *{$otp}*\n\nBerlaku 15 menit. Jangan bagikan kode ini kepada siapa pun."
         );
 
         if (! $sent) {
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal mengirim OTP via WhatsApp. Silakan coba lagi.',
+                'message' => 'Gagal mengirim OTP via WhatsApp gateway. Pastikan nomor aktif atau coba lagi.',
             ], 503);
         }
+
+        // Simpan OTP di cache selama 15 menit setelah berhasil dikirim
+        Cache::put($cacheKey, [
+            'otp' => $otp,
+            'user_id' => $user->id,
+            'attempts' => 0,
+        ], now()->addMinutes(15));
+
+        // Increment rate limit counter
+        Cache::put($rateLimitKey, Cache::get($rateLimitKey, 0) + 1, now()->addMinutes(15));
 
         return response()->json([
             'success' => true,
@@ -139,6 +211,7 @@ class AuthController extends Controller
 
         $normalized = $this->normalizePhone($request->input('whatsapp'));
         $cacheKey = "wa_otp:{$normalized}";
+        $rateLimitKey = "wa_otp_rate:{$normalized}";
         $stored = Cache::get($cacheKey);
 
         if (! $stored) {
@@ -161,7 +234,7 @@ class AuthController extends Controller
         if ($stored['otp'] !== $request->input('otp')) {
             // Increment attempts
             $stored['attempts']++;
-            Cache::put($cacheKey, $stored, now()->addMinutes(5));
+            Cache::put($cacheKey, $stored, now()->addMinutes(15));
 
             $remaining = 5 - $stored['attempts'];
 
@@ -181,7 +254,15 @@ class AuthController extends Controller
             ], 422);
         }
 
+        if (! $user->is_active) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun Anda belum aktif atau sedang menunggu persetujuan (ACC) dari Admin.',
+            ], 403);
+        }
+
         Cache::forget($cacheKey);
+        Cache::forget($rateLimitKey);
 
         Auth::login($user, true);
         $request->session()->regenerate();

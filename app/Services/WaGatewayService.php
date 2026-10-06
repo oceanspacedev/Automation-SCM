@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class WaGatewayService
 {
@@ -13,8 +14,8 @@ class WaGatewayService
 
     public function __construct()
     {
-        $this->baseUrl = rtrim((string) config('services.waghub.url', ''), '/');
-        $this->token = (string) config('services.waghub.token', '');
+        $this->baseUrl = rtrim((string) (config('services.waghub.url') ?: config('services.wag.url', 'https://waghub.mekayastudio.com')), '/');
+        $this->token = (string) (config('services.waghub.token') ?: config('services.wag.token', ''));
     }
 
     /**
@@ -31,22 +32,38 @@ class WaGatewayService
         }
 
         $normalized = $this->normalizePhone($phone);
+        $uuid = Str::uuid()->toString();
+
+        $payload = [
+            'idempotency_key' => $uuid,
+            'recipient' => [
+                'type' => 'phone',
+                'value' => $normalized,
+            ],
+            'message' => [
+                'type' => 'text',
+                'text' => $message,
+            ],
+            'purpose' => 'transactional',
+            'mode' => 'async',
+            'route_key' => 'default',
+        ];
 
         try {
-            $response = Http::withoutVerifying()
-                ->withToken($this->token)
+            $client = Http::withToken($this->token)
                 ->acceptJson()
-                ->timeout(15)
-                ->post("{$this->baseUrl}/api/v1/messages", [
-                    'recipient' => [
-                        'type' => 'phone',
-                        'value' => $normalized,
-                    ],
-                    'message' => [
-                        'type' => 'text',
-                        'text' => $message,
-                    ],
-                ]);
+                ->asJson()
+                ->withHeaders([
+                    'Idempotency-Key' => $uuid,
+                ])
+                ->timeout(20)
+                ->retry(2, 500, throw: false);
+
+            if (! config('services.wag.verify_ssl', false)) {
+                $client = $client->withoutVerifying();
+            }
+
+            $response = $client->post("{$this->baseUrl}/api/v1/messages", $payload);
 
             if ($response->successful()) {
                 Log::info("WAGhub: Pesan terkirim ke {$normalized}.");

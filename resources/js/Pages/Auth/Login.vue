@@ -136,20 +136,14 @@
             <label for="wa-phone" class="block text-sm font-medium text-neutral-700 mb-1">
               Nomor WhatsApp
             </label>
-            <div class="flex gap-2">
-              <div class="h-10 px-3 flex items-center rounded-lg border border-neutral-300 bg-neutral-50 text-sm text-neutral-600 shrink-0">
-                🇮🇩 +62
-              </div>
-              <input
-                id="wa-phone"
-                v-model="waPhone"
-                type="tel"
-                required
-                placeholder="812xxxxxxxx"
-                maxlength="15"
-                class="flex-1 h-10 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#25D366] focus:border-[#25D366] transition"
-              />
-            </div>
+            <input
+              id="wa-phone"
+              v-model="waPhone"
+              type="tel"
+              required
+              placeholder="Contoh: 08xxxxxxxxxx"
+              class="h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#25D366] focus:border-[#25D366] transition"
+            />
             <p class="text-xs text-neutral-400 mt-1">Nomor yang terdaftar di akun SCM Anda</p>
           </div>
 
@@ -170,7 +164,7 @@
               Kode OTP
             </label>
             <p class="text-xs text-neutral-500 mb-2">
-              Kode 6 digit dikirim ke WhatsApp <strong>+62{{ waPhone }}</strong>
+              Kode 6 digit dikirim ke WhatsApp <strong>{{ waPhone }}</strong>
             </p>
             <input
               v-model="waOtp"
@@ -212,6 +206,13 @@
             </button>
           </div>
         </form>
+      </div>
+
+      <div class="text-center text-xs text-neutral-600 pt-2 border-t border-neutral-100">
+        Belum punya akun?
+        <router-link to="/register" class="font-semibold text-[#1D70F5] hover:underline ml-1">
+          Daftar di sini
+        </router-link>
       </div>
 
       <div class="text-center text-xs text-neutral-400">
