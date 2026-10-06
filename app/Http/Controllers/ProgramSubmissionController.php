@@ -1130,6 +1130,38 @@ class ProgramSubmissionController extends Controller
             'is_pkp' => $request->boolean('is_pkp', false),
         ];
 
+        $cnFile = $request->file('credit_note_file');
+        $agrFile = $request->file('agreement_file');
+        $taxFile = $request->file('tax_invoice_file');
+
+        if ($cnFile && $agrFile && $cnFile->isValid() && $agrFile->isValid()) {
+            if ($cnFile->getClientOriginalName() === $agrFile->getClientOriginalName() && $cnFile->getSize() === $agrFile->getSize()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Dokumen tidak boleh digabung! File yang diunggah untuk Credit Note dan Agreement sama persis. Harap pisahkan file dokumen khusus Credit Note saja dan Agreement saja.',
+                    'error_type' => 'MERGED_DOCUMENTS',
+                ], 422);
+            }
+        }
+        if ($cnFile && $taxFile && $cnFile->isValid() && $taxFile->isValid()) {
+            if ($cnFile->getClientOriginalName() === $taxFile->getClientOriginalName() && $cnFile->getSize() === $taxFile->getSize()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Dokumen tidak boleh digabung! File yang diunggah untuk Credit Note dan Faktur Pajak sama persis. Harap pisahkan file dokumen.',
+                    'error_type' => 'MERGED_DOCUMENTS',
+                ], 422);
+            }
+        }
+        if ($agrFile && $taxFile && $agrFile->isValid() && $taxFile->isValid()) {
+            if ($agrFile->getClientOriginalName() === $taxFile->getClientOriginalName() && $agrFile->getSize() === $taxFile->getSize()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Dokumen tidak boleh digabung! File yang diunggah untuk Agreement dan Faktur Pajak sama persis. Harap pisahkan file dokumen.',
+                    'error_type' => 'MERGED_DOCUMENTS',
+                ], 422);
+            }
+        }
+
         // 1. Inspect documents with AI first before storing or creating submission
         $inspection = $this->aiService->inspectDocumentFiles($formData, [
             'cn' => $request->file('credit_note_file') ?: $request->input('credit_note_url'),

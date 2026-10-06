@@ -1782,4 +1782,28 @@ class ProgramSubmissionTest extends TestCase
         $this->assertEquals('valid', $result['doc_validation']['cn']['status']);
         $this->assertEquals('valid', $result['doc_validation']['agr']['status']);
     }
+
+    public function test_detects_and_rejects_merged_or_duplicate_documents(): void
+    {
+        $service = app(DocumentAnalysisService::class);
+
+        $cnFile = UploadedFile::fake()->create('dokumen_gabung.pdf', 100, 'application/pdf');
+        $agrFile = UploadedFile::fake()->create('dokumen_gabung.pdf', 100, 'application/pdf');
+
+        $result = $service->heuristicDocumentInspection([
+            'dealer_name' => 'Abadi Cell',
+            'program_name' => 'PROGRAM DSA FEBRUARI 2026',
+        ], [
+            'cn' => $cnFile,
+            'agr' => $agrFile,
+        ]);
+
+        $this->assertTrue($result['has_invalid']);
+        $this->assertEquals('invalid', $result['doc_validation']['cn']['status']);
+        $this->assertEquals('merged', $result['doc_validation']['cn']['actual_type']);
+        $this->assertEquals('invalid', $result['doc_validation']['agr']['status']);
+        $this->assertEquals('merged', $result['doc_validation']['agr']['actual_type']);
+        $this->assertStringContainsString('DIGABUNG', $result['cek_dokumen']);
+        $this->assertEquals('BELUM BISA POTONG', $result['status_potong_purchase']);
+    }
 }

@@ -1109,4 +1109,34 @@ class DataProgramTest extends TestCase
         $this->assertEquals(1, $res2['deleted_count']);
         $this->assertDatabaseMissing('data_programs', ['row_hash' => 'row_6']);
     }
+
+    public function test_get_data_program_url_returns_configured_urls(): void
+    {
+        $response = $this->getJson('/api/data-program/url');
+
+        $response->assertOk()
+            ->assertJsonStructure(['url', 'webapp_url']);
+
+        $this->assertStringContainsString('1AFEAxjycq50heaxJeAH9YjpVWFs3GeprplJDOJMzjSU', $response->json('url'));
+    }
+
+    public function test_map_row_to_data_skips_header_and_title_rows(): void
+    {
+        $service = app(DataProgramSyncService::class);
+
+        // Title row
+        $titleRow = array_pad(['MASTER DATA PROGRAM & DOKUMEN'], 56, '');
+        $this->assertNull($service->mapRowToData($titleRow, 1));
+
+        // Header row
+        $headerRow = array_pad(['NAMA DEALER', 'PROGRAM', 'Kode BT', 'NAMA PROGRAM'], 56, '');
+        $this->assertNull($service->mapRowToData($headerRow, 4));
+
+        // Valid data row
+        $dataRow = array_pad(['CV OLIVIA', 'PROGRAM 1', 'BT03429', 'Program Realme 8 Pro'], 56, '');
+        $mapped = $service->mapRowToData($dataRow, 5);
+        $this->assertNotNull($mapped);
+        $this->assertSame('row_5', $mapped['row_hash']);
+        $this->assertSame('CV OLIVIA', $mapped['dealer_name']);
+    }
 }

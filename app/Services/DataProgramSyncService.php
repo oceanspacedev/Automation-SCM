@@ -13,7 +13,7 @@ class DataProgramSyncService
 {
     public const CACHE_KEY_SPREADSHEET_URL = 'data_program_spreadsheet_url';
 
-    public const DEFAULT_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1w8J_ahdfk-Dj0NZWkXf1GJucpusQ4vQaerdU5wfnkJc/export?format=csv&gid=1715579975';
+    public const DEFAULT_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1AFEAxjycq50heaxJeAH9YjpVWFs3GeprplJDOJMzjSU/export?format=csv&gid=241795572';
 
     /**
      * Get configured Google Sheet CSV URL.
@@ -323,23 +323,17 @@ class DataProgramSyncService
             throw new Exception('Gagal membaca temporary file CSV.');
         }
 
-        // Read header
-        $header = fgetcsv($handle, 0, ',', '"', '\\');
-        if (! $header || count($header) < 5) {
-            fclose($handle);
-            @unlink($tmpFile);
-            throw new Exception('Format kolom spreadsheet tidak valid atau kosong.');
-        }
-
         $batch = [];
         $batchSize = 400;
         $totalProcessed = 0;
-        $rowIdx = 1; // 1 was header
+        $rowIdx = 0;
+        $headerFound = false;
+        $headerRowIdx = 0;
 
         $syncTimestamp = now()->subSecond()->toDateTimeString();
         $now = now()->toDateTimeString();
 
-        $maxRowProcessed = 1;
+        $maxRowProcessed = 0;
         $emptyRowHashes = [];
 
         try {
@@ -347,6 +341,31 @@ class DataProgramSyncService
 
             while (($row = fgetcsv($handle, 0, ',', '"', '\\')) !== false) {
                 $rowIdx++;
+
+                // Cari baris header kolom jika belum ditemukan (lewati title banner/baris kosong di atas header)
+                if (! $headerFound) {
+                    $firstCol = trim((string) ($row[0] ?? ''));
+                    $secondCol = trim((string) ($row[1] ?? ''));
+                    $thirdCol = trim((string) ($row[2] ?? ''));
+                    $fourthCol = trim((string) ($row[3] ?? ''));
+
+                    if (
+                        strcasecmp($firstCol, 'NAMA DEALER') === 0 ||
+                        stripos($firstCol, 'DEALER') !== false ||
+                        stripos($secondCol, 'PROGRAM') !== false ||
+                        stripos($thirdCol, 'BT') !== false ||
+                        stripos($fourthCol, 'PROGRAM') !== false
+                    ) {
+                        $headerFound = true;
+                        $headerRowIdx = $rowIdx;
+                        $maxRowProcessed = $rowIdx;
+
+                        continue;
+                    }
+
+                    continue;
+                }
+
                 $maxRowProcessed = $rowIdx;
 
                 $mapped = $this->mapRowToData($row, $rowIdx, $now);
@@ -369,6 +388,10 @@ class DataProgramSyncService
                 }
             }
 
+            if (! $headerFound && $rowIdx > 0) {
+                throw new Exception('Format kolom spreadsheet tidak valid atau kolom header tidak ditemukan.');
+            }
+
             if (! empty($batch)) {
                 $this->upsertBatch($batch);
             }
@@ -378,8 +401,11 @@ class DataProgramSyncService
                 DataProgram::whereIn('row_hash', $emptyRowHashes)->delete();
             }
 
-            // Hapus data di database yang barisnya sudah dihapus dari Spreadsheet (melebihi jumlah baris sheet)
+            // Hapus data di database yang barisnya sudah dihapus dari Spreadsheet (melebihi jumlah baris sheet atau baris banner/header)
             if ($limit === 0 && $maxRowProcessed >= 2) {
+                if ($headerRowIdx >= 1) {
+                    DataProgram::whereRaw('CAST(SUBSTRING(row_hash, 5) AS UNSIGNED) <= ?', [$headerRowIdx])->delete();
+                }
                 DataProgram::whereRaw('CAST(SUBSTRING(row_hash, 5) AS UNSIGNED) > ?', [$maxRowProcessed])->delete();
                 DataProgram::where('row_hash', 'not like', 'row_%')->delete();
             }
@@ -419,6 +445,14 @@ class DataProgramSyncService
         $program = trim((string) ($row[1] ?? ''));
         $kodeBt = trim((string) ($row[2] ?? ''));
         $programName = trim((string) ($row[3] ?? ''));
+
+        if (
+            strcasecmp($dealerName, 'NAMA DEALER') === 0 ||
+            strcasecmp($dealerName, 'DEALER') === 0 ||
+            stripos($dealerName, 'MASTER DATA') !== false
+        ) {
+            return null;
+        }
 
         if (empty($dealerName) && empty($program) && empty($kodeBt) && empty($programName)) {
             return null;

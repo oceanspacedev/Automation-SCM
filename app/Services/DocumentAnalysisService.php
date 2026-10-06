@@ -345,6 +345,8 @@ class DocumentAnalysisService
             'text' => '',
             'data_uri' => null,
             'has_file' => false,
+            'size' => 0,
+            'hash' => '',
         ];
 
         if (empty($fileOrUrl)) {
@@ -356,8 +358,18 @@ class DocumentAnalysisService
                 $result['has_file'] = true;
                 $result['name'] = $fileOrUrl->getClientOriginalName();
                 $result['mime'] = $fileOrUrl->getMimeType() ?: 'application/octet-stream';
-                $bytes = @file_get_contents($fileOrUrl->getRealPath());
+                $result['size'] = (int) ($fileOrUrl->getSize() ?: 0);
+                try {
+                    $bytes = $fileOrUrl->getContent();
+                } catch (\Throwable) {
+                    $path = $fileOrUrl->getRealPath() ?: $fileOrUrl->getPathname();
+                    $bytes = $path && file_exists($path) ? @file_get_contents($path) : '';
+                }
                 if (! empty($bytes)) {
+                    $result['hash'] = md5($bytes);
+                    if ($result['size'] === 0) {
+                        $result['size'] = strlen($bytes);
+                    }
                     $result['data_uri'] = "data:{$result['mime']};base64,".base64_encode($bytes);
                     if (str_contains($result['mime'], 'pdf') || str_ends_with(strtolower($result['name']), '.pdf')) {
                         $result['text'] = $this->extractPdfText($bytes);
@@ -680,6 +692,11 @@ class DocumentAnalysisService
             }
             $haystack = strtoupper($info['name'].' '.$info['text']);
 
+            // Deteksi jika file jelas merupakan dokumen gabungan dari namanya
+            if (preg_match('/(?:cn.*(?:agr|faktur)|(?:agr|faktur).*cn|gabung|merged|all[\s_\-]*in[\s_\-]*one)/i', $info['name'])) {
+                return 'merged';
+            }
+
             $hasCnKw = (bool) preg_match('/credit[\s_\-]*note|nota[\s_\-]*kredit|potongan|incentive|\bcn[_\-\s0-9]|^cn\./i', $haystack);
             $hasAgrKw = (bool) preg_match('/agreement|perjanjian|kesepakatan|pihak[\s_\-]*pertama|\bagr[_\-\s0-9]|^agr\./i', $haystack);
             $hasFakturKw = (bool) preg_match('/faktur[\s_\-]*pajak|pengusaha[\s_\-]*kena[\s_\-]*pajak|010\.\d{3}/i', $haystack);
@@ -712,11 +729,42 @@ class DocumentAnalysisService
         $docValidation = [];
         $hasSwapped = false;
         $hasInvalid = false;
+        $hasMerged = false;
         $swapDetails = [];
+        $mergedDetails = [];
+
+        // Deteksi file yang sama diunggah ke slot berbeda (dokumen digabung atau diunggah ganda)
+        $isCnAgrSame = ($infos['cn']['has_file'] && $infos['agr']['has_file']) && (
+            (! empty($infos['cn']['name']) && $infos['cn']['name'] === $infos['agr']['name']) ||
+            (! empty($infos['cn']['hash']) && $infos['cn']['hash'] === $infos['agr']['hash'])
+        );
+        $isCnTaxSame = ($infos['cn']['has_file'] && $infos['faktur']['has_file']) && (
+            (! empty($infos['cn']['name']) && $infos['cn']['name'] === $infos['faktur']['name']) ||
+            (! empty($infos['cn']['hash']) && $infos['cn']['hash'] === $infos['faktur']['hash'])
+        );
+        $isAgrTaxSame = ($infos['agr']['has_file'] && $infos['faktur']['has_file']) && (
+            (! empty($infos['agr']['name']) && $infos['agr']['name'] === $infos['faktur']['name']) ||
+            (! empty($infos['agr']['hash']) && $infos['agr']['hash'] === $infos['faktur']['hash'])
+        );
 
         // Validate CN slot
         if (! $infos['cn']['has_file']) {
             $docValidation['cn'] = ['status' => 'empty', 'actual_type' => 'none', 'message' => 'Dokumen Credit Note belum diunggah.'];
+        } elseif ($isCnAgrSame) {
+            $docValidation['cn'] = ['status' => 'invalid', 'actual_type' => 'merged', 'message' => 'File Credit Note dan Agreement sama persis. Dokumen tidak boleh digabung dalam satu file! Harap pisahkan file CN dan Agreement.'];
+            $hasInvalid = true;
+            $hasMerged = true;
+            $mergedDetails[] = 'CN & AGR';
+        } elseif ($isCnTaxSame) {
+            $docValidation['cn'] = ['status' => 'invalid', 'actual_type' => 'merged', 'message' => 'File Credit Note dan Faktur Pajak sama persis. Dokumen tidak boleh digabung dalam satu file!'];
+            $hasInvalid = true;
+            $hasMerged = true;
+            $mergedDetails[] = 'CN & FAKTUR';
+        } elseif ($detectedTypes['cn'] === 'merged') {
+            $docValidation['cn'] = ['status' => 'invalid', 'actual_type' => 'merged', 'message' => 'Dokumen terdeteksi digabung dalam satu file. Dokumen tidak boleh digabung! Slot Credit Note khusus untuk dokumen Credit Note saja.'];
+            $hasInvalid = true;
+            $hasMerged = true;
+            $mergedDetails[] = 'CN';
         } elseif ($detectedTypes['cn'] === 'agr') {
             $docValidation['cn'] = ['status' => 'swapped', 'actual_type' => 'agr', 'message' => 'File di slot Credit Note terdeteksi sebagai Dokumen Agreement (Tertukar)!'];
             $hasSwapped = true;
@@ -732,6 +780,20 @@ class DocumentAnalysisService
         // Validate AGR slot
         if (! $infos['agr']['has_file']) {
             $docValidation['agr'] = ['status' => 'empty', 'actual_type' => 'none', 'message' => 'Dokumen Agreement belum diunggah.'];
+        } elseif ($isCnAgrSame) {
+            $docValidation['agr'] = ['status' => 'invalid', 'actual_type' => 'merged', 'message' => 'File Agreement dan Credit Note sama persis. Dokumen tidak boleh digabung dalam satu file! Harap pisahkan file Agreement dan CN.'];
+            $hasInvalid = true;
+            $hasMerged = true;
+        } elseif ($isAgrTaxSame) {
+            $docValidation['agr'] = ['status' => 'invalid', 'actual_type' => 'merged', 'message' => 'File Agreement dan Faktur Pajak sama persis. Dokumen tidak boleh digabung dalam satu file!'];
+            $hasInvalid = true;
+            $hasMerged = true;
+            $mergedDetails[] = 'AGR & FAKTUR';
+        } elseif ($detectedTypes['agr'] === 'merged') {
+            $docValidation['agr'] = ['status' => 'invalid', 'actual_type' => 'merged', 'message' => 'Dokumen terdeteksi digabung dalam satu file. Dokumen tidak boleh digabung! Slot Agreement khusus untuk dokumen Agreement saja.'];
+            $hasInvalid = true;
+            $hasMerged = true;
+            $mergedDetails[] = 'AGR';
         } elseif ($detectedTypes['agr'] === 'cn') {
             $docValidation['agr'] = ['status' => 'swapped', 'actual_type' => 'cn', 'message' => 'File di slot Agreement terdeteksi sebagai Dokumen Credit Note (Tertukar)!'];
             $hasSwapped = true;
@@ -747,6 +809,15 @@ class DocumentAnalysisService
         // Validate Faktur slot
         if (! $infos['faktur']['has_file']) {
             $docValidation['faktur'] = ['status' => 'empty', 'actual_type' => 'none', 'message' => 'Faktur Pajak tidak diunggah.'];
+        } elseif ($isCnTaxSame || $isAgrTaxSame) {
+            $docValidation['faktur'] = ['status' => 'invalid', 'actual_type' => 'merged', 'message' => 'File Faktur Pajak sama dengan file dokumen lain. Dokumen tidak boleh digabung!'];
+            $hasInvalid = true;
+            $hasMerged = true;
+        } elseif ($detectedTypes['faktur'] === 'merged') {
+            $docValidation['faktur'] = ['status' => 'invalid', 'actual_type' => 'merged', 'message' => 'Dokumen terdeteksi digabung dalam satu file. Dokumen tidak boleh digabung! Slot Faktur khusus Faktur Pajak saja.'];
+            $hasInvalid = true;
+            $hasMerged = true;
+            $mergedDetails[] = 'FAKTUR';
         } elseif ($detectedTypes['faktur'] === 'cn') {
             $docValidation['faktur'] = ['status' => 'swapped', 'actual_type' => 'cn', 'message' => 'File di slot Faktur terdeteksi sebagai Credit Note (Tertukar)!'];
             $hasSwapped = true;
@@ -798,7 +869,11 @@ class DocumentAnalysisService
             $missing[] = 'FAKTUR';
         }
 
-        if ($hasSwapped) {
+        if ($hasMerged) {
+            $statusPurchase = 'BELUM BISA POTONG';
+            $cekDokumen = 'DOKUMEN DIGABUNG ('.implode(', ', array_unique($mergedDetails)).')';
+            $keterangan = 'Dokumen tidak boleh digabung dalam satu file. Dokumen Credit Note, Agreement, dan Faktur Pajak wajib diunggah terpisah ke kolom masing-masing.';
+        } elseif ($hasSwapped) {
             $statusPurchase = 'BELUM BISA POTONG';
             $cekDokumen = 'DOKUMEN TERTUKAR ('.implode(', ', $swapDetails).')';
             $keterangan = 'Dokumen tertukar posisi upload. Harap perbaiki posisi slot Credit Note dan Agreement.';
@@ -818,15 +893,17 @@ class DocumentAnalysisService
         $dealerMismatch = false;
         $inputDealer = trim((string) ($formData['dealer_name'] ?? ''));
 
-        if (! $hasSwapped && empty($missing) && $extractedDealerName && $inputDealer !== '' && $inputDealer !== '-') {
+        if (! $hasSwapped && ! $hasMerged && empty($missing) && $extractedDealerName && $inputDealer !== '' && $inputDealer !== '-') {
             if (! $this->isDealerNameMatching($inputDealer, $extractedDealerName)) {
                 $dealerMismatch = true;
                 $hasInvalid = true;
-                $docValidation['cn'] = [
-                    'status' => 'invalid',
-                    'actual_type' => 'cn',
-                    'message' => "Nama dealer di dokumen ('{$extractedDealerName}') berbeda dengan isian formulir ('{$inputDealer}').",
-                ];
+                if (($docValidation['cn']['status'] ?? '') !== 'invalid') {
+                    $docValidation['cn'] = [
+                        'status' => 'invalid',
+                        'actual_type' => 'cn',
+                        'message' => "Nama dealer di dokumen ('{$extractedDealerName}') berbeda dengan isian formulir ('{$inputDealer}').",
+                    ];
+                }
                 $statusPurchase = 'BELUM BISA POTONG';
                 $cekDokumen = 'NAMA DEALER TIDAK SESUAI (CN)';
                 $keterangan = "Nama dealer di formulir ('{$inputDealer}') berbeda dengan nama dealer pada dokumen Credit Note ('{$extractedDealerName}'). Harap sesuaikan atau isi '-' agar otomatis diambil dari dokumen.";
@@ -843,16 +920,18 @@ class DocumentAnalysisService
         $inputProgram = trim((string) ($formData['program_name'] ?? ''));
 
         // Check Agreement Dealer Mismatch
-        if (! $hasSwapped && empty($missing) && $extractedAgrDealer) {
+        if (! $hasSwapped && ! $hasMerged && empty($missing) && $extractedAgrDealer) {
             $effectiveDealer = ($inputDealer !== '' && $inputDealer !== '-') ? $inputDealer : $extractedDealerName;
             if ($effectiveDealer && ! $this->isDealerNameMatching($effectiveDealer, $extractedAgrDealer)) {
                 $agrDealerMismatch = true;
                 $hasInvalid = true;
-                $docValidation['agr'] = [
-                    'status' => 'invalid',
-                    'actual_type' => 'agr',
-                    'message' => "Nama dealer pada Agreement ('{$extractedAgrDealer}') berbeda dengan nama dealer yang diajukan ('{$effectiveDealer}').",
-                ];
+                if (($docValidation['agr']['status'] ?? '') !== 'invalid') {
+                    $docValidation['agr'] = [
+                        'status' => 'invalid',
+                        'actual_type' => 'agr',
+                        'message' => "Nama dealer pada Agreement ('{$extractedAgrDealer}') berbeda dengan nama dealer yang diajukan ('{$effectiveDealer}').",
+                    ];
+                }
                 $statusPurchase = 'BELUM BISA POTONG';
                 $cekDokumen = 'NAMA DEALER TIDAK SESUAI (AGR)';
                 $keterangan = "Nama dealer di formulir ('{$effectiveDealer}') berbeda dengan nama dealer pada dokumen Agreement ('{$extractedAgrDealer}'). Harap sesuaikan dokumen Agreement Anda.";
@@ -860,15 +939,17 @@ class DocumentAnalysisService
         }
 
         // Check Agreement Program Mismatch
-        if (! $hasSwapped && empty($missing) && $extractedAgrProgram && $inputProgram !== '') {
+        if (! $hasSwapped && ! $hasMerged && empty($missing) && $extractedAgrProgram && $inputProgram !== '') {
             if (! $this->isProgramNameMatching($inputProgram, $extractedAgrProgram)) {
                 $agrProgramMismatch = true;
                 $hasInvalid = true;
-                $docValidation['agr'] = [
-                    'status' => 'invalid',
-                    'actual_type' => 'agr',
-                    'message' => "Nama program pada Agreement ('{$extractedAgrProgram}') berbeda dengan program yang dipilih ('{$inputProgram}').",
-                ];
+                if (($docValidation['agr']['status'] ?? '') !== 'invalid') {
+                    $docValidation['agr'] = [
+                        'status' => 'invalid',
+                        'actual_type' => 'agr',
+                        'message' => "Nama program pada Agreement ('{$extractedAgrProgram}') berbeda dengan program yang dipilih ('{$inputProgram}').",
+                    ];
+                }
                 $statusPurchase = 'BELUM BISA POTONG';
                 $cekDokumen = 'NAMA PROGRAM TIDAK SESUAI (AGR)';
                 $keterangan = "Nama program di formulir ('{$inputProgram}') berbeda dengan nama program pada dokumen Agreement ('{$extractedAgrProgram}'). Harap sesuaikan dokumen Agreement Anda.";
@@ -876,6 +957,10 @@ class DocumentAnalysisService
         }
 
         return [
+            'has_invalid' => $hasInvalid,
+            'has_swapped' => $hasSwapped,
+            'has_merged' => $hasMerged,
+            'is_clean' => (! $hasSwapped && ! $hasInvalid && ! $hasMerged && ! $dealerMismatch && ! $agrDealerMismatch && ! $agrProgramMismatch),
             'cek_dokumen' => $cekDokumen,
             'status_potong_purchase' => $statusPurchase,
             'keterangan' => $keterangan,
@@ -1273,15 +1358,28 @@ class DocumentAnalysisService
         // Recompute invalid details from docValidation
         $hasInvalid = false;
         $invalidDetails = [];
+        $hasMerged = ! empty($parsed['has_merged']);
+        $mergedSlots = [];
+
         foreach ($docValidation as $slot => $info) {
             if (! empty($slotHasUrl[$slot]) && ($info['status'] ?? '') === 'invalid') {
                 $hasInvalid = true;
-                $invalidDetails[] = strtoupper($slot);
+                if (($info['actual_type'] ?? '') === 'merged' || str_contains(strtolower($info['message'] ?? ''), 'gabung')) {
+                    $hasMerged = true;
+                    $mergedSlots[] = strtoupper($slot);
+                } else {
+                    $invalidDetails[] = strtoupper($slot);
+                }
             }
         }
 
         // Finalize statusPurchase, cekDokumen, and keterangan
-        if ($hasSwapped) {
+        if ($hasMerged) {
+            $statusPurchase = 'BELUM BISA POTONG';
+            $slotLabel = ! empty($mergedSlots) ? ' ('.implode(', ', $mergedSlots).')' : '';
+            $cekDokumen = 'DOKUMEN DIGABUNG'.$slotLabel;
+            $keterangan = 'Dokumen tidak boleh digabung dalam satu file. Dokumen Credit Note, Agreement, dan Faktur Pajak wajib diunggah terpisah ke kolom masing-masing.';
+        } elseif ($hasSwapped) {
             $statusPurchase = 'BELUM BISA POTONG';
             $swapLabels = [];
             foreach ($swapDetails as $k => $v) {
@@ -1521,12 +1619,20 @@ Analisis Finansial & Pajak:
   * has_npwp: boolean (apakah NPWP tertera atau valid)
   * note_pph: Catatan ringkas status fisik: "ok" jika lengkap dan ada cap/TTD/NPWP, atau sebutkan yang kurang seperti "CAP?", "TTD?", "NPWP?", "CAP? TTD?", dsb.
 
-- Validasi Isi Dokumen (Deteksi Dokumen Tertukar atau Tidak Sesuai):
+- Validasi Isi Dokumen (Deteksi Dokumen Tertukar, Digabung, atau Tidak Sesuai):
   Status per slot ("valid", "swapped", "invalid", "empty"):
   - "empty": Slot dokumen TIDAK diunggah (URL kosong, "-", atau tidak valid). JANGAN PERNAH menandai dokumen kosong sebagai "invalid" atau "swapped"!
-  - "valid": Dokumen ada diunggah, sesuai jenis slotnya dan data dealer/program cocok.
+  - "valid": Dokumen ada diunggah, murni sesuai jenis slotnya, tidak digabung, dan data dealer/program cocok.
   - "swapped": Dokumen ada diunggah, tetapi isinya tertukar antar slot (contoh: slot Faktur diisi file CN atau Agr).
-  - "invalid": Dokumen ada diunggah, tetapi isinya salah upload (contoh: foto selfie, nota sembarangan, dokumen dealer lain, dsb).
+  - "invalid": Dokumen ada diunggah, tetapi isinya tidak sesuai:
+    * DOKUMEN DIGABUNG / MERGED: File memuat lebih dari satu jenis dokumen (contoh: di slot CN memuat lembar Agreement atau Faktur Pajak, atau di slot AGR memuat lembar CN). DOKUMEN TIDAK BOLEH DIGABUNG! Slot CN harus murni CN saja, Agreement murni Agreement saja, Faktur murni Faktur Pajak saja.
+      Jika terdeteksi dokumen digabung:
+      - Tandai slot tersebut sebagai "invalid" (actual_type: "merged").
+      - message: "Dokumen terdeteksi digabung dalam satu file. Dokumen tidak boleh digabung! Harap pisahkan dokumen dan unggah khusus [CN / Agreement / Faktur] saja."
+      - cek_dokumen: "DOKUMEN DIGABUNG ([SLOT])"
+      - status_potong_purchase: "BELUM BISA POTONG"
+      - keterangan: "Dokumen tidak boleh digabung. Dokumen Credit Note, Agreement, dan Faktur Pajak wajib diunggah terpisah ke kolom masing-masing."
+    * Dokumen salah upload (foto selfie, nota sembarangan, dokumen dealer lain, dsb).
 
 Ketentuan Penentuan Output:
 1. Ketentuan Khusus Pajak (PKP vs NON PKP):

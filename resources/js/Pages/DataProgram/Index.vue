@@ -1105,248 +1105,418 @@
       >
         <div
           v-if="showTestModal"
-          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs font-sans overflow-y-auto"
+          class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-xs font-sans"
           @click.self="showTestModal = false"
         >
-          <div class="relative w-full max-w-2xl bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden font-sans my-6">
+          <div class="relative w-full max-w-3xl sm:max-w-4xl bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden font-sans my-4 flex flex-col max-h-[90vh]">
             <!-- Modal Header -->
-            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50/70 flex items-center justify-between">
-              <div>
-                <h3 class="text-sm font-semibold text-gray-900">Hasil Uji Kecocokan Data Program</h3>
-                <p class="text-xs text-gray-500 mt-0.5 truncate">
-                  Dealer: <strong class="text-gray-800">{{ testRow?.dealer_name || '-' }}</strong>
-                  <span v-if="testRow?.kode_bt" class="text-gray-400"> ({{ testRow.kode_bt }})</span>
-                  &bull; {{ testRow?.program_name }}
-                </p>
+            <div class="px-6 py-4 border-b border-slate-200/80 bg-gradient-to-r from-slate-50 via-white to-slate-50 flex items-start justify-between gap-4 shrink-0">
+              <div class="flex items-start gap-3 min-w-0">
+                <div class="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200/70 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
+                  <ShieldCheckIcon class="w-5 h-5" />
+                </div>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h3 class="text-base font-semibold text-slate-900 leading-snug">Hasil Uji Kecocokan Data Program</h3>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-slate-100 text-slate-600 border border-slate-200">
+                      Reconciliation
+                    </span>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500 mt-1">
+                    <span class="font-semibold text-slate-800">{{ testRow?.dealer_name || '-' }}</span>
+                    <span v-if="testRow?.kode_bt" class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-mono font-medium">
+                      {{ testRow.kode_bt }}
+                    </span>
+                    <span class="text-slate-300">&bull;</span>
+                    <span class="text-slate-600 truncate max-w-md">{{ testRow?.program_name }}</span>
+                  </div>
+                </div>
               </div>
               <button
                 type="button"
                 @click="showTestModal = false"
-                class="w-8 h-8 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition cursor-pointer"
+                class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition cursor-pointer shrink-0"
+                title="Tutup Modal"
               >
                 <XIcon class="w-4 h-4" />
               </button>
             </div>
 
-            <!-- Modal Body (Tabel Polos yang Rapi) -->
-            <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
-              <!-- Ringkasan Status -->
-              <div class="p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 flex items-center justify-between">
-                <div>
-                  <span class="font-medium text-gray-900">
-                    {{ testResult?.matched ? 'Berhasil dicocokkan dengan Test Program #' + testResult.details?.submission_id : 'Belum ditemukan data Test Program yang cocok' }}
-                  </span>
-                  <div class="text-[11px] text-gray-500 mt-0.5">
-                    Status Potong: <strong class="text-gray-800">{{ testResult?.details?.status_potong_purchase || testRow?.status_potong_purchase || '-' }}</strong>
-                    &bull; Cek Dokumen: <strong class="text-gray-800">{{ testResult?.details?.cek_dokumen || testRow?.cek_dokumen || '-' }}</strong>
+            <!-- Modal Body -->
+            <div class="px-6 py-5 space-y-4 overflow-y-auto flex-1 text-xs">
+              <!-- Ringkasan Status Card -->
+              <div
+                v-if="testResult?.matched"
+                class="p-4 rounded-xl border border-emerald-200/90 bg-gradient-to-r from-emerald-50/80 via-teal-50/40 to-emerald-50/60 flex items-center justify-between gap-4 shadow-2xs"
+              >
+                <div class="flex items-start gap-3 min-w-0">
+                  <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
+                    <CheckCircleIcon class="w-5 h-5" />
+                  </div>
+                  <div class="space-y-1 min-w-0">
+                    <span class="text-sm font-semibold text-slate-900">
+                      Berhasil dicocokkan dengan Test Program #{{ testResult.details?.submission_id }}
+                    </span>
+                    <div class="flex items-center gap-2 flex-wrap text-xs">
+                      <span class="text-slate-500 font-normal">Status Potong:</span>
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] bg-emerald-100 text-emerald-800 border border-emerald-200">
+                        {{ testResult?.details?.status_potong_purchase || testRow?.status_potong_purchase || '-' }}
+                      </span>
+                      <span class="text-slate-300">&bull;</span>
+                      <span class="text-slate-500 font-normal">Cek Dokumen:</span>
+                      <span class="inline-flex items-center px-2 py-0.5 rounded-md font-semibold text-[11px] bg-teal-100 text-teal-800 border border-teal-200">
+                        {{ testResult?.details?.cek_dokumen || testRow?.cek_dokumen || '-' }}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <div class="shrink-0 ml-4">
-                  <span
-                    v-if="testResult?.matched"
-                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold"
-                  >
-                    <CheckIcon class="w-3 h-3" />
+                <div class="shrink-0">
+                  <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-semibold shadow-xs">
+                    <CheckIcon class="w-3.5 h-3.5 stroke-[2.5]" />
                     <span>Sesuai</span>
                   </span>
-                  <span
-                    v-else
-                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gray-100 text-gray-700 border border-gray-200 text-xs font-medium"
-                  >
+                </div>
+              </div>
+
+              <div
+                v-else
+                class="p-4 rounded-xl border border-amber-200/90 bg-gradient-to-r from-amber-50/80 via-orange-50/40 to-amber-50/60 flex items-center justify-between gap-4 shadow-2xs"
+              >
+                <div class="flex items-start gap-3 min-w-0">
+                  <div class="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center shrink-0 mt-0.5">
+                    <AlertCircleIcon class="w-5 h-5" />
+                  </div>
+                  <div class="space-y-1 min-w-0">
+                    <span class="text-sm font-semibold text-slate-900">
+                      Belum ditemukan data Test Program yang cocok
+                    </span>
+                    <div class="flex items-center gap-2 flex-wrap text-xs text-slate-500">
+                      <span>Status Potong: <strong class="text-slate-700">{{ testRow?.status_potong_purchase || '-' }}</strong></span>
+                      <span class="text-slate-300">&bull;</span>
+                      <span>Cek Dokumen: <strong class="text-slate-700">{{ testRow?.cek_dokumen || '-' }}</strong></span>
+                    </div>
+                  </div>
+                </div>
+                <div class="shrink-0">
+                  <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-xs font-semibold">
                     <span>Belum Cocok</span>
                   </span>
                 </div>
               </div>
 
               <!-- Tabel Komparasi Rapi -->
-              <div class="rounded-lg border border-gray-200 overflow-hidden">
+              <div class="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-2xs">
                 <table class="w-full text-xs text-left">
-                  <thead class="bg-gray-50 border-b border-gray-200 text-gray-500 font-medium">
+                  <thead class="bg-slate-50/90 border-b border-slate-200 text-slate-500 text-[11px] font-semibold uppercase tracking-wider">
                     <tr>
-                      <th class="px-3.5 py-2.5 w-1/4">Parameter</th>
-                      <th class="px-3.5 py-2.5 w-1/3">Data Program (Master)</th>
-                      <th class="px-3.5 py-2.5 w-1/3">Test Program (Respon Web)</th>
-                      <th class="px-3.5 py-2.5 w-[85px] text-center">Hasil</th>
+                      <th class="px-4 py-3 w-[26%]">Parameter</th>
+                      <th class="px-4 py-3 w-[34%]">Data Program (Master)</th>
+                      <th class="px-4 py-3 w-[34%]">Test Program (Respon Web)</th>
+                      <th class="px-3 py-3 w-[6%] text-center">Hasil</th>
                     </tr>
                   </thead>
-                  <tbody class="divide-y divide-gray-100 text-gray-700">
+                  <tbody class="divide-y divide-slate-100 text-slate-700">
                     <!-- 1. Region -->
-                    <tr>
-                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Region</td>
-                      <td class="px-3.5 py-2">{{ testRow?.region || testRow?.big_region || '-' }}</td>
-                      <td class="px-3.5 py-2">{{ testResult?.details?.submission?.region || '-' }}</td>
-                      <td class="px-3.5 py-2 text-center">
-                        <span v-if="testResult?.details?.criteria_match?.region" class="text-emerald-700 font-medium">Cocok</span>
-                        <span v-else class="text-rose-600 font-medium">Beda</span>
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                      <td class="px-4 py-2.5 font-medium text-slate-600 bg-slate-50/30 border-r border-slate-100">Region</td>
+                      <td class="px-4 py-2.5 font-normal text-slate-800">{{ testRow?.region || testRow?.big_region || '-' }}</td>
+                      <td class="px-4 py-2.5 font-normal text-slate-800">{{ testResult?.details?.submission?.region || '-' }}</td>
+                      <td class="px-3 py-2.5 text-center">
+                        <span v-if="testResult?.details?.criteria_match?.region" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckIcon class="w-3 h-3 stroke-[2.5]" /> Cocok
+                        </span>
+                        <span v-else class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                          <XIcon class="w-3 h-3 stroke-[2.5]" /> Beda
+                        </span>
                       </td>
                     </tr>
 
                     <!-- 2. Kode BT / ID Real -->
-                    <tr>
-                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Kode BT / ID Real</td>
-                      <td class="px-3.5 py-2">{{ testRow?.kode_bt || '-' }}</td>
-                      <td class="px-3.5 py-2">{{ testResult?.details?.submission?.id_real || '-' }}</td>
-                      <td class="px-3.5 py-2 text-center">
-                        <span v-if="testResult?.details?.criteria_match?.kode_bt" class="text-emerald-700 font-medium">Cocok</span>
-                        <span v-else-if="testResult?.details?.criteria_match?.kode_bt === false" class="text-rose-600 font-medium">Beda</span>
-                        <span v-else class="text-gray-400">Opsional</span>
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                      <td class="px-4 py-2.5 font-medium text-slate-600 bg-slate-50/30 border-r border-slate-100">Kode BT / ID Real</td>
+                      <td class="px-4 py-2.5">
+                        <span v-if="testRow?.kode_bt" class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[11px] font-medium">{{ testRow.kode_bt }}</span>
+                        <span v-else class="text-slate-400">-</span>
+                      </td>
+                      <td class="px-4 py-2.5">
+                        <span v-if="testResult?.details?.submission?.id_real" class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[11px] font-medium">{{ testResult.details.submission.id_real }}</span>
+                        <span v-else class="text-slate-400">-</span>
+                      </td>
+                      <td class="px-3 py-2.5 text-center">
+                        <span v-if="testResult?.details?.criteria_match?.kode_bt" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckIcon class="w-3 h-3 stroke-[2.5]" /> Cocok
+                        </span>
+                        <span v-else-if="testResult?.details?.criteria_match?.kode_bt === false" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                          <XIcon class="w-3 h-3 stroke-[2.5]" /> Beda
+                        </span>
+                        <span v-else class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                          Opsional
+                        </span>
                       </td>
                     </tr>
 
                     <!-- 3. Nama Dealer -->
-                    <tr>
-                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Nama Dealer</td>
-                      <td class="px-3.5 py-2">{{ testRow?.dealer_name || '-' }}</td>
-                      <td class="px-3.5 py-2">{{ testResult?.details?.submission?.dealer_name || '-' }}</td>
-                      <td class="px-3.5 py-2 text-center">
-                        <span v-if="testResult?.details?.criteria_match?.dealer" class="text-emerald-700 font-medium">Cocok</span>
-                        <span v-else class="text-rose-600 font-medium">Beda</span>
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                      <td class="px-4 py-2.5 font-medium text-slate-600 bg-slate-50/30 border-r border-slate-100">Nama Dealer</td>
+                      <td class="px-4 py-2.5 font-medium text-slate-900">{{ testRow?.dealer_name || '-' }}</td>
+                      <td class="px-4 py-2.5 font-medium text-slate-900">{{ testResult?.details?.submission?.dealer_name || '-' }}</td>
+                      <td class="px-3 py-2.5 text-center">
+                        <span v-if="testResult?.details?.criteria_match?.dealer" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckIcon class="w-3 h-3 stroke-[2.5]" /> Cocok
+                        </span>
+                        <span v-else class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                          <XIcon class="w-3 h-3 stroke-[2.5]" /> Beda
+                        </span>
                       </td>
                     </tr>
 
                     <!-- 4. Nama Program -->
-                    <tr>
-                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Nama Program</td>
-                      <td class="px-3.5 py-2">{{ testRow?.program_name || '-' }}</td>
-                      <td class="px-3.5 py-2">{{ testResult?.details?.submission?.program_name || '-' }}</td>
-                      <td class="px-3.5 py-2 text-center">
-                        <span v-if="testResult?.details?.criteria_match?.program" class="text-emerald-700 font-medium">Cocok</span>
-                        <span v-else class="text-rose-600 font-medium">Beda</span>
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                      <td class="px-4 py-2.5 font-medium text-slate-600 bg-slate-50/30 border-r border-slate-100">Nama Program</td>
+                      <td class="px-4 py-2.5 text-slate-800">{{ testRow?.program_name || '-' }}</td>
+                      <td class="px-4 py-2.5 text-slate-800">{{ testResult?.details?.submission?.program_name || '-' }}</td>
+                      <td class="px-3 py-2.5 text-center">
+                        <span v-if="testResult?.details?.criteria_match?.program" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckIcon class="w-3 h-3 stroke-[2.5]" /> Cocok
+                        </span>
+                        <span v-else class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                          <XIcon class="w-3 h-3 stroke-[2.5]" /> Beda
+                        </span>
                       </td>
                     </tr>
 
                     <!-- 5. Nominal Finansial (DPP / Net Pay) -->
-                    <tr>
-                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Nominal (DPP / Net)</td>
-                      <td class="px-3.5 py-2 font-medium">{{ formatRupiah(testRow?.net_pay || testRow?.dpp) }}</td>
-                      <td class="px-3.5 py-2 font-medium">{{ formatRupiah(testResult?.details?.submission?.net_pay || testResult?.details?.submission?.dpp) }}</td>
-                      <td class="px-3.5 py-2 text-center">
-                        <span v-if="testResult?.details?.financial_match || testResult?.details?.criteria_match?.financial" class="text-emerald-700 font-medium">Cocok</span>
-                        <span v-else class="text-gray-500">
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                      <td class="px-4 py-2.5 font-medium text-slate-600 bg-slate-50/30 border-r border-slate-100">Nominal (DPP / Net)</td>
+                      <td class="px-4 py-2.5 font-semibold text-slate-900">{{ formatRupiah(testRow?.net_pay || testRow?.dpp) }}</td>
+                      <td class="px-4 py-2.5 font-semibold text-slate-900">{{ formatRupiah(testResult?.details?.submission?.net_pay || testResult?.details?.submission?.dpp) }}</td>
+                      <td class="px-3 py-2.5 text-center">
+                        <span v-if="testResult?.details?.financial_match || testResult?.details?.criteria_match?.financial" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckIcon class="w-3 h-3 stroke-[2.5]" /> Cocok
+                        </span>
+                        <span v-else class="text-slate-500 font-mono text-[11px]">
                           {{ testResult?.details?.selisih ? formatRupiah(testResult.details.selisih) : '-' }}
                         </span>
                       </td>
                     </tr>
 
                     <!-- 6. Dokumen CN -->
-                    <tr>
-                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Dokumen CN</td>
-                      <td class="px-3.5 py-2">
-                        <a v-if="isValidUrl(testRow?.cn)" :href="testRow.cn" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas</a>
-                        <span v-else class="text-gray-400">-</span>
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                      <td class="px-4 py-2.5 font-medium text-slate-600 bg-slate-50/30 border-r border-slate-100">Dokumen CN</td>
+                      <td class="px-4 py-2.5">
+                        <a
+                          v-if="isValidUrl(testRow?.cn)"
+                          :href="testRow.cn"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 transition-all cursor-pointer group shadow-2xs"
+                        >
+                          <FileTextIcon class="w-3.5 h-3.5 text-blue-600 group-hover:scale-105 transition-transform" />
+                          <span>Buka Berkas</span>
+                          <ExternalLinkIcon class="w-3 h-3 text-blue-400 group-hover:text-blue-600" />
+                        </a>
+                        <span v-else class="text-slate-400 italic text-[11px]">Tidak ada berkas</span>
                       </td>
-                      <td class="px-3.5 py-2">
-                        <a v-if="isValidUrl(testResult?.details?.submission?.credit_note_url)" :href="testResult.details.submission.credit_note_url" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas</a>
-                        <span v-else class="text-gray-400">-</span>
+                      <td class="px-4 py-2.5">
+                        <a
+                          v-if="isValidUrl(testResult?.details?.submission?.credit_note_url)"
+                          :href="testResult.details.submission.credit_note_url"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 transition-all cursor-pointer group shadow-2xs"
+                        >
+                          <FileTextIcon class="w-3.5 h-3.5 text-blue-600 group-hover:scale-105 transition-transform" />
+                          <span>Buka Berkas</span>
+                          <ExternalLinkIcon class="w-3 h-3 text-blue-400 group-hover:text-blue-600" />
+                        </a>
+                        <span v-else class="text-slate-400 italic text-[11px]">Tidak ada berkas</span>
                       </td>
-                      <td class="px-3.5 py-2 text-center">
-                        <span v-if="isValidUrl(testRow?.cn) || isValidUrl(testResult?.details?.submission?.credit_note_url)" class="text-emerald-700 font-medium">Ada</span>
-                        <span v-else class="text-rose-600 font-medium">Kosong</span>
+                      <td class="px-3 py-2.5 text-center">
+                        <span v-if="isValidUrl(testRow?.cn) || isValidUrl(testResult?.details?.submission?.credit_note_url)" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                          <CheckIcon class="w-3 h-3 stroke-[2.5]" /> Ada
+                        </span>
+                        <span v-else class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                          <XIcon class="w-3 h-3 stroke-[2.5]" /> Kosong
+                        </span>
                       </td>
                     </tr>
 
                     <!-- 7. Dokumen Agreement -->
-                    <tr>
-                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Dokumen Agreement</td>
-                      <td class="px-3.5 py-2">
-                        <a v-if="isValidUrl(testRow?.agrement)" :href="testRow.agrement" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas</a>
-                        <span v-else class="text-gray-400">-</span>
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                      <td class="px-4 py-2.5 font-medium text-slate-600 bg-slate-50/30 border-r border-slate-100">Dokumen Agreement</td>
+                      <td class="px-4 py-2.5">
+                        <a
+                          v-if="isValidUrl(testRow?.agrement)"
+                          :href="testRow.agrement"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 transition-all cursor-pointer group shadow-2xs"
+                        >
+                          <FileTextIcon class="w-3.5 h-3.5 text-blue-600 group-hover:scale-105 transition-transform" />
+                          <span>Buka Berkas</span>
+                          <ExternalLinkIcon class="w-3 h-3 text-blue-400 group-hover:text-blue-600" />
+                        </a>
+                        <span v-else class="text-slate-400 italic text-[11px]">Tidak ada berkas</span>
                       </td>
-                      <td class="px-3.5 py-2">
-                        <a v-if="isValidUrl(testResult?.details?.submission?.agreement_url)" :href="testResult.details.submission.agreement_url" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas</a>
-                        <span v-else class="text-gray-400">-</span>
+                      <td class="px-4 py-2.5">
+                        <a
+                          v-if="isValidUrl(testResult?.details?.submission?.agreement_url)"
+                          :href="testResult.details.submission.agreement_url"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 transition-all cursor-pointer group shadow-2xs"
+                        >
+                          <FileTextIcon class="w-3.5 h-3.5 text-blue-600 group-hover:scale-105 transition-transform" />
+                          <span>Buka Berkas</span>
+                          <ExternalLinkIcon class="w-3 h-3 text-blue-400 group-hover:text-blue-600" />
+                        </a>
+                        <span v-else class="text-slate-400 italic text-[11px]">Tidak ada berkas</span>
                       </td>
-                      <td class="px-3.5 py-2 text-center">
-                        <span v-if="isValidUrl(testRow?.agrement) || isValidUrl(testResult?.details?.submission?.agreement_url)" class="text-emerald-700 font-medium">Ada</span>
-                        <span v-else class="text-rose-600 font-medium">Kosong</span>
+                      <td class="px-3 py-2.5 text-center">
+                        <span v-if="isValidUrl(testRow?.agrement) || isValidUrl(testResult?.details?.submission?.agreement_url)" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                          <CheckIcon class="w-3 h-3 stroke-[2.5]" /> Ada
+                        </span>
+                        <span v-else class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                          <XIcon class="w-3 h-3 stroke-[2.5]" /> Kosong
+                        </span>
                       </td>
                     </tr>
 
                     <!-- 8. Dokumen Faktur Pajak -->
-                    <tr>
-                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Dokumen Faktur Pajak</td>
-                      <td class="px-3.5 py-2">
-                        <a v-if="isValidUrl(testRow?.cek_fp)" :href="testRow.cek_fp" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas</a>
-                        <span v-else-if="!testResult?.details?.is_pkp" class="text-gray-500">Bebas FP (Non-PKP)</span>
-                        <span v-else class="text-gray-400">-</span>
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                      <td class="px-4 py-2.5 font-medium text-slate-600 bg-slate-50/30 border-r border-slate-100">Dokumen Faktur Pajak</td>
+                      <td class="px-4 py-2.5">
+                        <a
+                          v-if="isValidUrl(testRow?.cek_fp)"
+                          :href="testRow.cek_fp"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 transition-all cursor-pointer group shadow-2xs"
+                        >
+                          <FileTextIcon class="w-3.5 h-3.5 text-blue-600 group-hover:scale-105 transition-transform" />
+                          <span>Buka Berkas</span>
+                          <ExternalLinkIcon class="w-3 h-3 text-blue-400 group-hover:text-blue-600" />
+                        </a>
+                        <span v-else-if="!testResult?.details?.is_pkp" class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">Bebas FP (Non-PKP)</span>
+                        <span v-else class="text-slate-400 italic text-[11px]">Tidak ada berkas</span>
                       </td>
-                      <td class="px-3.5 py-2">
-                        <a v-if="isValidUrl(testResult?.details?.submission?.tax_invoice_url)" :href="testResult.details.submission.tax_invoice_url" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Buka Berkas</a>
-                        <span v-else-if="!testResult?.details?.is_pkp" class="text-gray-500">Bebas FP (Non-PKP)</span>
-                        <span v-else class="text-gray-400">-</span>
+                      <td class="px-4 py-2.5">
+                        <a
+                          v-if="isValidUrl(testResult?.details?.submission?.tax_invoice_url)"
+                          :href="testResult.details.submission.tax_invoice_url"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 transition-all cursor-pointer group shadow-2xs"
+                        >
+                          <FileTextIcon class="w-3.5 h-3.5 text-blue-600 group-hover:scale-105 transition-transform" />
+                          <span>Buka Berkas</span>
+                          <ExternalLinkIcon class="w-3 h-3 text-blue-400 group-hover:text-blue-600" />
+                        </a>
+                        <span v-else-if="!testResult?.details?.is_pkp" class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">Bebas FP (Non-PKP)</span>
+                        <span v-else class="text-slate-400 italic text-[11px]">Tidak ada berkas</span>
                       </td>
-                      <td class="px-3.5 py-2 text-center">
-                        <span v-if="!testResult?.details?.is_pkp" class="text-gray-500 font-medium">Bebas FP</span>
-                        <span v-else-if="isValidUrl(testRow?.cek_fp) || isValidUrl(testResult?.details?.submission?.tax_invoice_url)" class="text-emerald-700 font-medium">Ada</span>
-                        <span v-else class="text-rose-600 font-medium">Kosong</span>
+                      <td class="px-3 py-2.5 text-center">
+                        <span v-if="!testResult?.details?.is_pkp" class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                          Bebas FP
+                        </span>
+                        <span v-else-if="isValidUrl(testRow?.cek_fp) || isValidUrl(testResult?.details?.submission?.tax_invoice_url)" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                          <CheckIcon class="w-3 h-3 stroke-[2.5]" /> Ada
+                        </span>
+                        <span v-else class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                          <XIcon class="w-3 h-3 stroke-[2.5]" /> Kosong
+                        </span>
                       </td>
                     </tr>
 
                     <!-- 9. Wajib Pajak & Aturan -->
-                    <tr>
-                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Wajib Pajak & Aturan</td>
-                      <td colspan="3" class="px-3.5 py-2">
-                        <div class="flex items-center gap-2">
-                          <span class="font-medium text-gray-900">{{ testResult?.details?.wajib_pajak || testRow?.wajib_pajak || '-' }}</span>
-                          <span class="text-gray-400">&bull;</span>
-                          <span class="text-gray-600">
-                            {{ testResult?.details?.is_pkp ? 'PKP (Wajib melampirkan Faktur Pajak yang sah bersama CN & Agreement)' : 'NON-PKP (Cukup dokumen CN & Agreement)' }}
+                    <tr class="hover:bg-slate-50/50 transition-colors">
+                      <td class="px-4 py-2.5 font-medium text-slate-600 bg-slate-50/30 border-r border-slate-100">Wajib Pajak & Aturan</td>
+                      <td colspan="3" class="px-4 py-2.5">
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <span
+                            v-if="testResult?.details?.is_pkp"
+                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wide bg-purple-50 text-purple-700 border border-purple-200"
+                          >
+                            PKP
+                          </span>
+                          <span
+                            v-else
+                            class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wide bg-slate-100 text-slate-700 border border-slate-200"
+                          >
+                            NON-PKP
+                          </span>
+                          <span class="text-xs text-slate-600">
+                            {{ testResult?.details?.is_pkp ? 'Wajib melampirkan Faktur Pajak yang sah bersama CN & Agreement' : 'Cukup melampirkan dokumen CN & Agreement (Bebas Faktur Pajak)' }}
+                          </span>
+                          <span v-if="testRow?.wajib_pajak && testRow.wajib_pajak !== '-'" class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[11px] font-mono">
+                            {{ testRow.wajib_pajak }}
                           </span>
                         </div>
-                      </td>
-                    </tr>
-
-                    <!-- 10. Catatan Rekonsiliasi -->
-                    <tr v-if="testRow?.noted || testRow?.keterangan || testResult?.details?.keterangan">
-                      <td class="px-3.5 py-2 text-gray-500 font-medium bg-gray-50/50">Catatan Rekonsiliasi</td>
-                      <td colspan="3" class="px-3.5 py-2 text-gray-700">
-                        {{ testRow?.noted || testRow?.keterangan || testResult?.details?.keterangan || '-' }}
                       </td>
                     </tr>
                   </tbody>
                 </table>
               </div>
+
+              <!-- 10. Catatan Rekonsiliasi Card -->
+              <div
+                v-if="testRow?.noted || testRow?.keterangan || testResult?.details?.keterangan"
+                class="p-3.5 rounded-xl border border-slate-200/90 bg-slate-50/80 text-xs text-slate-700 flex items-start gap-3 shadow-2xs"
+              >
+                <div class="w-6 h-6 rounded-md bg-white border border-slate-200 text-slate-500 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                  <InfoIcon class="w-3.5 h-3.5" />
+                </div>
+                <div class="space-y-0.5 min-w-0 flex-1">
+                  <span class="font-semibold text-slate-900 text-xs block">Catatan Rekonsiliasi</span>
+                  <p class="text-xs text-slate-600 leading-relaxed break-words">
+                    {{ testRow?.noted || testRow?.keterangan || testResult?.details?.keterangan }}
+                  </p>
+                </div>
+              </div>
             </div>
 
             <!-- Modal Footer -->
-            <div class="px-6 py-3 bg-gray-50/70 border-t border-gray-200 flex items-center justify-between text-xs">
-              <button
-                type="button"
-                @click="testMatchSingleRow(testRow, true)"
-                :disabled="reconcilingRowId === testRow?.id"
-                class="h-8 px-3 rounded-md border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition cursor-pointer flex items-center gap-1.5 font-medium disabled:opacity-50 text-xs shadow-2xs"
-              >
-                <RefreshCwIcon :class="['w-3.5 h-3.5 text-gray-500', reconcilingRowId === testRow?.id && 'animate-spin']" />
-                <span>{{ reconcilingRowId === testRow?.id ? 'Menguji Ulang...' : 'Uji Ulang (Paksa)' }}</span>
-              </button>
+            <div class="px-6 py-3.5 bg-slate-50/90 border-t border-slate-200/80 flex items-center justify-between gap-3 text-xs shrink-0">
               <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  @click="testMatchSingleRow(testRow, true)"
+                  :disabled="reconcilingRowId === testRow?.id"
+                  class="h-9 px-3.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition cursor-pointer flex items-center gap-1.5 font-medium disabled:opacity-50 text-xs shadow-2xs active:scale-98"
+                  title="Uji ulang pencocokan baris ini"
+                >
+                  <RefreshCwIcon :class="['w-3.5 h-3.5 text-slate-500', reconcilingRowId === testRow?.id && 'animate-spin']" />
+                  <span>{{ reconcilingRowId === testRow?.id ? 'Menguji...' : 'Uji Ulang (Paksa)' }}</span>
+                </button>
+                <button
+                  type="button"
+                  @click="openHistoryModal(testRow)"
+                  class="h-9 px-3.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 transition cursor-pointer flex items-center gap-1.5 font-medium text-xs shadow-2xs active:scale-98"
+                  title="Lihat riwayat pencocokan untuk baris ini"
+                >
+                  <HistoryIcon class="w-3.5 h-3.5 text-slate-500" />
+                  <span>Riwayat Baris Ini</span>
+                </button>
+              </div>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  @click="showTestModal = false"
+                  class="h-9 px-4 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-medium transition cursor-pointer text-xs active:scale-98"
+                >
+                  Tutup
+                </button>
                 <button
                   v-if="testRow?.status_potong_purchase === 'BISA DI POTONG'"
                   type="button"
                   @click="sendWaToTelemarketing(testRow)"
                   :disabled="sendingWaId === testRow?.id"
-                  class="h-8 px-3 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer flex items-center gap-1.5 font-medium disabled:opacity-50 text-xs shadow-2xs"
+                  class="h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer flex items-center gap-2 font-semibold disabled:opacity-50 text-xs shadow-xs active:scale-98"
                   title="Kirim info klaim ini ke WhatsApp Telemarketing"
                 >
                   <RefreshCwIcon v-if="sendingWaId === testRow?.id" class="w-3.5 h-3.5 animate-spin" />
                   <SendIcon v-else class="w-3.5 h-3.5" />
                   <span>Kirim ke WA Telemarketing</span>
-                </button>
-                <button
-                  type="button"
-                  @click="openHistoryModal(testRow)"
-                  class="h-8 px-3 rounded-md border border-gray-200 bg-white text-gray-700 hover:bg-gray-100 transition cursor-pointer flex items-center gap-1.5 font-normal text-xs"
-                  title="Lihat riwayat pencocokan untuk baris ini"
-                >
-                  <HistoryIcon class="w-3.5 h-3.5 text-gray-500" />
-                  <span>Riwayat Baris Ini</span>
-                </button>
-                <button
-                  type="button"
-                  @click="showTestModal = false"
-                  class="h-8 px-3.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 font-medium transition cursor-pointer text-xs"
-                >
-                  Tutup
                 </button>
               </div>
             </div>
@@ -1399,7 +1569,7 @@ const isValidUrl = (url) => {
   return typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'));
 };
 
-const googleSheetUrl = 'https://docs.google.com/spreadsheets/d/1w8J_ahdfk-Dj0NZWkXf1GJucpusQ4vQaerdU5wfnkJc/edit?gid=1715579975#gid=1715579975';
+const googleSheetUrl = ref('https://docs.google.com/spreadsheets/d/1AFEAxjycq50heaxJeAH9YjpVWFs3GeprplJDOJMzjSU/edit?gid=241795572#gid=241795572');
 
 const items = ref([]);
 const isLoading = ref(false);
@@ -1779,8 +1949,16 @@ const sendWaToTelemarketing = async (row) => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
   fetchData(1);
+  try {
+    const res = await axios.get('/api/data-program/url');
+    if (res.data?.url) {
+      googleSheetUrl.value = res.data.url;
+    }
+  } catch {
+    // Keep default URL on error
+  }
   document.addEventListener('click', handleClickOutsideSpreadsheetDropdown);
   document.addEventListener('click', handleClickOutsideReconcileDropdown);
   document.addEventListener('click', handleClickOutsideProgramDropdown);

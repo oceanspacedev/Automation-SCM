@@ -351,7 +351,7 @@
           class="bg-white rounded-xl shadow-xs border p-6 space-y-4 transition"
           :class="validationErrors.credit_note ? 'border-rose-300 ring-1 ring-rose-100' : 'border-gray-200'"
         >
-          <div class="space-y-1">
+          <div class="space-y-2">
             <label class="block text-sm sm:text-base font-medium text-gray-900">
               DOKUMEN CREDIT NOTE/INVOICE <span class="text-rose-500">*</span>
             </label>
@@ -416,20 +416,39 @@
           <!-- Loading verification indicator -->
           <div v-if="isScanningDoc.credit_note" class="pt-1 flex items-center gap-2 text-xs text-gray-500">
             <RefreshCwIcon class="w-3.5 h-3.5 animate-spin text-gray-400 shrink-0" />
-            <span>Memverifikasi dokumen...</span>
+            <span>Memverifikasi dokumen Credit Note...</span>
           </div>
 
-          <!-- Warning ONLY if invalid or wrong document -->
+          <!-- Hasil Analisis Pas Di-Upload (Invalid / Merged / Swapped) -->
           <div v-else-if="aiAnalysis.docValidation?.cn && aiAnalysis.docValidation.cn.status !== 'valid'" class="pt-1">
-            <div class="p-2.5 rounded-lg border border-red-200 bg-red-50 text-xs text-red-800 flex items-center gap-2">
-              <AlertCircleIcon class="w-4 h-4 text-red-600 shrink-0" />
-              <span>
-                {{
-                  aiAnalysis.docValidation.cn.status === 'swapped'
-                    ? 'File yang diunggah adalah Dokumen Agreement, bukan Credit Note. Mohon unggah file Credit Note yang benar.'
-                    : (aiAnalysis.docValidation.cn.message || 'File tidak sesuai / bukan Credit Note.')
-                }}
-              </span>
+            <div class="p-3 rounded-lg border border-red-200 bg-red-50 text-xs text-red-900 flex items-start gap-2.5">
+              <AlertCircleIcon class="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+              <div class="space-y-0.5 min-w-0">
+                <p class="font-semibold text-red-950">
+                  {{
+                    aiAnalysis.docValidation.cn.actual_type === 'merged'
+                      ? 'Hasil Analisis: Dokumen Tidak Boleh Digabung!'
+                      : (aiAnalysis.docValidation.cn.status === 'swapped'
+                          ? 'Hasil Analisis: Dokumen Tertukar!'
+                          : 'Hasil Analisis: Dokumen Tidak Sesuai')
+                  }}
+                </p>
+                <p class="leading-relaxed">
+                  {{
+                    aiAnalysis.docValidation.cn.status === 'swapped'
+                      ? 'File yang diunggah terdeteksi sebagai Dokumen Agreement, bukan Credit Note. Mohon unggah file Credit Note yang benar.'
+                      : (aiAnalysis.docValidation.cn.message || 'File tidak sesuai / bukan Credit Note.')
+                  }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hasil Analisis Pas Di-Upload (Valid) -->
+          <div v-else-if="aiAnalysis.docValidation?.cn && aiAnalysis.docValidation.cn.status === 'valid' && filePreviews.credit_note" class="pt-1">
+            <div class="p-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-xs text-emerald-800 flex items-center gap-2">
+              <CheckCircle2Icon class="w-4 h-4 text-emerald-600 shrink-0" />
+              <span class="font-medium">Hasil Analisis: Dokumen Credit Note Terverifikasi (Valid)</span>
             </div>
           </div>
 
@@ -444,7 +463,7 @@
           class="bg-white rounded-xl shadow-xs border p-6 space-y-4 transition"
           :class="validationErrors.agreement ? 'border-rose-300 ring-1 ring-rose-100' : 'border-gray-200'"
         >
-          <div class="space-y-1">
+          <div class="space-y-2">
             <label class="block text-sm sm:text-base font-medium text-gray-900">
               AGREEMENT <span class="text-rose-500">*</span>
             </label>
@@ -509,20 +528,39 @@
           <!-- Loading verification indicator -->
           <div v-if="isScanningDoc.agreement" class="pt-1 flex items-center gap-2 text-xs text-gray-500">
             <RefreshCwIcon class="w-3.5 h-3.5 animate-spin text-gray-400 shrink-0" />
-            <span>Memverifikasi dokumen...</span>
+            <span>Memverifikasi dokumen Agreement...</span>
           </div>
 
-          <!-- Warning ONLY if invalid or wrong document -->
+          <!-- Hasil Analisis Pas Di-Upload (Invalid / Merged / Swapped) -->
           <div v-else-if="aiAnalysis.docValidation?.agr && aiAnalysis.docValidation.agr.status !== 'valid'" class="pt-1">
-            <div class="p-2.5 rounded-lg border border-red-200 bg-red-50 text-xs text-red-800 flex items-center gap-2">
-              <AlertCircleIcon class="w-4 h-4 text-red-600 shrink-0" />
-              <span>
-                {{
-                  aiAnalysis.docValidation.agr.status === 'swapped'
-                    ? 'File yang diunggah adalah Dokumen Credit Note, bukan Agreement. Mohon unggah file Agreement yang benar.'
-                    : (aiAnalysis.docValidation.agr.message || 'File tidak sesuai / bukan Agreement.')
-                }}
-              </span>
+            <div class="p-3 rounded-lg border border-red-200 bg-red-50 text-xs text-red-900 flex items-start gap-2.5">
+              <AlertCircleIcon class="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+              <div class="space-y-0.5 min-w-0">
+                <p class="font-semibold text-red-950">
+                  {{
+                    aiAnalysis.docValidation.agr.actual_type === 'merged'
+                      ? 'Hasil Analisis: Dokumen Tidak Boleh Digabung!'
+                      : (aiAnalysis.docValidation.agr.status === 'swapped'
+                          ? 'Hasil Analisis: Dokumen Tertukar!'
+                          : 'Hasil Analisis: Dokumen Tidak Sesuai')
+                  }}
+                </p>
+                <p class="leading-relaxed">
+                  {{
+                    aiAnalysis.docValidation.agr.status === 'swapped'
+                      ? 'File yang diunggah terdeteksi sebagai Dokumen Credit Note, bukan Agreement. Mohon unggah file Agreement yang benar.'
+                      : (aiAnalysis.docValidation.agr.message || 'File tidak sesuai / bukan Agreement.')
+                  }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hasil Analisis Pas Di-Upload (Valid) -->
+          <div v-else-if="aiAnalysis.docValidation?.agr && aiAnalysis.docValidation.agr.status === 'valid' && filePreviews.agreement" class="pt-1">
+            <div class="p-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-xs text-emerald-800 flex items-center gap-2">
+              <CheckCircle2Icon class="w-4 h-4 text-emerald-600 shrink-0" />
+              <span class="font-medium">Hasil Analisis: Dokumen Agreement Terverifikasi (Valid)</span>
             </div>
           </div>
 
@@ -577,7 +615,7 @@
         <div
           class="bg-white rounded-xl shadow-xs border border-gray-200 p-6 space-y-4 transition"
         >
-          <div class="space-y-1">
+          <div class="space-y-2">
             <label class="block text-sm sm:text-base font-medium text-gray-900">
               FAKTUR PAJAK
             </label>
@@ -642,17 +680,197 @@
           <!-- Loading verification indicator -->
           <div v-if="isScanningDoc.tax_invoice" class="pt-1 flex items-center gap-2 text-xs text-gray-500">
             <RefreshCwIcon class="w-3.5 h-3.5 animate-spin text-gray-400 shrink-0" />
-            <span>Memverifikasi dokumen...</span>
+            <span>Memverifikasi dokumen Faktur Pajak...</span>
           </div>
 
-          <!-- AI Warning ONLY if invalid -->
+          <!-- Hasil Analisis Pas Di-Upload (Invalid / Merged) -->
           <div v-else-if="aiAnalysis.docValidation?.faktur && filePreviews.tax_invoice" class="pt-1">
             <div
               v-if="aiAnalysis.docValidation.faktur.status === 'invalid'"
-              class="p-2.5 rounded-lg border border-red-200 bg-red-50 text-xs text-red-800 flex items-center gap-2"
+              class="p-3 rounded-lg border border-red-200 bg-red-50 text-xs text-red-900 flex items-start gap-2.5"
             >
-              <AlertCircleIcon class="w-4 h-4 text-red-600 shrink-0" />
-              <span>{{ aiAnalysis.docValidation.faktur.message || 'File tidak sesuai / bukan Faktur Pajak.' }}</span>
+              <AlertCircleIcon class="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+              <div class="space-y-0.5 min-w-0">
+                <p class="font-semibold text-red-950">
+                  {{ aiAnalysis.docValidation.faktur.actual_type === 'merged' ? 'Hasil Analisis: Dokumen Tidak Boleh Digabung!' : 'Hasil Analisis: Dokumen Tidak Sesuai' }}
+                </p>
+                <p class="leading-relaxed">{{ aiAnalysis.docValidation.faktur.message || 'File tidak sesuai / bukan Faktur Pajak.' }}</p>
+              </div>
+            </div>
+            <div
+              v-else-if="aiAnalysis.docValidation.faktur.status === 'valid'"
+              class="p-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-xs text-emerald-800 flex items-center gap-2"
+            >
+              <CheckCircle2Icon class="w-4 h-4 text-emerald-600 shrink-0" />
+              <span class="font-medium">Hasil Analisis: Dokumen Faktur Pajak Terverifikasi (Valid)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ================= CARD HASIL ANALISIS DOKUMEN (MUNCUL PAS DI-UPLOAD) ================= -->
+        <div
+          v-if="hasUploadedAnyDocument"
+          class="bg-white rounded-xl shadow-xs border p-5 sm:p-6 space-y-4 transition animate-in fade-in duration-200"
+          :class="[
+            aiAnalysis.hasMerged || aiAnalysis.hasInvalid
+              ? 'border-red-300 ring-1 ring-red-100'
+              : (aiAnalysis.hasSwapped ? 'border-amber-300 ring-1 ring-amber-100' : 'border-gray-200')
+          ]"
+        >
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <FileTextIcon class="w-5 h-5 text-gray-700 shrink-0" />
+              <h3 class="text-sm sm:text-base font-semibold text-gray-900">
+                Hasil Analisis Dokumen
+              </h3>
+            </div>
+
+            <!-- Status Badge -->
+            <div v-if="aiAnalysis.isScanning" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+              <RefreshCwIcon class="w-3.5 h-3.5 animate-spin" />
+              <span>Menganalisis dokumen...</span>
+            </div>
+            <div v-else-if="aiAnalysis.hasMerged" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
+              <AlertCircleIcon class="w-3.5 h-3.5 text-red-600" />
+              <span>BELUM BISA POTONG (DOKUMEN DIGABUNG)</span>
+            </div>
+            <div v-else-if="aiAnalysis.hasSwapped" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
+              <AlertTriangleIcon class="w-3.5 h-3.5 text-amber-600" />
+              <span>BELUM BISA POTONG (TERTUKAR)</span>
+            </div>
+            <div v-else-if="aiAnalysis.hasInvalid" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
+              <AlertCircleIcon class="w-3.5 h-3.5 text-red-600" />
+              <span>BELUM BISA POTONG</span>
+            </div>
+            <div v-else-if="aiAnalysis.hasScanned && aiAnalysis.isClean" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">
+              <CheckCircle2Icon class="w-3.5 h-3.5 text-emerald-600" />
+              <span>BISA DI POTONG (LENGKAP)</span>
+            </div>
+          </div>
+
+          <!-- Sedang Scanning -->
+          <div v-if="aiAnalysis.isScanning" class="p-3 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-600 flex items-center gap-2">
+            <RefreshCwIcon class="w-4 h-4 animate-spin text-gray-400 shrink-0" />
+            <span>Sedang memeriksa keaslian file, kesesuaian dokumen terpisah (CN khusus CN, Agreement khusus Agreement, Faktur khusus Faktur), serta kecocokan data...</span>
+          </div>
+
+          <div v-else-if="aiAnalysis.hasScanned" class="space-y-3">
+            <!-- Warning Alert Box jika Digabung -->
+            <div
+              v-if="aiAnalysis.hasMerged"
+              class="p-3.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-900 space-y-1.5"
+            >
+              <div class="flex items-center gap-2 font-semibold text-red-950">
+                <AlertCircleIcon class="w-4 h-4 text-red-600 shrink-0" />
+                <span>Dokumen Tidak Boleh Digabung!</span>
+              </div>
+              <p class="leading-relaxed">
+                {{ aiAnalysis.keterangan || 'Dokumen Credit Note, Agreement, dan Faktur Pajak wajib diunggah terpisah ke slot masing-masing. Jangan digabung menjadi satu file PDF atau foto.' }}
+              </p>
+              <p class="text-[11px] text-red-800 font-medium">
+                *Slot CN khusus dokumen Credit Note saja, slot Agreement khusus dokumen Agreement saja, dan slot Faktur Pajak khusus Faktur Pajak.
+              </p>
+            </div>
+
+            <!-- Warning Alert Box jika Tertukar -->
+            <div
+              v-else-if="aiAnalysis.hasSwapped"
+              class="p-3.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1.5"
+            >
+              <div class="flex items-center gap-2 font-semibold text-amber-950">
+                <AlertTriangleIcon class="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Dokumen Tertukar Posisi Upload</span>
+              </div>
+              <p class="leading-relaxed">
+                {{ aiAnalysis.keterangan || 'Posisi file Credit Note dan Agreement tertukar. Harap periksa dan sesuaikan letak unggahan file.' }}
+              </p>
+            </div>
+
+            <!-- Success Box jika Bersih -->
+            <div
+              v-else-if="aiAnalysis.isClean"
+              class="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center gap-2"
+            >
+              <CheckCircle2Icon class="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>{{ aiAnalysis.keterangan || 'Semua dokumen valid, terpisah dengan benar, dan siap diproses potong.' }}</span>
+            </div>
+
+            <!-- Detail Pengecekan Tiap Slot Dokumen -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
+              <!-- CN Slot -->
+              <div
+                class="p-3 rounded-lg border flex flex-col justify-between"
+                :class="[
+                  files.credit_note
+                    ? (aiAnalysis.docValidation?.cn?.status === 'valid'
+                        ? 'border-emerald-200 bg-emerald-50/50'
+                        : 'border-red-200 bg-red-50/50')
+                    : 'border-gray-200 bg-gray-50'
+                ]"
+              >
+                <div>
+                  <span class="font-semibold block text-gray-900">1. Credit Note</span>
+                  <span class="text-[11px] text-gray-600">
+                    {{
+                      !files.credit_note
+                        ? 'Belum diunggah'
+                        : (aiAnalysis.docValidation?.cn?.status === 'valid'
+                            ? '✓ Valid (Khusus CN)'
+                            : (aiAnalysis.docValidation?.cn?.actual_type === 'merged' ? '❌ Terdeteksi Digabung' : '❌ Tidak Sesuai'))
+                    }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- AGR Slot -->
+              <div
+                class="p-3 rounded-lg border flex flex-col justify-between"
+                :class="[
+                  files.agreement
+                    ? (aiAnalysis.docValidation?.agr?.status === 'valid'
+                        ? 'border-emerald-200 bg-emerald-50/50'
+                        : 'border-red-200 bg-red-50/50')
+                    : 'border-gray-200 bg-gray-50'
+                ]"
+              >
+                <div>
+                  <span class="font-semibold block text-gray-900">2. Agreement</span>
+                  <span class="text-[11px] text-gray-600">
+                    {{
+                      !files.agreement
+                        ? 'Belum diunggah'
+                        : (aiAnalysis.docValidation?.agr?.status === 'valid'
+                            ? '✓ Valid (Khusus AGR)'
+                            : (aiAnalysis.docValidation?.agr?.actual_type === 'merged' ? '❌ Terdeteksi Digabung' : '❌ Tidak Sesuai'))
+                    }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Faktur Slot -->
+              <div
+                class="p-3 rounded-lg border flex flex-col justify-between"
+                :class="[
+                  files.tax_invoice
+                    ? (aiAnalysis.docValidation?.faktur?.status === 'valid'
+                        ? 'border-emerald-200 bg-emerald-50/50'
+                        : 'border-red-200 bg-red-50/50')
+                    : 'border-gray-200 bg-gray-50'
+                ]"
+              >
+                <div>
+                  <span class="font-semibold block text-gray-900">3. Faktur Pajak</span>
+                  <span class="text-[11px] text-gray-600">
+                    {{
+                      !files.tax_invoice
+                        ? (form.is_pkp ? 'Wajib diisi (PKP)' : 'Opsional (Non-PKP)')
+                        : (aiAnalysis.docValidation?.faktur?.status === 'valid'
+                            ? '✓ Valid (Khusus FP)'
+                            : (aiAnalysis.docValidation?.faktur?.actual_type === 'merged' ? '❌ Terdeteksi Digabung' : '❌ Tidak Sesuai'))
+                    }}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -751,6 +969,8 @@ import {
   Check as CheckIcon,
   X as XIcon,
   AlertCircle as AlertCircleIcon,
+  AlertTriangle as AlertTriangleIcon,
+  CheckCircle2 as CheckCircle2Icon,
 } from 'lucide-vue-next';
 
 // ================= FORM STATE =================
@@ -830,6 +1050,7 @@ const aiAnalysis = reactive({
   hasScanned: false,
   isClean: false,
   hasSwapped: false,
+  hasMerged: false,
   hasInvalid: false,
   swapDetails: {},
   cekDokumen: '',
@@ -1073,6 +1294,7 @@ async function triggerAiPreValidation() {
       aiAnalysis.hasScanned = true;
       aiAnalysis.isClean = !!d.is_clean;
       aiAnalysis.hasSwapped = !!d.has_swapped;
+      aiAnalysis.hasMerged = !!d.has_merged;
       aiAnalysis.hasInvalid = !!d.has_invalid;
       aiAnalysis.swapDetails = d.swap_details || {};
       aiAnalysis.cekDokumen = d.cek_dokumen || '';
@@ -1252,6 +1474,7 @@ async function handleSubmit() {
       aiAnalysis.hasScanned = true;
       aiAnalysis.isClean = !!preValResult.is_clean;
       aiAnalysis.hasSwapped = !!preValResult.has_swapped;
+      aiAnalysis.hasMerged = !!preValResult.has_merged;
       aiAnalysis.hasInvalid = !!preValResult.has_invalid;
       aiAnalysis.swapDetails = preValResult.swap_details || {};
       aiAnalysis.cekDokumen = preValResult.cek_dokumen || '';
@@ -1317,6 +1540,64 @@ async function handleSubmit() {
       details: [
         'Kolom Credit Note terisi file Agreement',
         'Kolom Agreement terisi file Credit Note',
+      ],
+    });
+    return;
+  }
+
+  // CHECK IF DOCUMENTS ARE MERGED / COMBINED
+  if (preValResult?.has_merged || aiAnalysis.hasMerged) {
+    isSubmitting.value = false;
+    openValidationModal({
+      title: 'Dokumen Tidak Boleh Digabung',
+      message: aiAnalysis.keterangan || 'Dokumen Credit Note, Agreement, dan Faktur Pajak tidak boleh digabung dalam satu file. Dokumen wajib diunggah terpisah ke kolom masing-masing.',
+      details: [
+        'Slot Credit Note: Khusus dokumen Credit Note saja.',
+        'Slot Agreement: Khusus dokumen Agreement saja.',
+        'Slot Faktur Pajak: Khusus dokumen Faktur Pajak saja.',
+        'Silakan pisahkan berkas dokumen Anda ke masing-masing slot upload.',
+      ],
+    });
+    return;
+  }
+
+  // CHECK IF FILES ARE DUPLICATED (GABUNG/SAMA)
+  if (files.credit_note && files.agreement && files.credit_note.name === files.agreement.name && files.credit_note.size === files.agreement.size) {
+    isSubmitting.value = false;
+    openValidationModal({
+      title: 'Dokumen Tidak Boleh Digabung',
+      message: 'File yang diunggah untuk Credit Note dan Agreement sama persis. Dokumen tidak boleh digabung menjadi satu file!',
+      details: [
+        'File Credit Note dan Agreement harus terpisah.',
+        'Slot Credit Note: Khusus dokumen Credit Note saja.',
+        'Slot Agreement: Khusus dokumen Agreement saja.',
+        'Silakan pisahkan file dan unggah dokumen yang sesuai pada masing-masing slot.',
+      ],
+    });
+    return;
+  }
+  if (files.credit_note && files.tax_invoice && files.credit_note.name === files.tax_invoice.name && files.credit_note.size === files.tax_invoice.size) {
+    isSubmitting.value = false;
+    openValidationModal({
+      title: 'Dokumen Tidak Boleh Digabung',
+      message: 'File yang diunggah untuk Credit Note dan Faktur Pajak sama persis. Dokumen tidak boleh digabung!',
+      details: [
+        'Slot Credit Note: Khusus dokumen Credit Note saja.',
+        'Slot Faktur Pajak: Khusus dokumen Faktur Pajak saja.',
+        'Silakan pisahkan file dan unggah dokumen yang sesuai.',
+      ],
+    });
+    return;
+  }
+  if (files.agreement && files.tax_invoice && files.agreement.name === files.tax_invoice.name && files.agreement.size === files.tax_invoice.size) {
+    isSubmitting.value = false;
+    openValidationModal({
+      title: 'Dokumen Tidak Boleh Digabung',
+      message: 'File yang diunggah untuk Agreement dan Faktur Pajak sama persis. Dokumen tidak boleh digabung!',
+      details: [
+        'Slot Agreement: Khusus dokumen Agreement saja.',
+        'Slot Faktur Pajak: Khusus dokumen Faktur Pajak saja.',
+        'Silakan pisahkan file dan unggah dokumen yang sesuai.',
       ],
     });
     return;
