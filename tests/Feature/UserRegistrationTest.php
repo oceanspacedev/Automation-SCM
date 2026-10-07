@@ -152,4 +152,24 @@ class UserRegistrationTest extends TestCase
 
         $this->assertAuthenticatedAs($user);
     }
+
+    public function test_user_can_login_with_username(): void
+    {
+        $user = User::factory()->create([
+            'name' => 'admin_gudang',
+            'email' => 'gudang@scm.test',
+            'password' => bcrypt('password123'),
+            'is_active' => true,
+        ]);
+
+        $res = $this->postJson('/api/login', [
+            'login' => 'admin_gudang',
+            'password' => 'password123',
+        ]);
+
+        $res->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertAuthenticatedAs($user);
+    }
 }

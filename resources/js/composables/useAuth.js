@@ -27,10 +27,30 @@ export function useAuth() {
     try {
       const res = await axios.post('/api/login', credentials);
       state.user = res.data.user;
+      state.initialized = true;
       return res.data;
     } finally {
       state.loading = false;
     }
+  };
+
+  const verifyWaOtp = async (payload) => {
+    state.loading = true;
+    try {
+      const res = await axios.post('/api/auth/wa-otp/verify', payload);
+      if (res.data?.success && res.data?.user) {
+        state.user = res.data.user;
+        state.initialized = true;
+      }
+      return res.data;
+    } finally {
+      state.loading = false;
+    }
+  };
+
+  const setUser = (user) => {
+    state.user = user;
+    state.initialized = true;
   };
 
   const logout = async () => {
@@ -51,6 +71,8 @@ export function useAuth() {
     isInitialized: computed(() => state.initialized),
     checkAuth,
     login,
+    verifyWaOtp,
+    setUser,
     logout,
   };
 }

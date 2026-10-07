@@ -1,22 +1,13 @@
 <template>
-  <div class="min-h-screen bg-white text-gray-900 flex flex-col font-sans">
+  <div class="min-h-screen bg-white dark:bg-[#0B1120] text-gray-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
     <!-- Header (Hidden on Login Page & Standalone Public Pages) -->
     <header
       v-if="!isStandalonePage"
-      class="border-b border-gray-200 bg-white sticky top-0 z-30"
+      class="border-b border-gray-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md sticky top-0 z-30 transition-colors"
     >
       <div class="w-full mx-auto px-4 sm:px-6">
         <div class="flex justify-between items-center h-16">
-          <div class="flex items-center space-x-6">
-            <!-- Brand with SCM Logo (Besar & Tanpa Teks SCM Tambahan) -->
-            <router-link to="/dashboard" class="flex items-center group mr-3" title="SCM - Supply Chain Management">
-              <img
-                src="/images/scm-logo.png"
-                alt="SCM Supply Chain Management"
-                class="h-11 w-auto max-w-[130px] object-contain group-hover:scale-105 transition"
-              />
-            </router-link>
-
+          <div class="flex items-center">
             <!-- Shadcn-Vue NavigationMenu (Direct Links without Sub-menu) -->
             <NavigationMenu>
               <NavigationMenuList class="flex items-center gap-1">
@@ -27,7 +18,7 @@
                       to="/drafts"
                       :class="[
                         navigationMenuTriggerStyle(),
-                        isActive('/drafts') && 'bg-gray-100 text-gray-900 font-semibold'
+                        isActive('/drafts') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
                       ]"
                     >
                       Draft
@@ -42,7 +33,7 @@
                       to="/invoices"
                       :class="[
                         navigationMenuTriggerStyle(),
-                        isActive('/invoices') && 'bg-gray-100 text-gray-900 font-semibold'
+                        isActive('/invoices') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
                       ]"
                     >
                       Invoice
@@ -57,7 +48,7 @@
                       to="/test-program"
                       :class="[
                         navigationMenuTriggerStyle(),
-                        isActive('/test-program') && 'bg-gray-100 text-gray-900 font-semibold'
+                        isActive('/test-program') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
                       ]"
                     >
                       Form Program
@@ -72,7 +63,7 @@
                       to="/data-program"
                       :class="[
                         navigationMenuTriggerStyle(),
-                        isActive('/data-program') && 'bg-gray-100 text-gray-900 font-semibold'
+                        isActive('/data-program') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
                       ]"
                     >
                       Data Program
@@ -88,26 +79,26 @@
                         type="button"
                         :class="[
                           navigationMenuTriggerStyle(),
-                          (isActive('/dashboard') || isActive('/riwayat-program') || isActive('/email-logs')) && 'bg-gray-100 text-gray-900 font-semibold',
-                          'gap-1.5'
+                          (isActive('/dashboard') || isActive('/riwayat-program') || isActive('/email-logs')) && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
+                          'gap-1.5 dark:text-slate-200 dark:hover:bg-slate-800'
                         ]"
                       >
                         <span>Riwayat</span>
                         <ChevronDownIcon
-                          class="w-3.5 h-3.5 text-gray-500 transition-transform duration-200"
+                          class="w-3.5 h-3.5 text-gray-500 dark:text-slate-400 transition-transform duration-200"
                           :class="isRiwayatOpen && 'rotate-180'"
                         />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent align="start" class="w-48 p-1 rounded-lg border border-gray-200 bg-white shadow-lg text-xs space-y-0.5">
+                    <PopoverContent align="start" class="w-48 p-1.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl text-xs space-y-0.5">
 
                       <router-link
                         v-if="canAccess('riwayat_program')"
                         to="/riwayat-program"
                         @click="isRiwayatOpen = false"
                         :class="[
-                          'block px-3 py-2 rounded-md transition-colors text-xs font-medium',
-                          isActive('/riwayat-program') ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                          isActive('/riwayat-program') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
                         ]"
                       >
                         Riwayat Program
@@ -118,8 +109,8 @@
                         to="/email-logs"
                         @click="isRiwayatOpen = false"
                         :class="[
-                          'block px-3 py-2 rounded-md transition-colors text-xs font-medium',
-                          isActive('/email-logs') ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                          isActive('/email-logs') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
                         ]"
                       >
                         Riwayat Email
@@ -130,8 +121,8 @@
                         to="/dashboard"
                         @click="isRiwayatOpen = false"
                         :class="[
-                          'block px-3 py-2 rounded-md transition-colors text-xs font-medium',
-                          isActive('/dashboard') ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                          isActive('/dashboard') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
                         ]"
                       >
                         Dashboard
@@ -147,7 +138,7 @@
                       to="/users"
                       :class="[
                         navigationMenuTriggerStyle(),
-                        isActive('/users') && 'bg-gray-100 text-gray-900 font-semibold'
+                        isActive('/users') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
                       ]"
                     >
                       Master User
@@ -167,10 +158,10 @@
                   <button
                     type="button"
                     :class="[
-                      'h-9 px-3 rounded-full border transition-all duration-300 flex items-center gap-2 text-xs font-medium cursor-pointer select-none focus:outline-none focus:ring-1 focus:ring-black',
+                      'h-9 px-3 rounded-full border transition-all duration-300 flex items-center gap-2 text-xs font-medium cursor-pointer select-none focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white',
                       aiStatus.isRunning
-                        ? 'bg-emerald-50/90 border-emerald-300 text-emerald-900 shadow-xs hover:bg-emerald-100/90'
-                        : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
+                        ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 shadow-xs hover:bg-emerald-100/90'
+                        : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'
                     ]"
                   >
                     <!-- Pulsing indicator dot when running -->
@@ -182,37 +173,37 @@
                     <BotIcon
                       :class="[
                         'w-4 h-4',
-                        aiStatus.isRunning ? 'text-emerald-600 animate-pulse' : 'text-gray-500'
+                        aiStatus.isRunning ? 'text-emerald-600 dark:text-emerald-400 animate-pulse' : 'text-gray-500 dark:text-slate-400'
                       ]"
                     />
 
                     <div class="flex items-center gap-1.5">
-                      <span v-if="aiStatus.isRunning" class="font-medium text-emerald-900">
+                      <span v-if="aiStatus.isRunning" class="font-medium text-emerald-900 dark:text-emerald-200">
                         AI Memproses
-                        <span v-if="aiStatus.runningInfo?.total" class="font-mono text-[11px] font-semibold text-emerald-700 ml-0.5">
+                        <span v-if="aiStatus.runningInfo?.total" class="font-mono text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 ml-0.5">
                           ({{ aiStatus.runningInfo.processed }}/{{ aiStatus.runningInfo.total }})
                         </span>
                       </span>
-                      <span v-else class="text-gray-700 font-medium flex items-center gap-1">
-                        <CheckCircle2Icon class="w-3.5 h-3.5 text-emerald-600" />
+                      <span v-else class="text-gray-700 dark:text-slate-300 font-medium flex items-center gap-1">
+                        <CheckCircle2Icon class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                         <span>AI Selesai</span>
                       </span>
                     </div>
 
-                    <Loader2Icon v-if="aiStatus.isRunning" class="w-3.5 h-3.5 text-emerald-600 animate-spin ml-0.5" />
+                    <Loader2Icon v-if="aiStatus.isRunning" class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 animate-spin ml-0.5" />
                   </button>
                 </PopoverTrigger>
 
-                <PopoverContent align="end" class="w-72 p-3.5 rounded-xl border border-gray-200 bg-white shadow-xl text-xs space-y-2.5">
-                  <div class="flex items-center justify-between border-b border-gray-100 pb-2">
-                    <div class="flex items-center gap-1.5 font-semibold text-gray-900">
-                      <BotIcon class="w-4 h-4 text-emerald-600" />
+                <PopoverContent align="end" class="w-72 p-3.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl text-xs space-y-2.5 text-gray-900 dark:text-slate-100">
+                  <div class="flex items-center justify-between border-b border-gray-100 dark:border-slate-800 pb-2">
+                    <div class="flex items-center gap-1.5 font-semibold text-gray-900 dark:text-slate-100">
+                      <BotIcon class="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                       <span>Analisis AI di Latar Belakang</span>
                     </div>
                     <span
                       :class="[
                         'px-1.5 py-0.5 rounded text-[10px] font-medium uppercase',
-                        aiStatus.isRunning ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
+                        aiStatus.isRunning ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300' : 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400'
                       ]"
                     >
                       {{ aiStatus.isRunning ? 'Aktif' : 'Selesai' }}
@@ -220,35 +211,35 @@
                   </div>
 
                   <div v-if="aiStatus.isRunning" class="space-y-1.5">
-                    <div class="flex justify-between text-gray-600 text-[11px]">
+                    <div class="flex justify-between text-gray-600 dark:text-slate-400 text-[11px]">
                       <span>Progres dokumen:</span>
-                      <span class="font-mono font-semibold text-gray-900">
+                      <span class="font-mono font-semibold text-gray-900 dark:text-slate-100">
                         {{ aiStatus.runningInfo?.processed || 0 }} dari {{ aiStatus.runningInfo?.total || 0 }}
                       </span>
                     </div>
 
                     <!-- Progress bar -->
-                    <div class="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
+                    <div class="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
                       <div
                         class="bg-emerald-500 h-1.5 rounded-full transition-all duration-300"
                         :style="{ width: progressPercentage + '%' }"
                       ></div>
                     </div>
 
-                    <div v-if="aiStatus.runningInfo?.current_dealer" class="text-[11px] text-gray-500 truncate pt-0.5">
-                      Memeriksa: <span class="font-medium text-gray-800">{{ aiStatus.runningInfo.current_dealer }}</span>
+                    <div v-if="aiStatus.runningInfo?.current_dealer" class="text-[11px] text-gray-500 dark:text-slate-400 truncate pt-0.5">
+                      Memeriksa: <span class="font-medium text-gray-800 dark:text-slate-200">{{ aiStatus.runningInfo.current_dealer }}</span>
                     </div>
                   </div>
 
-                  <div v-else class="text-[11px] text-gray-500">
+                  <div v-else class="text-[11px] text-gray-500 dark:text-slate-400">
                     Semua batch dokumen program telah selesai dianalisis.
                   </div>
 
-                  <div class="pt-1 border-t border-gray-100 flex items-center justify-between text-[11px]">
-                    <span class="text-gray-400 font-mono">Model: {{ aiStatus.currentModel || 'ag/gemini-3-flash' }}</span>
+                  <div class="pt-1 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
+                    <span class="text-gray-400 dark:text-slate-500 font-mono">Model: {{ aiStatus.currentModel || 'ag/gemini-3-flash' }}</span>
                     <router-link
                       to="/test-program"
-                      class="text-gray-900 hover:text-black font-medium hover:underline flex items-center gap-1"
+                      class="text-gray-900 dark:text-slate-200 hover:text-black dark:hover:text-white font-medium hover:underline flex items-center gap-1"
                     >
                       <span>Ke Form Program</span>
                       <ExternalLinkIcon class="w-3 h-3" />
@@ -263,19 +254,19 @@
               <PopoverTrigger as-child>
                 <button
                   type="button"
-                  class="w-9 h-9 rounded-full border border-neutral-200 bg-white hover:bg-neutral-100 flex items-center justify-center text-neutral-700 transition cursor-pointer shadow-2xs focus:outline-none focus:ring-1 focus:ring-black"
+                  class="w-9 h-9 rounded-full border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-neutral-100 dark:hover:bg-slate-700 flex items-center justify-center text-neutral-700 dark:text-slate-200 transition cursor-pointer shadow-2xs focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
                   title="Akun Saya"
                 >
-                  <UserIcon class="w-4 h-4 text-neutral-700" />
+                  <UserIcon class="w-4 h-4 text-neutral-700 dark:text-slate-200" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="end" class="w-48 p-1 rounded-lg border border-gray-200 bg-white shadow-lg text-xs space-y-0.5">
+              <PopoverContent align="end" class="w-52 p-1.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl text-xs space-y-1">
                 <!-- Info Akun -->
-                <div class="px-3 py-2 border-b border-gray-100">
-                  <div class="font-semibold text-xs text-gray-900 leading-tight">
+                <div class="px-3 py-2 border-b border-gray-100 dark:border-slate-800">
+                  <div class="font-semibold text-xs text-gray-900 dark:text-slate-100 leading-tight">
                     {{ user.name || 'Admin SCM' }}
                   </div>
-                  <div class="text-[11px] text-gray-500 truncate mt-0.5">
+                  <div class="text-[11px] text-gray-500 dark:text-slate-400 truncate mt-0.5">
                     {{ user.email || 'admin@scm.com' }}
                   </div>
                 </div>
@@ -285,18 +276,47 @@
                   v-if="canAccess('master_user')"
                   to="/users"
                   :class="[
-                    'block px-3 py-2 rounded-md transition-colors text-xs font-medium',
-                    isActive('/users') ? 'bg-gray-100 text-gray-900 font-semibold' : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                    'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                    isActive('/users')
+                      ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
+                      : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
                   ]"
                 >
                   Master User
                 </router-link>
 
+                <!-- Toggle Mode Gelap (Clean & Eye-Friendly) -->
+                <button
+                  @click="toggleDarkMode"
+                  type="button"
+                  class="w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-xs font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white cursor-pointer select-none"
+                >
+                  <div class="flex items-center gap-2">
+                    <MoonIcon v-if="!isDark" class="w-3.5 h-3.5 text-gray-500 dark:text-slate-400" />
+                    <SunIcon v-else class="w-3.5 h-3.5 text-amber-400" />
+                    <span>Mode Gelap</span>
+                  </div>
+                  <!-- Clean iOS/Shadcn style toggle switch -->
+                  <div
+                    :class="[
+                      'w-7 h-4 rounded-full transition-colors relative flex items-center p-0.5',
+                      isDark ? 'bg-[#1D70F5]' : 'bg-gray-300 dark:bg-slate-700'
+                    ]"
+                  >
+                    <div
+                      :class="[
+                        'w-3 h-3 rounded-full bg-white shadow-2xs transition-transform transform',
+                        isDark ? 'translate-x-3' : 'translate-x-0'
+                      ]"
+                    ></div>
+                  </div>
+                </button>
+
                 <!-- Tombol Keluar -->
                 <button
                   @click="handleLogout"
                   type="button"
-                  class="w-full text-left block px-3 py-2 rounded-md transition-colors text-xs font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 cursor-pointer"
+                  class="w-full text-left block px-3 py-2 rounded-lg transition-colors text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
                 >
                   Keluar
                 </button>
@@ -319,6 +339,7 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { useAuth } from '@/composables/useAuth';
+import { useTheme } from '@/composables/useTheme';
 import {
   NavigationMenu,
   NavigationMenuItem,
@@ -336,11 +357,14 @@ import {
   ExternalLink as ExternalLinkIcon,
   ChevronDown as ChevronDownIcon,
   Users as UsersIcon,
+  Moon as MoonIcon,
+  Sun as SunIcon,
 } from 'lucide-vue-next';
 
 const route = useRoute();
 const router = useRouter();
 const { user, logout } = useAuth();
+const { isDark, toggleDarkMode, initTheme } = useTheme();
 
 const isRiwayatOpen = ref(false);
 
@@ -456,6 +480,7 @@ const checkAiStatus = async () => {
 };
 
 onMounted(() => {
+  initTheme();
   if (!isStandalonePage.value) {
     checkAiStatus();
   }

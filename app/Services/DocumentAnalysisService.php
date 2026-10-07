@@ -457,8 +457,15 @@ class DocumentAnalysisService
             $nameWithoutExt = pathinfo($filename, PATHINFO_FILENAME);
             $clean = preg_replace('/^(?:CN|CREDIT[\s_\-]*NOTE|NOTA[\s_\-]*KREDIT|INVOICE|INV)[\s_\-]+/i', '', $nameWithoutExt);
             $clean = preg_replace('/[\s_\-]+(?:CN|CREDIT[\s_\-]*NOTE|NOTA[\s_\-]*KREDIT|INVOICE|INV)$/i', '', $clean);
-            $clean = preg_replace('/^\d{4,14}[\s_\-]+/', '', $clean);
             $clean = trim(str_replace(['_', '-'], ' ', $clean));
+
+            // If filename contains program segment (e.g. "OCCEAN SPACE PROGRAM DSA..."), extract dealer part
+            if (preg_match('/^(.*?)(?:\s+)(PROGRAM\b.*)$/i', $clean, $pm)) {
+                $dealerPart = trim($pm[1]);
+                if (strlen($dealerPart) >= 3) {
+                    $clean = $dealerPart;
+                }
+            }
 
             // Must have at least 4 characters, contain letters, and not be generic placeholders/URLs
             if (strlen($clean) >= 4
@@ -580,9 +587,15 @@ class DocumentAnalysisService
 
             $nameWithoutExt = pathinfo($filename, PATHINFO_FILENAME);
             $clean = preg_replace('/^(?:AGR|AGREEMENT|PERJANJIAN|SURAT[\s_\-]*PERJANJIAN)[\s_\-]+/i', '', $nameWithoutExt);
-            $clean = preg_replace('/[\s_\-]+(?:AGR|AGREEMENT|PERJANJIAN)$/i', '', $clean);
-            $clean = preg_replace('/^\d{4,14}[\s_\-]+/', '', $clean);
             $clean = trim(str_replace(['_', '-'], ' ', $clean));
+
+            // If filename contains program segment (e.g. "OCCEAN SPACE PROGRAM DSA..."), extract dealer part
+            if (preg_match('/^(.*?)(?:\s+)(PROGRAM\b.*)$/i', $clean, $pm)) {
+                $dealerPart = trim($pm[1]);
+                if (strlen($dealerPart) >= 3) {
+                    $clean = $dealerPart;
+                }
+            }
 
             if (strlen($clean) >= 4
                 && preg_match('/[a-zA-Z]{3,}/', $clean)
@@ -612,19 +625,23 @@ class DocumentAnalysisService
 
         // 1. Try regex on text
         if (! empty($text)) {
-            if (preg_match('/(?:program|nama\s*program|judul\s*program|perjanjian\s*program|pelaksanaan\s*program|kerjasama\s*program|perihal)\s*[:=\-]?\s*([A-Za-z0-9\s\.\,\&\-\'\(\)\/]{3,60})/i', $text, $m)) {
+            if (preg_match('/(?:program|nama\s*program|judul\s*program|perjanjian\s*program|pelaksanaan\s*program|kerjasama\s*program|perihal|klaim\s*(?:program)?|keterangan|deskripsi|description)\s*[:=\-]?\s*([A-Za-z0-9\s\.\,\&\-\'\(\)\/]{3,60})/i', $text, $m)) {
                 $candidate = trim(preg_replace('/\s+/', ' ', $m[1]));
-                if (! preg_match('/^(?:tanggal|no|nomor|pihak|pasal|pada\s*hari|realme)/i', $candidate)) {
+                if (! preg_match('/^(?:tanggal|no|nomor|pihak|pasal|pada\s*hari|realme|alamat|telepon)/i', $candidate)) {
                     return $candidate;
                 }
             }
+
+            if (preg_match('/\b(PROGRAM\s+(?:DSA|NPS|FL|REGULAR|HERO|SELL\s*OUT)[A-Za-z0-9\s\.\-\(\)\/]{2,50})/i', $text, $m)) {
+                return trim(preg_replace('/\s+/', ' ', $m[1]));
+            }
         }
 
-        // 2. Try regex on filename (e.g. "AGR_PROGRAM_DSA_JULI_2026.pdf" or "PROGRAM_DSA_JULI_2026.pdf")
+        // 2. Try regex on filename (e.g. "CN_PROGRAM_DSA_FERUARI.pdf", "AGR_PROGRAM_DSA_JULI_2026.pdf", etc.)
         if (! empty($filename)) {
             $nameWithoutExt = pathinfo($filename, PATHINFO_FILENAME);
             if (preg_match('/(?:PROGRAM[_\-\s].*)/i', $nameWithoutExt, $m)) {
-                $clean = preg_replace('/^(?:AGR|AGREEMENT|PERJANJIAN)[_\-\s]+/i', '', $m[0]);
+                $clean = preg_replace('/^(?:CN|CREDIT[\s_\-]*NOTE|NOTA[\s_\-]*KREDIT|AGR|AGREEMENT|PERJANJIAN|INV|INVOICE)[_\-\s]+/i', '', $m[0]);
                 $clean = trim(str_replace(['_', '-'], ' ', $clean));
                 if (strlen($clean) >= 4 && ! preg_match('/^(?:document|file|pdf|scan)$/i', $clean)) {
                     return ucwords(strtolower($clean));
@@ -650,29 +667,89 @@ class DocumentAnalysisService
         $cleanForm = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $form));
         $cleanDoc = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $doc));
 
-        if ($cleanForm === $cleanDoc || str_contains($cleanForm, $cleanDoc) || str_contains($cleanDoc, $cleanForm)) {
+        if ($cleanForm === $cleanDoc) {
             return true;
         }
 
-        $stripWords = function (string $str): string {
-            return preg_replace('/\b(?:program|kerjasama|perjanjian|cashback|so|sell\s*out|refund|periode|series)\b/i', '', strtolower($str));
+        // 1. Check Year: If either has a 4-digit year (e.g. 2024, 2025, 2026)
+        preg_match_all('/\b(202\d)\b/', $form, $formYears);
+        preg_match_all('/\b(202\d)\b/', $doc, $docYears);
+        $formYear = $formYears[1][0] ?? null;
+        $docYear = $docYears[1][0] ?? null;
+
+        if ($formYear && $docYear && $formYear !== $docYear) {
+            return false;
+        }
+        if ($formYear && ! $docYear) {
+            return false;
+        }
+
+        // 2. Check Month (Januari - Desember)
+        $monthPattern = '/\b(januari|january|februari|february|maret|march|april|mei|may|juni|june|juli|july|agustus|august|september|oktober|october|november|desember|december)\b/i';
+        preg_match($monthPattern, $form, $formMonthMatch);
+        preg_match($monthPattern, $doc, $docMonthMatch);
+
+        $normalizeMonth = function (?string $m): ?int {
+            if (! $m) {
+                return null;
+            }
+            $m = strtolower($m);
+
+            return match (true) {
+                str_starts_with($m, 'jan') => 1,
+                str_starts_with($m, 'feb') => 2,
+                str_starts_with($m, 'mar') => 3,
+                str_starts_with($m, 'apr') => 4,
+                str_starts_with($m, 'mei') || str_starts_with($m, 'may') => 5,
+                str_starts_with($m, 'jun') => 6,
+                str_starts_with($m, 'jul') => 7,
+                str_starts_with($m, 'ag') || str_starts_with($m, 'au') => 8,
+                str_starts_with($m, 'sep') => 9,
+                str_starts_with($m, 'okt') || str_starts_with($m, 'oct') => 10,
+                str_starts_with($m, 'nov') => 11,
+                str_starts_with($m, 'des') || str_starts_with($m, 'dec') => 12,
+                default => null,
+            };
         };
 
-        $coreForm = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $stripWords($form)));
-        $coreDoc = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $stripWords($doc)));
+        $formMonth = $normalizeMonth($formMonthMatch[1] ?? null);
+        $docMonth = $normalizeMonth($docMonthMatch[1] ?? null);
 
-        if ($coreForm !== '' && $coreDoc !== '') {
-            if ($coreForm === $coreDoc || str_contains($coreForm, $coreDoc) || str_contains($coreDoc, $coreForm)) {
-                return true;
+        if ($formMonth !== null && $docMonth !== null && $formMonth !== $docMonth) {
+            return false;
+        }
+        if ($formMonth !== null && $docMonth === null) {
+            return false;
+        }
+
+        // 3. Check Core Program Types (e.g. DSA, NPS, REGULAR, HERO)
+        $types = ['dsa', 'nps', 'fl', 'regular', 'hero', 'bundle', 'cashback'];
+        foreach ($types as $t) {
+            $inForm = (bool) preg_match('/\b'.$t.'\b/i', $form);
+            $inDoc = (bool) preg_match('/\b'.$t.'\b/i', $doc);
+            if ($inForm !== $inDoc) {
+                return false;
             }
         }
 
-        similar_text($cleanForm, $cleanDoc, $percent);
-        if ($percent >= 60) {
-            return true;
+        // 4. Token comparison
+        $stripPunct = function (string $str): array {
+            $words = preg_split('/[^a-zA-Z0-9]+/', strtolower($str), -1, PREG_SPLIT_NO_EMPTY);
+
+            return array_values(array_filter($words, fn ($w) => ! in_array($w, ['program', 'kerjasama', 'perjanjian', 'realme'], true)));
+        };
+
+        $formTokens = $stripPunct($form);
+        $docTokens = $stripPunct($doc);
+
+        if (! empty($formTokens) && ! empty($docTokens)) {
+            $diff = array_diff($formTokens, $docTokens);
+            if (! empty($diff)) {
+                return false;
+            }
         }
 
-        return false;
+        return true;
     }
 
     /**
@@ -891,22 +968,55 @@ class DocumentAnalysisService
 
         $extractedDealerName = $this->extractDealerNameFromCn($infos['cn']);
         $dealerMismatch = false;
-        $inputDealer = trim((string) ($formData['dealer_name'] ?? ''));
+        $extractedCnProgram = $this->extractProgramNameFromDoc($infos['cn']);
+        $cnProgramMismatch = false;
 
-        if (! $hasSwapped && ! $hasMerged && empty($missing) && $extractedDealerName && $inputDealer !== '' && $inputDealer !== '-') {
-            if (! $this->isDealerNameMatching($inputDealer, $extractedDealerName)) {
-                $dealerMismatch = true;
-                $hasInvalid = true;
-                if (($docValidation['cn']['status'] ?? '') !== 'invalid') {
-                    $docValidation['cn'] = [
-                        'status' => 'invalid',
-                        'actual_type' => 'cn',
-                        'message' => "Nama dealer di dokumen ('{$extractedDealerName}') berbeda dengan isian formulir ('{$inputDealer}').",
-                    ];
+        $inputDealer = trim((string) ($formData['dealer_name'] ?? ''));
+        $inputProgram = trim((string) ($formData['program_name'] ?? ''));
+
+        // Check Credit Note Dealer & Program Mismatch
+        if (! $hasSwapped && ! $hasMerged && $infos['cn']['has_file']) {
+            if ($extractedDealerName && $inputDealer !== '' && $inputDealer !== '-') {
+                if (! $this->isDealerNameMatching($inputDealer, $extractedDealerName)) {
+                    $dealerMismatch = true;
+                    $hasInvalid = true;
                 }
+            }
+
+            if ($extractedCnProgram && $inputProgram !== '') {
+                if (! $this->isProgramNameMatching($inputProgram, $extractedCnProgram)) {
+                    $cnProgramMismatch = true;
+                    $hasInvalid = true;
+                }
+            }
+
+            if ($dealerMismatch && $cnProgramMismatch) {
+                $docValidation['cn'] = [
+                    'status' => 'invalid',
+                    'actual_type' => 'cn',
+                    'message' => "Nama dealer ('{$extractedDealerName}') dan program ('{$extractedCnProgram}') di dokumen berbeda dengan isian formulir (Dealer: '{$inputDealer}', Program: '{$inputProgram}').",
+                ];
+                $statusPurchase = 'BELUM BISA POTONG';
+                $cekDokumen = 'DEALER & PROGRAM TIDAK SESUAI (CN)';
+                $keterangan = "Nama dealer dan program pada dokumen Credit Note tidak sesuai dengan isian formulir (Dealer: '{$extractedDealerName}' vs '{$inputDealer}', Program: '{$extractedCnProgram}' vs '{$inputProgram}'). Harap sesuaikan dokumen Credit Note atau pilihan formulir.";
+            } elseif ($dealerMismatch) {
+                $docValidation['cn'] = [
+                    'status' => 'invalid',
+                    'actual_type' => 'cn',
+                    'message' => "Nama dealer di dokumen ('{$extractedDealerName}') berbeda dengan isian formulir ('{$inputDealer}').",
+                ];
                 $statusPurchase = 'BELUM BISA POTONG';
                 $cekDokumen = 'NAMA DEALER TIDAK SESUAI (CN)';
                 $keterangan = "Nama dealer di formulir ('{$inputDealer}') berbeda dengan nama dealer pada dokumen Credit Note ('{$extractedDealerName}'). Harap sesuaikan atau isi '-' agar otomatis diambil dari dokumen.";
+            } elseif ($cnProgramMismatch) {
+                $docValidation['cn'] = [
+                    'status' => 'invalid',
+                    'actual_type' => 'cn',
+                    'message' => "Nama program di dokumen Credit Note ('{$extractedCnProgram}') berbeda dengan program yang dipilih ('{$inputProgram}').",
+                ];
+                $statusPurchase = 'BELUM BISA POTONG';
+                $cekDokumen = 'NAMA PROGRAM TIDAK SESUAI (CN)';
+                $keterangan = "Nama program di formulir ('{$inputProgram}') berbeda dengan nama program pada dokumen Credit Note ('{$extractedCnProgram}'). Harap sesuaikan dokumen Credit Note atau program yang dipilih.";
             }
         }
 
@@ -917,39 +1027,45 @@ class DocumentAnalysisService
         $extractedAgrProgram = $this->extractProgramNameFromDoc($infos['agr']);
         $agrProgramMismatch = false;
 
-        $inputProgram = trim((string) ($formData['program_name'] ?? ''));
-
-        // Check Agreement Dealer Mismatch
-        if (! $hasSwapped && ! $hasMerged && empty($missing) && $extractedAgrDealer) {
+        // Check Agreement Dealer & Program Mismatch
+        if (! $hasSwapped && ! $hasMerged && $infos['agr']['has_file']) {
             $effectiveDealer = ($inputDealer !== '' && $inputDealer !== '-') ? $inputDealer : $extractedDealerName;
-            if ($effectiveDealer && ! $this->isDealerNameMatching($effectiveDealer, $extractedAgrDealer)) {
+            if ($extractedAgrDealer && $effectiveDealer && ! $this->isDealerNameMatching($effectiveDealer, $extractedAgrDealer)) {
                 $agrDealerMismatch = true;
                 $hasInvalid = true;
-                if (($docValidation['agr']['status'] ?? '') !== 'invalid') {
-                    $docValidation['agr'] = [
-                        'status' => 'invalid',
-                        'actual_type' => 'agr',
-                        'message' => "Nama dealer pada Agreement ('{$extractedAgrDealer}') berbeda dengan nama dealer yang diajukan ('{$effectiveDealer}').",
-                    ];
+            }
+
+            if ($extractedAgrProgram && $inputProgram !== '') {
+                if (! $this->isProgramNameMatching($inputProgram, $extractedAgrProgram)) {
+                    $agrProgramMismatch = true;
+                    $hasInvalid = true;
                 }
+            }
+
+            if ($agrDealerMismatch && $agrProgramMismatch) {
+                $docValidation['agr'] = [
+                    'status' => 'invalid',
+                    'actual_type' => 'agr',
+                    'message' => "Nama dealer ('{$extractedAgrDealer}') dan program ('{$extractedAgrProgram}') pada dokumen Agreement berbeda dengan data pengajuan.",
+                ];
+                $statusPurchase = 'BELUM BISA POTONG';
+                $cekDokumen = 'DEALER & PROGRAM TIDAK SESUAI (AGR)';
+                $keterangan = 'Nama dealer dan program pada dokumen Agreement tidak sesuai dengan formulir.';
+            } elseif ($agrDealerMismatch) {
+                $docValidation['agr'] = [
+                    'status' => 'invalid',
+                    'actual_type' => 'agr',
+                    'message' => "Nama dealer pada Agreement ('{$extractedAgrDealer}') berbeda dengan nama dealer yang diajukan ('{$effectiveDealer}').",
+                ];
                 $statusPurchase = 'BELUM BISA POTONG';
                 $cekDokumen = 'NAMA DEALER TIDAK SESUAI (AGR)';
                 $keterangan = "Nama dealer di formulir ('{$effectiveDealer}') berbeda dengan nama dealer pada dokumen Agreement ('{$extractedAgrDealer}'). Harap sesuaikan dokumen Agreement Anda.";
-            }
-        }
-
-        // Check Agreement Program Mismatch
-        if (! $hasSwapped && ! $hasMerged && empty($missing) && $extractedAgrProgram && $inputProgram !== '') {
-            if (! $this->isProgramNameMatching($inputProgram, $extractedAgrProgram)) {
-                $agrProgramMismatch = true;
-                $hasInvalid = true;
-                if (($docValidation['agr']['status'] ?? '') !== 'invalid') {
-                    $docValidation['agr'] = [
-                        'status' => 'invalid',
-                        'actual_type' => 'agr',
-                        'message' => "Nama program pada Agreement ('{$extractedAgrProgram}') berbeda dengan program yang dipilih ('{$inputProgram}').",
-                    ];
-                }
+            } elseif ($agrProgramMismatch) {
+                $docValidation['agr'] = [
+                    'status' => 'invalid',
+                    'actual_type' => 'agr',
+                    'message' => "Nama program pada Agreement ('{$extractedAgrProgram}') berbeda dengan program yang dipilih ('{$inputProgram}').",
+                ];
                 $statusPurchase = 'BELUM BISA POTONG';
                 $cekDokumen = 'NAMA PROGRAM TIDAK SESUAI (AGR)';
                 $keterangan = "Nama program di formulir ('{$inputProgram}') berbeda dengan nama program pada dokumen Agreement ('{$extractedAgrProgram}'). Harap sesuaikan dokumen Agreement Anda.";
@@ -960,12 +1076,14 @@ class DocumentAnalysisService
             'has_invalid' => $hasInvalid,
             'has_swapped' => $hasSwapped,
             'has_merged' => $hasMerged,
-            'is_clean' => (! $hasSwapped && ! $hasInvalid && ! $hasMerged && ! $dealerMismatch && ! $agrDealerMismatch && ! $agrProgramMismatch),
+            'is_clean' => (! $hasSwapped && ! $hasInvalid && ! $hasMerged && ! $dealerMismatch && ! $cnProgramMismatch && ! $agrDealerMismatch && ! $agrProgramMismatch),
             'cek_dokumen' => $cekDokumen,
             'status_potong_purchase' => $statusPurchase,
             'keterangan' => $keterangan,
             'dealer_name' => $extractedDealerName ?: $extractedAgrDealer,
             'dealer_mismatch' => $dealerMismatch,
+            'cn_program_name' => $extractedCnProgram,
+            'cn_program_mismatch' => $cnProgramMismatch,
             'agr_dealer_name' => $extractedAgrDealer,
             'agr_dealer_mismatch' => $agrDealerMismatch,
             'agr_program_name' => $extractedAgrProgram,
@@ -1228,40 +1346,74 @@ class DocumentAnalysisService
             $extractedDealerName = $this->extractDealerNameFromCn($this->extractFileContentInfo($filesOrUrls['cn'] ?? null));
         }
 
-        $dealerMismatch = false;
-        $inputDealer = trim((string) ($formData['dealer_name'] ?? ''));
+        $extractedCnProgram = null;
+        if (! empty($parsed['cn_program_name']) && trim((string) $parsed['cn_program_name']) !== '-' && trim((string) $parsed['cn_program_name']) !== '') {
+            $extractedCnProgram = trim((string) $parsed['cn_program_name']);
+        } else {
+            $extractedCnProgram = $this->extractProgramNameFromDoc($this->extractFileContentInfo($filesOrUrls['cn'] ?? null));
+        }
 
-        if (! $hasSwapped && empty($missingDocs) && $extractedDealerName && $inputDealer !== '' && $inputDealer !== '-') {
+        $dealerMismatch = false;
+        $cnProgramMismatch = false;
+        $inputDealer = trim((string) ($formData['dealer_name'] ?? ''));
+        $inputProgram = trim((string) ($formData['program_name'] ?? ''));
+
+        // Check Credit Note Dealer Mismatch
+        if (! $hasSwapped && $slotHasUrl['cn'] && $extractedDealerName && $inputDealer !== '' && $inputDealer !== '-') {
             if ($this->isDealerNameMatching($inputDealer, $extractedDealerName)) {
                 $dealerMismatch = false;
-                if (isset($docValidation['cn']) && $docValidation['cn']['status'] === 'invalid') {
-                    $cnMsg = strtolower($docValidation['cn']['message'] ?? '');
-                    if (str_contains($cnMsg, 'dealer') || str_contains($cnMsg, 'berbeda') || str_contains($cnMsg, 'nama')) {
-                        $docValidation['cn']['status'] = 'valid';
-                        $docValidation['cn']['message'] = 'Dokumen Credit Note terverifikasi.';
-                    }
-                }
             } else {
                 $dealerMismatch = true;
-                $docValidation['cn'] = [
-                    'status' => 'invalid',
-                    'actual_type' => 'cn',
-                    'message' => "Nama dealer di dokumen ('{$extractedDealerName}') berbeda dengan isian formulir ('{$inputDealer}').",
-                ];
             }
         } elseif (! empty($parsed['dealer_mismatch']) && $extractedDealerName && $inputDealer !== '' && $inputDealer !== '-') {
             // Re-verify parsed dealer mismatch with typo tolerance
             if ($this->isDealerNameMatching($inputDealer, $extractedDealerName)) {
                 $dealerMismatch = false;
-                if (isset($docValidation['cn']) && $docValidation['cn']['status'] === 'invalid') {
-                    $cnMsg = strtolower($docValidation['cn']['message'] ?? '');
-                    if (str_contains($cnMsg, 'dealer') || str_contains($cnMsg, 'berbeda') || str_contains($cnMsg, 'nama')) {
-                        $docValidation['cn']['status'] = 'valid';
-                        $docValidation['cn']['message'] = 'Dokumen Credit Note terverifikasi.';
-                    }
-                }
             } else {
                 $dealerMismatch = true;
+            }
+        }
+
+        // Check Credit Note Program Mismatch
+        if (! $hasSwapped && $slotHasUrl['cn'] && $extractedCnProgram && $inputProgram !== '') {
+            if ($this->isProgramNameMatching($inputProgram, $extractedCnProgram)) {
+                $cnProgramMismatch = false;
+            } else {
+                $cnProgramMismatch = true;
+            }
+        } elseif (! empty($parsed['cn_program_mismatch']) && $extractedCnProgram && $inputProgram !== '') {
+            if ($this->isProgramNameMatching($inputProgram, $extractedCnProgram)) {
+                $cnProgramMismatch = false;
+            } else {
+                $cnProgramMismatch = true;
+            }
+        }
+
+        if ($dealerMismatch && $cnProgramMismatch) {
+            $docValidation['cn'] = [
+                'status' => 'invalid',
+                'actual_type' => 'cn',
+                'message' => "Nama dealer ('{$extractedDealerName}') dan program ('{$extractedCnProgram}') di dokumen berbeda dengan isian formulir (Dealer: '{$inputDealer}', Program: '{$inputProgram}').",
+            ];
+        } elseif ($dealerMismatch) {
+            $docValidation['cn'] = [
+                'status' => 'invalid',
+                'actual_type' => 'cn',
+                'message' => "Nama dealer di dokumen ('{$extractedDealerName}') berbeda dengan isian formulir ('{$inputDealer}').",
+            ];
+        } elseif ($cnProgramMismatch) {
+            $docValidation['cn'] = [
+                'status' => 'invalid',
+                'actual_type' => 'cn',
+                'message' => "Nama program di dokumen Credit Note ('{$extractedCnProgram}') berbeda dengan program yang dipilih ('{$inputProgram}').",
+            ];
+        } else {
+            if (isset($docValidation['cn']) && $docValidation['cn']['status'] === 'invalid') {
+                $cnMsg = strtolower($docValidation['cn']['message'] ?? '');
+                if (str_contains($cnMsg, 'dealer') || str_contains($cnMsg, 'program') || str_contains($cnMsg, 'berbeda')) {
+                    $docValidation['cn']['status'] = 'valid';
+                    $docValidation['cn']['message'] = 'Dokumen Credit Note terverifikasi.';
+                }
             }
         }
 
@@ -1283,75 +1435,63 @@ class DocumentAnalysisService
         $agrDealerMismatch = false;
         $agrProgramMismatch = false;
 
-        $inputProgram = trim((string) ($formData['program_name'] ?? ''));
-
         // Check Agreement Dealer Mismatch
-        if (! $hasSwapped && empty($missingDocs) && $extractedAgrDealer) {
+        if (! $hasSwapped && $slotHasUrl['agr'] && $extractedAgrDealer) {
             $effectiveDealer = ($inputDealer !== '' && $inputDealer !== '-') ? $inputDealer : $extractedDealerName;
             if ($effectiveDealer && $this->isDealerNameMatching($effectiveDealer, $extractedAgrDealer)) {
                 $agrDealerMismatch = false;
-                if (isset($docValidation['agr']) && $docValidation['agr']['status'] === 'invalid') {
-                    $agrMsg = strtolower($docValidation['agr']['message'] ?? '');
-                    if (str_contains($agrMsg, 'dealer') || str_contains($agrMsg, 'berbeda') || str_contains($agrMsg, 'nama')) {
-                        $docValidation['agr']['status'] = 'valid';
-                        $docValidation['agr']['message'] = 'Dokumen Agreement terverifikasi.';
-                    }
-                }
             } elseif ($effectiveDealer && ! $this->isDealerNameMatching($effectiveDealer, $extractedAgrDealer)) {
                 $agrDealerMismatch = true;
-                $docValidation['agr'] = [
-                    'status' => 'invalid',
-                    'actual_type' => 'agr',
-                    'message' => "Nama dealer pada Agreement ('{$extractedAgrDealer}') berbeda dengan nama dealer yang diajukan ('{$effectiveDealer}').",
-                ];
             }
         } elseif (! empty($parsed['agr_dealer_mismatch']) && $extractedAgrDealer) {
             $effectiveDealer = ($inputDealer !== '' && $inputDealer !== '-') ? $inputDealer : $extractedDealerName;
             if ($effectiveDealer && $this->isDealerNameMatching($effectiveDealer, $extractedAgrDealer)) {
                 $agrDealerMismatch = false;
-                if (isset($docValidation['agr']) && $docValidation['agr']['status'] === 'invalid') {
-                    $agrMsg = strtolower($docValidation['agr']['message'] ?? '');
-                    if (str_contains($agrMsg, 'dealer') || str_contains($agrMsg, 'berbeda') || str_contains($agrMsg, 'nama')) {
-                        $docValidation['agr']['status'] = 'valid';
-                        $docValidation['agr']['message'] = 'Dokumen Agreement terverifikasi.';
-                    }
-                }
             } else {
                 $agrDealerMismatch = true;
             }
         }
 
         // Check Agreement Program Mismatch
-        if (! $hasSwapped && empty($missingDocs) && $extractedAgrProgram && $inputProgram !== '') {
+        if (! $hasSwapped && $slotHasUrl['agr'] && $extractedAgrProgram && $inputProgram !== '') {
             if ($this->isProgramNameMatching($inputProgram, $extractedAgrProgram)) {
                 $agrProgramMismatch = false;
-                if (isset($docValidation['agr']) && $docValidation['agr']['status'] === 'invalid') {
-                    $agrMsg = strtolower($docValidation['agr']['message'] ?? '');
-                    if (str_contains($agrMsg, 'program') || str_contains($agrMsg, 'berbeda')) {
-                        $docValidation['agr']['status'] = 'valid';
-                        $docValidation['agr']['message'] = 'Dokumen Agreement terverifikasi.';
-                    }
-                }
             } else {
                 $agrProgramMismatch = true;
-                $docValidation['agr'] = [
-                    'status' => 'invalid',
-                    'actual_type' => 'agr',
-                    'message' => "Nama program pada Agreement ('{$extractedAgrProgram}') berbeda dengan program yang dipilih ('{$inputProgram}').",
-                ];
             }
         } elseif (! empty($parsed['agr_program_mismatch']) && $extractedAgrProgram && $inputProgram !== '') {
             if ($this->isProgramNameMatching($inputProgram, $extractedAgrProgram)) {
                 $agrProgramMismatch = false;
-                if (isset($docValidation['agr']) && $docValidation['agr']['status'] === 'invalid') {
-                    $agrMsg = strtolower($docValidation['agr']['message'] ?? '');
-                    if (str_contains($agrMsg, 'program') || str_contains($agrMsg, 'berbeda')) {
-                        $docValidation['agr']['status'] = 'valid';
-                        $docValidation['agr']['message'] = 'Dokumen Agreement terverifikasi.';
-                    }
-                }
             } else {
                 $agrProgramMismatch = true;
+            }
+        }
+
+        if ($agrDealerMismatch && $agrProgramMismatch) {
+            $docValidation['agr'] = [
+                'status' => 'invalid',
+                'actual_type' => 'agr',
+                'message' => "Nama dealer ('{$extractedAgrDealer}') dan program ('{$extractedAgrProgram}') pada dokumen Agreement berbeda dengan data pengajuan.",
+            ];
+        } elseif ($agrDealerMismatch) {
+            $docValidation['agr'] = [
+                'status' => 'invalid',
+                'actual_type' => 'agr',
+                'message' => "Nama dealer pada Agreement ('{$extractedAgrDealer}') berbeda dengan nama dealer yang diajukan ('{$effectiveDealer}').",
+            ];
+        } elseif ($agrProgramMismatch) {
+            $docValidation['agr'] = [
+                'status' => 'invalid',
+                'actual_type' => 'agr',
+                'message' => "Nama program pada Agreement ('{$extractedAgrProgram}') berbeda dengan program yang dipilih ('{$inputProgram}').",
+            ];
+        } else {
+            if (isset($docValidation['agr']) && $docValidation['agr']['status'] === 'invalid') {
+                $agrMsg = strtolower($docValidation['agr']['message'] ?? '');
+                if (str_contains($agrMsg, 'dealer') || str_contains($agrMsg, 'program') || str_contains($agrMsg, 'berbeda')) {
+                    $docValidation['agr']['status'] = 'valid';
+                    $docValidation['agr']['message'] = 'Dokumen Agreement terverifikasi.';
+                }
             }
         }
 
@@ -1387,10 +1527,22 @@ class DocumentAnalysisService
             }
             $cekDokumen = 'DOKUMEN TERTUKAR ('.implode(', ', $swapLabels).')';
             $keterangan = 'Dokumen tertukar antar kolom. Harap perbaiki posisi upload dokumen.';
+        } elseif ($dealerMismatch && $cnProgramMismatch) {
+            $statusPurchase = 'BELUM BISA POTONG';
+            $cekDokumen = 'DEALER & PROGRAM TIDAK SESUAI (CN)';
+            $keterangan = "Nama dealer dan program pada dokumen Credit Note tidak sesuai dengan isian formulir (Dealer: '{$extractedDealerName}' vs '{$inputDealer}', Program: '{$extractedCnProgram}' vs '{$inputProgram}'). Harap sesuaikan dokumen Credit Note atau pilihan formulir.";
         } elseif ($dealerMismatch) {
             $statusPurchase = 'BELUM BISA POTONG';
             $cekDokumen = 'NAMA DEALER TIDAK SESUAI (CN)';
             $keterangan = "Nama dealer di formulir ('{$inputDealer}') berbeda dengan nama dealer pada dokumen Credit Note ('{$extractedDealerName}'). Harap sesuaikan atau isi '-' agar otomatis diambil dari dokumen.";
+        } elseif ($cnProgramMismatch) {
+            $statusPurchase = 'BELUM BISA POTONG';
+            $cekDokumen = 'NAMA PROGRAM TIDAK SESUAI (CN)';
+            $keterangan = "Nama program di formulir ('{$inputProgram}') berbeda dengan nama program pada dokumen Credit Note ('{$extractedCnProgram}'). Harap sesuaikan dokumen Credit Note atau program yang dipilih.";
+        } elseif ($agrDealerMismatch && $agrProgramMismatch) {
+            $statusPurchase = 'BELUM BISA POTONG';
+            $cekDokumen = 'DEALER & PROGRAM TIDAK SESUAI (AGR)';
+            $keterangan = 'Nama dealer dan program pada dokumen Agreement tidak sesuai dengan isian formulir.';
         } elseif ($agrDealerMismatch) {
             $statusPurchase = 'BELUM BISA POTONG';
             $cekDokumen = 'NAMA DEALER TIDAK SESUAI (AGR)';
@@ -1415,7 +1567,7 @@ class DocumentAnalysisService
                 : 'Dokumen (CN dan Agreement) lengkap untuk dealer Non PKP dan siap diproses potong.';
         }
 
-        $isClean = (! $hasSwapped && ! $hasInvalid && empty($missingDocs) && ! $dealerMismatch && ! $agrDealerMismatch && ! $agrProgramMismatch);
+        $isClean = (! $hasSwapped && ! $hasInvalid && empty($missingDocs) && ! $dealerMismatch && ! $cnProgramMismatch && ! $agrDealerMismatch && ! $agrProgramMismatch);
 
         return [
             'success' => true,
@@ -1424,6 +1576,8 @@ class DocumentAnalysisService
             'has_invalid' => $hasInvalid,
             'dealer_name' => $extractedDealerName ?: $extractedAgrDealer,
             'dealer_mismatch' => $dealerMismatch,
+            'cn_program_name' => $extractedCnProgram,
+            'cn_program_mismatch' => $cnProgramMismatch,
             'agr_dealer_name' => $extractedAgrDealer,
             'agr_dealer_mismatch' => $agrDealerMismatch,
             'agr_program_name' => $extractedAgrProgram,
@@ -1714,6 +1868,9 @@ Format Keluaran:
 Wajib mengembalikan JSON murni TANPA pembungkus markdown ```json ``` dengan key berikut:
 {
   "dealer_name": string | null,
+  "dealer_mismatch": boolean,
+  "cn_program_name": string | null,
+  "cn_program_mismatch": boolean,
   "agr_dealer_name": string | null,
   "agr_program_name": string | null,
   "agr_dealer_mismatch": boolean,

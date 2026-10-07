@@ -101,6 +101,29 @@
             </div>
           </div>
 
+          <!-- Alert jika nama program di CN berbeda -->
+          <div
+            v-if="aiAnalysis.cnProgramMismatch"
+            class="p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-900 space-y-1.5"
+          >
+            <div class="flex items-start gap-2">
+              <AlertCircleIcon class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div class="space-y-1 min-w-0 flex-1">
+                <p class="font-semibold text-amber-950">Nama Program Berbeda dengan Dokumen CN</p>
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                  <span>Dokumen CN: <strong>"{{ aiAnalysis.extractedCnProgramName }}"</strong> (dipilih: "{{ form.program_name }}")</span>
+                  <button
+                    type="button"
+                    @click="applyProgramFromCn"
+                    class="text-[11px] font-medium text-amber-800 hover:text-amber-950 underline cursor-pointer"
+                  >
+                    Gunakan "{{ aiAnalysis.extractedCnProgramName }}"
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div v-if="validationErrors.program_name" class="flex items-center gap-1.5 text-xs text-rose-600 pt-1">
             <AlertCircleIcon class="w-4 h-4 shrink-0" />
             <span>{{ validationErrors.program_name }}</span>
@@ -204,34 +227,36 @@
           </div>
 
           <!-- Dealer mismatch warning in card -->
+          <!-- Alert jika ada ketidaksesuaian nama dealer dari AI -->
           <div
             v-if="aiAnalysis.dealerMismatch && form.dealer_name.trim() !== '-'"
-            class="p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-900 space-y-2 animate-in fade-in duration-150"
+            class="p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-900 space-y-1.5"
           >
             <div class="flex items-start gap-2">
               <AlertCircleIcon class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              <div class="space-y-1">
-                <p class="font-semibold text-amber-950">Nama Dealer Berbeda dengan Dokumen</p>
-                <p>
-                  Nama pada dokumen Credit Note adalah <strong>"{{ aiAnalysis.extractedDealerName }}"</strong>, berbeda dengan isian formulir <strong>"{{ form.dealer_name }}"</strong>.
-                </p>
+              <div class="space-y-1 min-w-0 flex-1">
+                <p class="font-semibold text-amber-950">Nama Dealer Berbeda dengan Dokumen CN</p>
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                  <span>Dokumen CN: <strong>"{{ aiAnalysis.extractedDealerName }}"</strong> (formulir: "{{ form.dealer_name }}")</span>
+                  <div class="flex items-center gap-2">
+                    <button
+                      type="button"
+                      @click="applyDealerFromCn"
+                      class="text-[11px] font-medium text-amber-800 hover:text-amber-950 underline cursor-pointer"
+                    >
+                      Gunakan nama ini
+                    </button>
+                    <span class="text-amber-400">&bull;</span>
+                    <button
+                      type="button"
+                      @click="form.dealer_name = '-'; isAutoFilledDealer = true; aiAnalysis.dealerMismatch = false"
+                      class="text-[11px] text-amber-700 underline hover:text-amber-950 cursor-pointer"
+                    >
+                      Set '-' agar otomatis
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div class="flex items-center gap-3 pt-1">
-              <button
-                type="button"
-                @click="applyDealerFromCn"
-                class="px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-medium transition cursor-pointer"
-              >
-                Gunakan "{{ aiAnalysis.extractedDealerName }}"
-              </button>
-              <button
-                type="button"
-                @click="form.dealer_name = '-'; isAutoFilledDealer = true; aiAnalysis.dealerMismatch = false"
-                class="text-[11px] text-amber-800 underline hover:text-amber-950 cursor-pointer"
-              >
-                Set '-' agar otomatis
-              </button>
             </div>
           </div>
 
@@ -420,7 +445,7 @@
           </div>
 
           <!-- Hasil Analisis Pas Di-Upload (Invalid / Merged / Swapped) -->
-          <div v-else-if="aiAnalysis.docValidation?.cn && aiAnalysis.docValidation.cn.status !== 'valid'" class="pt-1">
+          <div v-else-if="aiAnalysis.docValidation?.cn && aiAnalysis.docValidation.cn.status !== 'valid' && !aiAnalysis.dealerMismatch && !aiAnalysis.cnProgramMismatch" class="pt-1">
             <div class="p-3 rounded-lg border border-red-200 bg-red-50 text-xs text-red-900 flex items-start gap-2.5">
               <AlertCircleIcon class="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
               <div class="space-y-0.5 min-w-0">
@@ -444,8 +469,64 @@
             </div>
           </div>
 
+          <!-- Hasil Analisis Khusus Ketidaksesuaian Data CN (Nama Dealer / Nama Program) -->
+          <div
+            v-else-if="(aiAnalysis.dealerMismatch && form.dealer_name.trim() !== '-') || aiAnalysis.cnProgramMismatch"
+            class="pt-1"
+          >
+            <div class="p-3.5 rounded-lg border border-red-200 bg-red-50 text-xs text-red-900 space-y-2.5">
+              <div class="flex items-start gap-2">
+                <AlertCircleIcon class="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <div class="min-w-0 flex-1">
+                  <p class="font-semibold text-red-950">
+                    {{
+                      aiAnalysis.dealerMismatch && aiAnalysis.cnProgramMismatch
+                        ? 'Hasil Analisis: Nama Dealer & Program di CN Tidak Sesuai'
+                        : (aiAnalysis.dealerMismatch ? 'Hasil Analisis: Nama Dealer di CN Tidak Sesuai' : 'Hasil Analisis: Nama Program di CN Tidak Sesuai')
+                    }}
+                  </p>
+                  <p class="text-[11px] text-red-700/80">
+                    Sistem mendeteksi perbedaan antara isian formulir dengan isi dokumen Credit Note yang diunggah:
+                  </p>
+                </div>
+              </div>
+
+              <!-- Tabel Perbandingan Data CN -->
+              <div class="overflow-x-auto rounded-md border border-red-200/80 bg-white/70">
+                <table class="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr class="border-b border-red-200 bg-red-100/40 text-[11px] font-semibold text-red-950">
+                      <th class="py-1.5 px-3 w-28">Data</th>
+                      <th class="py-1.5 px-3">Isian Formulir</th>
+                      <th class="py-1.5 px-3">Tertera di Dokumen CN</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-red-100">
+                    <!-- Baris Dealer -->
+                    <tr v-if="aiAnalysis.dealerMismatch && form.dealer_name.trim() !== '-'">
+                      <td class="py-2 px-3 font-semibold text-red-950 whitespace-nowrap">Dealer :</td>
+                      <td class="py-2 px-3 text-red-800">{{ form.dealer_name }}</td>
+                      <td class="py-2 px-3 font-semibold text-red-950">{{ aiAnalysis.extractedDealerName }}</td>
+                    </tr>
+
+                    <!-- Baris Program -->
+                    <tr v-if="aiAnalysis.cnProgramMismatch">
+                      <td class="py-2 px-3 font-semibold text-red-950 whitespace-nowrap">Program :</td>
+                      <td class="py-2 px-3 text-red-800">{{ form.program_name }}</td>
+                      <td class="py-2 px-3 font-semibold text-red-950">{{ aiAnalysis.extractedCnProgramName }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <p class="text-[11px] text-red-700/80">
+                Harap sesuaikan formulir atau unggah dokumen Credit Note yang sesuai.
+              </p>
+            </div>
+          </div>
+
           <!-- Hasil Analisis Pas Di-Upload (Valid) -->
-          <div v-else-if="aiAnalysis.docValidation?.cn && aiAnalysis.docValidation.cn.status === 'valid' && filePreviews.credit_note" class="pt-1">
+          <div v-else-if="aiAnalysis.docValidation?.cn && aiAnalysis.docValidation.cn.status === 'valid' && !aiAnalysis.dealerMismatch && !aiAnalysis.cnProgramMismatch && filePreviews.credit_note" class="pt-1">
             <div class="p-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-xs text-emerald-800 flex items-center gap-2">
               <CheckCircle2Icon class="w-4 h-4 text-emerald-600 shrink-0" />
               <span class="font-medium">Hasil Analisis: Dokumen Credit Note Terverifikasi (Valid)</span>
@@ -532,7 +613,7 @@
           </div>
 
           <!-- Hasil Analisis Pas Di-Upload (Invalid / Merged / Swapped) -->
-          <div v-else-if="aiAnalysis.docValidation?.agr && aiAnalysis.docValidation.agr.status !== 'valid'" class="pt-1">
+          <div v-else-if="aiAnalysis.docValidation?.agr && aiAnalysis.docValidation.agr.status !== 'valid' && !aiAnalysis.agrDealerMismatch && !aiAnalysis.agrProgramMismatch" class="pt-1">
             <div class="p-3 rounded-lg border border-red-200 bg-red-50 text-xs text-red-900 flex items-start gap-2.5">
               <AlertCircleIcon class="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
               <div class="space-y-0.5 min-w-0">
@@ -556,52 +637,67 @@
             </div>
           </div>
 
+          <!-- Hasil Analisis Khusus Ketidaksesuaian Data AGR (Nama Dealer / Nama Program) -->
+          <div
+            v-else-if="(aiAnalysis.agrDealerMismatch && form.dealer_name.trim() !== '-') || aiAnalysis.agrProgramMismatch"
+            class="pt-1"
+          >
+            <div class="p-3.5 rounded-lg border border-red-200 bg-red-50 text-xs text-red-900 space-y-2.5">
+              <div class="flex items-start gap-2">
+                <AlertCircleIcon class="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <div class="min-w-0 flex-1">
+                  <p class="font-semibold text-red-950">
+                    {{
+                      aiAnalysis.agrDealerMismatch && aiAnalysis.agrProgramMismatch
+                        ? 'Hasil Analisis: Nama Dealer & Program di Agreement Tidak Sesuai'
+                        : (aiAnalysis.agrDealerMismatch ? 'Hasil Analisis: Nama Dealer di Agreement Tidak Sesuai' : 'Hasil Analisis: Nama Program di Agreement Tidak Sesuai')
+                    }}
+                  </p>
+                  <p class="text-[11px] text-red-700/80">
+                    Sistem mendeteksi perbedaan antara isian formulir dengan isi dokumen Agreement yang diunggah:
+                  </p>
+                </div>
+              </div>
+
+              <!-- Tabel Perbandingan Data AGR -->
+              <div class="overflow-x-auto rounded-md border border-red-200/80 bg-white/70">
+                <table class="w-full text-left text-xs border-collapse">
+                  <thead>
+                    <tr class="border-b border-red-200 bg-red-100/40 text-[11px] font-semibold text-red-950">
+                      <th class="py-1.5 px-3 w-28">Data</th>
+                      <th class="py-1.5 px-3">Isian Formulir</th>
+                      <th class="py-1.5 px-3">Tertera di Dokumen AGR</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-red-100">
+                    <!-- Baris Dealer -->
+                    <tr v-if="aiAnalysis.agrDealerMismatch && form.dealer_name.trim() !== '-'">
+                      <td class="py-2 px-3 font-semibold text-red-950 whitespace-nowrap">Dealer :</td>
+                      <td class="py-2 px-3 text-red-800">{{ form.dealer_name }}</td>
+                      <td class="py-2 px-3 font-semibold text-red-950">{{ aiAnalysis.extractedAgrDealerName }}</td>
+                    </tr>
+
+                    <!-- Baris Program -->
+                    <tr v-if="aiAnalysis.agrProgramMismatch">
+                      <td class="py-2 px-3 font-semibold text-red-950 whitespace-nowrap">Program :</td>
+                      <td class="py-2 px-3 text-red-800">{{ form.program_name }}</td>
+                      <td class="py-2 px-3 font-semibold text-red-950">{{ aiAnalysis.extractedAgrProgramName }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <p class="text-[11px] text-red-700/80">
+                Harap sesuaikan formulir atau unggah dokumen Agreement yang sesuai.
+              </p>
+            </div>
+          </div>
+
           <!-- Hasil Analisis Pas Di-Upload (Valid) -->
-          <div v-else-if="aiAnalysis.docValidation?.agr && aiAnalysis.docValidation.agr.status === 'valid' && filePreviews.agreement" class="pt-1">
+          <div v-else-if="aiAnalysis.docValidation?.agr && aiAnalysis.docValidation.agr.status === 'valid' && !aiAnalysis.agrDealerMismatch && !aiAnalysis.agrProgramMismatch && filePreviews.agreement" class="pt-1">
             <div class="p-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-xs text-emerald-800 flex items-center gap-2">
               <CheckCircle2Icon class="w-4 h-4 text-emerald-600 shrink-0" />
               <span class="font-medium">Hasil Analisis: Dokumen Agreement Terverifikasi (Valid)</span>
-            </div>
-          </div>
-
-          <!-- Warning for Agreement Dealer Mismatch -->
-          <div
-            v-if="aiAnalysis.agrDealerMismatch && form.dealer_name.trim() !== '-'"
-            class="p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-900 space-y-2 animate-in fade-in duration-150"
-          >
-            <div class="flex items-start gap-2">
-              <AlertCircleIcon class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              <div class="space-y-1">
-                <p class="font-semibold text-amber-950">Nama Dealer di Agreement Tidak Sesuai</p>
-                <p>
-                  Nama dealer pada dokumen Agreement adalah <strong>"{{ aiAnalysis.extractedAgrDealerName }}"</strong>, berbeda dengan isian formulir <strong>"{{ form.dealer_name }}"</strong>.
-                </p>
-              </div>
-            </div>
-            <div class="flex items-center gap-3 pt-1">
-              <button
-                type="button"
-                @click="applyDealerFromAgr"
-                class="px-2.5 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-medium transition cursor-pointer"
-              >
-                Gunakan "{{ aiAnalysis.extractedAgrDealerName }}"
-              </button>
-            </div>
-          </div>
-
-          <!-- Warning for Agreement Program Mismatch -->
-          <div
-            v-if="aiAnalysis.agrProgramMismatch"
-            class="p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-900 space-y-1.5 animate-in fade-in duration-150"
-          >
-            <div class="flex items-start gap-2">
-              <AlertCircleIcon class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              <div class="space-y-1">
-                <p class="font-semibold text-amber-950">Nama Program di Agreement Tidak Sesuai</p>
-                <p>
-                  Nama program pada dokumen Agreement adalah <strong>"{{ aiAnalysis.extractedAgrProgramName }}"</strong>, berbeda dengan program yang dipilih <strong>"{{ form.program_name }}"</strong>.
-                </p>
-              </div>
             </div>
           </div>
 
@@ -792,7 +888,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import axios from 'axios';
 import {
   UploadCloud as UploadCloudIcon,
@@ -894,6 +990,8 @@ const aiAnalysis = reactive({
   audit: null,
   extractedDealerName: '',
   dealerMismatch: false,
+  extractedCnProgramName: '',
+  cnProgramMismatch: false,
   extractedAgrDealerName: '',
   agrDealerMismatch: false,
   extractedAgrProgramName: '',
@@ -907,6 +1005,15 @@ function applyDealerFromCn() {
     isAutoFilledDealer.value = true;
     aiAnalysis.dealerMismatch = false;
     validationErrors.dealer_name = '';
+    triggerAiPreValidationDebounced();
+  }
+}
+
+function applyProgramFromCn() {
+  if (aiAnalysis.extractedCnProgramName) {
+    handleProgramChange(aiAnalysis.extractedCnProgramName);
+    aiAnalysis.cnProgramMismatch = false;
+    triggerAiPreValidationDebounced();
   }
 }
 
@@ -916,6 +1023,15 @@ function applyDealerFromAgr() {
     isAutoFilledDealer.value = true;
     aiAnalysis.agrDealerMismatch = false;
     validationErrors.dealer_name = '';
+    triggerAiPreValidationDebounced();
+  }
+}
+
+function applyProgramFromAgr() {
+  if (aiAnalysis.extractedAgrProgramName) {
+    handleProgramChange(aiAnalysis.extractedAgrProgramName);
+    aiAnalysis.agrProgramMismatch = false;
+    triggerAiPreValidationDebounced();
   }
 }
 
@@ -955,6 +1071,16 @@ const hasUploadedAnyDocument = computed(() => {
   return !!(files.credit_note || files.agreement || files.tax_invoice);
 });
 
+// Re-validate live when user changes dealer name or program selection
+watch(
+  () => [form.dealer_name, form.program_name],
+  () => {
+    if (hasUploadedAnyDocument.value) {
+      triggerAiPreValidationDebounced();
+    }
+  }
+);
+
 // ================= LIFECYCLE & INITIALIZATION =================
 onMounted(async () => {
   document.addEventListener('click', handleClickOutside);
@@ -989,9 +1115,15 @@ async function fetchFormOptions() {
 
 // ================= HANDLERS =================
 function handleProgramChange(prog) {
-  programRadioSelection.value = prog;
-  form.program_name = prog;
-  form.program_custom = '';
+  if (defaultProgramsList.includes(prog)) {
+    programRadioSelection.value = prog;
+    form.program_name = prog;
+    form.program_custom = '';
+  } else {
+    programRadioSelection.value = '__OTHER__';
+    form.program_custom = prog;
+    form.program_name = prog;
+  }
   validationErrors.program_name = '';
 }
 
@@ -1138,6 +1270,8 @@ async function triggerAiPreValidation() {
       aiAnalysis.audit = d.audit || {};
       aiAnalysis.extractedDealerName = d.dealer_name || '';
       aiAnalysis.dealerMismatch = !!d.dealer_mismatch;
+      aiAnalysis.extractedCnProgramName = d.cn_program_name || '';
+      aiAnalysis.cnProgramMismatch = !!d.cn_program_mismatch;
       aiAnalysis.extractedAgrDealerName = d.agr_dealer_name || '';
       aiAnalysis.agrDealerMismatch = !!d.agr_dealer_mismatch;
       aiAnalysis.extractedAgrProgramName = d.agr_program_name || '';
@@ -1148,7 +1282,7 @@ async function triggerAiPreValidation() {
         if (isDealerNameSimilar(form.dealer_name, d.dealer_name)) {
           aiAnalysis.dealerMismatch = false;
           d.dealer_mismatch = false;
-          if (aiAnalysis.docValidation?.cn?.status === 'invalid') {
+          if (aiAnalysis.docValidation?.cn?.status === 'invalid' && !aiAnalysis.cnProgramMismatch) {
             const cnMsg = (aiAnalysis.docValidation.cn.message || '').toLowerCase();
             if (cnMsg.includes('dealer') || cnMsg.includes('berbeda') || cnMsg.includes('nama')) {
               aiAnalysis.docValidation.cn.status = 'valid';
@@ -1161,7 +1295,7 @@ async function triggerAiPreValidation() {
         if (isDealerNameSimilar(form.dealer_name, d.agr_dealer_name)) {
           aiAnalysis.agrDealerMismatch = false;
           d.agr_dealer_mismatch = false;
-          if (aiAnalysis.docValidation?.agr?.status === 'invalid') {
+          if (aiAnalysis.docValidation?.agr?.status === 'invalid' && !aiAnalysis.agrProgramMismatch) {
             const agrMsg = (aiAnalysis.docValidation.agr.message || '').toLowerCase();
             if (agrMsg.includes('dealer') || agrMsg.includes('berbeda') || agrMsg.includes('nama')) {
               aiAnalysis.docValidation.agr.status = 'valid';
@@ -1317,6 +1451,8 @@ async function handleSubmit() {
       aiAnalysis.financial = preValResult.financial || {};
       aiAnalysis.extractedDealerName = preValResult.dealer_name || '';
       aiAnalysis.dealerMismatch = !!preValResult.dealer_mismatch;
+      aiAnalysis.extractedCnProgramName = preValResult.cn_program_name || '';
+      aiAnalysis.cnProgramMismatch = !!preValResult.cn_program_mismatch;
       aiAnalysis.extractedAgrDealerName = preValResult.agr_dealer_name || '';
       aiAnalysis.agrDealerMismatch = !!preValResult.agr_dealer_mismatch;
       aiAnalysis.extractedAgrProgramName = preValResult.agr_program_name || '';
@@ -1337,7 +1473,7 @@ async function handleSubmit() {
         if (isDealerNameSimilar(form.dealer_name, preValResult.dealer_name)) {
           aiAnalysis.dealerMismatch = false;
           preValResult.dealer_mismatch = false;
-          if (aiAnalysis.docValidation?.cn?.status === 'invalid') {
+          if (aiAnalysis.docValidation?.cn?.status === 'invalid' && !aiAnalysis.cnProgramMismatch) {
             const cnMsg = (aiAnalysis.docValidation.cn.message || '').toLowerCase();
             if (cnMsg.includes('dealer') || cnMsg.includes('berbeda') || cnMsg.includes('nama')) {
               aiAnalysis.docValidation.cn.status = 'valid';
@@ -1350,7 +1486,7 @@ async function handleSubmit() {
         if (isDealerNameSimilar(form.dealer_name, preValResult.agr_dealer_name)) {
           aiAnalysis.agrDealerMismatch = false;
           preValResult.agr_dealer_mismatch = false;
-          if (aiAnalysis.docValidation?.agr?.status === 'invalid') {
+          if (aiAnalysis.docValidation?.agr?.status === 'invalid' && !aiAnalysis.agrProgramMismatch) {
             const agrMsg = (aiAnalysis.docValidation.agr.message || '').toLowerCase();
             if (agrMsg.includes('dealer') || agrMsg.includes('berbeda') || agrMsg.includes('nama')) {
               aiAnalysis.docValidation.agr.status = 'valid';
@@ -1436,9 +1572,27 @@ async function handleSubmit() {
     return;
   }
 
-  // 2. BLOCK IF CN DEALER NAME MISMATCH
-  const hasMismatch = (preValResult?.dealer_mismatch || aiAnalysis.dealerMismatch) && form.dealer_name.trim() !== '-';
-  if (hasMismatch) {
+  // 2. BLOCK IF CN MISMATCH (DEALER AND/OR PROGRAM)
+  const hasCnDealerMismatch = (preValResult?.dealer_mismatch || aiAnalysis.dealerMismatch) && form.dealer_name.trim() !== '-';
+  const hasCnProgMismatch = (preValResult?.cn_program_mismatch || aiAnalysis.cnProgramMismatch);
+
+  if (hasCnDealerMismatch && hasCnProgMismatch) {
+    isSubmitting.value = false;
+    const docDealer = preValResult?.dealer_name || aiAnalysis.extractedDealerName || 'Dokumen Credit Note';
+    const docCnProg = preValResult?.cn_program_name || aiAnalysis.extractedCnProgramName || 'Dokumen Credit Note';
+    openValidationModal({
+      title: 'Nama Dealer & Program di CN Tidak Sesuai',
+      message: 'Nama dealer dan nama program pada formulir berbeda dengan isi dokumen Credit Note yang diunggah.',
+      details: [
+        `Nama Dealer di Form: "${form.dealer_name}" (Dokumen CN: "${docDealer}")`,
+        `Nama Program di Form: "${form.program_name}" (Dokumen CN: "${docCnProg}")`,
+        'Solusi: Sesuaikan isian formulir atau unggah file Credit Note yang sesuai.',
+      ],
+    });
+    return;
+  }
+
+  if (hasCnDealerMismatch) {
     isSubmitting.value = false;
     const docDealer = preValResult?.dealer_name || aiAnalysis.extractedDealerName || 'Dokumen Credit Note';
     openValidationModal({
@@ -1448,6 +1602,21 @@ async function handleSubmit() {
         `Nama di formulir: ${form.dealer_name}`,
         `Nama di dokumen Credit Note: ${docDealer}`,
         `Solusi: Samakan nama dealer dengan dokumen, atau cukup isi tanda '-' agar sistem membaca otomatis.`,
+      ],
+    });
+    return;
+  }
+
+  if (hasCnProgMismatch) {
+    isSubmitting.value = false;
+    const docCnProg = preValResult?.cn_program_name || aiAnalysis.extractedCnProgramName || 'Dokumen Credit Note';
+    openValidationModal({
+      title: 'Nama Program di Credit Note Tidak Sesuai',
+      message: `Nama program yang dipilih ('${form.program_name}') berbeda dengan nama program pada dokumen Credit Note ('${docCnProg}').`,
+      details: [
+        `Program di formulir: ${form.program_name}`,
+        `Program di dokumen Credit Note: ${docCnProg}`,
+        `Solusi: Pastikan dokumen Credit Note yang diunggah sesuai dengan program yang dipilih di form.`,
       ],
     });
     return;

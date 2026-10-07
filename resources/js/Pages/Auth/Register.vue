@@ -5,8 +5,8 @@
       <div class="text-center space-y-2">
         <img
           src="/images/scm-logo.png"
-          alt="SCM Supply Chain Management"
-          class="h-16 w-auto max-w-[160px] mx-auto object-contain"
+          alt="SCM"
+          class="h-10 sm:h-11 w-auto mx-auto object-contain mb-2"
         />
         <h1 class="text-2xl font-bold tracking-tight text-neutral-900">
           {{ isSuccess ? 'Pendaftaran Berhasil' : 'Daftar Akun Baru' }}

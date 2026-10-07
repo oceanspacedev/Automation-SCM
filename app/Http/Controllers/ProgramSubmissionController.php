@@ -1195,6 +1195,17 @@ class ProgramSubmissionController extends Controller
                     ], 422);
                 }
             }
+        } elseif (! empty($inspection['dealer_mismatch']) && ! empty($inspection['cn_program_mismatch'])) {
+            $extractedDealer = $inspection['dealer_name'] ?? 'Dokumen CN';
+            $extractedCnProgram = $inspection['cn_program_name'] ?? 'Dokumen Credit Note';
+
+            return response()->json([
+                'success' => false,
+                'message' => "Nama dealer ('{$formData['dealer_name']}' vs '{$extractedDealer}') dan program ('{$formData['program_name']}' vs '{$extractedCnProgram}') tidak sesuai dengan dokumen Credit Note. Harap sesuaikan isian formulir atau unggah dokumen yang benar.",
+                'error_type' => 'CN_MISMATCH',
+                'doc_validation' => $inspection['doc_validation'] ?? [],
+                'cek_dokumen' => $inspection['cek_dokumen'] ?? '',
+            ], 422);
         } elseif (! empty($inspection['dealer_mismatch'])) {
             $extracted = $inspection['dealer_name'] ?? 'Dokumen CN';
 
@@ -1202,6 +1213,16 @@ class ProgramSubmissionController extends Controller
                 'success' => false,
                 'message' => "Nama dealer di formulir ('{$formData['dealer_name']}') tidak sesuai dengan nama dealer pada dokumen Credit Note ('{$extracted}'). Harap sesuaikan atau isi '-' agar nama dealer otomatis diambil dari dokumen.",
                 'error_type' => 'DEALER_MISMATCH',
+                'doc_validation' => $inspection['doc_validation'] ?? [],
+                'cek_dokumen' => $inspection['cek_dokumen'] ?? '',
+            ], 422);
+        } elseif (! empty($inspection['cn_program_mismatch'])) {
+            $extractedCnProgram = $inspection['cn_program_name'] ?? 'Dokumen Credit Note';
+
+            return response()->json([
+                'success' => false,
+                'message' => "Nama program yang diajukan ('{$formData['program_name']}') tidak sesuai dengan nama program pada dokumen Credit Note ('{$extractedCnProgram}'). Harap sesuaikan dokumen Credit Note atau program yang dipilih.",
+                'error_type' => 'CN_PROGRAM_MISMATCH',
                 'doc_validation' => $inspection['doc_validation'] ?? [],
                 'cek_dokumen' => $inspection['cek_dokumen'] ?? '',
             ], 422);

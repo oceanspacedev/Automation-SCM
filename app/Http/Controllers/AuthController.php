@@ -59,14 +59,36 @@ class AuthController extends Controller
 
     public function login(Request $request): JsonResponse
     {
-        $credentials = $request->validate([
-            'email' => ['required', 'email'],
+        $request->validate([
+            'email' => ['nullable', 'string'],
+            'login' => ['nullable', 'string'],
             'password' => ['required', 'string'],
         ]);
 
-        $remember = $request->boolean('remember', false);
+        $loginInput = trim((string) ($request->input('login') ?: $request->input('email')));
 
-        if (Auth::attempt($credentials, $remember)) {
+        if (empty($loginInput)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Username atau email wajib diisi.',
+            ], 422);
+        }
+
+        $remember = $request->boolean('remember', false);
+        $password = (string) $request->input('password');
+
+        // Coba login dengan email terlebih dahulu jika format email, atau username (name)
+        $field = filter_var($loginInput, FILTER_VALIDATE_EMAIL) ? 'email' : 'name';
+
+        $attempted = Auth::attempt([$field => $loginInput, 'password' => $password], $remember);
+
+        // Jika gagal dan dicoba nama, coba juga sebagai email (atau sebaliknya)
+        if (! $attempted) {
+            $altField = ($field === 'email') ? 'name' : 'email';
+            $attempted = Auth::attempt([$altField => $loginInput, 'password' => $password], $remember);
+        }
+
+        if ($attempted) {
             $user = Auth::user();
 
             if (! $user->is_active) {
@@ -91,7 +113,7 @@ class AuthController extends Controller
 
         return response()->json([
             'success' => false,
-            'message' => 'Email atau password salah.',
+            'message' => 'Username/email atau password salah.',
         ], 422);
     }
 
@@ -181,12 +203,20 @@ class AuthController extends Controller
             ], 503);
         }
 
-        // Simpan OTP di cache selama 15 menit setelah berhasil dikirim
-        Cache::put($cacheKey, [
+        $otpData = [
             'otp' => $otp,
             'user_id' => $user->id,
+            'whatsapp' => $normalized,
             'attempts' => 0,
-        ], now()->addMinutes(15));
+        ];
+
+        // Simpan OTP di cache selama 15 menit
+        Cache::put($cacheKey, $otpData, now()->addMinutes(15));
+        Cache::put("wa_otp_user:{$user->id}", $otpData, now()->addMinutes(15));
+        if (! empty($user->whatsapp) && $user->whatsapp !== $normalized) {
+            $userNorm = $this->normalizePhone($user->whatsapp);
+            Cache::put("wa_otp:{$userNorm}", $otpData, now()->addMinutes(15));
+        }
 
         // Increment rate limit counter
         Cache::put($rateLimitKey, Cache::get($rateLimitKey, 0) + 1, now()->addMinutes(15));
@@ -206,13 +236,41 @@ class AuthController extends Controller
     {
         $request->validate([
             'whatsapp' => ['required', 'string'],
-            'otp' => ['required', 'string', 'size:6'],
+            'otp' => ['required', 'string'],
         ]);
 
-        $normalized = $this->normalizePhone($request->input('whatsapp'));
+        $rawPhone = (string) $request->input('whatsapp');
+        $normalized = $this->normalizePhone($rawPhone);
+        $inputOtp = preg_replace('/\D/', '', (string) $request->input('otp'));
+
+        if (strlen($inputOtp) !== 6) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kode OTP harus 6 digit angka.',
+            ], 422);
+        }
+
         $cacheKey = "wa_otp:{$normalized}";
         $rateLimitKey = "wa_otp_rate:{$normalized}";
         $stored = Cache::get($cacheKey);
+
+        // Fallback jika format nomor telepon saat request verify berbeda dengan saat send
+        if (! $stored) {
+            $rawDigits = preg_replace('/\D/', '', $rawPhone);
+            $variants = array_filter(array_unique([
+                $normalized,
+                $rawDigits,
+                $rawPhone,
+                '0'.substr($normalized, 2),
+                substr($normalized, 2),
+                '+'.$normalized,
+            ]));
+            $userFound = User::whereIn('whatsapp', $variants)->first();
+            if ($userFound) {
+                $stored = Cache::get("wa_otp_user:{$userFound->id}")
+                    ?? Cache::get('wa_otp:'.$this->normalizePhone((string) $userFound->whatsapp));
+            }
+        }
 
         if (! $stored) {
             return response()->json([
@@ -224,6 +282,9 @@ class AuthController extends Controller
         // Max 5 percobaan
         if ($stored['attempts'] >= 5) {
             Cache::forget($cacheKey);
+            if (isset($stored['user_id'])) {
+                Cache::forget("wa_otp_user:{$stored['user_id']}");
+            }
 
             return response()->json([
                 'success' => false,
@@ -231,10 +292,13 @@ class AuthController extends Controller
             ], 422);
         }
 
-        if ($stored['otp'] !== $request->input('otp')) {
+        if ((string) $stored['otp'] !== $inputOtp) {
             // Increment attempts
             $stored['attempts']++;
             Cache::put($cacheKey, $stored, now()->addMinutes(15));
+            if (isset($stored['user_id'])) {
+                Cache::put("wa_otp_user:{$stored['user_id']}", $stored, now()->addMinutes(15));
+            }
 
             $remaining = 5 - $stored['attempts'];
 
@@ -263,6 +327,12 @@ class AuthController extends Controller
 
         Cache::forget($cacheKey);
         Cache::forget($rateLimitKey);
+        if (isset($stored['user_id'])) {
+            Cache::forget("wa_otp_user:{$stored['user_id']}");
+        }
+        if (! empty($user->whatsapp)) {
+            Cache::forget('wa_otp:'.$this->normalizePhone((string) $user->whatsapp));
+        }
 
         Auth::login($user, true);
         $request->session()->regenerate();

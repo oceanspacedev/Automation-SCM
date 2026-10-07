@@ -1806,4 +1806,53 @@ class ProgramSubmissionTest extends TestCase
         $this->assertStringContainsString('DIGABUNG', $result['cek_dokumen']);
         $this->assertEquals('BELUM BISA POTONG', $result['status_potong_purchase']);
     }
+
+    public function test_pre_validate_detects_cn_dealer_and_program_mismatch(): void
+    {
+        $service = app(DocumentAnalysisService::class);
+
+        // Upload CN file named with OCCEAN SPACE and PROGRAM DSA FERUARI
+        $cnFile = UploadedFile::fake()->create('CN_OCCEAN_SPACE_PROGRAM_DSA_FERUARI.pdf', 100, 'application/pdf');
+
+        $result = $service->heuristicDocumentInspection([
+            'dealer_name' => 'rez',
+            'program_name' => 'PROGRAM DSA FEBRUARI 2026',
+        ], [
+            'cn' => $cnFile,
+            'agr' => null,
+            'faktur' => null,
+        ]);
+
+        $this->assertTrue($result['dealer_mismatch'], 'Dealer mismatch should be true when rez vs OCCEAN SPACE');
+        $this->assertTrue($result['cn_program_mismatch'], 'CN program mismatch should be true when FEBRUARI 2026 vs FERUARI');
+        $this->assertEquals('invalid', $result['doc_validation']['cn']['status']);
+        $this->assertEqualsIgnoringCase('OCCEAN SPACE', $result['dealer_name']);
+        $this->assertEqualsIgnoringCase('PROGRAM DSA FERUARI', $result['cn_program_name']);
+        $this->assertStringContainsString('DEALER & PROGRAM TIDAK SESUAI', $result['cek_dokumen']);
+    }
+
+    public function test_submit_form_blocks_when_cn_dealer_and_program_mismatched(): void
+    {
+        Storage::fake('public');
+        config(['services.ai_router.api_key' => '']);
+        config(['services.openai_compatible.api_key' => '']);
+        Cache::forget(DocumentAnalysisService::CACHE_KEY_CONFIG);
+
+        $cnFile = UploadedFile::fake()->create('CN_OCCEAN_SPACE_PROGRAM_DSA_FERUARI.pdf', 100, 'application/pdf');
+        $agrFile = UploadedFile::fake()->create('AGR_OCCEAN_SPACE.pdf', 100, 'application/pdf');
+
+        $response = $this->postJson('/api/program-submissions/submit-form', [
+            'program_name' => 'PROGRAM DSA FEBRUARI 2026',
+            'region' => 'BIG BANDUNG',
+            'id_real' => 'IDME12345',
+            'dealer_name' => 'rez',
+            'sales_name' => 'AGUS',
+            'credit_note_file' => $cnFile,
+            'agreement_file' => $agrFile,
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertFalse($response->json('success'));
+        $this->assertStringContainsString('tidak sesuai dengan dokumen Credit Note', $response->json('message'));
+    }
 }
