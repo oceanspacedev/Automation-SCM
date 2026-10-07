@@ -27,40 +27,8 @@
       <!-- Main Login Card (Compact, Clean Dark Mode) -->
       <div class="bg-white dark:bg-slate-900 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_25px_rgba(0,0,0,0.35)] border border-neutral-200/80 dark:border-slate-800 p-5 sm:p-6 transition-colors">
 
-        <!-- =================== LOGIN SUCCESS SCREEN =================== -->
-        <div v-if="isLoginSuccess" class="py-6 text-center space-y-4">
-          <div class="relative mx-auto w-16 h-16 flex items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/80 shadow-xs">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-25"></span>
-            <CheckCircle2 class="w-8 h-8 relative" />
-          </div>
-
-          <div>
-            <h3 class="text-lg font-bold text-neutral-900 dark:text-white tracking-tight">
-              Login Berhasil!
-            </h3>
-            <p class="text-xs text-neutral-500 dark:text-slate-400 mt-1">
-              Selamat datang kembali. Mengalihkan ke dashboard...
-            </p>
-          </div>
-
-          <!-- Animated Progress Bar -->
-          <div class="w-full bg-neutral-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden mt-3">
-            <div
-              class="bg-emerald-500 dark:bg-emerald-400 h-1.5 rounded-full transition-all duration-700 ease-out"
-              :style="{ width: redirectProgress + '%' }"
-            ></div>
-          </div>
-
-          <div class="flex items-center justify-center gap-1.5 text-[11px] text-neutral-400 dark:text-slate-500 pt-0.5 font-medium">
-            <Loader2 class="w-3.5 h-3.5 animate-spin text-emerald-600 dark:text-emerald-400" />
-            <span>Memuat data SCM...</span>
-          </div>
-        </div>
-
-        <!-- =================== FORM CONTAINER =================== -->
-        <div v-else>
-          <!-- Header Title (Clean without top icon box) -->
-          <div class="text-center mb-4">
+        <!-- Header Title (Clean without top icon box) -->
+        <div class="text-center mb-4">
             <h2 class="text-base sm:text-lg font-bold tracking-tight text-neutral-900 dark:text-white">
               {{ loginMode === 'email' ? 'Sign in' : (otpStep === 'phone' ? 'Masuk via WhatsApp' : 'Verifikasi OTP WhatsApp') }}
             </h2>
@@ -167,11 +135,12 @@
           <!-- Blue Sign In Button -->
           <button
             type="submit"
-            :disabled="loading"
+            :disabled="loading || isLoginSuccess"
             class="w-full h-9.5 rounded-lg bg-[#1D70F5] hover:bg-[#155FD1] active:scale-[0.99] text-white font-semibold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-60"
           >
-            <span v-if="loading" class="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-            <span>{{ loading ? 'Signing in...' : 'Sign in' }}</span>
+            <span v-if="loading && !isLoginSuccess" class="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            <Check v-else-if="isLoginSuccess" class="h-4 w-4 text-white" />
+            <span>{{ isLoginSuccess ? 'Berhasil masuk...' : (loading ? 'Signing in...' : 'Sign in') }}</span>
           </button>
 
           <!-- Divider: ATAU MASUK DENGAN -->
@@ -262,11 +231,12 @@
 
             <button
               type="submit"
-              :disabled="loading || cleanOtpLength !== 6"
+              :disabled="loading || cleanOtpLength !== 6 || isLoginSuccess"
               class="w-full h-9.5 rounded-lg bg-[#1D70F5] hover:bg-[#155FD1] active:scale-[0.99] text-white font-semibold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
             >
-              <span v-if="loading" class="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-              <span>{{ loading ? 'Memverifikasi...' : 'Verifikasi & Masuk' }}</span>
+              <span v-if="loading && !isLoginSuccess" class="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              <Check v-else-if="isLoginSuccess" class="h-4 w-4 text-white" />
+              <span>{{ isLoginSuccess ? 'Berhasil masuk...' : (loading ? 'Memverifikasi...' : 'Verifikasi & Masuk') }}</span>
             </button>
 
             <!-- Navigation & Resend Links -->
@@ -297,8 +267,6 @@
             </button>
           </form>
 
-        </div>
-
       </div>
 
     </div>
@@ -325,7 +293,7 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import { useTheme } from '@/composables/useTheme';
-import { Eye, EyeOff, Moon, Sun, CheckCircle2, Loader2 } from 'lucide-vue-next';
+import { Eye, EyeOff, Moon, Sun, CheckCircle2, Check } from 'lucide-vue-next';
 import axios from 'axios';
 
 const router = useRouter();
@@ -348,7 +316,6 @@ const waOtp = ref('');
 
 const loading = ref(false);
 const isLoginSuccess = ref(false);
-const redirectProgress = ref(0);
 const errorMessage = ref('');
 const successMessage = ref('');
 const showPassword = ref(false);
@@ -389,14 +356,10 @@ function onOtpInput(event) {
 }
 
 async function triggerSuccessRedirect() {
-  isLoginSuccess.value = true;
-  redirectProgress.value = 25;
   errorMessage.value = '';
-  successMessage.value = '';
-
-  setTimeout(() => {
-    redirectProgress.value = 75;
-  }, 250);
+  successMessage.value = 'Login berhasil! Mengalihkan ke dashboard...';
+  isLoginSuccess.value = true;
+  loading.value = false;
 
   try {
     await checkAuth();
@@ -405,12 +368,8 @@ async function triggerSuccessRedirect() {
   }
 
   setTimeout(() => {
-    redirectProgress.value = 100;
-  }, 550);
-
-  setTimeout(() => {
     router.push('/dashboard');
-  }, 850);
+  }, 250);
 }
 
 // ===== 1. EMAIL & PASSWORD SUBMIT =====
