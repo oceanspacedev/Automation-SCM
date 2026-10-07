@@ -31,7 +31,7 @@ class DataProgramSyncService
 
     public const CACHE_KEY_WEBAPP_URL = 'data_program_webapp_url';
 
-    public const DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzXBZOrWjaxN2F_JYslnurQB3FMgbZNysW3ZhXZRqyQMcmUTIIYWghFln43o6iU7YhW/exec';
+    public const DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwJRdSbhKwKWlU4T6Haxu1oWwiYQLef4c-IKYyAVd_sIAY2Z2UukEFQirWKox5qDebtXQ/exec';
 
     /**
      * Get configured Google Apps Script Web App URL for pushing updates.

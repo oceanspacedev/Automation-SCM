@@ -228,7 +228,7 @@ class DataProgramTest extends TestCase
         ]);
 
         $service = app(DataProgramSyncService::class);
-        $result = $service->sync('https://script.google.com/macros/s/AKfycbzXBZOrWjaxN2F_JYslnurQB3FMgbZNysW3ZhXZRqyQMcmUTIIYWghFln43o6iU7YhW/exec');
+        $result = $service->sync('https://script.google.com/macros/s/AKfycbwJRdSbhKwKWlU4T6Haxu1oWwiYQLef4c-IKYyAVd_sIAY2Z2UukEFQirWKox5qDebtXQ/exec');
 
         $this->assertEquals(1, $result['synced_count']);
         $this->assertDatabaseHas('data_programs', [
@@ -1059,7 +1059,7 @@ class DataProgramTest extends TestCase
         ]);
 
         $service = app(DataProgramSyncService::class);
-        $result = $service->sync('https://script.google.com/macros/s/AKfycbzXBZOrWjaxN2F_JYslnurQB3FMgbZNysW3ZhXZRqyQMcmUTIIYWghFln43o6iU7YhW/exec');
+        $result = $service->sync('https://script.google.com/macros/s/AKfycbwJRdSbhKwKWlU4T6Haxu1oWwiYQLef4c-IKYyAVd_sIAY2Z2UukEFQirWKox5qDebtXQ/exec');
 
         $this->assertDatabaseHas('data_programs', [
             'row_hash' => 'row_2',
