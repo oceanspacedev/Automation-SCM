@@ -2,11 +2,16 @@
 
 namespace App\Models;
 
+use App\Area;
+use App\Models\Concerns\BelongsToArea;
+use App\Services\AreaContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProgramReconciliationLog extends Model
 {
+    use BelongsToArea;
+
     public const STATUS_MATCHED = 'MATCHED';
 
     public const STATUS_DOC_INCOMPLETE = 'DOC_INCOMPLETE';
@@ -36,11 +41,28 @@ class ProgramReconciliationLog extends Model
     }
 
     /**
+     * A log belongs to the area of the Data Program / Form Program row it describes,
+     * even when created outside a request (e.g. the AI analysis command).
+     */
+    protected function areaForNewRecord(): Area
+    {
+        $area = $this->data_program_id
+            ? DataProgram::withoutGlobalScope('area')->whereKey($this->data_program_id)->value('area')
+            : null;
+
+        $area ??= $this->program_submission_id
+            ? ProgramSubmission::withoutGlobalScope('area')->withTrashed()->whereKey($this->program_submission_id)->value('area')
+            : null;
+
+        return Area::fromInput($area) ?? app(AreaContext::class)->resolve();
+    }
+
+    /**
      * Data Program (56 kolom master spreadsheet) relation.
      */
     public function dataProgram(): BelongsTo
     {
-        return $this->belongsTo(DataProgram::class, 'data_program_id');
+        return $this->belongsTo(DataProgram::class, 'data_program_id')->withoutGlobalScope('area');
     }
 
     /**
@@ -48,6 +70,6 @@ class ProgramReconciliationLog extends Model
      */
     public function programSubmission(): BelongsTo
     {
-        return $this->belongsTo(ProgramSubmission::class, 'program_submission_id');
+        return $this->belongsTo(ProgramSubmission::class, 'program_submission_id')->withoutGlobalScope('area');
     }
 }

@@ -181,6 +181,15 @@
               </div>
             </div>
 
+            <!-- Draft yang masuk ke area lain karena tokonya milik area itu di Master Dealer -->
+            <p
+              v-for="(count, areaLabel) in (result.moved_to_area || {})"
+              :key="areaLabel"
+              class="text-xs text-gray-600"
+            >
+              {{ count }} draft masuk ke tab <strong class="text-gray-900">{{ areaLabel }}</strong> karena tokonya terdaftar di area itu pada Master Dealer.
+            </p>
+
             <!-- Error Details Table if any -->
             <div v-if="result.errors && result.errors.length > 0">
               <div class="text-xs font-semibold text-rose-700 mb-2 flex items-center gap-1.5">

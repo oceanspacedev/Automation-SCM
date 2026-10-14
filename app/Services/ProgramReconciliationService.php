@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Area;
 use App\Models\DataProgram;
+use App\Models\Dealer;
 use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
 use Illuminate\Support\Collection;
@@ -121,8 +123,9 @@ class ProgramReconciliationService
      */
     public function isBtMatch(?string $idReal, ?string $kodeBt): ?bool
     {
-        $cleanReal = strtoupper(trim(preg_replace('/[^A-Za-z0-9]/', '', (string) $idReal)));
-        $cleanBt = strtoupper(trim(preg_replace('/[^A-Za-z0-9]/', '', (string) $kodeBt)));
+        // "BTO…" (huruf O) dan "BT0…" (angka nol) dianggap kode BT yang sama
+        $cleanReal = (string) Dealer::normalizeKodeBt(preg_replace('/[^A-Za-z0-9]/', '', (string) $idReal));
+        $cleanBt = (string) Dealer::normalizeKodeBt(preg_replace('/[^A-Za-z0-9]/', '', (string) $kodeBt));
 
         if (empty($cleanReal) || empty($cleanBt) || $cleanReal === '-' || $cleanBt === '-') {
             return null;
@@ -163,10 +166,25 @@ class ProgramReconciliationService
     }
 
     /**
-     * Determine if a ProgramSubmission is PKP by checking its PPN or matching DataProgram.
+     * PKP status of the submitting store from its Jenis NPWP in Master Dealer (null when the store or its type is unknown).
+     */
+    public function masterPkpStatus(ProgramSubmission $submission): ?bool
+    {
+        return app(AreaContext::class)
+            ->run($submission->areaEnum(), fn () => Dealer::findByIdReal($submission->id_real, $submission->dealer_name))
+            ?->isPkp();
+    }
+
+    /**
+     * Determine if a ProgramSubmission is PKP: Jenis NPWP in Master Dealer first, then its PPN or matching DataProgram.
      */
     public function isPkpFromSubmission(ProgramSubmission $submission): bool
     {
+        $masterPkp = $this->masterPkpStatus($submission);
+        if ($masterPkp !== null) {
+            return $masterPkp;
+        }
+
         if ((float) ($submission->ppn ?? 0) > 0) {
             return true;
         }
@@ -175,11 +193,11 @@ class ProgramReconciliationService
         $dp = null;
 
         if (! empty($idReal) && $idReal !== '-') {
-            $dp = DataProgram::where('kode_bt', $idReal)->first();
+            $dp = DataProgram::where('area', $submission->areaEnum()->value)->where('kode_bt', $idReal)->first();
         }
 
         if (! $dp && ! empty($submission->dealer_name)) {
-            $dp = DataProgram::where('dealer_name', 'like', "%{$submission->dealer_name}%")->first();
+            $dp = DataProgram::where('area', $submission->areaEnum()->value)->where('dealer_name', 'like', "%{$submission->dealer_name}%")->first();
         }
 
         if ($dp) {
@@ -198,6 +216,11 @@ class ProgramReconciliationService
      */
     public function evaluateMatchScore(DataProgram $dataProgram, ProgramSubmission $sub): ?int
     {
+        // 0. Data Program & Form Program dari area berbeda (Jabar/Jateng) tidak boleh saling dicocokkan
+        if ($dataProgram->areaEnum() !== $sub->areaEnum()) {
+            return null;
+        }
+
         // 1. Strict Region Check: Region MUST match. If different, immediately disqualify!
         if (! $this->isRegionMatch($sub->region, $dataProgram->region, $dataProgram->big_region)) {
             return null;
@@ -383,7 +406,7 @@ class ProgramReconciliationService
         $candidates = $preloadedSubmissions;
 
         if ($candidates === null) {
-            $query = ProgramSubmission::query();
+            $query = ProgramSubmission::query()->where('area', $dataProgram->areaEnum()->value);
             $tokens = array_filter(explode(' ', $dpDealerNorm), fn ($t) => strlen($t) >= 3);
             $kodeBt = trim((string) ($dataProgram->kode_bt ?? ''));
 
@@ -855,7 +878,7 @@ class ProgramReconciliationService
                     ];
 
                     $rowIndex = (int) str_replace('row_', '', (string) $dp->row_hash);
-                    $rowsToPush[] = [
+                    $rowsToPush[$dp->areaEnum()->value][] = [
                         'row_index' => $rowIndex > 0 ? $rowIndex : null,
                         'kode_bt' => $dp->kode_bt,
                         'dealer_name' => $dp->dealer_name,
@@ -908,10 +931,13 @@ class ProgramReconciliationService
 
         $sheetPushResult = null;
         if (! empty($rowsToPush) && ! empty($options['push_to_sheet'])) {
-            try {
-                $sheetPushResult = app(DataProgramSyncService::class)->pushUpdatesToSpreadsheet($rowsToPush);
-            } catch (\Throwable $e) {
-                Log::warning('Push to spreadsheet failed: '.$e->getMessage());
+            // Tiap area dikirim ke spreadsheet Data Program area masing-masing
+            foreach ($rowsToPush as $areaValue => $areaRows) {
+                try {
+                    $sheetPushResult = app(DataProgramSyncService::class)->pushUpdatesToSpreadsheet($areaRows, null, Area::from($areaValue));
+                } catch (\Throwable $e) {
+                    Log::warning('Push to spreadsheet failed: '.$e->getMessage());
+                }
             }
         }
 
@@ -946,8 +972,8 @@ class ProgramReconciliationService
 
         $idReal = trim((string) ($submission->id_real ?? ''));
 
-        // Find candidate DataProgram by Kode BT or Dealer Name
-        $query = DataProgram::query();
+        // Find candidate DataProgram by Kode BT or Dealer Name (hanya dalam area yang sama)
+        $query = DataProgram::query()->where('area', $submission->areaEnum()->value);
         $tokens = array_filter(explode(' ', $subDealerNorm), fn ($t) => strlen($t) >= 3);
 
         $query->where(function ($q) use ($idReal, $submission, $tokens) {
@@ -997,7 +1023,7 @@ class ProgramReconciliationService
             // Push updated row directly to Google Spreadsheet master if configured
             try {
                 $rowIndex = (int) str_replace('row_', '', (string) $bestDp->row_hash);
-                app(DataProgramSyncService::class)->pushUpdatesToSpreadsheet([[
+                app(DataProgramSyncService::class)->pushUpdatesToSpreadsheet(area: $bestDp->areaEnum(), rowsToUpdate: [[
                     'row_index' => $rowIndex > 0 ? $rowIndex : null,
                     'kode_bt' => $bestDp->kode_bt,
                     'dealer_name' => $bestDp->dealer_name,

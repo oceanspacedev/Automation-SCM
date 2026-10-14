@@ -2,7 +2,10 @@
 
 namespace App\Services;
 
+use App\Area;
+use App\Models\Dealer;
 use App\Models\Draft;
+use App\Models\Invoice;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\UploadedFile;
@@ -152,6 +155,9 @@ class DraftImportService
         $failedCount = 0;
         $warningCount = 0;
         $errors = [];
+        $importArea = app(AreaContext::class)->resolve()->value;
+        $movedToArea = [];
+        $cnNumbersInFile = [];
 
         foreach ($dataRows as $rowIndex => $rowData) {
             $excelRowNumber = $headerRowIndex + 1 + $rowIndex + 1; // 1-indexed Excel row
@@ -217,6 +223,20 @@ class DraftImportService
                 ];
             }
 
+            // No CN dipakai sebagai nomor invoice, jadi wajib diisi dan tidak boleh dobel
+            $cnNumber = trim((string) ($cleanData['cn_number'] ?? ''));
+            if ($cnError = $this->cnNumberError($cnNumber, $cnNumbersInFile)) {
+                $rowErrors[] = [
+                    'row' => $excelRowNumber,
+                    'field' => 'No CN',
+                    'value' => $cnNumber,
+                    'error' => $cnError,
+                ];
+            }
+            if ($cnNumber !== '') {
+                $cnNumbersInFile[$cnNumber] ??= $excelRowNumber;
+            }
+
             // Calculation validation & comparison
             $calcResult = $this->calculator->calculateFromValues(
                 (float) $cleanData['support_amount'],
@@ -268,6 +288,13 @@ class DraftImportService
                 'errors' => $rowErrors,
             ];
 
+            // Area mengikuti toko di Master Dealer (mis. diimport dari tab Jawa Barat tapi tokonya Jawa Tengah)
+            $dealer = $this->findMasterDealer($cleanData['kode_bt'] ?? null, $cleanData['dealer_code'] ?? null);
+            $cleanData['area'] = $dealer?->area ?? $importArea;
+            if ($cleanData['area'] !== $importArea) {
+                $movedToArea[$cleanData['area']] = ($movedToArea[$cleanData['area']] ?? 0) + 1;
+            }
+
             // Save to database
             try {
                 Draft::create($cleanData);
@@ -291,7 +318,52 @@ class DraftImportService
             'failed' => $failedCount,
             'warning' => $warningCount,
             'errors' => $errors,
+            // Jumlah draft yang masuk ke area lain karena tokonya milik area itu di Master Dealer
+            'moved_to_area' => collect($movedToArea)
+                ->mapWithKeys(fn (int $count, string $area) => [Area::from($area)->label() => $count])
+                ->all(),
         ];
+    }
+
+    /**
+     * Why a row's No CN can't become its invoice number (empty, or already used by another row, draft or invoice); null when it can.
+     *
+     * @param  array<string, int>  $cnNumbersInFile  No CN of earlier rows in the file => their Excel row number
+     */
+    protected function cnNumberError(string $cnNumber, array $cnNumbersInFile): ?string
+    {
+        if ($cnNumber === '') {
+            return 'No CN wajib diisi karena dipakai sebagai nomor invoice.';
+        }
+
+        if (isset($cnNumbersInFile[$cnNumber])) {
+            return "No CN {$cnNumber} sudah dipakai baris {$cnNumbersInFile[$cnNumber]} di file ini.";
+        }
+
+        if ($draft = Draft::withoutGlobalScope('area')->where('cn_number', $cnNumber)->first()) {
+            return "No CN {$cnNumber} sudah dipakai draft {$draft->dealer_name} ({$draft->areaEnum()->label()}).";
+        }
+
+        if (Invoice::where('invoice_number', $cnNumber)->exists()) {
+            return "No CN {$cnNumber} sudah dipakai invoice lain.";
+        }
+
+        return null;
+    }
+
+    /**
+     * The store of a draft row in Master Dealer: by kode BT first (unique), then by dealer code (ID Realme).
+     */
+    protected function findMasterDealer(?string $kodeBt, ?string $dealerCode): ?Dealer
+    {
+        $kodeBt = Dealer::normalizeKodeBt($kodeBt);
+        if ($kodeBt && ($dealer = Dealer::withoutGlobalScope('area')->where('kode_bt', $kodeBt)->first())) {
+            return $dealer;
+        }
+
+        $dealerCode = strtoupper(trim((string) $dealerCode));
+
+        return $dealerCode !== '' ? Dealer::withoutGlobalScope('area')->where('id_realme', $dealerCode)->first() : null;
     }
 
     /**

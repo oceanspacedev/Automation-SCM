@@ -3,7 +3,7 @@
     <!-- Top Bar -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-200">
       <div class="flex items-center space-x-2.5">
-        <router-link to="/drafts" class="text-xs font-medium text-gray-500 hover:text-gray-900 transition">
+        <router-link :to="`/drafts/${draft.area || 'jabar'}`" class="text-xs font-medium text-gray-500 hover:text-gray-900 transition">
           ← Kembali ke Draft
         </router-link>
         <span class="text-gray-300">|</span>

@@ -16,6 +16,11 @@ class DocumentAnalysisService
     public const CACHE_KEY_MODELS = 'ai_router_available_models';
 
     /**
+     * How long an AI document inspection result is reused for the same documents & form input.
+     */
+    public const INSPECTION_CACHE_MINUTES = 30;
+
+    /**
      * Get active AI Router config (from cache or config/services.php fallback).
      *
      * @return array{base_url: string, api_key: string, model: string}
@@ -24,9 +29,6 @@ class DocumentAnalysisService
     {
         $cached = Cache::get(self::CACHE_KEY_CONFIG);
         $model = (string) ($cached['model'] ?? config('services.openai_compatible.model', 'ag/gemini-3.7-flash-low'));
-        if ($model === 'ag/gemini-3-flash') {
-            $model = 'ag/gemini-3.7-flash-low';
-        }
 
         if (is_array($cached) && ! empty($cached['api_key'])) {
             return [
@@ -141,7 +143,7 @@ class DocumentAnalysisService
         $hasAgr = ! empty($submission->agreement_url) && str_starts_with(trim((string) $submission->agreement_url), 'http');
         $hasFaktur = ! empty($submission->tax_invoice_url) && str_starts_with(trim((string) $submission->tax_invoice_url), 'http');
 
-        $isPkp = ((float) ($submission->ppn ?? 0) > 0) || app(ProgramReconciliationService::class)->isPkpFromSubmission($submission);
+        $isPkp = app(ProgramReconciliationService::class)->isPkpFromSubmission($submission);
 
         $missing = [];
         if (! $hasCn) {
@@ -382,7 +384,7 @@ class DocumentAnalysisService
 
         if (is_string($fileOrUrl)) {
             $trimmed = trim($fileOrUrl);
-            $result['name'] = basename(parse_url($trimmed, PHP_URL_PATH) ?: '');
+            $result['name'] = $this->originalUploadName(basename(rawurldecode(parse_url($trimmed, PHP_URL_PATH) ?: '')));
 
             $isHttp = str_starts_with($trimmed, 'http://') || str_starts_with($trimmed, 'https://');
             if ($isHttp) {
@@ -426,6 +428,71 @@ class DocumentAnalysisService
     }
 
     /**
+     * Recover the uploaded filename from a stored copy named "CN_<timestamp>_<name>", where the name's spaces and
+     * brackets became underscores, e.g. "CN_1791951794_INVOICE-PROGRAM_DSA_JULI_2026-NEWCO_CELL__DLKS2217_.pdf"
+     * becomes "INVOICE-PROGRAM DSA JULI 2026-NEWCO CELL (DLKS2217).pdf".
+     */
+    protected function originalUploadName(string $storedName): string
+    {
+        if (! preg_match('/^(?:CN|AGR|FAKTUR)_\d{9,}_(.+)$/i', $storedName, $m)) {
+            return $storedName;
+        }
+
+        $name = preg_replace('/(?<=_)_([A-Za-z0-9]+)_(?=[_.]|$)/', '($1)', $m[1]);
+
+        return trim(preg_replace('/\s*_+\s*/', ' ', $name));
+    }
+
+    /**
+     * Split a document filename into its dash-separated parts, dropping "(...)" codes and
+     * "Telemarketing ..." parts, e.g. "INVOICE-PROGRAM DSA JULI 2026-NEWCO CELL (DLKS2217) - Telemarketing Big Karawang (1).pdf"
+     * becomes ["INVOICE", "PROGRAM DSA JULI 2026", "NEWCO CELL"].
+     *
+     * @return array<int, string>
+     */
+    protected function filenameSegments(string $filename): array
+    {
+        $parts = preg_split('/\s*-\s*/', pathinfo($filename, PATHINFO_FILENAME)) ?: [];
+
+        $parts = array_map(fn (string $part) => trim(preg_replace('/\s+/', ' ', preg_replace('/\([^)]*\)/', ' ', $part))), $parts);
+
+        return array_values(array_filter($parts, fn (string $part) => $part !== '' && ! preg_match('/^telemarketing\b/i', $part)));
+    }
+
+    /**
+     * Read program & dealer from the standard filename "INVOICE-PROGRAM <program>-<DEALER> (<ID>)".
+     *
+     * @return array{program: ?string, dealer: ?string}
+     */
+    protected function parseProgramFilename(string $filename): array
+    {
+        $segments = $this->filenameSegments($filename);
+
+        foreach ($segments as $index => $segment) {
+            if (! preg_match('/^PROGRAM\b/i', $segment)) {
+                continue;
+            }
+
+            // Program names may contain a dash, e.g. "PROGRAM ST Q2 REALME MEI-JUNI 2026"
+            $program = $segment;
+            $next = $index + 1;
+            while (isset($segments[$next]) && preg_match('/^(?:JANUARI|FEBRUARI|MARET|APRIL|MEI|JUNI|JULI|AGUSTUS|SEPTEMBER|OKTOBER|NOVEMBER|DESEMBER|\d{4})\b/i', $segments[$next])) {
+                $program .= '-'.$segments[$next];
+                $next++;
+            }
+
+            $dealer = $segments[$next] ?? null;
+
+            return [
+                'program' => strtoupper($program),
+                'dealer' => $dealer !== null && strlen($dealer) >= 3 && preg_match('/[a-zA-Z]{2,}/', $dealer) ? strtoupper($dealer) : null,
+            ];
+        }
+
+        return ['program' => null, 'dealer' => null];
+    }
+
+    /**
      * Extract dealer name from Credit Note text or filename.
      */
     public function extractDealerNameFromCn(array $cnInfo): ?string
@@ -452,6 +519,10 @@ class DocumentAnalysisService
             // Ignore generic URL routes or endpoints
             if (in_array(strtolower($filename), ['open', 'view', 'edit', 'preview', 'uc', 'download', 'file', 'document', 'index', 'show'], true)) {
                 return null;
+            }
+
+            if ($dealer = $this->parseProgramFilename($filename)['dealer']) {
+                return $dealer;
             }
 
             $nameWithoutExt = pathinfo($filename, PATHINFO_FILENAME);
@@ -585,9 +656,14 @@ class DocumentAnalysisService
                 return null;
             }
 
-            $nameWithoutExt = pathinfo($filename, PATHINFO_FILENAME);
+            if ($dealer = $this->parseProgramFilename($filename)['dealer']) {
+                return $dealer;
+            }
+
+            // Drop "(...)" codes & "Telemarketing ..." parts, e.g. "Agreement Realme CV Top - Telemarketing Big Karawang"
+            $nameWithoutExt = implode(' ', $this->filenameSegments($filename));
             $clean = preg_replace('/^(?:AGR|AGREEMENT|PERJANJIAN|SURAT[\s_\-]*PERJANJIAN)[\s_\-]+/i', '', $nameWithoutExt);
-            $clean = trim(str_replace(['_', '-'], ' ', $clean));
+            $clean = preg_replace('/^REALME\s+/i', '', trim(str_replace(['_', '-'], ' ', $clean)));
 
             // If filename contains program segment (e.g. "OCCEAN SPACE PROGRAM DSA..."), extract dealer part
             if (preg_match('/^(.*?)(?:\s+)(PROGRAM\b.*)$/i', $clean, $pm)) {
@@ -639,6 +715,10 @@ class DocumentAnalysisService
 
         // 2. Try regex on filename (e.g. "CN_PROGRAM_DSA_FERUARI.pdf", "AGR_PROGRAM_DSA_JULI_2026.pdf", etc.)
         if (! empty($filename)) {
+            if ($program = $this->parseProgramFilename($filename)['program']) {
+                return $program;
+            }
+
             $nameWithoutExt = pathinfo($filename, PATHINFO_FILENAME);
             if (preg_match('/(?:PROGRAM[_\-\s].*)/i', $nameWithoutExt, $m)) {
                 $clean = preg_replace('/^(?:CN|CREDIT[\s_\-]*NOTE|NOTA[\s_\-]*KREDIT|AGR|AGREEMENT|PERJANJIAN|INV|INVOICE)[_\-\s]+/i', '', $m[0]);
@@ -916,18 +996,10 @@ class DocumentAnalysisService
         $tglFaktur = null;
 
         $cnText = $infos['cn']['text'];
-        if (preg_match('/(?:dpp|dasar\s*pengenaan\s*pajak)\s*[:=]?\s*(?:rp\.?\s*)?([\d\.,]+)/i', $cnText, $m)) {
-            $dpp = (float) str_replace(['.', ','], ['', '.'], $m[1]);
-        }
-        if (preg_match('/(?:ppn|pajak\s*pertambahan\s*nilai)\s*[:=]?\s*(?:rp\.?\s*)?([\d\.,]+)/i', $cnText, $m)) {
-            $ppn = (float) str_replace(['.', ','], ['', '.'], $m[1]);
-        }
-        if (preg_match('/(?:pph|pajak\s*penghasilan)\s*[:=]?\s*(?:rp\.?\s*)?([\d\.,]+)/i', $cnText, $m)) {
-            $nilaiPph = (float) str_replace(['.', ','], ['', '.'], $m[1]);
-        }
-        if (preg_match('/(?:net\s*pay|total\s*bayar|diterima)\s*[:=]?\s*(?:rp\.?\s*)?([\d\.,]+)/i', $cnText, $m)) {
-            $netPay = (float) str_replace(['.', ','], ['', '.'], $m[1]);
-        }
+        $dpp = $this->amountAfterLabel($cnText, 'DPP|DASARPENGENAANPAJAK');
+        $ppn = $this->amountAfterLabel($cnText, 'PPN|PAJAKPERTAMBAHANNILAI') ?? 0.0;
+        $nilaiPph = $this->amountAfterLabel($cnText, 'PPH|PAJAKPENGHASILAN');
+        $netPay = $this->amountAfterLabel($cnText, 'NETPAY|TOTALBAYAR|DITERIMA');
 
         $fakturText = $infos['faktur']['text'].' '.$cnText;
         if (preg_match('/(010\.\d{3}[-\.]\d{2}[-\.]\d{8})/', $fakturText, $m)) {
@@ -962,8 +1034,8 @@ class DocumentAnalysisService
             $statusPurchase = 'BISA DI POTONG';
             $cekDokumen = 'LENGKAP';
             $keterangan = $isPkp
-                ? 'Semua dokumen (CN, Agreement, Faktur Pajak) lengkap dan terverifikasi.'
-                : 'Dokumen (CN dan Agreement) lengkap untuk dealer Non PKP dan siap diproses potong.';
+                ? 'Dokumen Credit Note dan Faktur Pajak lengkap dan terverifikasi.'
+                : 'Dokumen Credit Note lengkap untuk dealer Non PKP dan siap diproses potong.';
         }
 
         $extractedDealerName = $this->extractDealerNameFromCn($infos['cn']);
@@ -1108,7 +1180,7 @@ class DocumentAnalysisService
     /**
      * Comprehensive inspection of document files or URLs with AI vision & smart fallback.
      *
-     * @param  array  $formData  Form values (dealer_name, program_name, id_real, region, sales_name, whatsapp, is_pkp)
+     * @param  array  $formData  Form values (dealer_name, program_name, id_real, region, sales_name, whatsapp, is_pkp, is_pkp_master: PKP status from Master Dealer or null)
      * @param  array  $filesOrUrls  Slot mapping ('cn' => ..., 'agr' => ..., 'faktur' => ...)
      * @return array{
      *     success: bool,
@@ -1127,9 +1199,11 @@ class DocumentAnalysisService
      */
     public function inspectDocumentFiles(array $formData, array $filesOrUrls): array
     {
+        // Agreement diambil dari data master, jadi tidak ikut dianalisis (tidak dikirim ke AI & tidak dicek kelengkapan/kesesuaiannya)
+        unset($filesOrUrls['agr']);
+
         $config = $this->getConfig();
         $cnDataUri = $this->fileOrUrlToDataUri($filesOrUrls['cn'] ?? null);
-        $agrDataUri = $this->fileOrUrlToDataUri($filesOrUrls['agr'] ?? null);
         $taxDataUri = $this->fileOrUrlToDataUri($filesOrUrls['faktur'] ?? null);
 
         $hasDoc = function ($val): bool {
@@ -1156,7 +1230,6 @@ class DocumentAnalysisService
 
         $slotHasUrl = [
             'cn' => $hasDoc($filesOrUrls['cn'] ?? null),
-            'agr' => $hasDoc($filesOrUrls['agr'] ?? null),
             'faktur' => $hasDoc($filesOrUrls['faktur'] ?? null),
         ];
 
@@ -1173,9 +1246,8 @@ class DocumentAnalysisService
                             'dealer_name' => $formData['dealer_name'] ?? '-',
                             'program_name' => $formData['program_name'] ?? '-',
                             'sales_name' => $formData['sales_name'] ?? '-',
-                            'status_pajak' => ! empty($formData['is_pkp']) ? 'PKP' : 'NON PKP',
+                            'status_pajak' => ($formData['is_pkp_master'] ?? ! empty($formData['is_pkp'])) ? 'PKP' : 'NON PKP',
                             'has_cn_file' => $slotHasUrl['cn'],
-                            'has_agr_file' => $slotHasUrl['agr'],
                             'has_faktur_file' => $slotHasUrl['faktur'],
                         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
                     ],
@@ -1189,10 +1261,6 @@ class DocumentAnalysisService
                     $userParts[] = ['type' => 'text', 'text' => '--- LAMPIRAN DOKUMEN FAKTUR PAJAK ---'];
                     $userParts[] = ['type' => 'image_url', 'image_url' => ['url' => $taxDataUri]];
                 }
-                if ($agrDataUri) {
-                    $userParts[] = ['type' => 'text', 'text' => '--- LAMPIRAN DOKUMEN AGREEMENT (AGR) ---'];
-                    $userParts[] = ['type' => 'image_url', 'image_url' => ['url' => $agrDataUri]];
-                }
 
                 $payload = [
                     'model' => $config['model'] ?: 'ag/gemini-3.7-flash-low',
@@ -1204,16 +1272,41 @@ class DocumentAnalysisService
                     'temperature' => 0.1,
                 ];
 
-                $response = Http::withoutVerifying()
-                    ->withToken($config['api_key'])
-                    ->timeout(30)
-                    ->post("{$config['base_url']}/chat/completions", $payload);
+                // Hasil AI untuk dokumen & isian yang sama dipakai ulang (cek saat Kirim lalu simpan = 1x panggilan AI)
+                $cacheKey = 'doc_inspection:'.sha1(json_encode([$payload['model'], sha1($this->getSystemPrompt()), array_map(
+                    fn (array $part) => $part['type'] === 'image_url' ? sha1($part['image_url']['url']) : $part['text'],
+                    $userParts
+                )]));
+                $parsed = Cache::get($cacheKey);
 
-                if ($response->successful()) {
-                    $content = $response->json('choices.0.message.content');
-                    if (! empty($content)) {
-                        $parsed = $this->parseJsonResponse($content);
+                // Bila model utama error di AI router (mis. HTTP 404 dari penyedianya), coba model cadangan
+                foreach (is_array($parsed) ? [] : $this->inspectionModels($payload['model']) as $model) {
+                    $response = Http::withoutVerifying()
+                        ->withToken($config['api_key'])
+                        ->timeout(30)
+                        ->post("{$config['base_url']}/chat/completions", [...$payload, 'model' => $model]);
+
+                    if (! $response->successful()) {
+                        Log::warning("AI vision call with {$model} returned HTTP {$response->status()}.");
+
+                        continue;
                     }
+
+                    try {
+                        $parsed = $this->parseJsonResponse((string) $response->json('choices.0.message.content'));
+                    } catch (Exception $e) {
+                        Log::warning("AI vision call with {$model} returned an unreadable answer.");
+
+                        continue;
+                    }
+
+                    Cache::put($cacheKey, $parsed, now()->addMinutes(self::INSPECTION_CACHE_MINUTES));
+
+                    break;
+                }
+
+                if (! is_array($parsed)) {
+                    Log::warning('AI vision unavailable, using heuristic fallback.');
                 }
             } catch (\Throwable $e) {
                 Log::info('AI vision call failed, using heuristic fallback: '.$e->getMessage());
@@ -1234,7 +1327,8 @@ class DocumentAnalysisService
 
         $hasPpn = ! empty($ppn) && (float) $ppn > 0;
         $hasFaktur = (! empty($parsed['no_faktur']) && trim((string) $parsed['no_faktur']) !== '-') || $slotHasUrl['faktur'];
-        $isPkp = $hasPpn || $hasFaktur || (! empty($formData['is_pkp']));
+        // Jenis NPWP di Master Dealer menentukan wajib/tidaknya Faktur Pajak; tanpa data master, status PKP ditebak dari dokumen
+        $isPkp = $formData['is_pkp_master'] ?? ($hasPpn || $hasFaktur || (! empty($formData['is_pkp'])));
 
         $incentive = isset($parsed['incentive']) && is_numeric($parsed['incentive']) ? (float) $parsed['incentive'] : ($formData['incentive'] ?? null);
         if ($dpp !== null && ($incentive === null || abs($incentive - $dpp) < 0.01)) {
@@ -1258,7 +1352,7 @@ class DocumentAnalysisService
         // Process doc_validation slot mapping
         $docValidation = [];
         $rawDocVal = $parsed['doc_validation'] ?? [];
-        foreach (['cn', 'agr', 'faktur'] as $slot) {
+        foreach (['cn', 'faktur'] as $slot) {
             if (! $slotHasUrl[$slot]) {
                 $docValidation[$slot] = [
                     'status' => 'empty',
@@ -1308,9 +1402,6 @@ class DocumentAnalysisService
         if (! $slotHasUrl['cn']) {
             $missingDocs[] = 'CN';
         }
-        if (! $slotHasUrl['agr']) {
-            $missingDocs[] = 'AGR';
-        }
         if ($isPkp && ! $slotHasUrl['faktur']) {
             $missingDocs[] = 'FAKTUR';
         }
@@ -1335,8 +1426,8 @@ class DocumentAnalysisService
             $statusPurchase = 'BISA DI POTONG';
             $cekDokumen = 'LENGKAP';
             $keterangan = $isPkp
-                ? 'Semua dokumen (CN, Agreement, Faktur Pajak) lengkap dan terverifikasi.'
-                : 'Dokumen (CN dan Agreement) lengkap untuk dealer Non PKP dan siap diproses potong.';
+                ? 'Dokumen Credit Note dan Faktur Pajak lengkap dan terverifikasi.'
+                : 'Dokumen Credit Note lengkap untuk dealer Non PKP dan siap diproses potong.';
         }
 
         $extractedDealerName = null;
@@ -1417,84 +1508,6 @@ class DocumentAnalysisService
             }
         }
 
-        // Agreement Dealer & Program analysis
-        $extractedAgrDealer = null;
-        if (! empty($parsed['agr_dealer_name']) && trim((string) $parsed['agr_dealer_name']) !== '-' && trim((string) $parsed['agr_dealer_name']) !== '') {
-            $extractedAgrDealer = trim((string) $parsed['agr_dealer_name']);
-        } else {
-            $extractedAgrDealer = $this->extractDealerNameFromAgr($this->extractFileContentInfo($filesOrUrls['agr'] ?? null));
-        }
-
-        $extractedAgrProgram = null;
-        if (! empty($parsed['agr_program_name']) && trim((string) $parsed['agr_program_name']) !== '-' && trim((string) $parsed['agr_program_name']) !== '') {
-            $extractedAgrProgram = trim((string) $parsed['agr_program_name']);
-        } else {
-            $extractedAgrProgram = $this->extractProgramNameFromDoc($this->extractFileContentInfo($filesOrUrls['agr'] ?? null));
-        }
-
-        $agrDealerMismatch = false;
-        $agrProgramMismatch = false;
-
-        // Check Agreement Dealer Mismatch
-        if (! $hasSwapped && $slotHasUrl['agr'] && $extractedAgrDealer) {
-            $effectiveDealer = ($inputDealer !== '' && $inputDealer !== '-') ? $inputDealer : $extractedDealerName;
-            if ($effectiveDealer && $this->isDealerNameMatching($effectiveDealer, $extractedAgrDealer)) {
-                $agrDealerMismatch = false;
-            } elseif ($effectiveDealer && ! $this->isDealerNameMatching($effectiveDealer, $extractedAgrDealer)) {
-                $agrDealerMismatch = true;
-            }
-        } elseif (! empty($parsed['agr_dealer_mismatch']) && $extractedAgrDealer) {
-            $effectiveDealer = ($inputDealer !== '' && $inputDealer !== '-') ? $inputDealer : $extractedDealerName;
-            if ($effectiveDealer && $this->isDealerNameMatching($effectiveDealer, $extractedAgrDealer)) {
-                $agrDealerMismatch = false;
-            } else {
-                $agrDealerMismatch = true;
-            }
-        }
-
-        // Check Agreement Program Mismatch
-        if (! $hasSwapped && $slotHasUrl['agr'] && $extractedAgrProgram && $inputProgram !== '') {
-            if ($this->isProgramNameMatching($inputProgram, $extractedAgrProgram)) {
-                $agrProgramMismatch = false;
-            } else {
-                $agrProgramMismatch = true;
-            }
-        } elseif (! empty($parsed['agr_program_mismatch']) && $extractedAgrProgram && $inputProgram !== '') {
-            if ($this->isProgramNameMatching($inputProgram, $extractedAgrProgram)) {
-                $agrProgramMismatch = false;
-            } else {
-                $agrProgramMismatch = true;
-            }
-        }
-
-        if ($agrDealerMismatch && $agrProgramMismatch) {
-            $docValidation['agr'] = [
-                'status' => 'invalid',
-                'actual_type' => 'agr',
-                'message' => "Nama dealer ('{$extractedAgrDealer}') dan program ('{$extractedAgrProgram}') pada dokumen Agreement berbeda dengan data pengajuan.",
-            ];
-        } elseif ($agrDealerMismatch) {
-            $docValidation['agr'] = [
-                'status' => 'invalid',
-                'actual_type' => 'agr',
-                'message' => "Nama dealer pada Agreement ('{$extractedAgrDealer}') berbeda dengan nama dealer yang diajukan ('{$effectiveDealer}').",
-            ];
-        } elseif ($agrProgramMismatch) {
-            $docValidation['agr'] = [
-                'status' => 'invalid',
-                'actual_type' => 'agr',
-                'message' => "Nama program pada Agreement ('{$extractedAgrProgram}') berbeda dengan program yang dipilih ('{$inputProgram}').",
-            ];
-        } else {
-            if (isset($docValidation['agr']) && $docValidation['agr']['status'] === 'invalid') {
-                $agrMsg = strtolower($docValidation['agr']['message'] ?? '');
-                if (str_contains($agrMsg, 'dealer') || str_contains($agrMsg, 'program') || str_contains($agrMsg, 'berbeda')) {
-                    $docValidation['agr']['status'] = 'valid';
-                    $docValidation['agr']['message'] = 'Dokumen Agreement terverifikasi.';
-                }
-            }
-        }
-
         // Recompute invalid details from docValidation
         $hasInvalid = false;
         $invalidDetails = [];
@@ -1539,18 +1552,6 @@ class DocumentAnalysisService
             $statusPurchase = 'BELUM BISA POTONG';
             $cekDokumen = 'NAMA PROGRAM TIDAK SESUAI (CN)';
             $keterangan = "Nama program di formulir ('{$inputProgram}') berbeda dengan nama program pada dokumen Credit Note ('{$extractedCnProgram}'). Harap sesuaikan dokumen Credit Note atau program yang dipilih.";
-        } elseif ($agrDealerMismatch && $agrProgramMismatch) {
-            $statusPurchase = 'BELUM BISA POTONG';
-            $cekDokumen = 'DEALER & PROGRAM TIDAK SESUAI (AGR)';
-            $keterangan = 'Nama dealer dan program pada dokumen Agreement tidak sesuai dengan isian formulir.';
-        } elseif ($agrDealerMismatch) {
-            $statusPurchase = 'BELUM BISA POTONG';
-            $cekDokumen = 'NAMA DEALER TIDAK SESUAI (AGR)';
-            $keterangan = "Nama dealer di formulir ('{$effectiveDealer}') berbeda dengan nama dealer pada dokumen Agreement ('{$extractedAgrDealer}'). Harap sesuaikan dokumen Agreement Anda.";
-        } elseif ($agrProgramMismatch) {
-            $statusPurchase = 'BELUM BISA POTONG';
-            $cekDokumen = 'NAMA PROGRAM TIDAK SESUAI (AGR)';
-            $keterangan = "Nama program di formulir ('{$inputProgram}') berbeda dengan nama program pada dokumen Agreement ('{$extractedAgrProgram}'). Harap sesuaikan dokumen Agreement Anda.";
         } elseif ($hasInvalid) {
             $statusPurchase = 'BELUM BISA POTONG';
             $cekDokumen = 'DOKUMEN TIDAK SESUAI ('.implode(', ', $invalidDetails).')';
@@ -1563,25 +1564,26 @@ class DocumentAnalysisService
             $statusPurchase = 'BISA DI POTONG';
             $cekDokumen = 'LENGKAP';
             $keterangan = $isPkp
-                ? 'Semua dokumen (CN, Agreement, Faktur Pajak) lengkap dan terverifikasi.'
-                : 'Dokumen (CN dan Agreement) lengkap untuk dealer Non PKP dan siap diproses potong.';
+                ? 'Dokumen Credit Note dan Faktur Pajak lengkap dan terverifikasi.'
+                : 'Dokumen Credit Note lengkap untuk dealer Non PKP dan siap diproses potong.';
         }
 
-        $isClean = (! $hasSwapped && ! $hasInvalid && empty($missingDocs) && ! $dealerMismatch && ! $cnProgramMismatch && ! $agrDealerMismatch && ! $agrProgramMismatch);
+        $isClean = (! $hasSwapped && ! $hasInvalid && empty($missingDocs) && ! $dealerMismatch && ! $cnProgramMismatch);
 
         return [
             'success' => true,
             'is_clean' => $isClean,
             'has_swapped' => $hasSwapped,
             'has_invalid' => $hasInvalid,
-            'dealer_name' => $extractedDealerName ?: $extractedAgrDealer,
+            'dealer_name' => $extractedDealerName,
             'dealer_mismatch' => $dealerMismatch,
             'cn_program_name' => $extractedCnProgram,
             'cn_program_mismatch' => $cnProgramMismatch,
-            'agr_dealer_name' => $extractedAgrDealer,
-            'agr_dealer_mismatch' => $agrDealerMismatch,
-            'agr_program_name' => $extractedAgrProgram,
-            'agr_program_mismatch' => $agrProgramMismatch,
+            // Agreement tidak dianalisis (diambil dari data master)
+            'agr_dealer_name' => null,
+            'agr_dealer_mismatch' => false,
+            'agr_program_name' => null,
+            'agr_program_mismatch' => false,
             'swap_details' => $swapDetails,
             'cek_dokumen' => $cekDokumen,
             'status_potong_purchase' => $statusPurchase,
@@ -1620,14 +1622,15 @@ class DocumentAnalysisService
      */
     public function analyzeSubmission(ProgramSubmission $submission): array
     {
-        $isPkp = ((float) ($submission->ppn ?? 0) > 0) || app(ProgramReconciliationService::class)->isPkpFromSubmission($submission);
+        $reconciliation = app(ProgramReconciliationService::class);
 
         $res = $this->inspectDocumentFiles([
             'id_real' => $submission->id_real,
             'dealer_name' => $submission->dealer_name,
             'program_name' => $submission->program_name,
             'sales_name' => $submission->sales_name,
-            'is_pkp' => $isPkp,
+            'is_pkp' => $reconciliation->isPkpFromSubmission($submission),
+            'is_pkp_master' => $reconciliation->masterPkpStatus($submission),
             'dpp' => $submission->dpp,
             'ppn' => $submission->ppn,
             'dpp_lain' => $submission->dpp_lain,
@@ -1739,16 +1742,50 @@ class DocumentAnalysisService
     }
 
     /**
+     * Read the amount written after the first matching label in a Credit Note's text, e.g. "DPP : 450.450" or "PPN 12 % : -".
+     * PDFs exported from Excel often space out every character ("D P P : 4 5 0 . 4 5 0"), so whitespace is ignored.
+     * A tax rate after the label ("PPN 12 %") is skipped and "-" counts as zero; null when the label has no amount.
+     */
+    protected function amountAfterLabel(string $text, string $labels): ?float
+    {
+        $compact = strtoupper(preg_replace('/\s+/', '', $text));
+
+        if (! preg_match('/(?<![A-Z])(?:'.$labels.')(?:\d+(?:[.,]\d+)?%)?(?:[:=]|(?=RP))(?:RP\.?)?(-(?!\d)|\d[\d.,]*+)(?!%)/', $compact, $m)) {
+            return null;
+        }
+
+        if ($m[1] === '-') {
+            return 0.0;
+        }
+
+        // Pemisah terakhir yang diikuti 1-2 digit adalah desimal ("450.450,00"), sisanya pemisah ribuan ("450.450" / "45,045")
+        $amount = preg_replace('/[.,](\d{1,2})$/', '#$1', rtrim($m[1], '.,'));
+
+        return (float) str_replace(['.', ',', '#'], ['', '', '.'], $amount);
+    }
+
+    /**
+     * Models to try for document inspection, in order: the configured model, then the fallback model.
+     *
+     * @return array<int, string>
+     */
+    protected function inspectionModels(string $model): array
+    {
+        return array_values(array_unique(array_filter([$model, (string) config('services.openai_compatible.fallback_model')])));
+    }
+
+    /**
      * Build the system prompt with strict business rules.
      */
     protected function getSystemPrompt(): string
     {
         return <<<'PROMPT'
 Kamu adalah sistem AI Analisis Dokumen Finansial & Operasional SCM khusus Program REALME.
-Tugasmu adalah menganalisis kelengkapan tiga dokumen pendukung klaim program dealer:
+Tugasmu adalah menganalisis dokumen pendukung klaim program dealer:
 1. Credit Note (CN)
-2. Agreement (Agr)
-3. Faktur Pajak (Faktur)
+2. Faktur Pajak (Faktur)
+
+Dokumen Agreement TIDAK termasuk analisis (datanya diambil dari data master SCM). Jangan pernah menilai, mensyaratkan, atau menyebut Agreement sebagai dokumen yang kurang.
 
 Aturan Evaluasi:
 - Dokumen dianggap ADA jika URL dokumen tidak kosong dan diawali "http://" atau "https://".
@@ -1779,40 +1816,40 @@ Analisis Finansial & Pajak:
   - "valid": Dokumen ada diunggah, murni sesuai jenis slotnya, tidak digabung, dan data dealer/program cocok.
   - "swapped": Dokumen ada diunggah, tetapi isinya tertukar antar slot (contoh: slot Faktur diisi file CN atau Agr).
   - "invalid": Dokumen ada diunggah, tetapi isinya tidak sesuai:
-    * DOKUMEN DIGABUNG / MERGED: File memuat lebih dari satu jenis dokumen (contoh: di slot CN memuat lembar Agreement atau Faktur Pajak, atau di slot AGR memuat lembar CN). DOKUMEN TIDAK BOLEH DIGABUNG! Slot CN harus murni CN saja, Agreement murni Agreement saja, Faktur murni Faktur Pajak saja.
+    * DOKUMEN DIGABUNG / MERGED: File memuat lebih dari satu jenis dokumen (contoh: di slot CN memuat lembar Agreement atau Faktur Pajak). DOKUMEN TIDAK BOLEH DIGABUNG! Slot CN harus murni CN saja dan slot Faktur murni Faktur Pajak saja.
       Jika terdeteksi dokumen digabung:
       - Tandai slot tersebut sebagai "invalid" (actual_type: "merged").
-      - message: "Dokumen terdeteksi digabung dalam satu file. Dokumen tidak boleh digabung! Harap pisahkan dokumen dan unggah khusus [CN / Agreement / Faktur] saja."
+      - message: "Dokumen terdeteksi digabung dalam satu file. Dokumen tidak boleh digabung! Harap pisahkan dokumen dan unggah khusus [CN / Faktur] saja."
       - cek_dokumen: "DOKUMEN DIGABUNG ([SLOT])"
       - status_potong_purchase: "BELUM BISA POTONG"
-      - keterangan: "Dokumen tidak boleh digabung. Dokumen Credit Note, Agreement, dan Faktur Pajak wajib diunggah terpisah ke kolom masing-masing."
+      - keterangan: "Dokumen tidak boleh digabung. Dokumen Credit Note dan Faktur Pajak wajib diunggah terpisah ke kolom masing-masing."
     * Dokumen salah upload (foto selfie, nota sembarangan, dokumen dealer lain, dsb).
 
 Ketentuan Penentuan Output:
 1. Ketentuan Khusus Pajak (PKP vs NON PKP):
    - JIKA STATUS PAJAK ADALAH "PKP" (Badan atau Pribadi PKP, atau ada PPN):
-     * Wajib melampirkan ketiga dokumen: CN, Agreement (AGR), dan Faktur Pajak.
+     * Wajib melampirkan CN dan Faktur Pajak.
      * Jika Faktur Pajak tidak ada: "is_complete": false, "status_potong_purchase": "BELUM BISA POTONG", "cek_dokumen": "FAKTUR BELUM ADA".
-     * Jika ketiga dokumen lengkap & valid: "is_complete": true, "status_potong_purchase": "BISA DI POTONG", "cek_dokumen": "LENGKAP".
+     * Jika CN dan Faktur Pajak lengkap & valid: "is_complete": true, "status_potong_purchase": "BISA DI POTONG", "cek_dokumen": "LENGKAP".
 
    - JIKA STATUS PAJAK ADALAH "NON PKP" (Orang Pribadi, Non PKP, PPN = 0):
-     * TIDAK WAJIB FAKTUR PAJAK. Dokumen yang wajib hanya 2: CN dan Agreement (AGR).
-     * Meskipun CUMA DUA dokumen (CN dan AGR) yang diunggah dan valid, status TETAP "BISA DI POTONG", "is_complete": true, "cek_dokumen": "LENGKAP". Faktur Pajak TIDAK DIPERLUKAN untuk dealer Non-PKP dan JANGAN PERNAH dicatat sebagai kekurangan / "FAKTUR BELUM ADA".
-     * Hanya jika CN atau AGR belum ada / salah: "is_complete": false, "status_potong_purchase": "BELUM BISA POTONG", "cek_dokumen" mencatat dokumen yang kurang (misal "AGR BELUM ADA", tidak perlu menyebut Faktur).
+     * TIDAK WAJIB FAKTUR PAJAK. Dokumen yang wajib hanya CN.
+     * Jika CN diunggah dan valid, status TETAP "BISA DI POTONG", "is_complete": true, "cek_dokumen": "LENGKAP". Faktur Pajak TIDAK DIPERLUKAN untuk dealer Non-PKP dan JANGAN PERNAH dicatat sebagai kekurangan / "FAKTUR BELUM ADA".
+     * Hanya jika CN belum ada / salah: "is_complete": false, "status_potong_purchase": "BELUM BISA POTONG", "cek_dokumen" mencatat dokumen yang kurang (misal "CN BELUM ADA", tidak perlu menyebut Faktur).
 
 2. PENTING - JIKA ADA DOKUMEN YANG BELUM DIUNGGAH / KOSONG (URL kosong atau bernilai "-"):
    - Slot tersebut diberi status "empty" (BUKAN "invalid"!).
-   - Untuk dealer NON-PKP: Jika slot Faktur Pajak kosong, hal ini NORMAL dan DIBOLEHKAN. Jangan anggap dokumen kurang! Jika CN & AGR ada dan valid -> "status_potong_purchase": "BISA DI POTONG", "cek_dokumen": "LENGKAP".
-   - Untuk dealer PKP (atau jika CN/AGR kosong pada Non-PKP):
+   - Untuk dealer NON-PKP: Jika slot Faktur Pajak kosong, hal ini NORMAL dan DIBOLEHKAN. Jangan anggap dokumen kurang! Jika CN ada dan valid -> "status_potong_purchase": "BISA DI POTONG", "cek_dokumen": "LENGKAP".
+   - Untuk dealer PKP (atau jika CN kosong pada Non-PKP):
      * "is_complete": false
      * "status_potong_purchase": "BELUM BISA POTONG"
-     * "cek_dokumen": Wajib menyebutkan dokumen wajib yang belum ada (contoh: "FAKTUR BELUM ADA", "AGR BELUM ADA", "CN BELUM ADA", dsb).
+     * "cek_dokumen": Wajib menyebutkan dokumen wajib yang belum ada (contoh: "FAKTUR BELUM ADA", "CN BELUM ADA", dsb).
      * "keterangan": Penjelasan ringkas dokumen wajib mana yang belum diunggah.
 
 3. DOKUMEN TERTUKAR (swapped):
    (HANYA berlaku jika ADA file yang diunggah tetapi tertukar posisi antar slot):
    - "is_complete": false
-   - "cek_dokumen": Sebutkan dokumen yang tertukar, contoh: "DOKUMEN TERTUKAR (CN ↔ AGR)"
+   - "cek_dokumen": Sebutkan dokumen yang tertukar, contoh: "DOKUMEN TERTUKAR (CN ↔ FAKTUR)"
    - "status_potong_purchase": "BELUM BISA POTONG"
    - "keterangan": "File dokumen tertukar antar kolom. Harap perbaiki posisi upload dokumen."
 
@@ -1839,25 +1876,6 @@ Ketentuan Penentuan Output:
        - "cek_dokumen": "NAMA DEALER TIDAK SESUAI (CN)"
        - "keterangan": "Nama dealer di formulir ('[Nama Dealer Form]') berbeda dengan dokumen Credit Note ('[Nama Dealer Dokumen]'). Harap perbaiki atau isi '-' agar nama otomatis diambil dari dokumen."
        - Pada doc_validation.cn.message: "Nama dealer di dokumen ('[Nama Dealer Dokumen]') berbeda dengan Form ('[Nama Dealer Form]')."
-   - Validasi Dokumen Agreement (AGR) - NAMA DEALER & NAMA PROGRAM:
-     * Ekstrak nama dealer pada lembar Agreement ke field "agr_dealer_name".
-     * Ekstrak nama program pada lembar Agreement ke field "agr_program_name".
-     * Jika nama dealer pada form diisi "-", nama dealer dapat diambil dari Agreement jika CN tidak memuatnya.
-     * TOLERANSI TYPO: Jika nama dealer pada Agreement intinya sama dengan formulir/CN walau beda tipis / typo kecil (seperti "NEWCOO" vs "NEWCO"), WAJIB DIANGGAP SAMA ("agr_dealer_mismatch": false, status slot agr tetap "valid").
-     * HANYA jika Nama Dealer pada Agreement BENAR-BENAR BERBEDA (toko lain sama sekali):
-       - Set "agr_dealer_mismatch": true
-       - Tandai slot agr sebagai "invalid"
-       - "status_potong_purchase": "BELUM BISA POTONG"
-       - "cek_dokumen": "NAMA DEALER TIDAK SESUAI (AGR)"
-       - "keterangan": "Nama dealer di formulir ('[Nama Dealer Form]') berbeda dengan dokumen Agreement ('[Nama Dealer Agr]'). Harap sesuaikan dokumen Agreement."
-       - Pada doc_validation.agr.message: "Nama dealer pada dokumen Agreement ('[Nama Dealer Agr]') berbeda dengan formulir ('[Nama Dealer Form]')."
-     * Jika Nama Program pada Agreement BERBEDA dengan nama program yang diajukan di Form:
-       - Set "agr_program_mismatch": true
-       - Tandai slot agr sebagai "invalid"
-       - "status_potong_purchase": "BELUM BISA POTONG"
-       - "cek_dokumen": "NAMA PROGRAM TIDAK SESUAI (AGR)"
-       - "keterangan": "Nama program di formulir ('[Nama Program Form]') berbeda dengan dokumen Agreement ('[Nama Program Agr]'). Harap sesuaikan dokumen Agreement."
-       - Pada doc_validation.agr.message: "Nama program pada dokumen Agreement ('[Nama Program Agr]') berbeda dengan program yang diajukan ('[Nama Program Form]')."
    - Dokumen bukan dokumen resmi program atau file acak (foto selfie, nota sembarangan, dll):
      * "is_complete": false
      * "cek_dokumen": Sebutkan dokumen yang salah upload, contoh: "DOKUMEN TIDAK SESUAI (FAKTUR)"
@@ -1871,10 +1889,6 @@ Wajib mengembalikan JSON murni TANPA pembungkus markdown ```json ``` dengan key 
   "dealer_mismatch": boolean,
   "cn_program_name": string | null,
   "cn_program_mismatch": boolean,
-  "agr_dealer_name": string | null,
-  "agr_program_name": string | null,
-  "agr_dealer_mismatch": boolean,
-  "agr_program_mismatch": boolean,
   "is_complete": boolean,
   "cek_dokumen": string,
   "status_potong_purchase": "BISA DI POTONG" | "BELUM BISA POTONG",
@@ -1894,7 +1908,6 @@ Wajib mengembalikan JSON murni TANPA pembungkus markdown ```json ``` dengan key 
   "tgl_faktur": string | null,
   "doc_validation": {
     "cn": { "status": "valid" | "swapped" | "invalid" | "empty", "actual_type": "cn" | "agr" | "faktur" | "other" | "none", "message": string },
-    "agr": { "status": "valid" | "swapped" | "invalid" | "empty", "actual_type": "cn" | "agr" | "faktur" | "other" | "none", "message": string },
     "faktur": { "status": "valid" | "swapped" | "invalid" | "empty", "actual_type": "cn" | "agr" | "faktur" | "other" | "none", "message": string }
   }
 }

@@ -9,7 +9,7 @@
           <div class="h-2.5 bg-[#ea580c]"></div>
           <div class="p-6 sm:p-8 space-y-4">
             <h1 class="text-2xl sm:text-3xl font-normal text-gray-950 tracking-tight">
-              PROGRAM REALME JABAR
+              PROGRAM REALME {{ area.short }}
             </h1>
             <p class="text-sm text-gray-800 font-normal">
               Tanggapan Anda telah direkam.
@@ -38,7 +38,7 @@
           
           <div class="p-6 sm:p-8">
             <h1 class="text-2xl sm:text-3xl font-normal text-gray-950 tracking-tight">
-              PROGRAM REALME JABAR
+              PROGRAM REALME {{ area.short }}
             </h1>
           </div>
         </div>
@@ -56,26 +56,29 @@
           </div>
 
           <div class="space-y-2.5 pt-1">
+            <!-- Dua kolom di layar lebar (urut dari atas ke bawah), satu kolom di HP -->
+            <div class="sm:columns-2 sm:gap-x-4">
             <label
               v-for="prog in defaultProgramsList"
               :key="prog"
-              class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition group"
+              class="flex items-start gap-3 p-2 mb-1 rounded-lg hover:bg-gray-50 cursor-pointer transition group break-inside-avoid"
             >
               <input
                 type="radio"
                 name="program_name_radio"
                 :value="prog"
                 v-model="form.program_name"
-                class="w-4 h-4 text-orange-600 focus:ring-orange-500 border-gray-300 cursor-pointer"
+                class="w-4 h-4 mt-0.5 shrink-0 text-orange-600 focus:ring-orange-500 border-gray-300 cursor-pointer"
                 @change="handleProgramChange(prog)"
               />
               <span
-                class="text-xs sm:text-sm text-gray-800 transition"
+                class="text-xs sm:text-sm text-gray-800 leading-snug transition"
                 :class="form.program_name === prog ? 'font-semibold text-gray-950' : 'font-normal'"
               >
                 {{ prog }}
               </span>
             </label>
+            </div>
 
             <!-- Option "Yang lain:" -->
             <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition group">
@@ -101,29 +104,6 @@
             </div>
           </div>
 
-          <!-- Alert jika nama program di CN berbeda -->
-          <div
-            v-if="aiAnalysis.cnProgramMismatch"
-            class="p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-900 space-y-1.5"
-          >
-            <div class="flex items-start gap-2">
-              <AlertCircleIcon class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              <div class="space-y-1 min-w-0 flex-1">
-                <p class="font-semibold text-amber-950">Nama Program Berbeda dengan Dokumen CN</p>
-                <div class="flex items-center justify-between gap-2 flex-wrap">
-                  <span>Dokumen CN: <strong>"{{ aiAnalysis.extractedCnProgramName }}"</strong> (dipilih: "{{ form.program_name }}")</span>
-                  <button
-                    type="button"
-                    @click="applyProgramFromCn"
-                    class="text-[11px] font-medium text-amber-800 hover:text-amber-950 underline cursor-pointer"
-                  >
-                    Gunakan "{{ aiAnalysis.extractedCnProgramName }}"
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div v-if="validationErrors.program_name" class="flex items-center gap-1.5 text-xs text-rose-600 pt-1">
             <AlertCircleIcon class="w-4 h-4 shrink-0" />
             <span>{{ validationErrors.program_name }}</span>
@@ -136,9 +116,17 @@
           :class="validationErrors.region ? 'border-rose-300 ring-1 ring-rose-100' : 'border-gray-200'"
         >
           <div class="space-y-1">
-            <label class="block text-sm sm:text-base font-medium text-gray-900">
-              REGION <span class="text-rose-500">*</span>
-            </label>
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <label class="block text-sm sm:text-base font-medium text-gray-900">
+                REGION <span class="text-rose-500">*</span>
+              </label>
+              <span
+                v-if="isAutoFilledRegion"
+                class="text-xs text-gray-500 flex items-center gap-1 font-normal"
+              >
+                <CheckIcon class="w-3.5 h-3.5 text-gray-400" /> Terisi otomatis dari Master Dealer
+              </span>
+            </div>
             <p class="text-xs text-gray-500">Pilih wilayah cabang operasional toko.</p>
           </div>
 
@@ -154,7 +142,7 @@
                 :value="reg"
                 v-model="form.region"
                 class="w-4 h-4 text-orange-600 focus:ring-orange-500 border-gray-300 cursor-pointer"
-                @change="validationErrors.region = ''"
+                @change="validationErrors.region = ''; isAutoFilledRegion = false"
               />
               <span
                 class="text-xs sm:text-sm text-gray-800 transition"
@@ -173,20 +161,157 @@
 
         <!-- CARD 3: ID REALME -->
         <div
-          class="bg-white rounded-xl shadow-xs border p-6 space-y-3 transition"
+          class="bg-white rounded-xl shadow-xs border p-6 space-y-3 transition relative"
           :class="validationErrors.id_real ? 'border-rose-300 ring-1 ring-rose-100' : 'border-gray-200'"
         >
-          <label class="block text-sm sm:text-base font-medium text-gray-900">
-            ID REALME <span class="text-rose-500">*</span>
-          </label>
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <label class="block text-sm sm:text-base font-medium text-gray-900">
+              ID REALME <span class="text-rose-500">*</span>
+            </label>
+            <div class="flex items-center gap-3">
+              <span v-if="isLookupLoading" class="inline-flex items-center gap-1.5 text-xs text-gray-500 font-normal">
+                <Loader2Icon class="w-3.5 h-3.5 animate-spin text-orange-500" /> Memeriksa...
+              </span>
+              <!-- Toggle Mode Input: Dropdown Pilihan vs Ketik Langsung -->
+              <button
+                type="button"
+                @click="isManualIdInputMode = !isManualIdInputMode"
+                class="text-xs text-gray-500 hover:text-gray-900 underline cursor-pointer"
+              >
+                {{ isManualIdInputMode ? 'Pilih dari Daftar' : 'Ketik Manual' }}
+              </button>
+            </div>
+          </div>
 
-          <div class="pt-1">
+          <p class="text-xs text-gray-500">
+            {{ isManualIdInputMode ? 'Ketik ID Realme toko secara manual di bawah ini.' : 'Pilih dari Master Dealer, cari pakai kode BT, ID Realme, atau nama toko.' }}
+          </p>
+
+          <!-- MODE 1: Searchable Dropdown -->
+          <div v-if="!isManualIdInputMode" class="pt-1 relative w-full sm:max-w-md" ref="dealerDropdownRef">
+            <button
+              type="button"
+              @click="toggleDealerDropdown"
+              class="w-full h-11 px-3.5 border rounded-lg flex items-center justify-between gap-2 bg-white text-left text-sm transition cursor-pointer"
+              :class="validationErrors.id_real ? 'border-rose-500' : isDealerDropdownOpen ? 'border-orange-500 ring-2 ring-orange-100' : 'border-gray-300 hover:border-gray-400'"
+            >
+              <span v-if="form.id_real" class="flex items-baseline gap-2 min-w-0 flex-1">
+                <span class="text-gray-900 truncate">{{ form.dealer_name || form.id_real }}</span>
+                <span
+                  v-if="form.dealer_name && form.dealer_name.toLowerCase() !== form.id_real.toLowerCase()"
+                  class="text-xs text-gray-400 shrink-0"
+                >{{ form.id_real }}</span>
+              </span>
+              <span v-else class="text-gray-400 flex-1">Pilih ID Realme / toko</span>
+
+              <span class="flex items-center gap-1 shrink-0">
+                <span
+                  v-if="form.id_real"
+                  role="button"
+                  tabindex="0"
+                  title="Hapus pilihan"
+                  @click.stop="clearSelectedDealer"
+                  @keydown.enter.stop.prevent="clearSelectedDealer"
+                  class="p-1 rounded text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+                >
+                  <XIcon class="w-3.5 h-3.5" />
+                </span>
+                <ChevronDownIcon
+                  class="w-4 h-4 text-gray-400 transition-transform duration-200"
+                  :class="isDealerDropdownOpen && 'rotate-180'"
+                />
+              </span>
+            </button>
+
+            <!-- Dropdown Menu -->
+            <div
+              v-if="isDealerDropdownOpen"
+              class="absolute left-0 top-full mt-1.5 w-full bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden"
+            >
+              <!-- Search -->
+              <div class="relative border-b border-gray-100">
+                <SearchIcon class="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  v-model="dealerSearchQuery"
+                  @input="handleDealerSearchQueryInput"
+                  placeholder="Cari kode BT, ID Realme, atau nama toko"
+                  class="w-full h-11 pl-10 pr-9 text-sm bg-transparent focus:outline-none text-gray-900 placeholder:text-gray-400"
+                />
+                <button
+                  v-if="dealerSearchQuery"
+                  type="button"
+                  @click="clearDealerSearch"
+                  class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                >
+                  <XIcon class="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <!-- Region filter -->
+              <div class="flex items-center justify-between gap-2 px-3.5 py-2 text-xs text-gray-500">
+                <span class="truncate">
+                  {{ filterDealersByRegion && form.region ? form.region : 'Semua wilayah' }}
+                  · {{ dealerSuggestions.length }} toko
+                </span>
+                <button
+                  v-if="form.region"
+                  type="button"
+                  @click="toggleRegionFilter"
+                  class="shrink-0 text-gray-600 hover:text-gray-900 underline cursor-pointer"
+                >
+                  {{ filterDealersByRegion ? 'Semua wilayah' : `Hanya ${form.region}` }}
+                </button>
+              </div>
+
+              <!-- List of Dealers -->
+              <div class="overflow-y-auto max-h-64 pb-1">
+                <button
+                  v-for="item in dealerSuggestions"
+                  :key="item.id"
+                  type="button"
+                  @click="selectDealerSuggestion(item)"
+                  class="w-full px-3.5 py-2 flex items-center gap-3 text-left hover:bg-gray-50 transition cursor-pointer"
+                  :class="form.id_real === item.id_realme && 'bg-orange-50/60'"
+                >
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-sm text-gray-900 truncate">
+                      {{ (item.dealer_name && item.dealer_name !== '.' && item.dealer_name !== '-') ? item.dealer_name : item.id_realme }}
+                    </span>
+                    <!-- Kode BT · ID Realme (· region bila menampilkan semua wilayah) -->
+                    <span class="block text-xs text-gray-400 truncate">
+                      {{ [item.kode_bt, item.id_realme !== item.kode_bt ? item.id_realme : null, !(filterDealersByRegion && form.region) ? item.region : null].filter(Boolean).join(' · ') }}
+                    </span>
+                  </span>
+                  <CheckIcon v-if="form.id_real === item.id_realme" class="w-4 h-4 text-orange-600 shrink-0" />
+                </button>
+
+                <p v-if="dealerSuggestions.length === 0" class="px-3.5 py-6 text-center text-xs text-gray-500">
+                  Toko tidak ditemukan.
+                </p>
+              </div>
+
+              <!-- Manual entry -->
+              <button
+                type="button"
+                @click="switchToManualIdInput"
+                class="w-full px-3.5 py-2.5 border-t border-gray-100 text-left text-xs text-gray-500 hover:bg-gray-50 cursor-pointer"
+              >
+                Toko tidak ada di daftar? <span class="text-gray-900 underline">Ketik ID manual</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- MODE 2: Manual Direct Input -->
+          <div v-else class="pt-1 relative">
             <input
               type="text"
               v-model="form.id_real"
-              @blur="validateField('id_real')"
+              @input="handleIdRealInput"
+              @blur="handleIdRealBlur"
               placeholder="Jawaban Anda"
-              class="w-full text-xs sm:text-sm border-b pb-1.5 focus:outline-none transition bg-transparent placeholder:text-gray-400"
+              autocomplete="off"
+              class="w-full text-xs sm:text-sm border-b pb-1.5 focus:outline-none transition bg-transparent placeholder:text-gray-400 text-gray-900 font-normal"
               :class="validationErrors.id_real ? 'border-rose-500' : 'border-gray-300 focus:border-orange-500'"
             />
           </div>
@@ -202,15 +327,21 @@
           class="bg-white rounded-xl shadow-xs border p-6 space-y-3 transition"
           :class="validationErrors.dealer_name ? 'border-rose-300 ring-1 ring-rose-100' : 'border-gray-200'"
         >
-          <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
             <label class="block text-sm sm:text-base font-medium text-gray-900">
               NAMA DEALER <span class="text-rose-500">*</span>
             </label>
             <span
-              v-if="isAutoFilledDealer"
-              class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200"
+              v-if="isAutoFilledFromMaster"
+              class="text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1 font-medium border border-emerald-100"
             >
-              <CheckIcon class="w-3 h-3" /> Terisi Otomatis dari Dokumen
+              <CheckIcon class="w-3.5 h-3.5 text-emerald-600" /> Terisi otomatis dari Master
+            </span>
+            <span
+              v-else-if="isAutoFilledDealer"
+              class="text-xs text-gray-500 flex items-center gap-1 font-normal"
+            >
+              <CheckIcon class="w-3.5 h-3.5 text-gray-400" /> Terisi otomatis
             </span>
           </div>
 
@@ -218,46 +349,12 @@
             <input
               type="text"
               v-model="form.dealer_name"
-              @input="isAutoFilledDealer = false"
-              @blur="validateField('dealer_name'); triggerAiPreValidationDebounced()"
+              @input="isAutoFilledDealer = false; isAutoFilledFromMaster = false"
+              @blur="validateField('dealer_name')"
               placeholder="Jawaban Anda"
-              class="w-full text-xs sm:text-sm border-b pb-1.5 focus:outline-none transition bg-transparent placeholder:text-gray-400"
+              class="w-full text-xs sm:text-sm border-b pb-1.5 focus:outline-none transition bg-transparent placeholder:text-gray-400 text-gray-900 font-normal"
               :class="validationErrors.dealer_name ? 'border-rose-500' : 'border-gray-300 focus:border-orange-500'"
             />
-          </div>
-
-          <!-- Dealer mismatch warning in card -->
-          <!-- Alert jika ada ketidaksesuaian nama dealer dari AI -->
-          <div
-            v-if="aiAnalysis.dealerMismatch && form.dealer_name.trim() !== '-'"
-            class="p-3 rounded-lg border border-amber-200 bg-amber-50 text-xs text-amber-900 space-y-1.5"
-          >
-            <div class="flex items-start gap-2">
-              <AlertCircleIcon class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-              <div class="space-y-1 min-w-0 flex-1">
-                <p class="font-semibold text-amber-950">Nama Dealer Berbeda dengan Dokumen CN</p>
-                <div class="flex items-center justify-between gap-2 flex-wrap">
-                  <span>Dokumen CN: <strong>"{{ aiAnalysis.extractedDealerName }}"</strong> (formulir: "{{ form.dealer_name }}")</span>
-                  <div class="flex items-center gap-2">
-                    <button
-                      type="button"
-                      @click="applyDealerFromCn"
-                      class="text-[11px] font-medium text-amber-800 hover:text-amber-950 underline cursor-pointer"
-                    >
-                      Gunakan nama ini
-                    </button>
-                    <span class="text-amber-400">&bull;</span>
-                    <button
-                      type="button"
-                      @click="form.dealer_name = '-'; isAutoFilledDealer = true; aiAnalysis.dealerMismatch = false"
-                      class="text-[11px] text-amber-700 underline hover:text-amber-950 cursor-pointer"
-                    >
-                      Set '-' agar otomatis
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
 
           <div v-if="validationErrors.dealer_name" class="flex items-center gap-1.5 text-xs text-rose-600 pt-1">
@@ -438,100 +535,16 @@
             </button>
           </div>
 
-          <!-- Loading verification indicator -->
-          <div v-if="isScanningDoc.credit_note" class="pt-1 flex items-center gap-2 text-xs text-gray-500">
-            <RefreshCwIcon class="w-3.5 h-3.5 animate-spin text-gray-400 shrink-0" />
-            <span>Memverifikasi dokumen Credit Note...</span>
-          </div>
-
-          <!-- Hasil Analisis Pas Di-Upload (Invalid / Merged / Swapped) -->
-          <div v-else-if="aiAnalysis.docValidation?.cn && aiAnalysis.docValidation.cn.status !== 'valid' && !aiAnalysis.dealerMismatch && !aiAnalysis.cnProgramMismatch" class="pt-1">
-            <div class="p-3 rounded-lg border border-red-200 bg-red-50 text-xs text-red-900 flex items-start gap-2.5">
-              <AlertCircleIcon class="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-              <div class="space-y-0.5 min-w-0">
-                <p class="font-semibold text-red-950">
-                  {{
-                    aiAnalysis.docValidation.cn.actual_type === 'merged'
-                      ? 'Hasil Analisis: Dokumen Tidak Boleh Digabung!'
-                      : (aiAnalysis.docValidation.cn.status === 'swapped'
-                          ? 'Hasil Analisis: Dokumen Tertukar!'
-                          : 'Hasil Analisis: Dokumen Tidak Sesuai')
-                  }}
-                </p>
-                <p class="leading-relaxed">
-                  {{
-                    aiAnalysis.docValidation.cn.status === 'swapped'
-                      ? 'File yang diunggah terdeteksi sebagai Dokumen Agreement, bukan Credit Note. Mohon unggah file Credit Note yang benar.'
-                      : (aiAnalysis.docValidation.cn.message || 'File tidak sesuai / bukan Credit Note.')
-                  }}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Hasil Analisis Khusus Ketidaksesuaian Data CN (Nama Dealer / Nama Program) -->
-          <div
-            v-else-if="(aiAnalysis.dealerMismatch && form.dealer_name.trim() !== '-') || aiAnalysis.cnProgramMismatch"
-            class="pt-1"
-          >
-            <div class="p-3.5 rounded-lg border border-red-200 bg-red-50 text-xs text-red-900 space-y-2.5">
-              <div class="flex items-start gap-2">
-                <AlertCircleIcon class="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                <div class="min-w-0 flex-1">
-                  <p class="font-semibold text-red-950">
-                    {{
-                      aiAnalysis.dealerMismatch && aiAnalysis.cnProgramMismatch
-                        ? 'Hasil Analisis: Nama Dealer & Program di CN Tidak Sesuai'
-                        : (aiAnalysis.dealerMismatch ? 'Hasil Analisis: Nama Dealer di CN Tidak Sesuai' : 'Hasil Analisis: Nama Program di CN Tidak Sesuai')
-                    }}
-                  </p>
-                  <p class="text-[11px] text-red-700/80">
-                    Sistem mendeteksi perbedaan antara isian formulir dengan isi dokumen Credit Note yang diunggah:
-                  </p>
-                </div>
-              </div>
-
-              <!-- Tabel Perbandingan Data CN -->
-              <div class="overflow-x-auto rounded-md border border-red-200/80 bg-white/70">
-                <table class="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr class="border-b border-red-200 bg-red-100/40 text-[11px] font-semibold text-red-950">
-                      <th class="py-1.5 px-3 w-28">Data</th>
-                      <th class="py-1.5 px-3">Isian Formulir</th>
-                      <th class="py-1.5 px-3">Tertera di Dokumen CN</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-red-100">
-                    <!-- Baris Dealer -->
-                    <tr v-if="aiAnalysis.dealerMismatch && form.dealer_name.trim() !== '-'">
-                      <td class="py-2 px-3 font-semibold text-red-950 whitespace-nowrap">Dealer :</td>
-                      <td class="py-2 px-3 text-red-800">{{ form.dealer_name }}</td>
-                      <td class="py-2 px-3 font-semibold text-red-950">{{ aiAnalysis.extractedDealerName }}</td>
-                    </tr>
-
-                    <!-- Baris Program -->
-                    <tr v-if="aiAnalysis.cnProgramMismatch">
-                      <td class="py-2 px-3 font-semibold text-red-950 whitespace-nowrap">Program :</td>
-                      <td class="py-2 px-3 text-red-800">{{ form.program_name }}</td>
-                      <td class="py-2 px-3 font-semibold text-red-950">{{ aiAnalysis.extractedCnProgramName }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <p class="text-[11px] text-red-700/80">
-                Harap sesuaikan formulir atau unggah dokumen Credit Note yang sesuai.
-              </p>
-            </div>
-          </div>
-
-          <!-- Hasil Analisis Pas Di-Upload (Valid) -->
-          <div v-else-if="aiAnalysis.docValidation?.cn && aiAnalysis.docValidation.cn.status === 'valid' && !aiAnalysis.dealerMismatch && !aiAnalysis.cnProgramMismatch && filePreviews.credit_note" class="pt-1">
-            <div class="p-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-xs text-emerald-800 flex items-center gap-2">
-              <CheckCircle2Icon class="w-4 h-4 text-emerald-600 shrink-0" />
-              <span class="font-medium">Hasil Analisis: Dokumen Credit Note Terverifikasi (Valid)</span>
-            </div>
-          </div>
+          <!-- Status pemeriksaan dokumen (detail ada di Hasil Pemeriksaan di atas tombol Kirim) -->
+          <p v-if="docStatus('cn') === 'issue'" class="flex items-center gap-1.5 text-xs text-rose-600">
+            <AlertCircleIcon class="w-3.5 h-3.5 shrink-0" />
+            <span>Perlu diperbaiki ·</span>
+            <a href="#hasil-pemeriksaan" @click.prevent="scrollToAnalysis" class="underline hover:text-rose-800">lihat hasil pemeriksaan</a>
+          </p>
+          <p v-else-if="docStatus('cn') === 'ok'" class="flex items-center gap-1.5 text-xs text-emerald-700">
+            <CheckCircle2Icon class="w-3.5 h-3.5 shrink-0" />
+            <span>Sesuai</span>
+          </p>
 
           <div v-if="validationErrors.credit_note" class="flex items-center gap-1.5 text-xs text-rose-600 pt-1">
             <AlertCircleIcon class="w-4 h-4 shrink-0" />
@@ -606,101 +619,6 @@
             </button>
           </div>
 
-          <!-- Loading verification indicator -->
-          <div v-if="isScanningDoc.agreement" class="pt-1 flex items-center gap-2 text-xs text-gray-500">
-            <RefreshCwIcon class="w-3.5 h-3.5 animate-spin text-gray-400 shrink-0" />
-            <span>Memverifikasi dokumen Agreement...</span>
-          </div>
-
-          <!-- Hasil Analisis Pas Di-Upload (Invalid / Merged / Swapped) -->
-          <div v-else-if="aiAnalysis.docValidation?.agr && aiAnalysis.docValidation.agr.status !== 'valid' && !aiAnalysis.agrDealerMismatch && !aiAnalysis.agrProgramMismatch" class="pt-1">
-            <div class="p-3 rounded-lg border border-red-200 bg-red-50 text-xs text-red-900 flex items-start gap-2.5">
-              <AlertCircleIcon class="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-              <div class="space-y-0.5 min-w-0">
-                <p class="font-semibold text-red-950">
-                  {{
-                    aiAnalysis.docValidation.agr.actual_type === 'merged'
-                      ? 'Hasil Analisis: Dokumen Tidak Boleh Digabung!'
-                      : (aiAnalysis.docValidation.agr.status === 'swapped'
-                          ? 'Hasil Analisis: Dokumen Tertukar!'
-                          : 'Hasil Analisis: Dokumen Tidak Sesuai')
-                  }}
-                </p>
-                <p class="leading-relaxed">
-                  {{
-                    aiAnalysis.docValidation.agr.status === 'swapped'
-                      ? 'File yang diunggah terdeteksi sebagai Dokumen Credit Note, bukan Agreement. Mohon unggah file Agreement yang benar.'
-                      : (aiAnalysis.docValidation.agr.message || 'File tidak sesuai / bukan Agreement.')
-                  }}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Hasil Analisis Khusus Ketidaksesuaian Data AGR (Nama Dealer / Nama Program) -->
-          <div
-            v-else-if="(aiAnalysis.agrDealerMismatch && form.dealer_name.trim() !== '-') || aiAnalysis.agrProgramMismatch"
-            class="pt-1"
-          >
-            <div class="p-3.5 rounded-lg border border-red-200 bg-red-50 text-xs text-red-900 space-y-2.5">
-              <div class="flex items-start gap-2">
-                <AlertCircleIcon class="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                <div class="min-w-0 flex-1">
-                  <p class="font-semibold text-red-950">
-                    {{
-                      aiAnalysis.agrDealerMismatch && aiAnalysis.agrProgramMismatch
-                        ? 'Hasil Analisis: Nama Dealer & Program di Agreement Tidak Sesuai'
-                        : (aiAnalysis.agrDealerMismatch ? 'Hasil Analisis: Nama Dealer di Agreement Tidak Sesuai' : 'Hasil Analisis: Nama Program di Agreement Tidak Sesuai')
-                    }}
-                  </p>
-                  <p class="text-[11px] text-red-700/80">
-                    Sistem mendeteksi perbedaan antara isian formulir dengan isi dokumen Agreement yang diunggah:
-                  </p>
-                </div>
-              </div>
-
-              <!-- Tabel Perbandingan Data AGR -->
-              <div class="overflow-x-auto rounded-md border border-red-200/80 bg-white/70">
-                <table class="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr class="border-b border-red-200 bg-red-100/40 text-[11px] font-semibold text-red-950">
-                      <th class="py-1.5 px-3 w-28">Data</th>
-                      <th class="py-1.5 px-3">Isian Formulir</th>
-                      <th class="py-1.5 px-3">Tertera di Dokumen AGR</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-red-100">
-                    <!-- Baris Dealer -->
-                    <tr v-if="aiAnalysis.agrDealerMismatch && form.dealer_name.trim() !== '-'">
-                      <td class="py-2 px-3 font-semibold text-red-950 whitespace-nowrap">Dealer :</td>
-                      <td class="py-2 px-3 text-red-800">{{ form.dealer_name }}</td>
-                      <td class="py-2 px-3 font-semibold text-red-950">{{ aiAnalysis.extractedAgrDealerName }}</td>
-                    </tr>
-
-                    <!-- Baris Program -->
-                    <tr v-if="aiAnalysis.agrProgramMismatch">
-                      <td class="py-2 px-3 font-semibold text-red-950 whitespace-nowrap">Program :</td>
-                      <td class="py-2 px-3 text-red-800">{{ form.program_name }}</td>
-                      <td class="py-2 px-3 font-semibold text-red-950">{{ aiAnalysis.extractedAgrProgramName }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-
-              <p class="text-[11px] text-red-700/80">
-                Harap sesuaikan formulir atau unggah dokumen Agreement yang sesuai.
-              </p>
-            </div>
-          </div>
-
-          <!-- Hasil Analisis Pas Di-Upload (Valid) -->
-          <div v-else-if="aiAnalysis.docValidation?.agr && aiAnalysis.docValidation.agr.status === 'valid' && !aiAnalysis.agrDealerMismatch && !aiAnalysis.agrProgramMismatch && filePreviews.agreement" class="pt-1">
-            <div class="p-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-xs text-emerald-800 flex items-center gap-2">
-              <CheckCircle2Icon class="w-4 h-4 text-emerald-600 shrink-0" />
-              <span class="font-medium">Hasil Analisis: Dokumen Agreement Terverifikasi (Valid)</span>
-            </div>
-          </div>
-
           <div v-if="validationErrors.agreement" class="flex items-center gap-1.5 text-xs text-rose-600 pt-1">
             <AlertCircleIcon class="w-4 h-4 shrink-0" />
             <span>{{ validationErrors.agreement }}</span>
@@ -713,10 +631,15 @@
         >
           <div class="space-y-2">
             <label class="block text-sm sm:text-base font-medium text-gray-900">
-              FAKTUR PAJAK
+              FAKTUR PAJAK <span v-if="dealerTaxStatus?.isPkp" class="text-rose-500">*</span>
             </label>
             <p class="text-xs text-gray-500">
-              Upload 1 file yang didukung: PDF, drawing, atau image. Maks 10 GB. <em>(Opsional untuk toko Non-PKP, wajib bagi PKP).</em>
+              Upload 1 file yang didukung: PDF, drawing, atau image. Maks 10 GB.
+              <em v-if="!dealerTaxStatus">(Opsional untuk toko Non-PKP, wajib bagi PKP).</em>
+            </p>
+            <p v-if="dealerTaxStatus" class="text-xs text-gray-600">
+              Jenis NPWP toko: <span class="font-medium text-gray-900">{{ dealerTaxStatus.npwpType }}</span>
+              · {{ dealerTaxStatus.isPkp ? 'PKP, wajib upload Faktur Pajak.' : 'Non-PKP, Faktur Pajak tidak wajib.' }}
             </p>
           </div>
 
@@ -773,36 +696,61 @@
             </button>
           </div>
 
-          <!-- Loading verification indicator -->
-          <div v-if="isScanningDoc.tax_invoice" class="pt-1 flex items-center gap-2 text-xs text-gray-500">
-            <RefreshCwIcon class="w-3.5 h-3.5 animate-spin text-gray-400 shrink-0" />
-            <span>Memverifikasi dokumen Faktur Pajak...</span>
-          </div>
-
-          <!-- Hasil Analisis Pas Di-Upload (Invalid / Merged) -->
-          <div v-else-if="aiAnalysis.docValidation?.faktur && filePreviews.tax_invoice" class="pt-1">
-            <div
-              v-if="aiAnalysis.docValidation.faktur.status === 'invalid'"
-              class="p-3 rounded-lg border border-red-200 bg-red-50 text-xs text-red-900 flex items-start gap-2.5"
-            >
-              <AlertCircleIcon class="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-              <div class="space-y-0.5 min-w-0">
-                <p class="font-semibold text-red-950">
-                  {{ aiAnalysis.docValidation.faktur.actual_type === 'merged' ? 'Hasil Analisis: Dokumen Tidak Boleh Digabung!' : 'Hasil Analisis: Dokumen Tidak Sesuai' }}
-                </p>
-                <p class="leading-relaxed">{{ aiAnalysis.docValidation.faktur.message || 'File tidak sesuai / bukan Faktur Pajak.' }}</p>
-              </div>
-            </div>
-            <div
-              v-else-if="aiAnalysis.docValidation.faktur.status === 'valid'"
-              class="p-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-xs text-emerald-800 flex items-center gap-2"
-            >
-              <CheckCircle2Icon class="w-4 h-4 text-emerald-600 shrink-0" />
-              <span class="font-medium">Hasil Analisis: Dokumen Faktur Pajak Terverifikasi (Valid)</span>
-            </div>
-          </div>
+          <!-- Status pemeriksaan dokumen (detail ada di Hasil Pemeriksaan di atas tombol Kirim) -->
+          <p v-if="docStatus('faktur') === 'issue'" class="flex items-center gap-1.5 text-xs text-rose-600">
+            <AlertCircleIcon class="w-3.5 h-3.5 shrink-0" />
+            <span>Perlu diperbaiki ·</span>
+            <a href="#hasil-pemeriksaan" @click.prevent="scrollToAnalysis" class="underline hover:text-rose-800">lihat hasil pemeriksaan</a>
+          </p>
+          <p v-else-if="docStatus('faktur') === 'ok'" class="flex items-center gap-1.5 text-xs text-emerald-700">
+            <CheckCircle2Icon class="w-3.5 h-3.5 shrink-0" />
+            <span>Sesuai</span>
+          </p>
         </div>
 
+
+        <!-- ================= HASIL PEMERIKSAAN DOKUMEN (muncul setelah klik Kirim) ================= -->
+        <div
+          v-if="analysisRows.length"
+          id="hasil-pemeriksaan"
+          class="bg-white rounded-xl shadow-xs border p-6 space-y-3 scroll-mt-6"
+          :class="hasAnalysisIssues ? 'border-rose-300' : 'border-gray-200'"
+        >
+          <div>
+            <h2 class="text-sm sm:text-base font-medium text-gray-900">Hasil Pemeriksaan Dokumen</h2>
+            <p class="text-xs mt-0.5" :class="hasAnalysisIssues ? 'text-rose-600' : 'text-gray-500'">
+              {{ hasAnalysisIssues ? `${analysisIssueCount} hal perlu diperbaiki sebelum formulir bisa dikirim.` : 'Semua dokumen sesuai dengan isian formulir.' }}
+            </p>
+          </div>
+
+          <ul class="divide-y divide-gray-100 border-t border-gray-100">
+            <li v-for="row in analysisRows" :key="row.key" class="py-3 flex items-start gap-3">
+              <AlertCircleIcon v-if="!row.ok" class="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <CheckCircle2Icon v-else class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+
+              <div class="min-w-0 flex-1">
+                <p class="text-sm text-gray-900">{{ row.label }}</p>
+
+                <dl v-if="!row.ok && row.isComparison" class="mt-1.5 grid grid-cols-[64px_1fr] gap-x-3 gap-y-1 text-xs">
+                  <dt class="text-gray-500">Formulir</dt>
+                  <dd class="text-gray-700 break-words">{{ row.formValue || '—' }}</dd>
+                  <dt class="text-gray-500">Dokumen</dt>
+                  <dd class="text-gray-900 font-medium break-words">{{ row.docValue || '—' }}</dd>
+                </dl>
+                <p v-else-if="!row.ok && row.message" class="mt-1 text-xs text-gray-600">{{ row.message }}</p>
+              </div>
+
+              <button
+                v-if="!row.ok && row.apply && row.docValue"
+                type="button"
+                @click="row.apply"
+                class="shrink-0 text-xs text-gray-700 hover:text-gray-950 underline cursor-pointer"
+              >
+                Pakai dari dokumen
+              </button>
+            </li>
+          </ul>
+        </div>
 
         <!-- ================= FORM ACTIONS ================= -->
         <div class="pt-2 flex items-center justify-between gap-4">
@@ -827,7 +775,7 @@
 
         <!-- Google Form bottom footer notes -->
         <div class="pt-6 text-center space-y-1 text-xs text-gray-500">
-          <p>Formulir Pengajuan Program REALME Jawa Barat</p>
+          <p>Formulir Pengajuan Program REALME {{ area.label }}</p>
           <p class="text-[11px] text-gray-400">Jangan pernah mengirimkan sandi melalui formulir ini.</p>
         </div>
       </form>
@@ -888,8 +836,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import axios from 'axios';
+import { useArea } from '@/composables/useArea';
 import {
   UploadCloud as UploadCloudIcon,
   FileText as FileTextIcon,
@@ -897,13 +846,15 @@ import {
   ChevronDown as ChevronDownIcon,
   Check as CheckIcon,
   X as XIcon,
+  Search as SearchIcon,
   AlertCircle as AlertCircleIcon,
   AlertTriangle as AlertTriangleIcon,
   CheckCircle2 as CheckCircle2Icon,
+  Loader2 as Loader2Icon,
 } from 'lucide-vue-next';
 
 // ================= FORM STATE =================
-const defaultProgramsList = [
+const defaultProgramsList = ref([
   'PROGRAM DSA FEBRUARI 2026',
   'PROGRAM DSA MARET 2026',
   'PROGRAM SO R14T MARET 2026',
@@ -915,16 +866,19 @@ const defaultProgramsList = [
   'PROGRAM PROMOTION C100X SERIES JUNI 2026',
   'PROGRAM DSA JULI 2026',
   'PROGRAM DSA AGUSTUS 2026',
-];
+]);
 
 const programRadioSelection = ref('');
 
-const regionOptions = ref([
+// Area form diambil dari URL (/form/jateng); /form-realme & /form-submission tetap Jawa Barat
+const { area } = useArea();
+
+const regionOptions = ref(area.value.value === 'jabar' ? [
   'BIG BANDUNG',
   'BIG KARAWANG',
   'BIG TASIK',
   'BIG CIREBON',
-]);
+] : []);
 
 const salesList = ref([]);
 const salesSearchQuery = ref('');
@@ -936,12 +890,24 @@ const form = reactive({
   program_custom: '',
   region: '',
   id_real: '',
+  kode_bt: '',
   dealer_name: '',
   sales_name: '',
   sales_custom: '',
   whatsapp: '',
   is_pkp: false,
 });
+
+// Jenis NPWP toko dari Master Dealer: menentukan wajib/tidaknya Faktur Pajak (null bila toko/jenisnya tidak dikenali)
+const dealerTaxStatus = ref(null);
+
+function applyMasterDealerTax(dealer) {
+  form.kode_bt = dealer?.kode_bt || '';
+  form.is_pkp = dealer?.is_pkp === true;
+  dealerTaxStatus.value = typeof dealer?.is_pkp === 'boolean'
+    ? { npwpType: dealer.npwp_type, isPkp: dealer.is_pkp }
+    : null;
+}
 
 const files = reactive({
   credit_note: null,
@@ -971,6 +937,20 @@ const validationErrors = reactive({
   agreement: '',
 });
 
+// Master Dealer Lookup State
+const dealerDropdownRef = ref(null);
+const isDealerDropdownOpen = ref(false);
+const isManualIdInputMode = ref(false);
+const dealerSearchQuery = ref('');
+const isLookupLoading = ref(false);
+const isAutoFilledFromMaster = ref(false);
+const isAutoFilledRegion = ref(false);
+const filterDealersByRegion = ref(true);
+const dealerSuggestions = ref([]);
+const showDealerSuggestions = ref(false);
+let lookupTimeout = null;
+let suggestionsTimeout = null;
+
 // AI Inspection State
 const isAutoFilledDealer = ref(false);
 
@@ -992,10 +972,6 @@ const aiAnalysis = reactive({
   dealerMismatch: false,
   extractedCnProgramName: '',
   cnProgramMismatch: false,
-  extractedAgrDealerName: '',
-  agrDealerMismatch: false,
-  extractedAgrProgramName: '',
-  agrProgramMismatch: false,
   errorMsg: '',
 });
 
@@ -1005,7 +981,6 @@ function applyDealerFromCn() {
     isAutoFilledDealer.value = true;
     aiAnalysis.dealerMismatch = false;
     validationErrors.dealer_name = '';
-    triggerAiPreValidationDebounced();
   }
 }
 
@@ -1013,25 +988,91 @@ function applyProgramFromCn() {
   if (aiAnalysis.extractedCnProgramName) {
     handleProgramChange(aiAnalysis.extractedCnProgramName);
     aiAnalysis.cnProgramMismatch = false;
-    triggerAiPreValidationDebounced();
   }
 }
 
-function applyDealerFromAgr() {
-  if (aiAnalysis.extractedAgrDealerName) {
-    form.dealer_name = aiAnalysis.extractedAgrDealerName;
-    isAutoFilledDealer.value = true;
-    aiAnalysis.agrDealerMismatch = false;
-    validationErrors.dealer_name = '';
-    triggerAiPreValidationDebounced();
+// ================= HASIL PEMERIKSAAN DOKUMEN =================
+const DOCUMENT_SLOTS = [
+  { docKey: 'cn', slot: 'credit_note', label: 'Credit Note' },
+  { docKey: 'faktur', slot: 'tax_invoice', label: 'Faktur Pajak' },
+];
+
+// Masalah pada file itu sendiri (tertukar, digabung, tidak valid). Ketidaksesuaian nama dealer/program punya baris sendiri.
+function documentProblem(docKey) {
+  const result = aiAnalysis.docValidation?.[docKey];
+  if (!result || result.status === 'valid') return '';
+  if (result.actual_type === 'merged') return 'Dokumen digabung dengan dokumen lain. Unggah terpisah di kolom masing-masing.';
+  if (result.status === 'swapped') {
+    if (docKey === 'cn') return 'Terdeteksi sebagai Agreement, bukan Credit Note.';
   }
+  const hasNameMismatch = docKey === 'cn' && (aiAnalysis.dealerMismatch || aiAnalysis.cnProgramMismatch);
+  return hasNameMismatch ? '' : (result.message || 'File tidak sesuai.');
 }
 
-function applyProgramFromAgr() {
-  if (aiAnalysis.extractedAgrProgramName) {
-    handleProgramChange(aiAnalysis.extractedAgrProgramName);
-    aiAnalysis.agrProgramMismatch = false;
-    triggerAiPreValidationDebounced();
+const analysisRows = computed(() => {
+  if (!aiAnalysis.hasScanned) return [];
+
+  const rows = [];
+  const isDealerFilled = !!form.dealer_name.trim() && form.dealer_name.trim() !== '-';
+  const compare = (key, doc, label, formValue, docValue, isMismatch, apply) => {
+    if (!docValue && !isMismatch) return;
+    rows.push({ key, doc, label, formValue, docValue, ok: !isMismatch, isComparison: true, apply });
+  };
+
+  if (isDealerFilled) {
+    compare('cn_dealer', 'cn', 'Nama dealer di Credit Note', form.dealer_name, aiAnalysis.extractedDealerName, aiAnalysis.dealerMismatch, applyDealerFromCn);
+  }
+  compare('cn_program', 'cn', 'Program di Credit Note', form.program_name, aiAnalysis.extractedCnProgramName, aiAnalysis.cnProgramMismatch, applyProgramFromCn);
+
+  for (const { docKey, slot, label } of DOCUMENT_SLOTS) {
+    if (!filePreviews[slot] || !aiAnalysis.docValidation?.[docKey]) continue;
+    const problem = documentProblem(docKey);
+    rows.push({ key: `file_${docKey}`, doc: docKey, label: `Jenis file ${label}`, ok: !problem, message: problem });
+  }
+
+  // Dokumen ditolak tanpa rincian di atas (mis. belum memenuhi syarat program)
+  const isBlocked = aiAnalysis.hasSwapped || aiAnalysis.hasMerged || aiAnalysis.hasInvalid || aiAnalysis.statusPurchase === 'BELUM BISA POTONG';
+  if (isBlocked && rows.every(row => row.ok)) {
+    rows.push({
+      key: 'eligibility',
+      doc: null,
+      label: 'Kelayakan dokumen',
+      ok: false,
+      message: aiAnalysis.keterangan || aiAnalysis.cekDokumen || 'Dokumen belum memenuhi syarat program.',
+    });
+  }
+
+  // Yang perlu diperbaiki tampil paling atas
+  return [...rows.filter(row => !row.ok), ...rows.filter(row => row.ok)];
+});
+
+const analysisIssueCount = computed(() => analysisRows.value.filter(row => !row.ok).length);
+const hasAnalysisIssues = computed(() => analysisIssueCount.value > 0);
+
+function docStatus(docKey) {
+  const slot = DOCUMENT_SLOTS.find(item => item.docKey === docKey)?.slot;
+  if (!aiAnalysis.hasScanned || !filePreviews[slot]) return null;
+  if (analysisRows.value.some(row => !row.ok && row.doc === docKey)) return 'issue';
+  return aiAnalysis.docValidation?.[docKey] ? 'ok' : null;
+}
+
+function scrollToAnalysis() {
+  nextTick(() => {
+    document.getElementById('hasil-pemeriksaan')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+// Hasil pemeriksaan lama untuk dokumen ini tidak berlaku lagi setelah file diganti/dihapus
+function clearDocumentAnalysis(docKey) {
+  if (!docKey) return;
+  if (aiAnalysis.docValidation?.[docKey]) {
+    delete aiAnalysis.docValidation[docKey];
+  }
+  if (docKey === 'cn') {
+    aiAnalysis.extractedDealerName = '';
+    aiAnalysis.extractedCnProgramName = '';
+    aiAnalysis.dealerMismatch = false;
+    aiAnalysis.cnProgramMismatch = false;
   }
 }
 
@@ -1067,20 +1108,6 @@ const filteredSalesList = computed(() => {
   return salesList.value.filter(s => s.toLowerCase().includes(q));
 });
 
-const hasUploadedAnyDocument = computed(() => {
-  return !!(files.credit_note || files.agreement || files.tax_invoice);
-});
-
-// Re-validate live when user changes dealer name or program selection
-watch(
-  () => [form.dealer_name, form.program_name],
-  () => {
-    if (hasUploadedAnyDocument.value) {
-      triggerAiPreValidationDebounced();
-    }
-  }
-);
-
 // ================= LIFECYCLE & INITIALIZATION =================
 onMounted(async () => {
   document.addEventListener('click', handleClickOutside);
@@ -1095,13 +1122,20 @@ function handleClickOutside(event) {
   if (salesDropdownRef.value && !salesDropdownRef.value.contains(event.target)) {
     isSalesDropdownOpen.value = false;
   }
+  if (dealerDropdownRef.value && !dealerDropdownRef.value.contains(event.target)) {
+    isDealerDropdownOpen.value = false;
+  }
 }
 
 async function fetchFormOptions() {
   try {
     const res = await axios.get('/api/program-submissions/form-options');
     if (res.data) {
-      if (res.data.regions?.length) {
+      // Program & region mengikuti Master Program / Master Region area form ini
+      if (Array.isArray(res.data.programs)) {
+        defaultProgramsList.value = res.data.programs;
+      }
+      if (Array.isArray(res.data.regions)) {
         regionOptions.value = res.data.regions;
       }
       if (res.data.sales?.length) {
@@ -1115,7 +1149,7 @@ async function fetchFormOptions() {
 
 // ================= HANDLERS =================
 function handleProgramChange(prog) {
-  if (defaultProgramsList.includes(prog)) {
+  if (defaultProgramsList.value.includes(prog)) {
     programRadioSelection.value = prog;
     form.program_name = prog;
     form.program_custom = '';
@@ -1148,6 +1182,169 @@ function applyCustomSales() {
   }
 }
 
+// ================= MASTER DEALER LOOKUP & DROPDOWN =================
+async function toggleDealerDropdown() {
+  isDealerDropdownOpen.value = !isDealerDropdownOpen.value;
+  if (isDealerDropdownOpen.value) {
+    dealerSearchQuery.value = '';
+    await fetchDealerOptions();
+  }
+}
+
+async function fetchDealerOptions(query = '') {
+  try {
+    const params = {
+      query: query || undefined,
+      region: (filterDealersByRegion.value && form.region) ? form.region : undefined,
+      limit: 60,
+    };
+    const res = await axios.get('/api/dealers/suggestions', { params });
+    if (res.data?.success && res.data.data) {
+      dealerSuggestions.value = res.data.data;
+    }
+  } catch (e) {
+    // Ignore error
+  }
+}
+
+function handleDealerSearchQueryInput() {
+  if (suggestionsTimeout) clearTimeout(suggestionsTimeout);
+  suggestionsTimeout = setTimeout(() => {
+    fetchDealerOptions(dealerSearchQuery.value.trim());
+  }, 200);
+}
+
+function clearDealerSearch() {
+  dealerSearchQuery.value = '';
+  fetchDealerOptions('');
+}
+
+function toggleRegionFilter() {
+  filterDealersByRegion.value = !filterDealersByRegion.value;
+  fetchDealerOptions(dealerSearchQuery.value.trim());
+}
+
+function switchToManualIdInput() {
+  isDealerDropdownOpen.value = false;
+  isManualIdInputMode.value = true;
+}
+
+function clearSelectedDealer() {
+  form.id_real = '';
+  form.dealer_name = '';
+  applyMasterDealerTax(null);
+  isAutoFilledFromMaster.value = false;
+  isAutoFilledDealer.value = false;
+  isAutoFilledRegion.value = false;
+  validationErrors.id_real = '';
+  validationErrors.dealer_name = '';
+}
+
+async function handleIdRealInput() {
+  validationErrors.id_real = '';
+  applyMasterDealerTax(null);
+  const query = form.id_real ? form.id_real.trim() : '';
+
+  if (suggestionsTimeout) clearTimeout(suggestionsTimeout);
+  if (lookupTimeout) clearTimeout(lookupTimeout);
+
+  if (query.length >= 2) {
+    suggestionsTimeout = setTimeout(async () => {
+      try {
+        const res = await axios.get('/api/dealers/suggestions', { params: { query } });
+        if (res.data?.success && res.data.data) {
+          dealerSuggestions.value = res.data.data;
+          showDealerSuggestions.value = res.data.data.length > 0;
+        }
+      } catch (e) {
+        dealerSuggestions.value = [];
+        showDealerSuggestions.value = false;
+      }
+    }, 200);
+  } else {
+    dealerSuggestions.value = [];
+    showDealerSuggestions.value = false;
+  }
+
+  // Debounced auto lookup if query length >= 4
+  if (query.length >= 4) {
+    lookupTimeout = setTimeout(() => {
+      lookupDealerByIdRealme(query);
+    }, 500);
+  }
+}
+
+async function lookupDealerByIdRealme(idReal) {
+  const targetId = idReal || form.id_real?.trim();
+  if (!targetId || targetId === '-') return;
+
+  isLookupLoading.value = true;
+  try {
+    const res = await axios.get('/api/dealers/lookup', { params: { id_realme: targetId } });
+    if (res.data?.success && res.data.found && res.data.data) {
+      const dealer = res.data.data;
+      form.dealer_name = dealer.dealer_name;
+      applyMasterDealerTax(dealer);
+      if (dealer.region) {
+        const regUpper = dealer.region.trim().toUpperCase();
+        if (!regionOptions.value.includes(regUpper)) {
+          regionOptions.value.push(regUpper);
+        }
+        form.region = regUpper;
+        isAutoFilledRegion.value = true;
+        validationErrors.region = '';
+      }
+      if (dealer.whatsapp && !form.whatsapp) {
+        form.whatsapp = dealer.whatsapp;
+      }
+      isAutoFilledFromMaster.value = true;
+      isAutoFilledDealer.value = false;
+      validationErrors.dealer_name = '';
+      aiAnalysis.dealerMismatch = false;
+      showDealerSuggestions.value = false;
+    }
+  } catch (e) {
+    // Ignore error
+  } finally {
+    isLookupLoading.value = false;
+  }
+}
+
+function selectDealerSuggestion(dealer) {
+  form.id_real = dealer.id_realme;
+  form.dealer_name = dealer.dealer_name;
+  applyMasterDealerTax(dealer);
+  if (dealer.region) {
+    const regUpper = dealer.region.trim().toUpperCase();
+    if (!regionOptions.value.includes(regUpper)) {
+      regionOptions.value.push(regUpper);
+    }
+    form.region = regUpper;
+    isAutoFilledRegion.value = true;
+    validationErrors.region = '';
+  }
+  if (dealer.whatsapp && !form.whatsapp) {
+    form.whatsapp = dealer.whatsapp;
+  }
+  isAutoFilledFromMaster.value = true;
+  isAutoFilledDealer.value = false;
+  isDealerDropdownOpen.value = false;
+  showDealerSuggestions.value = false;
+  validationErrors.id_real = '';
+  validationErrors.dealer_name = '';
+  aiAnalysis.dealerMismatch = false;
+}
+
+function handleIdRealBlur() {
+  validateField('id_real');
+  setTimeout(() => {
+    showDealerSuggestions.value = false;
+  }, 250);
+  if (form.id_real && form.id_real.trim() && !form.dealer_name) {
+    lookupDealerByIdRealme(form.id_real.trim());
+  }
+}
+
 function openFilePicker(slot) {
   if (slot === 'cn' && cnFileInputRef.value) {
     cnFileInputRef.value.click();
@@ -1177,16 +1374,7 @@ function handleFileChange(event, slot) {
   if (slot === 'credit_note') validationErrors.credit_note = '';
   if (slot === 'agreement') validationErrors.agreement = '';
 
-  const docKey = slot === 'credit_note' ? 'cn' : (slot === 'agreement' ? 'agr' : 'faktur');
-  if (aiAnalysis.docValidation && aiAnalysis.docValidation[docKey]) {
-    delete aiAnalysis.docValidation[docKey];
-  }
-
-  // Activate loading indicator immediately for this slot
-  isScanningDoc[slot] = true;
-
-  // Trigger AI analysis on upload
-  triggerAiPreValidationDebounced();
+  clearDocumentAnalysis(DOCUMENT_SLOTS.find(item => item.slot === slot)?.docKey);
 }
 
 function removeFile(slot) {
@@ -1198,131 +1386,9 @@ function removeFile(slot) {
   if (slot === 'agreement' && agrFileInputRef.value) agrFileInputRef.value.value = '';
   if (slot === 'tax_invoice' && taxFileInputRef.value) taxFileInputRef.value.value = '';
 
-  if (aiAnalysis.docValidation && aiAnalysis.docValidation[slot === 'credit_note' ? 'cn' : slot === 'agreement' ? 'agr' : 'faktur']) {
-    delete aiAnalysis.docValidation[slot === 'credit_note' ? 'cn' : slot === 'agreement' ? 'agr' : 'faktur'];
-  }
-
-  triggerAiPreValidationDebounced();
+  clearDocumentAnalysis(DOCUMENT_SLOTS.find(item => item.slot === slot)?.docKey);
 }
 
-
-
-let debounceTimer = null;
-function triggerAiPreValidationDebounced() {
-  if (debounceTimer) clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    triggerAiPreValidation();
-  }, 400);
-}
-
-// Live AI Document Pre-Validation
-async function triggerAiPreValidation() {
-  if (!files.credit_note && !files.agreement && !files.tax_invoice) {
-    isScanningDoc.credit_note = false;
-    isScanningDoc.agreement = false;
-    isScanningDoc.tax_invoice = false;
-    return;
-  }
-
-  aiAnalysis.isScanning = true;
-  aiAnalysis.errorMsg = '';
-  if (files.credit_note) isScanningDoc.credit_note = true;
-  if (files.agreement) isScanningDoc.agreement = true;
-  if (files.tax_invoice) isScanningDoc.tax_invoice = true;
-
-  const formData = new FormData();
-  formData.append('program_name', form.program_name || '');
-  formData.append('region', form.region || '');
-  formData.append('id_real', form.id_real || '');
-  formData.append('dealer_name', form.dealer_name || '');
-  formData.append('sales_name', form.sales_name || '');
-  formData.append('whatsapp', form.whatsapp || '');
-  formData.append('is_pkp', form.is_pkp ? '1' : '0');
-
-  if (files.credit_note) {
-    formData.append('credit_note_file', files.credit_note);
-  }
-  if (files.agreement) {
-    formData.append('agreement_file', files.agreement);
-  }
-  if (files.tax_invoice) {
-    formData.append('tax_invoice_file', files.tax_invoice);
-  }
-
-  try {
-    const res = await axios.post('/api/program-submissions/pre-validate', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-
-    if (res.data?.success && res.data.data) {
-      const d = res.data.data;
-      aiAnalysis.hasScanned = true;
-      aiAnalysis.isClean = !!d.is_clean;
-      aiAnalysis.hasSwapped = !!d.has_swapped;
-      aiAnalysis.hasMerged = !!d.has_merged;
-      aiAnalysis.hasInvalid = !!d.has_invalid;
-      aiAnalysis.swapDetails = d.swap_details || {};
-      aiAnalysis.cekDokumen = d.cek_dokumen || '';
-      aiAnalysis.statusPurchase = d.status_potong_purchase || '';
-      aiAnalysis.keterangan = d.keterangan || '';
-      aiAnalysis.docValidation = d.doc_validation || {};
-      aiAnalysis.financial = d.financial || {};
-      aiAnalysis.audit = d.audit || {};
-      aiAnalysis.extractedDealerName = d.dealer_name || '';
-      aiAnalysis.dealerMismatch = !!d.dealer_mismatch;
-      aiAnalysis.extractedCnProgramName = d.cn_program_name || '';
-      aiAnalysis.cnProgramMismatch = !!d.cn_program_mismatch;
-      aiAnalysis.extractedAgrDealerName = d.agr_dealer_name || '';
-      aiAnalysis.agrDealerMismatch = !!d.agr_dealer_mismatch;
-      aiAnalysis.extractedAgrProgramName = d.agr_program_name || '';
-      aiAnalysis.agrProgramMismatch = !!d.agr_program_mismatch;
-
-      // Sanitize minor typos (e.g. NEWCOO CELL vs NEWCO CELL)
-      if (d.dealer_name && form.dealer_name.trim() && form.dealer_name.trim() !== '-') {
-        if (isDealerNameSimilar(form.dealer_name, d.dealer_name)) {
-          aiAnalysis.dealerMismatch = false;
-          d.dealer_mismatch = false;
-          if (aiAnalysis.docValidation?.cn?.status === 'invalid' && !aiAnalysis.cnProgramMismatch) {
-            const cnMsg = (aiAnalysis.docValidation.cn.message || '').toLowerCase();
-            if (cnMsg.includes('dealer') || cnMsg.includes('berbeda') || cnMsg.includes('nama')) {
-              aiAnalysis.docValidation.cn.status = 'valid';
-              aiAnalysis.docValidation.cn.message = 'Dokumen Credit Note terverifikasi.';
-            }
-          }
-        }
-      }
-      if (d.agr_dealer_name && form.dealer_name.trim() && form.dealer_name.trim() !== '-') {
-        if (isDealerNameSimilar(form.dealer_name, d.agr_dealer_name)) {
-          aiAnalysis.agrDealerMismatch = false;
-          d.agr_dealer_mismatch = false;
-          if (aiAnalysis.docValidation?.agr?.status === 'invalid' && !aiAnalysis.agrProgramMismatch) {
-            const agrMsg = (aiAnalysis.docValidation.agr.message || '').toLowerCase();
-            if (agrMsg.includes('dealer') || agrMsg.includes('berbeda') || agrMsg.includes('nama')) {
-              aiAnalysis.docValidation.agr.status = 'valid';
-              aiAnalysis.docValidation.agr.message = 'Dokumen Agreement terverifikasi.';
-            }
-          }
-        }
-      }
-
-      // Auto-populate dealer name if user entered '-' or left empty
-      if (d.dealer_name && (!form.dealer_name.trim() || form.dealer_name.trim() === '-')) {
-        form.dealer_name = d.dealer_name;
-        isAutoFilledDealer.value = true;
-        aiAnalysis.dealerMismatch = false;
-        aiAnalysis.agrDealerMismatch = false;
-        validationErrors.dealer_name = '';
-      }
-    }
-  } catch (e) {
-    aiAnalysis.errorMsg = e.response?.data?.message || e.message;
-  } finally {
-    aiAnalysis.isScanning = false;
-    isScanningDoc.credit_note = false;
-    isScanningDoc.agreement = false;
-    isScanningDoc.tax_invoice = false;
-  }
-}
 
 function validateField(field) {
   if (field === 'id_real') {
@@ -1414,123 +1480,7 @@ async function handleSubmit() {
     return;
   }
 
-  isSubmitting.value = true;
-  submitProgressText.value = 'Memeriksa kelayakan dokumen...';
-
-  // Always pre-validate documents before final submit
-  const preValData = new FormData();
-  preValData.append('program_name', form.program_name.trim());
-  preValData.append('region', form.region.trim());
-  preValData.append('id_real', form.id_real.trim());
-  preValData.append('dealer_name', form.dealer_name.trim());
-  preValData.append('sales_name', form.sales_name.trim());
-  if (form.whatsapp) preValData.append('whatsapp', form.whatsapp.trim());
-  preValData.append('is_pkp', form.is_pkp ? '1' : '0');
-
-  if (files.credit_note) preValData.append('credit_note_file', files.credit_note);
-  if (files.agreement) preValData.append('agreement_file', files.agreement);
-  if (files.tax_invoice) preValData.append('tax_invoice_file', files.tax_invoice);
-
-  let preValResult = null;
-  try {
-    const checkRes = await axios.post('/api/program-submissions/pre-validate', preValData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    if (checkRes.data?.success && checkRes.data.data) {
-      preValResult = checkRes.data.data;
-      aiAnalysis.hasScanned = true;
-      aiAnalysis.isClean = !!preValResult.is_clean;
-      aiAnalysis.hasSwapped = !!preValResult.has_swapped;
-      aiAnalysis.hasMerged = !!preValResult.has_merged;
-      aiAnalysis.hasInvalid = !!preValResult.has_invalid;
-      aiAnalysis.swapDetails = preValResult.swap_details || {};
-      aiAnalysis.cekDokumen = preValResult.cek_dokumen || '';
-      aiAnalysis.statusPurchase = preValResult.status_potong_purchase || '';
-      aiAnalysis.keterangan = preValResult.keterangan || '';
-      aiAnalysis.docValidation = preValResult.doc_validation || {};
-      aiAnalysis.financial = preValResult.financial || {};
-      aiAnalysis.extractedDealerName = preValResult.dealer_name || '';
-      aiAnalysis.dealerMismatch = !!preValResult.dealer_mismatch;
-      aiAnalysis.extractedCnProgramName = preValResult.cn_program_name || '';
-      aiAnalysis.cnProgramMismatch = !!preValResult.cn_program_mismatch;
-      aiAnalysis.extractedAgrDealerName = preValResult.agr_dealer_name || '';
-      aiAnalysis.agrDealerMismatch = !!preValResult.agr_dealer_mismatch;
-      aiAnalysis.extractedAgrProgramName = preValResult.agr_program_name || '';
-      aiAnalysis.agrProgramMismatch = !!preValResult.agr_program_mismatch;
-
-      // Auto-adopt dealer name if user entered '-'
-      if (preValResult.dealer_name && (!form.dealer_name.trim() || form.dealer_name.trim() === '-')) {
-        form.dealer_name = preValResult.dealer_name;
-        isAutoFilledDealer.value = true;
-        aiAnalysis.dealerMismatch = false;
-        aiAnalysis.agrDealerMismatch = false;
-        preValResult.dealer_mismatch = false;
-        preValResult.agr_dealer_mismatch = false;
-      }
-
-      // Sanitize minor typos in submit flow (e.g. NEWCOO CELL vs NEWCO CELL)
-      if (preValResult.dealer_name && form.dealer_name.trim() && form.dealer_name.trim() !== '-') {
-        if (isDealerNameSimilar(form.dealer_name, preValResult.dealer_name)) {
-          aiAnalysis.dealerMismatch = false;
-          preValResult.dealer_mismatch = false;
-          if (aiAnalysis.docValidation?.cn?.status === 'invalid' && !aiAnalysis.cnProgramMismatch) {
-            const cnMsg = (aiAnalysis.docValidation.cn.message || '').toLowerCase();
-            if (cnMsg.includes('dealer') || cnMsg.includes('berbeda') || cnMsg.includes('nama')) {
-              aiAnalysis.docValidation.cn.status = 'valid';
-              aiAnalysis.docValidation.cn.message = 'Dokumen Credit Note terverifikasi.';
-            }
-          }
-        }
-      }
-      if (preValResult.agr_dealer_name && form.dealer_name.trim() && form.dealer_name.trim() !== '-') {
-        if (isDealerNameSimilar(form.dealer_name, preValResult.agr_dealer_name)) {
-          aiAnalysis.agrDealerMismatch = false;
-          preValResult.agr_dealer_mismatch = false;
-          if (aiAnalysis.docValidation?.agr?.status === 'invalid' && !aiAnalysis.agrProgramMismatch) {
-            const agrMsg = (aiAnalysis.docValidation.agr.message || '').toLowerCase();
-            if (agrMsg.includes('dealer') || agrMsg.includes('berbeda') || agrMsg.includes('nama')) {
-              aiAnalysis.docValidation.agr.status = 'valid';
-              aiAnalysis.docValidation.agr.message = 'Dokumen Agreement terverifikasi.';
-            }
-          }
-        }
-      }
-    }
-  } catch (err) {
-    // If pre-validation endpoint failed network-wise, backend submitForm will still validate
-  }
-
-  // 1. BLOCK IF SWAPPED
-  if (preValResult?.has_swapped || aiAnalysis.hasSwapped) {
-    isSubmitting.value = false;
-    openValidationModal({
-      title: 'Dokumen Belum Sesuai',
-      message: 'Dokumen Credit Note dan Agreement yang diunggah tidak sesuai dengan peruntukannya (file terbalik). Silakan unggah file yang benar pada masing-masing kolom sebelum mengirim formulir.',
-      details: [
-        'Kolom Credit Note terisi file Agreement',
-        'Kolom Agreement terisi file Credit Note',
-      ],
-    });
-    return;
-  }
-
-  // CHECK IF DOCUMENTS ARE MERGED / COMBINED
-  if (preValResult?.has_merged || aiAnalysis.hasMerged) {
-    isSubmitting.value = false;
-    openValidationModal({
-      title: 'Dokumen Tidak Boleh Digabung',
-      message: aiAnalysis.keterangan || 'Dokumen Credit Note, Agreement, dan Faktur Pajak tidak boleh digabung dalam satu file. Dokumen wajib diunggah terpisah ke kolom masing-masing.',
-      details: [
-        'Slot Credit Note: Khusus dokumen Credit Note saja.',
-        'Slot Agreement: Khusus dokumen Agreement saja.',
-        'Slot Faktur Pajak: Khusus dokumen Faktur Pajak saja.',
-        'Silakan pisahkan berkas dokumen Anda ke masing-masing slot upload.',
-      ],
-    });
-    return;
-  }
-
-  // CHECK IF FILES ARE DUPLICATED (GABUNG/SAMA)
+  // Cek file sama/digabung lebih dulu (tanpa AI)
   if (files.credit_note && files.agreement && files.credit_note.name === files.agreement.name && files.credit_note.size === files.agreement.size) {
     isSubmitting.value = false;
     openValidationModal({
@@ -1572,102 +1522,78 @@ async function handleSubmit() {
     return;
   }
 
-  // 2. BLOCK IF CN MISMATCH (DEALER AND/OR PROGRAM)
-  const hasCnDealerMismatch = (preValResult?.dealer_mismatch || aiAnalysis.dealerMismatch) && form.dealer_name.trim() !== '-';
-  const hasCnProgMismatch = (preValResult?.cn_program_mismatch || aiAnalysis.cnProgramMismatch);
+  isSubmitting.value = true;
+  submitProgressText.value = 'Memeriksa kelayakan dokumen...';
 
-  if (hasCnDealerMismatch && hasCnProgMismatch) {
-    isSubmitting.value = false;
-    const docDealer = preValResult?.dealer_name || aiAnalysis.extractedDealerName || 'Dokumen Credit Note';
-    const docCnProg = preValResult?.cn_program_name || aiAnalysis.extractedCnProgramName || 'Dokumen Credit Note';
-    openValidationModal({
-      title: 'Nama Dealer & Program di CN Tidak Sesuai',
-      message: 'Nama dealer dan nama program pada formulir berbeda dengan isi dokumen Credit Note yang diunggah.',
-      details: [
-        `Nama Dealer di Form: "${form.dealer_name}" (Dokumen CN: "${docDealer}")`,
-        `Nama Program di Form: "${form.program_name}" (Dokumen CN: "${docCnProg}")`,
-        'Solusi: Sesuaikan isian formulir atau unggah file Credit Note yang sesuai.',
-      ],
+  // Always pre-validate documents before final submit
+  const preValData = new FormData();
+  preValData.append('program_name', form.program_name.trim());
+  preValData.append('region', form.region.trim());
+  preValData.append('id_real', form.id_real.trim());
+  if (form.kode_bt) preValData.append('kode_bt', form.kode_bt);
+  preValData.append('dealer_name', form.dealer_name.trim());
+  preValData.append('sales_name', form.sales_name.trim());
+  if (form.whatsapp) preValData.append('whatsapp', form.whatsapp.trim());
+  preValData.append('is_pkp', form.is_pkp ? '1' : '0');
+
+  if (files.credit_note) preValData.append('credit_note_file', files.credit_note);
+  if (files.agreement) preValData.append('agreement_file', files.agreement);
+  if (files.tax_invoice) preValData.append('tax_invoice_file', files.tax_invoice);
+
+  let preValResult = null;
+  try {
+    const checkRes = await axios.post('/api/program-submissions/pre-validate', preValData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
-    return;
+    if (checkRes.data?.success && checkRes.data.data) {
+      preValResult = checkRes.data.data;
+      aiAnalysis.hasScanned = true;
+      aiAnalysis.isClean = !!preValResult.is_clean;
+      aiAnalysis.hasSwapped = !!preValResult.has_swapped;
+      aiAnalysis.hasMerged = !!preValResult.has_merged;
+      aiAnalysis.hasInvalid = !!preValResult.has_invalid;
+      aiAnalysis.swapDetails = preValResult.swap_details || {};
+      aiAnalysis.cekDokumen = preValResult.cek_dokumen || '';
+      aiAnalysis.statusPurchase = preValResult.status_potong_purchase || '';
+      aiAnalysis.keterangan = preValResult.keterangan || '';
+      aiAnalysis.docValidation = preValResult.doc_validation || {};
+      aiAnalysis.financial = preValResult.financial || {};
+      aiAnalysis.extractedDealerName = preValResult.dealer_name || '';
+      aiAnalysis.dealerMismatch = !!preValResult.dealer_mismatch;
+      aiAnalysis.extractedCnProgramName = preValResult.cn_program_name || '';
+      aiAnalysis.cnProgramMismatch = !!preValResult.cn_program_mismatch;
+
+      // Auto-adopt dealer name if user entered '-'
+      if (preValResult.dealer_name && (!form.dealer_name.trim() || form.dealer_name.trim() === '-')) {
+        form.dealer_name = preValResult.dealer_name;
+        isAutoFilledDealer.value = true;
+        aiAnalysis.dealerMismatch = false;
+        preValResult.dealer_mismatch = false;
+      }
+
+      // Sanitize minor typos in submit flow (e.g. NEWCOO CELL vs NEWCO CELL)
+      if (preValResult.dealer_name && form.dealer_name.trim() && form.dealer_name.trim() !== '-') {
+        if (isDealerNameSimilar(form.dealer_name, preValResult.dealer_name)) {
+          aiAnalysis.dealerMismatch = false;
+          preValResult.dealer_mismatch = false;
+          if (aiAnalysis.docValidation?.cn?.status === 'invalid' && !aiAnalysis.cnProgramMismatch) {
+            const cnMsg = (aiAnalysis.docValidation.cn.message || '').toLowerCase();
+            if (cnMsg.includes('dealer') || cnMsg.includes('berbeda') || cnMsg.includes('nama')) {
+              aiAnalysis.docValidation.cn.status = 'valid';
+              aiAnalysis.docValidation.cn.message = 'Dokumen Credit Note terverifikasi.';
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    // If pre-validation endpoint failed network-wise, backend submitForm will still validate
   }
 
-  if (hasCnDealerMismatch) {
+  // Ada yang perlu diperbaiki (dokumen tertukar/digabung/tidak sesuai, nama dealer/program berbeda): tampilkan di Hasil Pemeriksaan
+  if (hasAnalysisIssues.value) {
     isSubmitting.value = false;
-    const docDealer = preValResult?.dealer_name || aiAnalysis.extractedDealerName || 'Dokumen Credit Note';
-    openValidationModal({
-      title: 'Nama Dealer Tidak Sesuai (CN)',
-      message: `Nama dealer yang diisi ('${form.dealer_name}') berbeda dengan nama pada dokumen Credit Note ('${docDealer}').`,
-      details: [
-        `Nama di formulir: ${form.dealer_name}`,
-        `Nama di dokumen Credit Note: ${docDealer}`,
-        `Solusi: Samakan nama dealer dengan dokumen, atau cukup isi tanda '-' agar sistem membaca otomatis.`,
-      ],
-    });
-    return;
-  }
-
-  if (hasCnProgMismatch) {
-    isSubmitting.value = false;
-    const docCnProg = preValResult?.cn_program_name || aiAnalysis.extractedCnProgramName || 'Dokumen Credit Note';
-    openValidationModal({
-      title: 'Nama Program di Credit Note Tidak Sesuai',
-      message: `Nama program yang dipilih ('${form.program_name}') berbeda dengan nama program pada dokumen Credit Note ('${docCnProg}').`,
-      details: [
-        `Program di formulir: ${form.program_name}`,
-        `Program di dokumen Credit Note: ${docCnProg}`,
-        `Solusi: Pastikan dokumen Credit Note yang diunggah sesuai dengan program yang dipilih di form.`,
-      ],
-    });
-    return;
-  }
-
-  // 3. BLOCK IF AGREEMENT DEALER MISMATCH
-  const hasAgrDealerMismatch = (preValResult?.agr_dealer_mismatch || aiAnalysis.agrDealerMismatch) && form.dealer_name.trim() !== '-';
-  if (hasAgrDealerMismatch) {
-    isSubmitting.value = false;
-    const docAgrDealer = preValResult?.agr_dealer_name || aiAnalysis.extractedAgrDealerName || 'Dokumen Agreement';
-    openValidationModal({
-      title: 'Nama Dealer di Agreement Tidak Sesuai',
-      message: `Nama dealer yang diajukan ('${form.dealer_name}') berbeda dengan nama dealer pada dokumen Agreement ('${docAgrDealer}').`,
-      details: [
-        `Nama di formulir: ${form.dealer_name}`,
-        `Nama di dokumen Agreement: ${docAgrDealer}`,
-        `Solusi: Pastikan dokumen Agreement yang diunggah sesuai dengan toko/dealer yang diajukan.`,
-      ],
-    });
-    return;
-  }
-
-  // 4. BLOCK IF AGREEMENT PROGRAM MISMATCH
-  const hasAgrProgMismatch = (preValResult?.agr_program_mismatch || aiAnalysis.agrProgramMismatch);
-  if (hasAgrProgMismatch) {
-    isSubmitting.value = false;
-    const docAgrProg = preValResult?.agr_program_name || aiAnalysis.extractedAgrProgramName || 'Dokumen Agreement';
-    openValidationModal({
-      title: 'Nama Program di Agreement Tidak Sesuai',
-      message: `Nama program yang dipilih ('${form.program_name}') berbeda dengan nama program pada dokumen Agreement ('${docAgrProg}').`,
-      details: [
-        `Program di formulir: ${form.program_name}`,
-        `Program di dokumen Agreement: ${docAgrProg}`,
-        `Solusi: Pastikan dokumen Agreement yang diunggah sesuai dengan program yang dipilih.`,
-      ],
-    });
-    return;
-  }
-
-  // 3. BLOCK IF INVALID OR NOT ELIGIBLE (BELUM BISA POTONG)
-  if (preValResult?.has_invalid || preValResult?.status_potong_purchase === 'BELUM BISA POTONG') {
-    isSubmitting.value = false;
-    const issues = [];
-    if (preValResult.cek_dokumen) issues.push(preValResult.cek_dokumen);
-    if (preValResult.keterangan) issues.push(preValResult.keterangan);
-
-    openValidationModal({
-      title: 'Dokumen Belum Sesuai',
-      message: 'Formulir tidak dapat dikirim karena dokumen yang diunggah belum sesuai atau tidak memenuhi syarat kelayakan program.',
-      details: issues.length ? issues : ['File yang diunggah tidak sesuai atau tidak terbaca dengan jelas.'],
-    });
+    scrollToAnalysis();
     return;
   }
 
@@ -1677,6 +1603,7 @@ async function handleSubmit() {
   formData.append('program_name', form.program_name.trim());
   formData.append('region', form.region.trim());
   formData.append('id_real', form.id_real.trim());
+  if (form.kode_bt) formData.append('kode_bt', form.kode_bt);
   formData.append('dealer_name', form.dealer_name.trim());
   formData.append('sales_name', form.sales_name.trim());
   if (form.whatsapp) formData.append('whatsapp', form.whatsapp.trim());
@@ -1721,6 +1648,7 @@ function handleClearForm() {
     form.region = '';
     form.id_real = '';
     form.dealer_name = '';
+    applyMasterDealerTax(null);
     form.sales_name = '';
     form.sales_custom = '';
     form.whatsapp = '';

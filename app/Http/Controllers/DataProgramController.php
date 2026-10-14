@@ -8,9 +8,12 @@ use App\Models\ProgramSubmission;
 use App\Services\DataProgramSyncService;
 use App\Services\ProgramReconciliationService;
 use App\Services\WhatsAppService;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DataProgramController extends Controller
@@ -207,6 +210,32 @@ class DataProgramController extends Controller
     }
 
     /**
+     * Save the selected area's Google Spreadsheet link and Apps Script Web App URL.
+     */
+    public function saveUrl(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'url' => ['nullable', 'url'],
+            'webapp_url' => ['nullable', 'url'],
+        ]);
+
+        if (! empty($validated['url'])) {
+            $this->syncService->setSpreadsheetUrl($validated['url']);
+        }
+
+        if (! empty($validated['webapp_url'])) {
+            $this->syncService->setWebAppUrl($validated['webapp_url']);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Link Google Spreadsheet Data Program berhasil disimpan.',
+            'url' => $this->syncService->getSpreadsheetUrl(),
+            'webapp_url' => $this->syncService->getWebAppUrl(),
+        ]);
+    }
+
+    /**
      * Export filtered dataset to CSV.
      */
     public function export(Request $request): StreamedResponse
@@ -236,7 +265,7 @@ class DataProgramController extends Controller
 
         $headers = [
             'NAMA DEALER', 'PROGRAM', 'Kode BT', 'NAMA PROGRAM', 'PERIODE',
-            'REGION', 'NO PO', 'ID GS', 'KODE SUPPLIER', 'Status DL',
+            'REGION', 'NO PO', 'ID GS', 'Status DL',
             'SALES PERSON', 'TELEMARKETING', 'WAJIB PAJAK', 'TRF PPH',
             'INCENTIVE', 'DPP', 'DPP LAIN', 'PPN', 'NILAI PPH', 'NET PAY',
             'CEK PAJAK TARIF PPH', 'SELISIH', 'NOTE PPH', 'NO FAKTUR PAJAK',
@@ -257,7 +286,7 @@ class DataProgramController extends Controller
                 foreach ($rows as $r) {
                     fputcsv($output, [
                         $r->dealer_name, $r->program, $r->kode_bt, $r->program_name, $r->periode,
-                        $r->region, $r->no_po, $r->id_gs, $r->kode_supplier, $r->status_dl,
+                        $r->region, $r->no_po, $r->id_gs, $r->status_dl,
                         $r->sales_person, $r->telemarketing, $r->wajib_pajak, $r->trf_pph,
                         $r->incentive, $r->dpp, $r->dpp_lain, $r->ppn, $r->nilai_pph, $r->net_pay,
                         $r->cek_pajak_tarif, $r->selisih, $r->note_pph, $r->no_faktur_pajak,
@@ -387,7 +416,7 @@ class DataProgramController extends Controller
                         'no_faktur_pajak' => $dp->no_faktur_pajak,
                         'ket_faktur_pajak' => $dp->ket_faktur_pajak,
                         'noted' => $dp->noted,
-                    ]]);
+                    ]], null, $dp->areaEnum());
                 } catch (\Throwable $e) {
                     Log::warning("Push single row reconcile to spreadsheet failed: {$e->getMessage()}");
                 }
@@ -561,48 +590,18 @@ class DataProgramController extends Controller
     {
         $dp = DataProgram::findOrFail($id);
 
-        $validated = $request->validate([
-            'status_potong_purchase' => 'nullable|string|max:100',
-            'cek_dokumen' => 'nullable|string|max:255',
-            'keterangan' => 'nullable|string',
-            'noted' => 'nullable|string',
-            'cn' => 'nullable|string',
-            'agrement' => 'nullable|string',
-            'cek_fp' => 'nullable|string',
-            'status_potong_ar' => 'nullable|string|max:100',
-            'tgl_potong_tf' => 'nullable|string|max:50',
-            'push_to_sheet' => 'nullable|boolean',
-        ]);
+        $validated = $request->validate([...$this->editableRules(), 'push_to_sheet' => 'nullable|boolean']);
 
         $pushToSheet = $validated['push_to_sheet'] ?? true;
         unset($validated['push_to_sheet']);
 
-        $dp->fill($validated);
+        $dp->fill($this->withAging($dp, $validated));
         $dp->save();
 
         $sheetPushResult = null;
         if ($pushToSheet) {
             try {
-                $rowIndex = (int) str_replace('row_', '', (string) $dp->row_hash);
-                $sheetPushResult = $this->syncService->pushUpdatesToSpreadsheet([[
-                    'row_index' => $rowIndex > 0 ? $rowIndex : null,
-                    'kode_bt' => $dp->kode_bt,
-                    'dealer_name' => $dp->dealer_name,
-                    'program' => $dp->program,
-                    'program_name' => $dp->program_name,
-                    'periode' => $dp->periode,
-                    'status_potong_purchase' => $dp->status_potong_purchase,
-                    'status_potong_ar' => $dp->status_potong_ar,
-                    'tgl_potong_tf' => $dp->tgl_potong_tf,
-                    'cek_dokumen' => $dp->cek_dokumen,
-                    'keterangan' => $dp->keterangan,
-                    'cn' => $dp->cn,
-                    'agrement' => $dp->agrement,
-                    'cek_fp' => $dp->cek_fp,
-                    'no_faktur_pajak' => $dp->no_faktur_pajak,
-                    'ket_faktur_pajak' => $dp->ket_faktur_pajak,
-                    'noted' => $dp->noted,
-                ]]);
+                $sheetPushResult = $this->syncService->pushUpdatesToSpreadsheet([$this->spreadsheetRow($dp)], null, $dp->areaEnum());
             } catch (\Throwable $e) {
                 Log::warning("Push single row update to spreadsheet failed: {$e->getMessage()}");
             }
@@ -617,12 +616,241 @@ class DataProgramController extends Controller
     }
 
     /**
+     * Set one column on several rows at once (cell edits and drag-to-fill in the Data Program table),
+     * then send those rows to the area's Google Spreadsheet in a single request.
+     */
+    public function bulkUpdate(Request $request): JsonResponse
+    {
+        $rules = $this->editableRules();
+        $field = $request->input('field');
+
+        $validated = $request->validate([
+            'field' => ['required', 'string', Rule::in(array_keys($rules))],
+            'rows' => ['required', 'array', 'min:1', 'max:500'],
+            'rows.*.id' => ['required', 'integer'],
+            'rows.*.value' => is_string($field) ? ($rules[$field] ?? 'nullable') : 'nullable',
+        ]);
+
+        $dataPrograms = DataProgram::whereIn('id', array_column($validated['rows'], 'id'))->get()->keyBy('id');
+
+        foreach ($validated['rows'] as $row) {
+            if ($dp = $dataPrograms->get($row['id'])) {
+                $dp->fill($this->withAging($dp, [$validated['field'] => $row['value'] ?? null]))->save();
+            }
+        }
+
+        $sheetPushResults = [];
+        foreach ($dataPrograms->groupBy(fn (DataProgram $dp) => $dp->areaEnum()->value) as $areaRows) {
+            try {
+                $sheetPushResults[] = $this->syncService->pushUpdatesToSpreadsheet(
+                    $areaRows->map(fn (DataProgram $dp) => $this->spreadsheetRow($dp))->values()->all(),
+                    null,
+                    $areaRows->first()->areaEnum()
+                );
+            } catch (\Throwable $e) {
+                Log::warning("Push bulk update to spreadsheet failed: {$e->getMessage()}");
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$dataPrograms->count()} baris Data Program diperbarui.",
+            'data' => $dataPrograms->values(),
+            'sheet_push' => $sheetPushResults,
+        ]);
+    }
+
+    /**
+     * Validation rules of the Data Program columns that can be edited from the web.
+     *
+     * @return array<string, string>
+     */
+    private function editableRules(): array
+    {
+        return [
+            // Identitas Dealer & Program
+            'dealer_name' => 'nullable|string|max:255',
+            'program' => 'nullable|string|max:255',
+            'kode_bt' => 'nullable|string|max:100',
+            'program_name' => 'nullable|string|max:255',
+            'periode' => 'nullable|string|max:100',
+            'region' => 'nullable|string|max:100',
+            'big_region' => 'nullable|string|max:100',
+            'id_gs' => 'nullable|string|max:100',
+            'kode_supplier' => 'nullable|string|max:100',
+            'status_dl' => 'nullable|string|max:100',
+            'sales_person' => 'nullable|string|max:100',
+            'telemarketing' => 'nullable|string|max:100',
+            'telemarketing_phone' => 'nullable|string|max:50',
+            'wajib_pajak' => 'nullable|string|max:100',
+            'trf_pph' => 'nullable|string|max:100',
+
+            // Finansial & Pajak
+            'incentive' => 'nullable|numeric',
+            'dpp' => 'nullable|numeric',
+            'dpp_lain' => 'nullable|numeric',
+            'ppn' => 'nullable|numeric',
+            'nilai_pph' => 'nullable|numeric',
+            'net_pay' => 'nullable|numeric',
+            'cek_pajak_tarif' => 'nullable|string|max:100',
+            'selisih' => 'nullable|numeric',
+            'note_pph' => 'nullable|string|max:255',
+            'no_faktur_pajak' => 'nullable|string|max:100',
+            'ket_faktur_pajak' => 'nullable|string|max:255',
+            'npwp' => 'nullable|string|max:100',
+            'nama_npwp' => 'nullable|string|max:255',
+
+            // Administrasi & Transaksi
+            'no_po' => 'nullable|string|max:100',
+            'no_po_sj' => 'nullable|string|max:100',
+            'no_transaksi' => 'nullable|string|max:100',
+            'tgl_input' => 'nullable|string|max:50',
+            'tgl_share_cn' => 'nullable|string|max:50',
+            'lama_pending' => 'nullable|string|max:50',
+            'tgl_potong_tf' => 'nullable|string|max:50',
+            'no_uid' => 'nullable|string|max:100',
+            'no_pembayaran' => 'nullable|string|max:100',
+            'tgl_input_bank_pph' => 'nullable|string|max:50',
+            'tf_status' => 'nullable|string|max:100',
+            'tgl_proses' => 'nullable|string|max:50',
+            'tgl_sj' => 'nullable|string|max:50',
+            'no_sj' => 'nullable|string|max:100',
+            'info_bank' => 'nullable|string|max:255',
+            'pending_potongan' => 'nullable|string|max:255',
+
+            // Status & Verifikasi
+            'keterangan' => 'nullable|string|max:255',
+            'cek_dokumen' => 'nullable|string|max:255',
+            'status_potong_purchase' => 'nullable|string|max:100',
+            'status_potong_ar' => 'nullable|string|max:100',
+
+            // Dokumen & Catatan
+            'program_2' => 'nullable|string',
+            'cn' => 'nullable|string',
+            'agrement' => 'nullable|string',
+            'cek_fp' => 'nullable|string|max:100',
+            'cek_evidance' => 'nullable|string|max:100',
+            'noted' => 'nullable|string',
+            'norek' => 'nullable|string|max:100',
+            'namrek' => 'nullable|string|max:255',
+            'bank' => 'nullable|string|max:100',
+        ];
+    }
+
+    /**
+     * Recalculate Lama Pending and the aging Keterangan when Tgl Input is filled in.
+     * A Keterangan written by hand (not an aging text) is kept.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function withAging(DataProgram $dp, array $attributes): array
+    {
+        if (empty($attributes['tgl_input'])) {
+            return $attributes;
+        }
+
+        try {
+            $days = max(0, (int) Carbon::parse($attributes['tgl_input'])->diffInDays(now()));
+        } catch (\Throwable) {
+            return $attributes;
+        }
+
+        if (! isset($attributes['lama_pending']) || $attributes['lama_pending'] === '') {
+            $attributes['lama_pending'] = (string) $days;
+        }
+
+        $keterangan = array_key_exists('keterangan', $attributes) ? $attributes['keterangan'] : $dp->keterangan;
+        if (empty($keterangan) || in_array($keterangan, ['LEBIH DARI 30 HARI', 'KURANG DARI 30 HARI'], true)) {
+            $attributes['keterangan'] = $days > 30 ? 'LEBIH DARI 30 HARI' : 'KURANG DARI 30 HARI';
+        }
+
+        return $attributes;
+    }
+
+    /**
+     * A Data Program row in the shape the spreadsheet's Apps Script "update_rows" action expects.
+     *
+     * @return array<string, mixed>
+     */
+    private function spreadsheetRow(DataProgram $dp): array
+    {
+        $rowIndex = str_starts_with((string) $dp->row_hash, 'row_') ? (int) str_replace('row_', '', (string) $dp->row_hash) : 0;
+
+        return [
+            'row_index' => $rowIndex > 0 ? $rowIndex : null,
+            'kode_bt' => $dp->kode_bt,
+            'dealer_name' => $dp->dealer_name,
+            'program' => $dp->program,
+            'program_name' => $dp->program_name,
+            'periode' => $dp->periode,
+            'region' => $dp->region,
+            'no_po' => $dp->no_po,
+            'id_gs' => $dp->id_gs,
+            'kode_supplier' => $dp->kode_supplier,
+            'status_dl' => $dp->status_dl,
+            'sales_person' => $dp->sales_person,
+            'telemarketing' => $dp->telemarketing,
+            'wajib_pajak' => $dp->wajib_pajak,
+            'trf_pph' => $dp->trf_pph,
+            'incentive' => $dp->incentive,
+            'dpp' => $dp->dpp,
+            'dpp_lain' => $dp->dpp_lain,
+            'ppn' => $dp->ppn,
+            'nilai_pph' => $dp->nilai_pph,
+            'net_pay' => $dp->net_pay,
+            'cek_pajak_tarif' => $dp->cek_pajak_tarif,
+            'selisih' => $dp->selisih,
+            'note_pph' => $dp->note_pph,
+            'no_faktur_pajak' => $dp->no_faktur_pajak,
+            'ket_faktur_pajak' => $dp->ket_faktur_pajak,
+            'no_po_sj' => $dp->no_po_sj,
+            'no_transaksi' => $dp->no_transaksi,
+            'tgl_input' => $dp->tgl_input,
+            'tgl_share_cn' => $dp->tgl_share_cn,
+            'lama_pending' => $dp->lama_pending,
+            'status_potong_purchase' => $dp->status_potong_purchase,
+            'status_potong_ar' => $dp->status_potong_ar,
+            'tgl_potong_tf' => $dp->tgl_potong_tf,
+            'no_uid' => $dp->no_uid,
+            'no_pembayaran' => $dp->no_pembayaran,
+            'tgl_input_bank_pph' => $dp->tgl_input_bank_pph,
+            'tf_status' => $dp->tf_status,
+            'tgl_proses' => $dp->tgl_proses,
+            'tgl_sj' => $dp->tgl_sj,
+            'no_sj' => $dp->no_sj,
+            'info_bank' => $dp->info_bank,
+            'pending_potongan' => $dp->pending_potongan,
+            'npwp' => $dp->npwp,
+            'nama_npwp' => $dp->nama_npwp,
+            'program_2' => $dp->program_2,
+            'cek_dokumen' => $dp->cek_dokumen,
+            'keterangan' => $dp->keterangan,
+            'cn' => $dp->cn,
+            'agrement' => $dp->agrement,
+            'cek_fp' => $dp->cek_fp,
+            'cek_evidance' => $dp->cek_evidance,
+            'noted' => $dp->noted,
+            'norek' => $dp->norek,
+            'namrek' => $dp->namrek,
+            'bank' => $dp->bank,
+            'big_region' => $dp->big_region,
+            'values' => $this->syncService->convertDataProgramToRowArray($dp),
+        ];
+    }
+
+    /**
      * Send WhatsApp notification to Telemarketing for DataProgram claim offer.
      */
     public function sendWaToTelemarketing(Request $request, int $id): JsonResponse
     {
         $dp = DataProgram::findOrFail($id);
-        $phone = $request->input('phone');
+        $phone = $request->input('phone') ?: $dp->telemarketing_phone;
+        $telemarketingName = $request->input('telemarketing_name');
+
+        if (! empty($telemarketingName)) {
+            $dp->update(['telemarketing' => $telemarketingName]);
+        }
 
         $result = $this->waService->sendDataProgramClaimNotificationToTelemarketing($dp, $phone);
 

@@ -10,6 +10,7 @@ use App\Models\GoogleToken;
 use App\Models\Invoice;
 use App\Models\WhatsAppLog;
 use App\Services\CustomerLookupService;
+use App\Services\DataProgramSyncService;
 use App\Services\GoogleMailService;
 use App\Services\InvoiceGenerator;
 use App\Services\WhatsAppService;
@@ -17,6 +18,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -26,7 +28,8 @@ class InvoiceController extends Controller
     public function __construct(
         protected InvoiceGenerator $generator,
         protected WhatsAppService $whatsAppService,
-        protected GoogleMailService $googleMailService
+        protected GoogleMailService $googleMailService,
+        protected DataProgramSyncService $dpSyncService
     ) {}
 
     /**
@@ -217,18 +220,26 @@ class InvoiceController extends Controller
 
         try {
             $invoice = $this->generator->generate($draft, $billTo);
-
-            return response()->json([
-                'success' => true,
-                'message' => "Invoice {$invoice->invoice_number} berhasil dibuat.",
-                'invoice' => $invoice,
-            ]);
         } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
             ], 422);
         }
+
+        $dpResult = null;
+        try {
+            $dpResult = $this->dpSyncService->syncDraftToDataProgram($draft->refresh(), true);
+        } catch (\Throwable $e) {
+            Log::warning('Auto sync invoiced draft to data program failed: '.$e->getMessage());
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Invoice {$invoice->invoice_number} berhasil dibuat.".($dpResult ? ' Data otomatis dikirim ke Data Program.' : ' Namun gagal mengirim ke Data Program.'),
+            'invoice' => $invoice,
+            'data_program_sync' => $dpResult,
+        ]);
     }
 
     /**
@@ -258,6 +269,7 @@ class InvoiceController extends Controller
         $successCount = 0;
         $failedCount = 0;
         $errors = [];
+        $dataPrograms = [];
 
         foreach ($drafts as $draft) {
             try {
@@ -266,10 +278,29 @@ class InvoiceController extends Controller
             } catch (Exception $e) {
                 $failedCount++;
                 $errors[] = "Draft #{$draft->id} ({$draft->dealer_name}): {$e->getMessage()}";
+
+                continue;
+            }
+
+            try {
+                $dataPrograms[] = $this->dpSyncService->syncDraftToDataProgram($draft->refresh(), false)['data_program'];
+            } catch (\Throwable $e) {
+                Log::warning("Auto sync invoiced draft #{$draft->id} to data program failed: ".$e->getMessage());
+            }
+        }
+
+        if (! empty($dataPrograms)) {
+            try {
+                $this->dpSyncService->pushDraftsToSpreadsheet($dataPrograms);
+            } catch (\Throwable $e) {
+                Log::warning('Batch push invoiced drafts to spreadsheet failed: '.$e->getMessage());
             }
         }
 
         $message = "Berhasil menerbitkan {$successCount} invoice.";
+        if (! empty($dataPrograms)) {
+            $message .= ' '.count($dataPrograms).' data otomatis dikirim ke Data Program.';
+        }
         if ($failedCount > 0) {
             $message .= " {$failedCount} draft gagal diproses.";
         }

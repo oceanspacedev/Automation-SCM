@@ -2,11 +2,15 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToArea;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DataProgram extends Model
 {
+    use BelongsToArea;
+
     protected $guarded = ['id'];
 
     protected function casts(): array
@@ -30,5 +34,13 @@ class DataProgram extends Model
     public function reconciliationLogs(): HasMany
     {
         return $this->hasMany(ProgramReconciliationLog::class, 'data_program_id')->orderByDesc('id');
+    }
+
+    /**
+     * Draft origin if created or synced from Draft.
+     */
+    public function draft(): BelongsTo
+    {
+        return $this->belongsTo(Draft::class, 'draft_id')->withoutGlobalScope('area');
     }
 }

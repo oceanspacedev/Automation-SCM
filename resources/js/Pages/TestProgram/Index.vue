@@ -4,15 +4,19 @@
     <div class="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
       <span>Form Program</span>
       <ChevronRightIcon class="w-3.5 h-3.5 text-gray-400" />
+      <span>{{ area.label }}</span>
+      <ChevronRightIcon class="w-3.5 h-3.5 text-gray-400" />
       <span class="text-gray-800">Hasil Input Form</span>
     </div>
+
+    <AreaTabs />
 
     <!-- Header Page -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Form Program</h1>
+        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Form Program {{ area.label }}</h1>
         <p class="text-xs text-gray-500 mt-0.5">
-          Daftar hasil inputan pengajuan program dari formulir web.
+          Daftar hasil inputan pengajuan program {{ area.label }} dari formulir web.
         </p>
       </div>
 
@@ -34,7 +38,7 @@
           class="absolute right-0 mt-1.5 w-52 rounded-xl border border-gray-200 bg-white shadow-lg z-50 py-1 overflow-hidden"
         >
           <a
-            href="/form-submission"
+            :href="publicFormUrl"
             target="_blank"
             rel="noopener noreferrer"
             @click="isDropdownOpen = false"
@@ -121,7 +125,7 @@
               type="text"
               v-model="searchQuery"
               @input="handleSearchDebounced"
-              placeholder="Cari dealer, ID Real, sales..."
+              placeholder="Cari dealer, ID Realme, sales..."
               class="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-3 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-900 shadow-2xs"
             />
             <button
@@ -143,7 +147,7 @@
               <th scope="col" class="py-2.5 px-3 text-center w-12 border-r border-gray-200">No</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Waktu</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Region</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">ID Real</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">ID Realme</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Nama Dealer</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Nama Program</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Nama Sales</th>
@@ -649,6 +653,7 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
+import AreaTabs from '@/components/AreaTabs.vue';
 import {
   ChevronRight as ChevronRightIcon,
   ChevronLeft as ChevronLeftIcon,
@@ -666,6 +671,13 @@ import {
   EyeOff as EyeOffIcon,
   Bot as BotIcon,
 } from 'lucide-vue-next';
+import { useArea, DEFAULT_AREA } from '@/composables/useArea';
+
+// ===== AREA (Jabar/Jateng) =====
+const { area } = useArea();
+const isDefaultArea = area.value.value === DEFAULT_AREA;
+// Jabar tetap memakai link form lama agar link yang sudah tersebar tidak berubah
+const publicFormUrl = isDefaultArea ? '/form-submission' : `/form/${area.value.value}`;
 
 // ===== DROPDOWN =====
 const isDropdownOpen = ref(false);
@@ -738,12 +750,7 @@ const items = ref([]);
 const isLoading = ref(false);
 const searchQuery = ref('');
 const selectedRegion = ref('');
-const regionOptions = ref([
-  'BIG BANDUNG',
-  'BIG KARAWANG',
-  'BIG TASIK',
-  'BIG CIREBON',
-]);
+const regionOptions = ref([]);
 
 const pagination = reactive({
   currentPage: 1,
@@ -757,6 +764,7 @@ const pagination = reactive({
 let pollTimer = null;
 onMounted(() => {
   fetchSubmissions();
+  loadSheetUrl();
   document.addEventListener('click', handleOutsideClick);
   // Sinkronkan data baru di latar belakang setiap 30 detik (seperti Form Program)
   pollTimer = setInterval(() => {
@@ -828,7 +836,7 @@ async function fetchSubmissions(isSilent = false) {
       pagination.from = p.from || 0;
       pagination.to = p.to || 0;
 
-      if (res.data.regions?.length) {
+      if (Array.isArray(res.data.regions)) {
         regionOptions.value = res.data.regions;
       }
 
@@ -843,11 +851,12 @@ async function fetchSubmissions(isSilent = false) {
 }
 
 // ================= GOOGLE SPREADSHEET CONFIGURATION =================
-const googleSheetUrl = ref('https://docs.google.com/spreadsheets/d/1rDYiHsNR43H44g2xyV-igyp1Ijv_jp8v8FblAMHqof8/edit?gid=0#gid=0');
+// Link bawaan hanya untuk Jawa Barat; area lain diatur lewat "Konfigurasi Spreadsheet"
+const googleSheetUrl = ref(isDefaultArea ? 'https://docs.google.com/spreadsheets/d/1rDYiHsNR43H44g2xyV-igyp1Ijv_jp8v8FblAMHqof8/edit?gid=0#gid=0' : '');
 const isConfigModalOpen = ref(false);
 const isSavingConfig = ref(false);
-const configWebappUrl = ref('https://script.google.com/macros/s/AKfycbz7fKNsgUfZeVtRVXGkZIKTr7PMQJPCcwuJZGkxAW_qSa2n_4m9z-459-FCaaSrxYhq/exec');
-const configSpreadsheetUrl = ref('https://docs.google.com/spreadsheets/d/1rDYiHsNR43H44g2xyV-igyp1Ijv_jp8v8FblAMHqof8/edit?gid=0#gid=0');
+const configWebappUrl = ref(isDefaultArea ? 'https://script.google.com/macros/s/AKfycbz7fKNsgUfZeVtRVXGkZIKTr7PMQJPCcwuJZGkxAW_qSa2n_4m9z-459-FCaaSrxYhq/exec' : '');
+const configSpreadsheetUrl = ref(googleSheetUrl.value);
 const saveMessage = ref('');
 const saveSuccess = ref(false);
 const hasCopiedScript = ref(false);
@@ -862,7 +871,7 @@ const appsScriptTemplate = `/**
  */
 
 // Domain Web SCM Automation untuk Webhook 2 Arah
-var SCM_WEBHOOK_URL = "https://scm-customer.oceanspace.co.id/api/webhooks/form-program";
+var SCM_WEBHOOK_URL = "https://scm-customer.oceanspace.co.id/api/webhooks/form-program?area=${area.value.value}";
 
 function formatHyperlink(val, label) {
   if (!val || typeof val !== "string") return "-";
@@ -1088,19 +1097,24 @@ function rapikanSemuaLink() {
   SpreadsheetApp.getActiveSpreadsheet().toast("Berhasil merapikan " + updatedCount + " link dokumen menjadi pendek & rapi!", "Selesai", 5);
 }`;
 
+async function loadSheetUrl() {
+  try {
+    const res = await axios.get('/api/program-submissions/config');
+    googleSheetUrl.value = res.data?.spreadsheet_url || '';
+  } catch (e) {
+    // Keep defaults
+  }
+}
+
 async function openConfigModal() {
   saveMessage.value = '';
   isConfigModalOpen.value = true;
   try {
     const res = await axios.get('/api/program-submissions/config');
     if (res.data) {
-      if (res.data.spreadsheet_url) {
-        configSpreadsheetUrl.value = res.data.spreadsheet_url;
-        googleSheetUrl.value = res.data.spreadsheet_url;
-      }
-      if (res.data.webapp_url) {
-        configWebappUrl.value = res.data.webapp_url;
-      }
+      configSpreadsheetUrl.value = res.data.spreadsheet_url || '';
+      googleSheetUrl.value = res.data.spreadsheet_url || '';
+      configWebappUrl.value = res.data.webapp_url || '';
     }
   } catch (e) {
     // Keep defaults

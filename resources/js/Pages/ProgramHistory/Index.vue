@@ -7,6 +7,8 @@
       <span class="text-gray-800 font-medium">Riwayat Program</span>
     </div>
 
+    <AreaTabs />
+
     <!-- Header Page -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
@@ -181,7 +183,7 @@
               </th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">
                 <span class="inline-flex items-center gap-1.5 select-none cursor-pointer">
-                  ID Real
+                  ID Realme
                   <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400" />
                 </span>
               </th>
@@ -552,6 +554,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
+import AreaTabs from '@/components/AreaTabs.vue';
 import {
   Search as SearchIcon,
   RefreshCw as RefreshCwIcon,

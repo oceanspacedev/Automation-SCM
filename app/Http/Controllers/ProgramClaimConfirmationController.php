@@ -62,7 +62,7 @@ class ProgramClaimConfirmationController extends Controller
                 }
 
                 // Cari dan sinkronkan DataProgram yang cocok jika ada
-                $matchingDp = DataProgram::where('kode_bt', $submission->id_real)->first();
+                $matchingDp = DataProgram::where('area', $submission->areaEnum()->value)->where('kode_bt', $submission->id_real)->first();
                 if ($matchingDp) {
                     $matchingDp->update(['status_potong_ar' => 'DEALER SETUJU (PROSES AR)']);
                     $this->pushDpToSpreadsheet($matchingDp);
@@ -75,7 +75,7 @@ class ProgramClaimConfirmationController extends Controller
                     'tgl_potong_tf' => $todayDate,
                 ]);
 
-                $matchingDp = DataProgram::where('kode_bt', $submission->id_real)->first();
+                $matchingDp = DataProgram::where('area', $submission->areaEnum()->value)->where('kode_bt', $submission->id_real)->first();
                 if ($matchingDp) {
                     $updateData = [
                         'status_potong_purchase' => 'SUDAH POTONG',
@@ -99,7 +99,7 @@ class ProgramClaimConfirmationController extends Controller
                     'status_potong_ar' => 'PENDING DEALER',
                 ]);
 
-                $matchingDp = DataProgram::where('kode_bt', $submission->id_real)->first();
+                $matchingDp = DataProgram::where('area', $submission->areaEnum()->value)->where('kode_bt', $submission->id_real)->first();
                 if ($matchingDp) {
                     $matchingDp->update(['status_potong_ar' => 'PENDING DEALER']);
                     $this->pushDpToSpreadsheet($matchingDp);
@@ -235,7 +235,7 @@ class ProgramClaimConfirmationController extends Controller
                 'no_faktur_pajak' => $dp->no_faktur_pajak,
                 'ket_faktur_pajak' => $dp->ket_faktur_pajak,
                 'noted' => $dp->noted,
-            ]]);
+            ]], null, $dp->areaEnum());
         } catch (\Throwable $e) {
             Log::warning("Gagal push status potong ke spreadsheet untuk DP ID {$dp->id}: {$e->getMessage()}");
         }

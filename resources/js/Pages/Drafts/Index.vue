@@ -7,6 +7,8 @@
       <span class="text-gray-800 font-medium">List</span>
     </div>
 
+    <AreaTabs />
+
     <!-- Header & Action Buttons -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
@@ -20,7 +22,7 @@
         <template v-if="selectedIds.length > 0">
           <button
             @click="askGenerateSelected"
-            :disabled="generatingBatch"
+            :disabled="generatingBatch || pushingBatch"
             class="h-9 px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center gap-2"
             :title="`Terbitkan ${selectedIds.length} draft terpilih menjadi invoice`"
           >
@@ -30,6 +32,20 @@
             </svg>
             <CheckSquareIcon v-else class="w-3.5 h-3.5 text-gray-500" />
             <span>{{ generatingBatch ? 'Menerbitkan...' : `Generate (${selectedIds.length}) Terpilih` }}</span>
+          </button>
+          <!-- Multi-select Kirim ke Data Program -->
+          <button
+            @click="askPushSelectedToDataProgram"
+            :disabled="pushingBatch || generatingBatch"
+            class="h-9 px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center gap-2"
+            :title="`Kirim ${selectedIds.length} draft terpilih ke Data Program & Google Spreadsheet`"
+          >
+            <svg v-if="pushingBatch" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <TableIcon v-else class="w-3.5 h-3.5 text-gray-500" />
+            <span>{{ pushingBatch ? 'Mengirim...' : `Kirim ke Data Program (${selectedIds.length})` }}</span>
           </button>
           <button
             @click="selectedIds = []"
@@ -69,6 +85,15 @@
           </svg>
           <span>Import Excel</span>
         </button>
+
+        <!-- Tambah Manual Button -->
+        <button
+          @click="showCreateModal = true"
+          class="h-9 px-3.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+        >
+          <PlusIcon class="w-3.5 h-3.5" />
+          <span>Tambah Manual</span>
+        </button>
       </div>
     </div>
 
@@ -96,16 +121,42 @@
           </span>
         </div>
 
-        <!-- Right: Search Box & Filter Popover -->
-        <div class="flex items-center gap-2 self-end sm:self-auto w-full sm:w-auto">
+        <!-- Right: Direct Filter Dropdowns, Search Box & Filter Popover -->
+        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap self-end sm:self-auto w-full sm:w-auto">
+          <!-- Wilayah Filter Dropdown (Kaya Pilih Wilayah) -->
+          <div class="relative min-w-[135px]">
+            <select
+              v-model="filters.region"
+              @change="fetchDrafts(1)"
+              class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 pr-8 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-900 cursor-pointer appearance-none shadow-2xs"
+            >
+              <option value="">Semua Wilayah</option>
+              <option v-for="r in regionOptions" :key="r" :value="r">{{ r }}</option>
+            </select>
+            <ChevronDownIcon class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          </div>
+
+          <!-- Program Filter Dropdown (Kaya Pilih Program) -->
+          <div class="relative min-w-[150px]" v-if="programOptions.length > 0">
+            <select
+              v-model="filters.program"
+              @change="fetchDrafts(1)"
+              class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 pr-8 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-900 cursor-pointer appearance-none shadow-2xs"
+            >
+              <option value="">Semua Program</option>
+              <option v-for="p in programOptions" :key="p" :value="p">{{ p }}</option>
+            </select>
+            <ChevronDownIcon class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          </div>
+
           <!-- Search box with Magnifying glass -->
-          <div class="relative flex-1 sm:w-64">
+          <div class="relative flex-1 sm:w-60">
             <SearchIcon class="w-4 h-4 text-gray-400 absolute left-3 top-2.5 pointer-events-none" />
             <input
               v-model="filters.search"
               @input="debounceFetch"
               type="text"
-              placeholder="Search"
+              placeholder="Search..."
               class="h-9 w-full pl-9 pr-3 text-xs text-gray-900 bg-white border border-gray-300 rounded-lg placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-950 focus:border-gray-950 transition"
             />
           </div>
@@ -121,7 +172,7 @@
                     ? 'border-gray-900 bg-gray-50 text-gray-950'
                     : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
                 ]"
-                title="Buka Filter"
+                title="Buka Filter Tambahan"
               >
                 <FilterIcon class="w-4 h-4 text-gray-600" />
                 <span
@@ -144,6 +195,32 @@
                 >
                   Reset
                 </button>
+              </div>
+
+              <!-- Wilayah Filter -->
+              <div class="space-y-1">
+                <label class="text-[11px] font-medium text-gray-700">Wilayah</label>
+                <select
+                  v-model="filters.region"
+                  @change="fetchDrafts(1)"
+                  class="w-full h-8 px-2.5 text-xs rounded-lg border border-gray-300 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-950 cursor-pointer"
+                >
+                  <option value="">Semua Wilayah</option>
+                  <option v-for="r in regionOptions" :key="r" :value="r">{{ r }}</option>
+                </select>
+              </div>
+
+              <!-- Program Filter -->
+              <div class="space-y-1" v-if="programOptions.length > 0">
+                <label class="text-[11px] font-medium text-gray-700">Nama Program</label>
+                <select
+                  v-model="filters.program"
+                  @change="fetchDrafts(1)"
+                  class="w-full h-8 px-2.5 text-xs rounded-lg border border-gray-300 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-950 cursor-pointer"
+                >
+                  <option value="">Semua Program</option>
+                  <option v-for="p in programOptions" :key="p" :value="p">{{ p }}</option>
+                </select>
               </div>
 
               <!-- Tipe Filter -->
@@ -305,19 +382,23 @@
               </td>
 
               <!-- Status -->
-              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
-                <span
-                  :class="[
-                    'px-2 py-0.5 rounded text-xs font-medium border inline-block',
-                    draft.status === 'ready'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : draft.status === 'invoiced'
-                      ? 'bg-sky-50 text-sky-700 border-sky-200'
-                      : 'bg-rose-50 text-rose-700 border-rose-200'
-                  ]"
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
+                <div class="flex items-center gap-1.5">
+                  <span
+                    class="w-1.5 h-1.5 rounded-full shrink-0"
+                    :class="draft.status === 'invoiced' ? 'bg-emerald-500' : draft.status === 'ready' ? 'bg-amber-500' : 'bg-rose-500'"
+                  ></span>
+                  <span class="text-xs text-gray-900">
+                    {{ draft.status === 'invoiced' ? 'Invoiced' : draft.status === 'ready' ? 'Ready' : 'Error' }}
+                  </span>
+                </div>
+                <p
+                  v-if="draft.data_program"
+                  class="mt-0.5 pl-3 text-[11px] text-gray-500"
+                  title="Sudah tersinkron di Data Program & Google Spreadsheet"
                 >
-                  {{ draft.status === 'ready' ? 'READY' : (draft.status === 'invoiced' ? 'INVOICED' : (draft.status ? draft.status.toUpperCase() : 'ERROR')) }}
-                </span>
+                  Masuk Data Program
+                </p>
               </td>
 
               <!-- Tanggal -->
@@ -380,6 +461,30 @@
                   >
                     <FileTextIcon class="w-3.5 h-3.5 text-gray-600" />
                   </router-link>
+
+                  <!-- 5. Kirim ke Data Program Action (setelah invoice diterbitkan) -->
+                  <button
+                    v-if="draft.status === 'invoiced'"
+                    type="button"
+                    @click="askPushSingleToDataProgram(draft)"
+                    :disabled="pushingId === draft.id"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
+                    :title="draft.data_program ? 'Sudah di Data Program (Klik untuk perbarui)' : 'Kirim ke Data Program & Google Spreadsheet'"
+                  >
+                    <span v-if="pushingId === draft.id" class="inline-block w-3.5 h-3.5 border-2 border-gray-400 border-t-gray-900 rounded-full animate-spin shrink-0"></span>
+                    <TableIcon v-else :class="draft.data_program ? 'text-emerald-600' : 'text-gray-600'" class="w-3.5 h-3.5" />
+                  </button>
+
+                  <!-- 6. Delete Action (Draft not yet invoiced) -->
+                  <button
+                    v-if="draft.status !== 'invoiced'"
+                    type="button"
+                    @click="askDeleteDraft(draft)"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                    title="Hapus Draft"
+                  >
+                    <Trash2Icon class="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </td>
             </tr>
@@ -420,6 +525,13 @@
       @imported="fetchDrafts(1)"
     />
 
+    <!-- Create Draft Modal (Tambah Manual) -->
+    <CreateDraftModal
+      :is-open="showCreateModal"
+      @close="showCreateModal = false"
+      @created="onDraftCreated"
+    />
+
     <!-- Confirmation Modal -->
     <ConfirmModal
       v-model="confirmState.show"
@@ -447,6 +559,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
+import AreaTabs from '@/components/AreaTabs.vue';
 import { parseDate } from '@internationalized/date';
 import {
   CalendarIcon,
@@ -460,11 +573,15 @@ import {
   Filter as FilterIcon,
   RefreshCw as RefreshCwIcon,
   FileText as FileTextIcon,
+  Plus as PlusIcon,
+  Trash2 as Trash2Icon,
+  Table as TableIcon,
 } from '@lucide/vue';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import ImportModal from '@/components/ImportModal.vue';
+import CreateDraftModal from '@/components/CreateDraftModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import GenerateInvoiceModal from '@/components/GenerateInvoiceModal.vue';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
@@ -472,11 +589,14 @@ import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 const drafts = ref([]);
 const loading = ref(false);
 const showImportModal = ref(false);
+const showCreateModal = ref(false);
 const isFilterOpen = ref(false);
 const selectedIds = ref([]);
 const generatingId = ref(null);
 const generatingBatch = ref(false);
 const generatingAll = ref(false);
+const pushingId = ref(null);
+const pushingBatch = ref(false);
 const alertMessage = ref(null);
 const alertSuccess = ref(true);
 
@@ -535,8 +655,32 @@ const toggleSelectAll = (e) => {
   }
 };
 
+const regionOptions = [
+  'BIG BANDUNG',
+  'BIG KARAWANG',
+  'BIG TASIK',
+  'BIG CIREBON',
+  'JABODETABEK',
+  'JAWA BARAT',
+];
+
+const programOptions = ref([]);
+
+const fetchProgramOptions = async () => {
+  try {
+    const res = await axios.get('/api/programs/options');
+    if (res.data?.names?.length) {
+      programOptions.value = res.data.names;
+    }
+  } catch (e) {
+    // Keep fallback
+  }
+};
+
 const filters = reactive({
   search: '',
+  region: '',
+  program: '',
   invoice_type: '',
   status: '',
   date: '',
@@ -544,6 +688,8 @@ const filters = reactive({
 
 const activeFilterCount = computed(() => {
   let count = 0;
+  if (filters.region) count++;
+  if (filters.program) count++;
   if (filters.invoice_type) count++;
   if (filters.status) count++;
   if (filters.date) count++;
@@ -614,6 +760,8 @@ const fetchDrafts = async (page = 1) => {
 
 const resetFilters = () => {
   filters.search = '';
+  filters.region = '';
+  filters.program = '';
   filters.invoice_type = '';
   filters.status = '';
   filters.date = '';
@@ -753,7 +901,84 @@ const formatCurrency = (val) => {
   return 'Rp ' + new Intl.NumberFormat('id-ID').format(num);
 };
 
+const askPushSingleToDataProgram = async (draft) => {
+  if (pushingId.value === draft.id) return;
+  pushingId.value = draft.id;
+  alertMessage.value = null;
+  try {
+    const res = await axios.post(`/api/drafts/${draft.id}/push-to-data-program`);
+    alertMessage.value = res.data.message || 'Draft berhasil dikirim ke Data Program & Google Spreadsheet.';
+    alertSuccess.value = true;
+    fetchDrafts(pagination.current_page);
+  } catch (err) {
+    alertMessage.value = err.response?.data?.message || 'Gagal mengirim draft ke Data Program.';
+    alertSuccess.value = false;
+  } finally {
+    pushingId.value = null;
+  }
+};
+
+const askPushSelectedToDataProgram = () => {
+  if (selectedIds.value.length === 0 || pushingBatch.value) return;
+  confirmState.title = 'Kirim ke Data Program & Spreadsheet';
+  confirmState.message = `Apakah Anda yakin ingin mengirim ${selectedIds.value.length} draft terpilih ke Data Program dan Google Spreadsheet?`;
+  confirmState.confirmText = `Ya, Kirim (${selectedIds.value.length}) Draft`;
+  confirmState.action = async () => {
+    confirmState.loading = true;
+    pushingBatch.value = true;
+    alertMessage.value = null;
+    try {
+      const res = await axios.post('/api/drafts/push-batch-to-data-program', {
+        ids: selectedIds.value,
+      });
+      alertMessage.value = res.data.message || 'Draft terpilih berhasil dikirim ke Data Program & Google Spreadsheet.';
+      alertSuccess.value = true;
+      selectedIds.value = [];
+      fetchDrafts(pagination.current_page);
+    } catch (err) {
+      alertMessage.value = err.response?.data?.message || 'Gagal mengirim draft terpilih ke Data Program.';
+      alertSuccess.value = false;
+    } finally {
+      pushingBatch.value = false;
+      confirmState.loading = false;
+      confirmState.show = false;
+    }
+  };
+  confirmState.show = true;
+};
+
+const onDraftCreated = (newDraft) => {
+  alertMessage.value = `Draft invoice #${newDraft.no || newDraft.id} (${newDraft.dealer_name}) berhasil ditambahkan secara manual.`;
+  alertSuccess.value = true;
+  fetchDrafts(1);
+};
+
+const askDeleteDraft = (draft) => {
+  confirmState.title = 'Hapus Draft Invoice';
+  confirmState.message = `Apakah Anda yakin ingin menghapus draft #${draft.no || draft.id} (${draft.dealer_name})? Tindakan ini tidak dapat dibatalkan.`;
+  confirmState.confirmText = 'Ya, Hapus Draft';
+  confirmState.action = async () => {
+    confirmState.loading = true;
+    try {
+      const res = await axios.delete(`/api/drafts/${draft.id}`);
+      if (res.data?.success) {
+        alertMessage.value = res.data.message || 'Draft berhasil dihapus.';
+        alertSuccess.value = true;
+        fetchDrafts(pagination.current_page);
+      }
+    } catch (e) {
+      alertMessage.value = e.response?.data?.message || 'Gagal menghapus draft.';
+      alertSuccess.value = false;
+    } finally {
+      confirmState.loading = false;
+      confirmState.show = false;
+    }
+  };
+  confirmState.show = true;
+};
+
 onMounted(() => {
   fetchDrafts(1);
+  fetchProgramOptions();
 });
 </script>

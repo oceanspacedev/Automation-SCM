@@ -41,34 +41,78 @@
                   </NavigationMenuLink>
                 </NavigationMenuItem>
 
-                <!-- 2. Form Program -->
+                <!-- 2. Dropdown Form Program (per area) -->
                 <NavigationMenuItem v-if="canAccess('form_program')">
-                  <NavigationMenuLink as-child>
-                    <router-link
-                      to="/test-program"
-                      :class="[
-                        navigationMenuTriggerStyle(),
-                        isActive('/test-program') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
-                      ]"
-                    >
-                      Form Program
-                    </router-link>
-                  </NavigationMenuLink>
+                  <Popover v-model:open="isFormProgramOpen">
+                    <PopoverTrigger as-child>
+                      <button
+                        type="button"
+                        :class="[
+                          navigationMenuTriggerStyle(),
+                          isActive('/test-program') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
+                          'gap-1.5 dark:text-slate-200 dark:hover:bg-slate-800'
+                        ]"
+                      >
+                        <span>Form Program</span>
+                        <span v-if="isActive('/test-program')" class="text-[10px] font-semibold text-gray-500 dark:text-slate-400">{{ activeAreaShort }}</span>
+                        <ChevronDownIcon
+                          class="w-3.5 h-3.5 text-gray-500 dark:text-slate-400 transition-transform duration-200"
+                          :class="isFormProgramOpen && 'rotate-180'"
+                        />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" class="w-48 p-1.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl text-xs space-y-0.5">
+                      <router-link
+                        v-for="area in AREAS"
+                        :key="area.value"
+                        :to="`/test-program/${area.value}`"
+                        @click="isFormProgramOpen = false"
+                        :class="[
+                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                          isActive(`/test-program/${area.value}`) ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                        ]"
+                      >
+                        {{ area.label }}
+                      </router-link>
+                    </PopoverContent>
+                  </Popover>
                 </NavigationMenuItem>
 
-                <!-- 3. Data Program -->
+                <!-- 3. Dropdown Data Program (per area) -->
                 <NavigationMenuItem v-if="canAccess('data_program')">
-                  <NavigationMenuLink as-child>
-                    <router-link
-                      to="/data-program"
-                      :class="[
-                        navigationMenuTriggerStyle(),
-                        isActive('/data-program') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
-                      ]"
-                    >
-                      Data Program
-                    </router-link>
-                  </NavigationMenuLink>
+                  <Popover v-model:open="isDataProgramOpen">
+                    <PopoverTrigger as-child>
+                      <button
+                        type="button"
+                        :class="[
+                          navigationMenuTriggerStyle(),
+                          isActive('/data-program') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
+                          'gap-1.5 dark:text-slate-200 dark:hover:bg-slate-800'
+                        ]"
+                      >
+                        <span>Data Program</span>
+                        <span v-if="isActive('/data-program')" class="text-[10px] font-semibold text-gray-500 dark:text-slate-400">{{ activeAreaShort }}</span>
+                        <ChevronDownIcon
+                          class="w-3.5 h-3.5 text-gray-500 dark:text-slate-400 transition-transform duration-200"
+                          :class="isDataProgramOpen && 'rotate-180'"
+                        />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" class="w-48 p-1.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl text-xs space-y-0.5">
+                      <router-link
+                        v-for="area in AREAS"
+                        :key="area.value"
+                        :to="`/data-program/${area.value}`"
+                        @click="isDataProgramOpen = false"
+                        :class="[
+                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                          isActive(`/data-program/${area.value}`) ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                        ]"
+                      >
+                        {{ area.label }}
+                      </router-link>
+                    </PopoverContent>
+                  </Popover>
                 </NavigationMenuItem>
 
                 <!-- 4. Dropdown Riwayat -->
@@ -131,19 +175,99 @@
                   </Popover>
                 </NavigationMenuItem>
 
-                <!-- 5. Master User -->
-                <NavigationMenuItem v-if="canAccess('master_user')">
-                  <NavigationMenuLink as-child>
-                    <router-link
-                      to="/users"
-                      :class="[
-                        navigationMenuTriggerStyle(),
-                        isActive('/users') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
-                      ]"
-                    >
-                      Master User
-                    </router-link>
-                  </NavigationMenuLink>
+                <!-- 5. Dropdown Master Data -->
+                <NavigationMenuItem v-if="canAccess('master')">
+                  <Popover v-model:open="isMasterOpen">
+                    <PopoverTrigger as-child>
+                      <button
+                        type="button"
+                        :class="[
+                          navigationMenuTriggerStyle(),
+                          (isActive('/dealers') || isActive('/customers') || isActive('/users') || isActive('/programs') || isActive('/regions') || isActive('/ar')) && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
+                          'gap-1.5 dark:text-slate-200 dark:hover:bg-slate-800'
+                        ]"
+                      >
+                        <span>Master</span>
+                        <ChevronDownIcon
+                          class="w-3.5 h-3.5 text-gray-500 dark:text-slate-400 transition-transform duration-200"
+                          :class="isMasterOpen && 'rotate-180'"
+                        />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" class="w-48 p-1.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl text-xs space-y-0.5">
+                      <router-link
+                        v-if="canAccess('master_program')"
+                        to="/programs"
+                        @click="isMasterOpen = false"
+                        :class="[
+                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                          isActive('/programs') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                        ]"
+                      >
+                        Program
+                      </router-link>
+
+                      <router-link
+                        v-if="canAccess('master_program')"
+                        to="/regions"
+                        @click="isMasterOpen = false"
+                        :class="[
+                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                          isActive('/regions') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                        ]"
+                      >
+                        Region
+                      </router-link>
+
+                      <router-link
+                        v-if="canAccess('master_program')"
+                        to="/ar"
+                        @click="isMasterOpen = false"
+                        :class="[
+                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                          isActive('/ar') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                        ]"
+                      >
+                        AR
+                      </router-link>
+
+                      <router-link
+                        v-if="canAccess('master_dealer')"
+                        to="/dealers"
+                        @click="isMasterOpen = false"
+                        :class="[
+                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                          isActive('/dealers') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                        ]"
+                      >
+                        Dealer
+                      </router-link>
+
+                      <router-link
+                        v-if="canAccess('master_customer')"
+                        to="/customers"
+                        @click="isMasterOpen = false"
+                        :class="[
+                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                          isActive('/customers') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                        ]"
+                      >
+                        Customer
+                      </router-link>
+
+                      <router-link
+                        v-if="canAccess('master_user')"
+                        to="/users"
+                        @click="isMasterOpen = false"
+                        :class="[
+                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                          isActive('/users') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                        ]"
+                      >
+                        User
+                      </router-link>
+                    </PopoverContent>
+                  </Popover>
                 </NavigationMenuItem>
               </NavigationMenuList>
             </NavigationMenu>
@@ -271,7 +395,72 @@
                   </div>
                 </div>
 
-                <!-- Menu Master User -->
+                <!-- Menu Master Links -->
+                <router-link
+                  v-if="canAccess('master_program')"
+                  to="/programs"
+                  :class="[
+                    'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                    isActive('/programs')
+                      ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
+                      : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                  ]"
+                >
+                  Program
+                </router-link>
+
+                <router-link
+                  v-if="canAccess('master_program')"
+                  to="/regions"
+                  :class="[
+                    'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                    isActive('/regions')
+                      ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
+                      : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                  ]"
+                >
+                  Region
+                </router-link>
+
+                <router-link
+                  v-if="canAccess('master_program')"
+                  to="/ar"
+                  :class="[
+                    'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                    isActive('/ar')
+                      ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
+                      : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                  ]"
+                >
+                  AR
+                </router-link>
+
+                <router-link
+                  v-if="canAccess('master_dealer')"
+                  to="/dealers"
+                  :class="[
+                    'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                    isActive('/dealers')
+                      ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
+                      : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                  ]"
+                >
+                  Dealer
+                </router-link>
+
+                <router-link
+                  v-if="canAccess('master_customer')"
+                  to="/customers"
+                  :class="[
+                    'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                    isActive('/customers')
+                      ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
+                      : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                  ]"
+                >
+                  Customer
+                </router-link>
+
                 <router-link
                   v-if="canAccess('master_user')"
                   to="/users"
@@ -282,7 +471,7 @@
                       : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
                   ]"
                 >
-                  Master User
+                  User
                 </router-link>
 
                 <!-- Toggle Mode Gelap (Clean & Eye-Friendly) -->
@@ -329,7 +518,7 @@
 
     <!-- Main Content -->
     <main :class="['flex-1 w-full', isStandalonePage ? 'p-0 m-0' : 'mx-auto px-4 sm:px-6 py-5']">
-      <router-view />
+      <router-view :key="`${route.name}-${route.params.area || ''}`" />
     </main>
   </div>
 </template>
@@ -340,6 +529,7 @@ import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { useAuth } from '@/composables/useAuth';
 import { useTheme } from '@/composables/useTheme';
+import { AREAS, findArea } from '@/composables/useArea';
 import {
   NavigationMenu,
   NavigationMenuItem,
@@ -367,6 +557,11 @@ const { user, logout } = useAuth();
 const { isDark, toggleDarkMode, initTheme } = useTheme();
 
 const isRiwayatOpen = ref(false);
+const isMasterOpen = ref(false);
+const isFormProgramOpen = ref(false);
+const isDataProgramOpen = ref(false);
+
+const activeAreaShort = computed(() => findArea(route.params.area).short);
 
 const isLoginPage = computed(() => route.path === '/login');
 const isStandalonePage = computed(() => {
@@ -407,6 +602,17 @@ const canAccess = (feature) => {
     if (feature === 'riwayat_program') return user.value.permissions.includes('riwayat_program');
     if (feature === 'email_logs') return user.value.permissions.includes('email_logs');
     if (feature === 'dashboard') return user.value.permissions.includes('dashboard');
+    if (feature === 'master') {
+      return (
+        user.value.permissions.includes('master_program') ||
+        user.value.permissions.includes('master_dealer') ||
+        user.value.permissions.includes('master_customer') ||
+        user.value.permissions.includes('master_user')
+      );
+    }
+    if (feature === 'master_program') return user.value.permissions.includes('master_program');
+    if (feature === 'master_dealer') return user.value.permissions.includes('master_dealer');
+    if (feature === 'master_customer') return user.value.permissions.includes('master_customer');
     if (feature === 'master_user') return user.value.permissions.includes('master_user');
     return user.value.permissions.includes(feature);
   }
@@ -426,6 +632,10 @@ const canAccess = (feature) => {
   if (feature === 'riwayat_program') return true;
   if (feature === 'email_logs') return role === 'ar';
   if (feature === 'dashboard') return role === 'ar';
+  if (feature === 'master') return false;
+  if (feature === 'master_program') return false;
+  if (feature === 'master_dealer') return false;
+  if (feature === 'master_customer') return false;
   if (feature === 'master_user') return false;
 
   return false;

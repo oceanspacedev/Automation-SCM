@@ -323,6 +323,96 @@ class DataProgramTest extends TestCase
         ]);
     }
 
+    public function test_update_supports_editing_missing_fields_and_auto_recalculates_aging(): void
+    {
+        $dp = DataProgram::create([
+            'row_hash' => 'hash_test_edit_empty_fields',
+            'dealer_name' => 'CV MAJU SEJAHTERA',
+            'kode_bt' => 'BT-MAJU',
+            'program_name' => 'PROGRAM TARGET Q2',
+        ]);
+
+        $updatePayload = [
+            'no_po' => 'PO-2026-999',
+            'no_sj' => 'SJ-2026-888',
+            'tgl_sj' => '2026-03-20',
+            'tgl_input' => '2026-03-01',
+            'bank' => 'BCA',
+            'norek' => '1234567890',
+            'namrek' => 'CV MAJU SEJAHTERA',
+            'sales_person' => 'Budi Santoso',
+            'telemarketing' => 'Siti Rahma',
+            'status_dl' => 'DL',
+            'no_faktur_pajak' => '010.001-26.00000001',
+            'ket_faktur_pajak' => 'Faktur Lengkap',
+            'no_transaksi' => 'TRX-9988',
+            'no_po_sj' => 'POSJ-1122',
+            'info_bank' => 'Cabang Semarang',
+            'pending_potongan' => 'Potong Q2',
+            'noted' => 'Catatan revisi admin',
+            'push_to_sheet' => false,
+        ];
+
+        $response = $this->putJson("/api/data-program/{$dp->id}", $updatePayload);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true);
+
+        $dp->refresh();
+        $this->assertEquals('PO-2026-999', $dp->no_po);
+        $this->assertEquals('SJ-2026-888', $dp->no_sj);
+        $this->assertEquals('2026-03-20', $dp->tgl_sj);
+        $this->assertEquals('BCA', $dp->bank);
+        $this->assertEquals('1234567890', $dp->norek);
+        $this->assertEquals('CV MAJU SEJAHTERA', $dp->namrek);
+        $this->assertEquals('Budi Santoso', $dp->sales_person);
+        $this->assertEquals('Siti Rahma', $dp->telemarketing);
+        $this->assertEquals('DL', $dp->status_dl);
+        $this->assertEquals('010.001-26.00000001', $dp->no_faktur_pajak);
+        $this->assertEquals('Catatan revisi admin', $dp->noted);
+        $this->assertEquals('LEBIH DARI 30 HARI', $dp->keterangan);
+        $this->assertTrue((int) $dp->lama_pending > 30);
+    }
+
+    public function test_bulk_update_fills_one_column_of_several_rows_and_pushes_them_in_one_request(): void
+    {
+        Http::fake(['script.google.com/macros/s/*' => Http::response(['success' => true, 'updated_count' => 2])]);
+
+        $first = DataProgram::create(['row_hash' => 'row_5', 'dealer_name' => 'CV OLIVIA']);
+        $second = DataProgram::create(['row_hash' => 'row_6', 'dealer_name' => 'NEWCO CELL', 'keterangan' => 'Menunggu dealer']);
+
+        $this->putJson('/api/data-program/bulk', [
+            'field' => 'no_po',
+            'rows' => [['id' => $first->id, 'value' => '2502200306'], ['id' => $second->id, 'value' => '2502200307']],
+        ])->assertOk()->assertJsonPath('data.1.no_po', '2502200307');
+
+        $this->assertSame('2502200306', $first->fresh()->no_po);
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => $request['action'] === 'update_rows'
+            && array_column($request['rows'], 'row_index') === [5, 6]
+            && array_column($request['rows'], 'no_po') === ['2502200306', '2502200307']);
+
+        // Mengisi Tgl Input saja menghitung ulang Lama Pending tanpa menimpa Keterangan yang ditulis manual
+        $this->putJson('/api/data-program/bulk', ['field' => 'tgl_input', 'rows' => [['id' => $second->id, 'value' => '2026-03-01']]])->assertOk();
+        $this->assertSame('Menunggu dealer', $second->fresh()->keterangan);
+        $this->assertGreaterThan(30, (int) $second->fresh()->lama_pending);
+    }
+
+    public function test_bulk_update_rejects_unknown_columns_and_invalid_values(): void
+    {
+        $dp = DataProgram::create(['row_hash' => 'row_5', 'dealer_name' => 'CV OLIVIA']);
+
+        $this->putJson('/api/data-program/bulk', ['field' => 'row_hash', 'rows' => [['id' => $dp->id, 'value' => 'row_9']]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['field']);
+
+        $this->putJson('/api/data-program/bulk', ['field' => 'dpp', 'rows' => [['id' => $dp->id, 'value' => 'empat ratus']]])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['rows.0.value']);
+
+        $this->assertSame('row_5', $dp->fresh()->row_hash);
+    }
+
     public function test_reconciliation_fails_when_region_differs(): void
     {
         $dp = DataProgram::create([

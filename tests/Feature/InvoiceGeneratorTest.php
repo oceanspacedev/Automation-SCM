@@ -24,6 +24,7 @@ class InvoiceGeneratorTest extends TestCase
     public function test_can_generate_dsa_invoice_from_draft(): void
     {
         $draft = Draft::create([
+            'cn_number' => 'CN-GEN-001',
             'dealer_code' => 'DLR001',
             'dealer_name' => 'PT Mitra Sejahtera',
             'customer_name' => 'John Doe',
@@ -38,7 +39,7 @@ class InvoiceGeneratorTest extends TestCase
 
         $this->assertInstanceOf(Invoice::class, $invoice);
         $this->assertEquals('DSA', $invoice->invoice_type);
-        $this->assertStringStartsWith('INV-', $invoice->invoice_number);
+        $this->assertSame('CN-GEN-001', $invoice->invoice_number);
         $this->assertEquals(9009009, $invoice->dpp);
         $this->assertEquals(8258258, $invoice->dpp_lain);
         $this->assertEquals(990991, $invoice->ppn);
@@ -52,6 +53,7 @@ class InvoiceGeneratorTest extends TestCase
     public function test_can_generate_nps_fl_invoice_from_draft(): void
     {
         $draft = Draft::create([
+            'cn_number' => 'CN-GEN-002',
             'dealer_code' => 'DLR002',
             'dealer_name' => 'CV Maju Lancar',
             'support_amount' => 5000000,
@@ -71,6 +73,7 @@ class InvoiceGeneratorTest extends TestCase
     public function test_cannot_generate_duplicate_invoice_from_same_draft(): void
     {
         $draft = Draft::create([
+            'cn_number' => 'CN-GEN-003',
             'dealer_code' => 'DLR003',
             'dealer_name' => 'PT Makmur Sentosa',
             'support_amount' => 10000000,
@@ -93,6 +96,7 @@ class InvoiceGeneratorTest extends TestCase
     public function test_invalid_invoice_type_fails(): void
     {
         $draft = Draft::create([
+            'cn_number' => 'CN-GEN-004',
             'dealer_code' => 'DLR004',
             'support_amount' => 1000000,
             'pph_type' => 'BADAN',
@@ -109,6 +113,7 @@ class InvoiceGeneratorTest extends TestCase
     public function test_invoice_preview_route(): void
     {
         $draft = Draft::create([
+            'cn_number' => 'CN-GEN-005',
             'dealer_code' => 'DLR005',
             'dealer_name' => 'PT Sukses Mandiri',
             'support_amount' => 10000000,
@@ -156,9 +161,27 @@ class InvoiceGeneratorTest extends TestCase
         $this->assertEquals('31.352.339.1-426.000', $invoice->customer_npwp);
     }
 
+    public function test_invoice_is_not_generated_without_an_unused_cn_number(): void
+    {
+        $draftData = ['dealer_name' => 'MAJU HARDWARE', 'support_amount' => 1000000, 'invoice_type' => 'DSA', 'status' => 'ready'];
+        $this->generator->generate(Draft::create([...$draftData, 'cn_number' => '2608000043']));
+
+        $draftWithoutCn = Draft::create($draftData);
+        $draftWithUsedCn = Draft::create([...$draftData, 'cn_number' => '2608000043']);
+
+        $this->postJson('/api/invoices/generate-all', ['ids' => [$draftWithoutCn->id, $draftWithUsedCn->id]])
+            ->assertJsonPath('generated_count', 0)
+            ->assertJsonPath('failed_count', 2);
+
+        $this->assertSame(1, Invoice::count());
+        $this->assertSame('ready', $draftWithoutCn->fresh()->status);
+        $this->assertSame('ready', $draftWithUsedCn->fresh()->status);
+    }
+
     public function test_can_bulk_generate_invoices_for_all_ready_drafts(): void
     {
         Draft::create([
+            'cn_number' => 'CN-GEN-006',
             'dealer_code' => 'DLR010',
             'dealer_name' => 'Dealer A',
             'support_amount' => 1000000,
@@ -168,6 +191,7 @@ class InvoiceGeneratorTest extends TestCase
         ]);
 
         Draft::create([
+            'cn_number' => 'CN-GEN-007',
             'dealer_code' => 'DLR011',
             'dealer_name' => 'Dealer B',
             'support_amount' => 2000000,
@@ -177,6 +201,7 @@ class InvoiceGeneratorTest extends TestCase
         ]);
 
         Draft::create([
+            'cn_number' => 'CN-GEN-008',
             'dealer_code' => 'DLR012',
             'dealer_name' => 'Dealer C',
             'support_amount' => 3000000,
@@ -199,6 +224,7 @@ class InvoiceGeneratorTest extends TestCase
     public function test_can_bulk_generate_invoices_for_selected_drafts_only(): void
     {
         $draft1 = Draft::create([
+            'cn_number' => 'CN-GEN-009',
             'dealer_code' => 'DLR020',
             'dealer_name' => 'Dealer Selected 1',
             'support_amount' => 1000000,
@@ -208,6 +234,7 @@ class InvoiceGeneratorTest extends TestCase
         ]);
 
         $draft2 = Draft::create([
+            'cn_number' => 'CN-GEN-010',
             'dealer_code' => 'DLR021',
             'dealer_name' => 'Dealer Selected 2',
             'support_amount' => 2000000,
@@ -217,6 +244,7 @@ class InvoiceGeneratorTest extends TestCase
         ]);
 
         $draft3 = Draft::create([
+            'cn_number' => 'CN-GEN-011',
             'dealer_code' => 'DLR022',
             'dealer_name' => 'Dealer Not Selected',
             'support_amount' => 1500000,
@@ -246,6 +274,7 @@ class InvoiceGeneratorTest extends TestCase
     public function test_can_generate_invoice_with_cv_top_bill_to(): void
     {
         $draft = Draft::create([
+            'cn_number' => 'CN-GEN-012',
             'dealer_code' => 'DLR030',
             'dealer_name' => 'Toko Pelanggan',
             'customer_name' => 'CV OKEY MEGAH PERKASA', // Originally customer is toko
@@ -265,6 +294,7 @@ class InvoiceGeneratorTest extends TestCase
     public function test_can_generate_invoice_with_pt_rism_bill_to(): void
     {
         $draft = Draft::create([
+            'cn_number' => 'CN-GEN-013',
             'dealer_code' => 'DLR031',
             'dealer_name' => 'Toko Pelanggan 2',
             'customer_name' => 'CV OKEY MEGAH PERKASA',
@@ -284,6 +314,7 @@ class InvoiceGeneratorTest extends TestCase
     public function test_can_generate_invoice_with_pt_msi_bill_to(): void
     {
         $draft = Draft::create([
+            'cn_number' => 'CN-GEN-014',
             'dealer_code' => 'DLR032',
             'dealer_name' => 'Toko Pelanggan 3',
             'customer_name' => 'CV OKEY MEGAH PERKASA',
@@ -303,6 +334,7 @@ class InvoiceGeneratorTest extends TestCase
     public function test_api_generate_single_with_bill_to(): void
     {
         $draft = Draft::create([
+            'cn_number' => 'CN-GEN-015',
             'dealer_code' => 'DLR033',
             'dealer_name' => 'Toko Pelanggan 4',
             'customer_name' => 'Customer Biasa',
@@ -325,6 +357,7 @@ class InvoiceGeneratorTest extends TestCase
     public function test_api_generate_all_with_bill_to(): void
     {
         $draft = Draft::create([
+            'cn_number' => 'CN-GEN-016',
             'dealer_code' => 'DLR034',
             'dealer_name' => 'Toko Pelanggan 5',
             'customer_name' => 'Customer Biasa',
@@ -358,6 +391,7 @@ class InvoiceGeneratorTest extends TestCase
     public function test_can_generate_regular_invoice_from_draft(): void
     {
         $draft = Draft::create([
+            'cn_number' => 'CN-GEN-017',
             'dealer_code' => 'DLR035',
             'dealer_name' => 'CV Sumber Rezeki',
             'customer_name' => 'Pelanggan Regular',
@@ -378,6 +412,7 @@ class InvoiceGeneratorTest extends TestCase
     public function test_regular_invoice_preview_does_not_display_nama_dsa_or_nama_nps_fl(): void
     {
         $draft = Draft::create([
+            'cn_number' => 'CN-GEN-018',
             'dealer_code' => 'DLR036',
             'dealer_name' => 'CV Sejahtera Abadi',
             'customer_name' => 'Pelanggan Regular 2',

@@ -2,9 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Area;
 use App\Console\Commands\AutoAnalyzeProgramAiCommand;
 use App\Models\DataProgram;
+use App\Models\Dealer;
+use App\Models\MasterProgram;
 use App\Models\ProgramSubmission;
+use App\Models\Region;
+use App\Services\AreaContext;
 use App\Services\DataProgramSyncService;
 use App\Services\DocumentAnalysisService;
 use App\Services\ProgramSubmissionService;
@@ -30,7 +35,16 @@ class ProgramSubmissionController extends Controller
         protected ProgramSubmissionService $service,
         protected DocumentAnalysisService $aiService,
         protected WhatsAppService $waService,
+        protected AreaContext $areaContext,
     ) {}
+
+    /**
+     * Cache key specific to the selected area, so each area's dropdowns & totals stay separate.
+     */
+    protected function areaCacheKey(string $key): string
+    {
+        return $this->areaContext->current()?->settingKey($key) ?? "{$key}_all";
+    }
 
     /**
      * List program submissions with filtering & pagination.
@@ -91,7 +105,7 @@ class ProgramSubmissionController extends Controller
         $submissions = $query->select($cols)->orderByDesc('id')->paginate($perPage);
 
         // Cache regions dropdown as plain array
-        $regions = Cache::remember('program_submissions_regions_list_v2', 300, function () {
+        $regions = Cache::remember($this->areaCacheKey('program_submissions_regions_list_v2'), 300, function () {
             return ProgramSubmission::whereNotNull('region')
                 ->where('region', '!=', '')
                 ->distinct()
@@ -107,7 +121,7 @@ class ProgramSubmissionController extends Controller
         });
 
         // Cache programs dropdown as plain array
-        $programs = Cache::remember('program_submissions_programs_list_v2', 300, function () {
+        $programs = Cache::remember($this->areaCacheKey('program_submissions_programs_list_v2'), 300, function () {
             return ProgramSubmission::whereNotNull('program_name')
                 ->where('program_name', '!=', '')
                 ->distinct()
@@ -135,11 +149,11 @@ class ProgramSubmissionController extends Controller
         }
 
         // Fast lookup for latest sync timestamp using indexed ID
-        $lastSyncedAt = Cache::remember('program_submissions_latest_time', 30, function () {
+        $lastSyncedAt = Cache::remember($this->areaCacheKey('program_submissions_latest_time'), 30, function () {
             return ProgramSubmission::orderByDesc('id')->value('updated_at')?->toIso8601String();
         });
 
-        $totalSubmissions = Cache::remember('program_submissions_total_count', 30, function () {
+        $totalSubmissions = Cache::remember($this->areaCacheKey('program_submissions_total_count'), 30, function () {
             return ProgramSubmission::count();
         });
 
@@ -1013,15 +1027,18 @@ class ProgramSubmissionController extends Controller
             'PROGRAM DSA AGUSTUS 2026',
         ];
 
-        $regions = [
-            'BIG BANDUNG',
-            'BIG KARAWANG',
-            'BIG TASIK',
-            'BIG CIREBON',
-        ];
+        $area = $this->areaContext->resolve();
+        $regions = Region::withoutGlobalScope('area')
+            ->where('area', $area->value)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->pluck('name')
+            ->all();
 
-        $sales = Cache::remember('program_submissions_sales_list_v2', 300, function () {
-            return ProgramSubmission::whereNotNull('sales_name')
+        $sales = Cache::remember($area->settingKey('program_submissions_sales_list_v2'), 300, function () use ($area) {
+            return ProgramSubmission::withoutGlobalScope('area')
+                ->where('area', $area->value)
+                ->whereNotNull('sales_name')
                 ->where('sales_name', '!=', '')
                 ->distinct()
                 ->orderBy('sales_name')
@@ -1031,22 +1048,49 @@ class ProgramSubmissionController extends Controller
                 ->all();
         });
 
-        $dbPrograms = ProgramSubmission::whereNotNull('program_name')
-            ->where('program_name', 'like', '%2026%')
-            ->distinct()
-            ->orderBy('program_name')
-            ->pluck('program_name')
-            ->filter(fn ($p) => trim((string) $p) !== '' && trim((string) $p) !== '-')
+        // Master Program satu daftar untuk semua area: form Jawa Barat & Jawa Tengah menampilkan program yang sama
+        $masterPrograms = MasterProgram::where('is_active', true)
+            ->orderBy('name')
+            ->pluck('name')
+            ->filter(fn ($p) => trim((string) $p) !== '')
             ->values()
             ->all();
 
-        $allPrograms = array_values(array_unique(array_merge($defaultPrograms, $dbPrograms)));
+        if (! empty($masterPrograms)) {
+            $allPrograms = $masterPrograms;
+        } else {
+            $dbPrograms = ProgramSubmission::withoutGlobalScope('area')
+                ->where('area', $area->value)
+                ->whereNotNull('program_name')
+                ->where('program_name', 'like', '%2026%')
+                ->distinct()
+                ->orderBy('program_name')
+                ->pluck('program_name')
+                ->filter(fn ($p) => trim((string) $p) !== '' && trim((string) $p) !== '-')
+                ->values()
+                ->all();
+
+            $allPrograms = array_values(array_unique(array_merge($defaultPrograms, $dbPrograms)));
+        }
 
         return response()->json([
             'programs' => $allPrograms,
             'regions' => $regions,
             'sales' => $sales,
+            'area' => ['value' => $area->value, 'label' => $area->label()],
         ]);
+    }
+
+    /**
+     * PKP status of the selected store from its Jenis NPWP in Master Dealer (null when the store or its type is unknown).
+     * The form sends the store's kode BT when it was picked from the list, since an ID Realme can be shared by several stores.
+     */
+    private function masterDealerPkpStatus(Request $request): ?bool
+    {
+        $dealer = Dealer::findByIdReal($request->input('kode_bt'))
+            ?? Dealer::findByIdReal($request->input('id_real'), $request->input('dealer_name'));
+
+        return $dealer?->isPkp();
     }
 
     /**
@@ -1062,6 +1106,7 @@ class ProgramSubmissionController extends Controller
             'sales_name' => (string) $request->input('sales_name', ''),
             'whatsapp' => (string) $request->input('whatsapp', ''),
             'is_pkp' => $request->boolean('is_pkp', false),
+            'is_pkp_master' => $this->masterDealerPkpStatus($request),
         ];
 
         $files = [
@@ -1090,6 +1135,14 @@ class ProgramSubmissionController extends Controller
      */
     public function submitForm(Request $request): JsonResponse
     {
+        // Auto-fill region from Master Dealer if region is empty but id_real is provided
+        if (! $request->filled('region') && $request->filled('id_real')) {
+            $dealerRegion = Dealer::where('id_realme', trim((string) $request->input('id_real')))->value('region');
+            if ($dealerRegion) {
+                $request->merge(['region' => $dealerRegion]);
+            }
+        }
+
         $request->validate([
             'program_name' => ['required', 'string', 'max:255'],
             'region' => ['required', 'string', 'max:100'],
@@ -1128,6 +1181,7 @@ class ProgramSubmissionController extends Controller
             'sales_name' => trim((string) $request->input('sales_name')),
             'whatsapp' => trim((string) $request->input('whatsapp')),
             'is_pkp' => $request->boolean('is_pkp', false),
+            'is_pkp_master' => $this->masterDealerPkpStatus($request),
         ];
 
         $cnFile = $request->file('credit_note_file');
@@ -1169,31 +1223,17 @@ class ProgramSubmissionController extends Controller
             'faktur' => $request->file('tax_invoice_file') ?: $request->input('tax_invoice_url'),
         ]);
 
-        // Auto-fill or validate dealer name from CN or Agreement if input is '-' or empty
+        // Auto-fill dealer name from the Credit Note if input is '-' or empty (Agreement tidak dianalisis, diambil dari data master)
         $isDealerAuto = ($formData['dealer_name'] === '-' || $formData['dealer_name'] === '');
         if ($isDealerAuto) {
             if (! empty($inspection['dealer_name'])) {
                 $formData['dealer_name'] = $inspection['dealer_name'];
-            } elseif (! empty($inspection['agr_dealer_name'])) {
-                $formData['dealer_name'] = $inspection['agr_dealer_name'];
             } else {
                 return response()->json([
                     'success' => false,
-                    'message' => "Nama dealer diisi '-', namun sistem tidak dapat membaca nama toko otomatis dari dokumen Credit Note maupun Agreement. Silakan ketik nama dealer secara manual.",
+                    'message' => "Nama dealer diisi '-', namun sistem tidak dapat membaca nama toko otomatis dari dokumen Credit Note. Silakan ketik nama dealer secara manual.",
                     'error_type' => 'DEALER_NAME_REQUIRED',
                 ], 422);
-            }
-
-            if (! empty($inspection['dealer_name']) && ! empty($inspection['agr_dealer_name'])) {
-                if (! $this->aiService->isDealerNameMatching($inspection['dealer_name'], $inspection['agr_dealer_name'])) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => "Nama dealer pada Credit Note ('{$inspection['dealer_name']}') berbeda dengan nama dealer pada Agreement ('{$inspection['agr_dealer_name']}'). Harap pastikan kedua dokumen berasal dari dealer yang sama.",
-                        'error_type' => 'DOC_DEALER_CONFLICT',
-                        'doc_validation' => $inspection['doc_validation'] ?? [],
-                        'cek_dokumen' => $inspection['cek_dokumen'] ?? '',
-                    ], 422);
-                }
             }
         } elseif (! empty($inspection['dealer_mismatch']) && ! empty($inspection['cn_program_mismatch'])) {
             $extractedDealer = $inspection['dealer_name'] ?? 'Dokumen CN';
@@ -1223,32 +1263,6 @@ class ProgramSubmissionController extends Controller
                 'success' => false,
                 'message' => "Nama program yang diajukan ('{$formData['program_name']}') tidak sesuai dengan nama program pada dokumen Credit Note ('{$extractedCnProgram}'). Harap sesuaikan dokumen Credit Note atau program yang dipilih.",
                 'error_type' => 'CN_PROGRAM_MISMATCH',
-                'doc_validation' => $inspection['doc_validation'] ?? [],
-                'cek_dokumen' => $inspection['cek_dokumen'] ?? '',
-            ], 422);
-        }
-
-        // Agreement Dealer Mismatch
-        if (! empty($inspection['agr_dealer_mismatch'])) {
-            $extractedAgrDealer = $inspection['agr_dealer_name'] ?? 'Dokumen Agreement';
-
-            return response()->json([
-                'success' => false,
-                'message' => "Nama dealer di formulir ('{$formData['dealer_name']}') tidak sesuai dengan nama dealer pada dokumen Agreement ('{$extractedAgrDealer}'). Harap sesuaikan dokumen Agreement Anda.",
-                'error_type' => 'AGR_DEALER_MISMATCH',
-                'doc_validation' => $inspection['doc_validation'] ?? [],
-                'cek_dokumen' => $inspection['cek_dokumen'] ?? '',
-            ], 422);
-        }
-
-        // Agreement Program Mismatch
-        if (! empty($inspection['agr_program_mismatch'])) {
-            $extractedAgrProgram = $inspection['agr_program_name'] ?? 'Dokumen Agreement';
-
-            return response()->json([
-                'success' => false,
-                'message' => "Nama program yang diajukan ('{$formData['program_name']}') tidak sesuai dengan nama program pada dokumen Agreement ('{$extractedAgrProgram}'). Harap sesuaikan dokumen Agreement Anda.",
-                'error_type' => 'AGR_PROGRAM_MISMATCH',
                 'doc_validation' => $inspection['doc_validation'] ?? [],
                 'cek_dokumen' => $inspection['cek_dokumen'] ?? '',
             ], 422);

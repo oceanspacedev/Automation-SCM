@@ -67,6 +67,7 @@ class InvoiceNotificationTest extends TestCase
     public function test_generate_invoice_copies_whatsapp_from_draft(): void
     {
         $draft = Draft::create([
+            'cn_number' => 'CN-NOTIF-001',
             'dealer_code' => 'DLR002',
             'dealer_name' => 'Toko Subur',
             'customer_name' => 'Subur Jaya',
@@ -126,6 +127,7 @@ class InvoiceNotificationTest extends TestCase
         ]);
 
         $draft = Draft::create([
+            'cn_number' => 'CN-NOTIF-002',
             'dealer_code' => 'DLR003',
             'dealer_name' => 'Dealer Sukses',
             'customer_name' => 'Sukses Abadi',

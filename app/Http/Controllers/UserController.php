@@ -280,4 +280,25 @@ class UserController extends Controller
 
         return $clean;
     }
+
+    /**
+     * Ambil daftar kontak tim telemarketing aktif untuk dropdown kirim WA.
+     */
+    public function telemarketingContacts(): JsonResponse
+    {
+        $contacts = User::where('role', 'telemarketing')
+            ->where('is_active', true)
+            ->whereNotNull('whatsapp')
+            ->where('whatsapp', '!=', '')
+            ->orderBy('name', 'asc')
+            ->get(['id', 'name', 'email', 'whatsapp']);
+
+        $defaultPhone = config('services.wag.telemarketing_phone') ?: config('services.wag.ar_phone', '081224290502');
+
+        return response()->json([
+            'success' => true,
+            'default_phone' => $defaultPhone,
+            'contacts' => $contacts,
+        ]);
+    }
 }

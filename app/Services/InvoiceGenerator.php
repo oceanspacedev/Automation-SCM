@@ -54,12 +54,13 @@ class InvoiceGenerator
             $netpay = ((float) $lockedDraft->netpay > 0) ? (float) $lockedDraft->netpay : $calc['netpay'];
             $supportAmount = ((float) $lockedDraft->support_amount > 0) ? (float) $lockedDraft->support_amount : $calc['support_amount'];
 
-            // 4. Determine Invoice Number: prefer draft's cn_number if present and unique
-            $candidateNumber = trim((string) $lockedDraft->cn_number);
-            if (! empty($candidateNumber) && ! Invoice::where('invoice_number', $candidateNumber)->exists()) {
-                $invoiceNumber = $candidateNumber;
-            } else {
-                $invoiceNumber = $this->generateNextInvoiceNumber();
+            // 4. Nomor invoice = No CN dari file draft yang diupload, jadi wajib diisi & belum dipakai invoice lain
+            $invoiceNumber = trim((string) $lockedDraft->cn_number);
+            if ($invoiceNumber === '') {
+                throw new Exception('No CN belum diisi. Nomor invoice diambil dari No CN di file draft.');
+            }
+            if (Invoice::where('invoice_number', $invoiceNumber)->exists()) {
+                throw new Exception("No CN {$invoiceNumber} sudah dipakai invoice lain. Periksa lagi No CN di file draft.");
             }
 
             // Customer lookup for Bill To information
@@ -125,31 +126,6 @@ class InvoiceGenerator
 
             return $invoice;
         });
-    }
-
-    /**
-     * Generate consecutive, race-condition safe invoice number.
-     * Format: INV-YYYY-000001
-     */
-    protected function generateNextInvoiceNumber(): string
-    {
-        $year = date('Y');
-        $prefix = "INV-{$year}-";
-
-        // Query the latest invoice number for this year with row lock
-        $latest = Invoice::where('invoice_number', 'like', "{$prefix}%")
-            ->orderByDesc('id')
-            ->lockForUpdate()
-            ->value('invoice_number');
-
-        if ($latest) {
-            $lastSequence = (int) substr($latest, strlen($prefix));
-            $nextSequence = $lastSequence + 1;
-        } else {
-            $nextSequence = 1;
-        }
-
-        return $prefix.str_pad((string) $nextSequence, 6, '0', STR_PAD_LEFT);
     }
 
     /**

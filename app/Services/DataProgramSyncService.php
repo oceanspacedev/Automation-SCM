@@ -2,7 +2,12 @@
 
 namespace App\Services;
 
+use App\Area;
 use App\Models\DataProgram;
+use App\Models\Dealer;
+use App\Models\Draft;
+use App\Models\MasterProgram;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -16,17 +21,21 @@ class DataProgramSyncService
     public const DEFAULT_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1AFEAxjycq50heaxJeAH9YjpVWFs3GeprplJDOJMzjSU/export?format=csv&gid=241795572';
 
     /**
-     * Get configured Google Sheet CSV URL.
+     * Get configured Google Sheet CSV URL of an area (defaults to the area selected in AreaContext).
+     * Only Jawa Barat has a built-in default spreadsheet; other areas must be configured first.
      */
-    public function getSpreadsheetUrl(): string
+    public function getSpreadsheetUrl(?Area $area = null): string
     {
-        $url = (string) Cache::get(self::CACHE_KEY_SPREADSHEET_URL, env('DATA_PROGRAM_SPREADSHEET_URL', ''));
+        $area ??= $this->currentArea();
+        $isDefaultArea = $area === Area::default();
+
+        $url = (string) Cache::get($area->settingKey(self::CACHE_KEY_SPREADSHEET_URL), $isDefaultArea ? env('DATA_PROGRAM_SPREADSHEET_URL', '') : '');
 
         if (! empty($url)) {
             return $url;
         }
 
-        return self::DEFAULT_SPREADSHEET_URL;
+        return $isDefaultArea ? self::DEFAULT_SPREADSHEET_URL : '';
     }
 
     public const CACHE_KEY_WEBAPP_URL = 'data_program_webapp_url';
@@ -34,37 +43,48 @@ class DataProgramSyncService
     public const DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwJRdSbhKwKWlU4T6Haxu1oWwiYQLef4c-IKYyAVd_sIAY2Z2UukEFQirWKox5qDebtXQ/exec';
 
     /**
-     * Get configured Google Apps Script Web App URL for pushing updates.
+     * Get configured Google Apps Script Web App URL of an area for pushing updates.
      */
-    public function getWebAppUrl(): string
+    public function getWebAppUrl(?Area $area = null): string
     {
-        $url = (string) Cache::get(self::CACHE_KEY_WEBAPP_URL, env('DATA_PROGRAM_WEBAPP_URL', ''));
+        $area ??= $this->currentArea();
+        $isDefaultArea = $area === Area::default();
+
+        $url = (string) Cache::get($area->settingKey(self::CACHE_KEY_WEBAPP_URL), $isDefaultArea ? env('DATA_PROGRAM_WEBAPP_URL', '') : '');
         if (! empty($url) && str_contains($url, 'script.google.com/macros/s/')) {
             return $url;
         }
 
-        $sheetUrl = (string) Cache::get(self::CACHE_KEY_SPREADSHEET_URL, env('DATA_PROGRAM_SPREADSHEET_URL', ''));
+        $sheetUrl = (string) Cache::get($area->settingKey(self::CACHE_KEY_SPREADSHEET_URL), $isDefaultArea ? env('DATA_PROGRAM_SPREADSHEET_URL', '') : '');
         if (! empty($sheetUrl) && str_contains($sheetUrl, 'script.google.com/macros/s/')) {
             return $sheetUrl;
         }
 
-        return self::DEFAULT_WEBAPP_URL;
+        return $isDefaultArea ? self::DEFAULT_WEBAPP_URL : '';
     }
 
     /**
-     * Set configured Google Apps Script Web App URL.
+     * Set configured Google Apps Script Web App URL of an area.
      */
-    public function setWebAppUrl(string $url): void
+    public function setWebAppUrl(string $url, ?Area $area = null): void
     {
-        Cache::forever(self::CACHE_KEY_WEBAPP_URL, trim($url));
+        Cache::forever(($area ?? $this->currentArea())->settingKey(self::CACHE_KEY_WEBAPP_URL), trim($url));
     }
 
     /**
-     * Set configured Google Sheet CSV URL.
+     * Set configured Google Sheet CSV URL of an area.
      */
-    public function setSpreadsheetUrl(string $url): void
+    public function setSpreadsheetUrl(string $url, ?Area $area = null): void
     {
-        Cache::forever(self::CACHE_KEY_SPREADSHEET_URL, trim($url));
+        Cache::forever(($area ?? $this->currentArea())->settingKey(self::CACHE_KEY_SPREADSHEET_URL), trim($url));
+    }
+
+    /**
+     * The area selected for the current request (Jawa Barat when none is selected).
+     */
+    protected function currentArea(): Area
+    {
+        return app(AreaContext::class)->resolve();
     }
 
     /**
@@ -110,17 +130,21 @@ class DataProgramSyncService
      */
     public function sync(?string $customUrl = null, int $limit = 0): array
     {
-        $url = trim((string) ($customUrl ?: $this->getSpreadsheetUrl()));
+        $area = $this->currentArea();
+        $url = trim((string) ($customUrl ?: ($this->getSpreadsheetUrl($area) ?: $this->getWebAppUrl($area))));
 
         if (empty($url)) {
-            throw new Exception('URL Google Spreadsheet belum diatur.');
+            throw new Exception("URL Google Spreadsheet Data Program {$area->label()} belum diatur.");
         }
 
-        if (str_contains($url, 'script.google.com/macros/s/')) {
-            return $this->syncFromWebAppUrl($url, $limit);
-        }
+        // Selalu jalankan dalam konteks area agar penghapusan baris hanya menyentuh data area ini
+        return app(AreaContext::class)->run($area, function () use ($url, $limit) {
+            if (str_contains($url, 'script.google.com/macros/s/')) {
+                return $this->syncFromWebAppUrl($url, $limit);
+            }
 
-        return $this->syncFromCsvUrl($url, $limit);
+            return $this->syncFromCsvUrl($url, $limit);
+        });
     }
 
     /**
@@ -191,7 +215,15 @@ class DataProgramSyncService
         }
 
         // Otomatis fallback ke Google Sheet CSV export stream (jauh lebih cepat untuk 21.000+ baris data)
-        return $this->syncFromCsvUrl(self::DEFAULT_SPREADSHEET_URL, $limit);
+        $csvUrl = $this->currentArea() === Area::default()
+            ? self::DEFAULT_SPREADSHEET_URL
+            : $this->getSpreadsheetUrl();
+
+        if (empty($csvUrl) || str_contains($csvUrl, 'script.google.com/macros/s/')) {
+            throw new Exception("Gagal mengambil data dari Google Apps Script {$this->currentArea()->label()} dan link CSV spreadsheet area ini belum diatur.");
+        }
+
+        return $this->syncFromCsvUrl($csvUrl, $limit);
     }
 
     /**
@@ -211,9 +243,9 @@ class DataProgramSyncService
      * }> $rowsToUpdate
      * @return array{success: bool, updated_count: int, message: string}
      */
-    public function pushUpdatesToSpreadsheet(array $rowsToUpdate, ?string $customUrl = null): array
+    public function pushUpdatesToSpreadsheet(array $rowsToUpdate, ?string $customUrl = null, ?Area $area = null): array
     {
-        $url = trim((string) ($customUrl ?: $this->getWebAppUrl()));
+        $url = trim((string) ($customUrl ?: $this->getWebAppUrl($area)));
 
         if (empty($url) || ! str_contains($url, 'script.google.com/macros/s/')) {
             return [
@@ -270,12 +302,352 @@ class DataProgramSyncService
     }
 
     /**
+     * Fill the draft's program code (e.g. "PROGRAM 342") and empty period from Master Program by program name.
+     */
+    protected function resolveProgramFromMaster(Draft $draft): ?MasterProgram
+    {
+        $master = MasterProgram::where('name', trim((string) $draft->program_name))->first();
+
+        if (! $master) {
+            return null;
+        }
+
+        if ($master->code) {
+            $draft->program_code = $master->code;
+        }
+
+        if (empty($draft->program_period) && $master->period) {
+            $draft->program_period = $master->period;
+        }
+
+        if ($draft->isDirty(['program_code', 'program_period'])) {
+            $draft->save();
+        }
+
+        return $master;
+    }
+
+    /**
+     * The Master Dealer of a draft: by kode BT first (unique), then by ID Realme.
+     */
+    protected function findDealerForDraft(Draft $draft): ?Dealer
+    {
+        $kodeBt = Dealer::normalizeKodeBt($draft->kode_bt);
+        if ($kodeBt && ($dealer = Dealer::withoutGlobalScope('area')->where('kode_bt', $kodeBt)->first())) {
+            return $dealer;
+        }
+
+        $dealerCode = trim((string) $draft->dealer_code);
+        if ($dealerCode === '') {
+            return null;
+        }
+
+        return Dealer::withoutGlobalScope('area')->where('kode_bt', Dealer::normalizeKodeBt($dealerCode))->first()
+            ?? Dealer::withoutGlobalScope('area')->where('id_realme', $dealerCode)->first();
+    }
+
+    /**
+     * Synchronize a Draft invoice record into DataProgram (local DB and Google Spreadsheet).
+     *
+     * @return array{success: bool, data_program: DataProgram, sheet_push: ?array, message: string}
+     */
+    public function syncDraftToDataProgram(Draft $draft, bool $pushToSpreadsheet = true): array
+    {
+        // Data Program draft disimpan & dikirim ke spreadsheet milik area draft tersebut
+        $areaContext = app(AreaContext::class);
+        if ($areaContext->current() !== $draft->areaEnum()) {
+            return $areaContext->run($draft->areaEnum(), fn () => $this->syncDraftToDataProgram($draft, $pushToSpreadsheet));
+        }
+
+        $rowHash = sprintf('draft_%d', $draft->id);
+
+        $this->resolveProgramFromMaster($draft);
+
+        $inputDateStr = $draft->invoice_date ?: date('Y-m-d');
+        $daysPending = 0;
+        try {
+            $inputDate = Carbon::parse($inputDateStr);
+            $daysPending = max(0, (int) $inputDate->diffInDays(now()));
+        } catch (\Throwable $e) {
+            $daysPending = 0;
+        }
+
+        $keteranganAging = $daysPending > 30 ? 'LEBIH DARI 30 HARI' : 'KURANG DARI 30 HARI';
+
+        $attributes = [
+            'draft_id' => $draft->id,
+            'dealer_name' => $draft->dealer_name,
+            'program' => $draft->program_code,
+            'kode_bt' => $draft->kode_bt ?: $draft->dealer_code,
+            'program_name' => $draft->program_name,
+            'periode' => $draft->program_period,
+            'region' => $draft->region,
+            'big_region' => $draft->region,
+            'id_gs' => $draft->dealer_code,
+            'wajib_pajak' => $draft->npwp_type ?: 'BADAN',
+            'trf_pph' => $draft->pph_type ?: 'BADAN',
+            'incentive' => (float) ($draft->support_amount ?: 0),
+            'dpp' => (float) ($draft->dpp ?: 0),
+            'dpp_lain' => (float) ($draft->dpp_lain ?: 0),
+            'ppn' => (float) ($draft->ppn ?: 0),
+            'nilai_pph' => (float) ($draft->pph ?: 0),
+            'net_pay' => (float) ($draft->netpay ?: 0),
+            'tgl_input' => $inputDateStr,
+            'lama_pending' => (string) $daysPending,
+            'keterangan' => $keteranganAging,
+            'noted' => $draft->ref_note,
+            'npwp' => $draft->npwp,
+            'nama_npwp' => $draft->npwp_name,
+            // Catatan: Kolom 'cn' di Data Program sengaja dikosongkan karena jalurnya khusus dari hasil matching Form Program (Test Program)
+        ];
+
+        // Sales & Telemarketing mengikuti Master Dealer (per toko); kosong di dealer tidak menimpa isian manual di Data Program
+        $dealer = $this->findDealerForDraft($draft);
+        foreach (['sales_person', 'telemarketing', 'telemarketing_phone'] as $column) {
+            if (! empty($dealer?->{$column})) {
+                $attributes[$column] = $dealer->{$column};
+            }
+        }
+
+        $dp = DataProgram::where('draft_id', $draft->id)
+            ->orWhere('row_hash', $rowHash)
+            ->first();
+
+        if ($dp) {
+            $dp->update($attributes);
+        } else {
+            $dp = DataProgram::create(array_merge($attributes, [
+                'row_hash' => $rowHash,
+                'cek_dokumen' => 'BELUM MATCH TEST',
+                'status_potong_purchase' => 'BELUM BISA POTONG',
+                'status_potong_ar' => 'BELUM POTONG',
+            ]));
+        }
+
+        $sheetPushResult = null;
+        if ($pushToSpreadsheet) {
+            try {
+                $sheetPushResult = $this->pushDraftsToSpreadsheet([$dp]);
+            } catch (\Throwable $e) {
+                Log::warning('Push draft to spreadsheet failed: '.$e->getMessage());
+            }
+        }
+
+        return [
+            'success' => true,
+            'data_program' => $dp,
+            'sheet_push' => $sheetPushResult,
+            'message' => 'Data draft berhasil disinkronkan ke Data Program'.($sheetPushResult && ($sheetPushResult['success'] ?? false) ? ' dan Google Spreadsheet.' : '.'),
+        ];
+    }
+
+    /**
+     * Convert a DataProgram model to a 56-column row array for Google Spreadsheet.
+     *
+     * @return array<int, mixed>
+     */
+    public function convertDataProgramToRowArray(DataProgram $dp): array
+    {
+        return [
+            $dp->dealer_name ?? '',
+            $dp->program ?? '',
+            $dp->kode_bt ?? '',
+            $dp->program_name ?? '',
+            $dp->periode ?? '',
+            $dp->region ?? '',
+            $dp->no_po ?? '',
+            $dp->id_gs ?? '',
+            $dp->kode_supplier ?? '',
+            $dp->status_dl ?? '',
+            $dp->sales_person ?? '',
+            $dp->telemarketing ?? '',
+            $dp->wajib_pajak ?? '',
+            $dp->trf_pph ?? '',
+            $dp->incentive ? number_format($dp->incentive, 0, ',', '.') : '',
+            $dp->dpp ? number_format($dp->dpp, 0, ',', '.') : '',
+            $dp->dpp_lain ? number_format($dp->dpp_lain, 0, ',', '.') : '',
+            $dp->ppn ? number_format($dp->ppn, 0, ',', '.') : '',
+            $dp->nilai_pph ? number_format($dp->nilai_pph, 0, ',', '.') : '',
+            $dp->net_pay ? number_format($dp->net_pay, 0, ',', '.') : '',
+            $dp->cek_pajak_tarif ?? '',
+            $dp->selisih ? number_format($dp->selisih, 0, ',', '.') : '',
+            $dp->note_pph ?? '',
+            $dp->no_faktur_pajak ?? '',
+            $dp->ket_faktur_pajak ?? '',
+            $dp->no_po_sj ?? '',
+            $dp->no_transaksi ?? '',
+            $dp->tgl_input ?? '',
+            $dp->tgl_share_cn ?? '',
+            $dp->lama_pending ?? '',
+            $dp->keterangan ?? '',
+            $dp->cek_dokumen ?? '',
+            $dp->status_potong_purchase ?? '',
+            $dp->status_potong_ar ?? '',
+            $dp->tgl_potong_tf ?? '',
+            $dp->no_uid ?? '',
+            $dp->no_pembayaran ?? '',
+            $dp->tgl_input_bank_pph ?? '',
+            $dp->tf_status ?? '',
+            $dp->tgl_proses ?? '',
+            $dp->tgl_sj ?? '',
+            $dp->no_sj ?? '',
+            $dp->info_bank ?? '',
+            $dp->pending_potongan ?? '',
+            $dp->npwp ?? '',
+            $dp->nama_npwp ?? '',
+            $dp->program_2 ?? '',
+            $dp->cn ?? '',
+            $dp->agrement ?? '',
+            $dp->cek_fp ?? '',
+            $dp->cek_evidance ?? '',
+            $dp->noted ?? '',
+            $dp->norek ?? '',
+            $dp->namrek ?? '',
+            $dp->bank ?? '',
+            $dp->big_region ?? '',
+        ];
+    }
+
+    /**
+     * Push draft DataProgram records to Google Spreadsheet via Apps Script Web App.
+     *
+     * @param  array<int, DataProgram>  $dataPrograms
+     * @return array{success: bool, count: int, message: string}
+     */
+    public function pushDraftsToSpreadsheet(array $dataPrograms, ?string $customUrl = null): array
+    {
+        // Kirim tiap area ke spreadsheet area masing-masing
+        $groups = collect($dataPrograms)
+            ->filter(fn ($dp) => $dp instanceof DataProgram)
+            ->groupBy(fn (DataProgram $dp) => $dp->areaEnum()->value);
+
+        if ($customUrl === null && $groups->count() > 1) {
+            $results = $groups->map(fn ($group) => $this->pushDraftsToSpreadsheet($group->all()));
+
+            return [
+                'success' => $results->every(fn ($result) => $result['success']),
+                'count' => $results->sum('count'),
+                'message' => $results->pluck('message')->implode(' '),
+            ];
+        }
+
+        $area = $groups->isNotEmpty() ? Area::from($groups->keys()->first()) : null;
+        $url = trim((string) ($customUrl ?: $this->getWebAppUrl($area)));
+
+        if (empty($url) || ! str_contains($url, 'script.google.com/macros/s/')) {
+            return [
+                'success' => false,
+                'count' => 0,
+                'message' => 'URL Google Apps Script Web App belum diatur atau bukan Web App Apps Script.',
+            ];
+        }
+
+        $rows = [];
+        foreach ($dataPrograms as $dp) {
+            if (! $dp instanceof DataProgram) {
+                continue;
+            }
+
+            $rowIndex = null;
+            if (str_starts_with((string) $dp->row_hash, 'row_')) {
+                $rowIndex = (int) str_replace('row_', '', (string) $dp->row_hash);
+            }
+
+            $rows[] = [
+                'row_index' => $rowIndex,
+                'dealer_name' => $dp->dealer_name,
+                'program' => $dp->program,
+                'kode_bt' => $dp->kode_bt,
+                'program_name' => $dp->program_name,
+                'periode' => $dp->periode,
+                'region' => $dp->region,
+                'id_gs' => $dp->id_gs,
+                'kode_supplier' => $dp->kode_supplier,
+                'wajib_pajak' => $dp->wajib_pajak,
+                'trf_pph' => $dp->trf_pph,
+                'incentive' => $dp->incentive,
+                'dpp' => $dp->dpp,
+                'dpp_lain' => $dp->dpp_lain,
+                'ppn' => $dp->ppn,
+                'nilai_pph' => $dp->nilai_pph,
+                'net_pay' => $dp->net_pay,
+                'tgl_input' => $dp->tgl_input,
+                'keterangan' => $dp->keterangan,
+                'cek_dokumen' => $dp->cek_dokumen,
+                'status_potong_purchase' => $dp->status_potong_purchase,
+                'status_potong_ar' => $dp->status_potong_ar,
+                'npwp' => $dp->npwp,
+                'nama_npwp' => $dp->nama_npwp,
+                'cn' => $dp->cn,
+                'big_region' => $dp->big_region,
+                'values' => $this->convertDataProgramToRowArray($dp),
+            ];
+        }
+
+        if (empty($rows)) {
+            return [
+                'success' => true,
+                'count' => 0,
+                'message' => 'Tidak ada data draft yang perlu dikirim ke spreadsheet.',
+            ];
+        }
+
+        try {
+            $response = Http::withoutVerifying()
+                ->withOptions(['allow_redirects' => true])
+                ->timeout(120)
+                ->post($url, [
+                    'action' => 'append_rows',
+                    'rows' => $rows,
+                ]);
+
+            if ($response->successful()) {
+                return [
+                    'success' => true,
+                    'count' => count($rows),
+                    'message' => 'Berhasil mengirim '.count($rows).' baris data ke Google Spreadsheet.',
+                ];
+            }
+
+            // Fallback: update_rows action
+            $fallback = Http::withoutVerifying()
+                ->withOptions(['allow_redirects' => true])
+                ->timeout(120)
+                ->post($url, [
+                    'action' => 'update_rows',
+                    'rows' => $rows,
+                ]);
+
+            return [
+                'success' => $fallback->successful(),
+                'count' => count($rows),
+                'message' => $fallback->successful()
+                    ? 'Berhasil mengirim '.count($rows).' baris ke Google Spreadsheet.'
+                    : 'Gagal mengirim ke Google Spreadsheet.',
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('Push drafts to spreadsheet failed: '.$e->getMessage());
+
+            return [
+                'success' => false,
+                'count' => 0,
+                'message' => 'Gagal mengirim ke Google Spreadsheet: '.$e->getMessage(),
+            ];
+        }
+    }
+
+    /**
      * Sync data from Google Spreadsheet CSV stream.
      *
      * @return array{total_rows: int, synced_count: int, new_count: int, updated_count: int, message: string}
      */
     public function syncFromCsvUrl(string $url, int $limit = 0): array
     {
+        $areaContext = app(AreaContext::class);
+        if ($areaContext->current() === null) {
+            return $areaContext->run($this->currentArea(), fn () => $this->syncFromCsvUrl($url, $limit));
+        }
+
         // Convert standard edit/view link to CSV export URL if needed
         if (str_contains($url, 'docs.google.com/spreadsheets/d/')) {
             if (preg_match('/\/d\/([a-zA-Z0-9-_]+)/', $url, $m)) {
@@ -463,6 +835,7 @@ class DataProgramSyncService
         $now = $now ?? now()->toDateTimeString();
 
         return [
+            'area' => $this->currentArea()->value,
             'row_hash' => $rowHash,
             'dealer_name' => $dealerName ?: null,
             'program' => $program ?: null,
@@ -533,6 +906,11 @@ class DataProgramSyncService
      */
     public function saveWebhookPayload(array $payload): array
     {
+        $areaContext = app(AreaContext::class);
+        if ($areaContext->current() === null) {
+            return $areaContext->run($this->currentArea(), fn () => $this->saveWebhookPayload($payload));
+        }
+
         $batch = [];
         $now = now()->toDateTimeString();
         $deletedCount = 0;
@@ -704,6 +1082,6 @@ class DataProgramSyncService
             'updated_at',
         ];
 
-        DataProgram::upsert($batch, ['row_hash'], $updateColumns);
+        DataProgram::upsert($batch, ['area', 'row_hash'], $updateColumns);
     }
 }

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Console\Commands\AutoAnalyzeProgramAiCommand;
+use App\Models\Dealer;
 use App\Models\ProgramSubmission;
 use App\Models\User;
 use App\Services\DocumentAnalysisService;
@@ -340,14 +341,14 @@ class ProgramSubmissionTest extends TestCase
         $response->assertJson([
             'success' => true,
             'data' => [
-                'cek_dokumen' => 'AGR & FAKTUR BELUM ADA',
+                'cek_dokumen' => 'FAKTUR BELUM ADA',
                 'status_potong_purchase' => 'BELUM BISA POTONG',
             ],
         ]);
 
         $this->assertDatabaseHas('program_submissions', [
             'id' => $submission->id,
-            'cek_dokumen' => 'AGR & FAKTUR BELUM ADA',
+            'cek_dokumen' => 'FAKTUR BELUM ADA',
             'status_potong_purchase' => 'BELUM BISA POTONG',
         ]);
     }
@@ -839,7 +840,8 @@ class ProgramSubmissionTest extends TestCase
         $this->assertIsArray($submission->doc_validation);
         $this->assertEquals('swapped', $submission->doc_validation['cn']['status']);
         $this->assertEquals('agr', $submission->doc_validation['cn']['actual_type']);
-        $this->assertEquals('swapped', $submission->doc_validation['agr']['status']);
+        // Agreement tidak dianalisis (diambil dari data master)
+        $this->assertArrayNotHasKey('agr', $submission->doc_validation);
         $this->assertEquals('valid', $submission->doc_validation['faktur']['status']);
     }
 
@@ -1237,6 +1239,98 @@ class ProgramSubmissionTest extends TestCase
         $this->assertEquals('FAKTUR BELUM ADA', $eval['cek_dokumen']);
     }
 
+    public function test_faktur_requirement_on_public_form_follows_master_dealer_npwp_type(): void
+    {
+        $aiResult = fn (float $ppn) => Http::response(['choices' => [['message' => ['content' => json_encode([
+            'dealer_name' => 'LA FAMILY SUBANG',
+            'cn_program_name' => 'PROGRAM DSA JANUARI 2026',
+            'ppn' => $ppn,
+            'doc_validation' => ['cn' => ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'Credit Note valid']],
+        ])]]]]);
+        Http::fake(['*/chat/completions' => Http::sequence()->pushResponse($aiResult(110000))->pushResponse($aiResult(0))]);
+        Cache::put(DocumentAnalysisService::CACHE_KEY_CONFIG, ['base_url' => 'https://router.example.com/v1', 'api_key' => 'test-key', 'model' => 'test-model']);
+
+        // Dua toko memakai ID Realme yang sama; nama dealer menentukan tokonya
+        Dealer::create(['area' => 'jabar', 'kode_bt' => 'BT03941', 'id_realme' => 'DLJH1517', 'dealer_name' => 'LA FAMILY SUBANG', 'npwp_type' => 'PRIBADI']);
+        Dealer::create(['area' => 'jabar', 'kode_bt' => 'BT03942', 'id_realme' => 'DLJH1517', 'dealer_name' => 'LA FAMILY CABANG', 'npwp_type' => 'BADAN']);
+        $form = [
+            'program_name' => 'PROGRAM DSA JANUARI 2026',
+            'region' => 'BIG KARAWANG',
+            'sales_name' => 'M RISWAN',
+            'credit_note_file' => UploadedFile::fake()->createWithContent('CN_LA_FAMILY.pdf', '%PDF-1.4 credit note'),
+        ];
+
+        // PRIBADI: Faktur Pajak tidak wajib walau CN mencantumkan PPN atau form mengaku PKP
+        $this->post('/api/program-submissions/pre-validate', [...$form, 'id_real' => 'DLJH1517', 'dealer_name' => 'LA FAMILY SUBANG', 'is_pkp' => '1'], ['Accept' => 'application/json', 'X-Area' => 'jabar'])
+            ->assertOk()
+            ->assertJsonPath('data.cek_dokumen', 'LENGKAP');
+
+        // BADAN: Faktur Pajak wajib walau CN tanpa PPN
+        $this->post('/api/program-submissions/pre-validate', [...$form, 'id_real' => 'DLJH1517', 'kode_bt' => 'BT03942', 'dealer_name' => 'LA FAMILY SUBANG'], ['Accept' => 'application/json', 'X-Area' => 'jabar'])
+            ->assertOk()
+            ->assertJsonPath('data.cek_dokumen', 'FAKTUR BELUM ADA');
+    }
+
+    public function test_document_inspection_retries_with_fallback_model_when_main_model_errors(): void
+    {
+        config(['services.openai_compatible.fallback_model' => 'model-cadangan']);
+        Cache::put(DocumentAnalysisService::CACHE_KEY_CONFIG, ['base_url' => 'https://router.example.com/v1', 'api_key' => 'test-key', 'model' => 'model-utama']);
+        Http::fake(['*/chat/completions' => Http::sequence()
+            ->push(['error' => ['message' => 'Requested entity was not found.']], 404)
+            ->push(['choices' => [['message' => ['content' => json_encode(['dpp' => 450450, 'nilai_pph' => 11261, 'net_pay' => 439189])]]]]),
+        ]);
+
+        $result = app(DocumentAnalysisService::class)->inspectDocumentFiles(['dealer_name' => 'LA FAMILY SUBANG'], [
+            'cn' => UploadedFile::fake()->createWithContent('CN_LA_FAMILY.pdf', '%PDF-1.4 credit note'),
+        ]);
+
+        $this->assertEquals(450450, $result['financial']['dpp']);
+        $this->assertEquals(439189, $result['financial']['net_pay']);
+        Http::assertSentInOrder([
+            fn ($request) => $request['model'] === 'model-utama',
+            fn ($request) => $request['model'] === 'model-cadangan',
+        ]);
+    }
+
+    public function test_heuristic_reads_letter_spaced_amounts_and_stored_filename_of_credit_note(): void
+    {
+        // Teks PDF ekspor Excel terbaca per huruf: "D P P : 4 5 0 . 4 5 0"
+        $spacedLine = fn (string $line) => '['.implode(' ', array_map(fn (string $char) => "({$char})", str_split($line))).'] TJ';
+        $pdf = "%PDF-1.4\n".implode("\n", array_map($spacedLine, ['DPP : 450.450', 'DPP LAIN : -', 'PPN 12 % : -', 'PPH : 11.261', 'Net Pay : 439.189']));
+        Http::fake(['storage.example.com/*' => Http::response($pdf)]);
+
+        $result = app(DocumentAnalysisService::class)->heuristicDocumentInspection(['dealer_name' => 'LA FAMILY SUBANG'], [
+            'cn' => 'https://storage.example.com/scm/CN_1791951794_INVOICE-PROGRAM_DSA_JANUARI_2026-LA_FAMILY_SUBANG__DLJH1517__-_Telemarketing_Big_Karawang__1_.pdf',
+        ]);
+
+        $this->assertSame('LA FAMILY SUBANG', $result['dealer_name']);
+        $this->assertFalse($result['dealer_mismatch']);
+        $this->assertSame('PROGRAM DSA JANUARI 2026', $result['cn_program_name']);
+        $this->assertEquals(450450, $result['dpp']);
+        $this->assertEquals(0, $result['ppn']);
+        $this->assertEquals(11261, $result['nilai_pph']);
+        $this->assertEquals(439189, $result['net_pay']);
+        $this->assertEquals(500000, $result['incentive']);
+    }
+
+    public function test_stored_submission_pkp_status_follows_master_dealer_npwp_type(): void
+    {
+        Dealer::create(['area' => 'jabar', 'kode_bt' => 'BT03941', 'id_realme' => 'DLJH1517', 'dealer_name' => 'LA FAMILY SUBANG', 'npwp_type' => 'PRIBADI']);
+
+        $submission = ProgramSubmission::create([
+            'area' => 'jabar',
+            'id_real' => 'DLJH1517',
+            'dealer_name' => 'LA FAMILY SUBANG',
+            'program_name' => 'PROGRAM DSA JANUARI 2026',
+            'credit_note_url' => 'https://drive.google.com/open?id=test_cn_valid',
+            'agreement_url' => 'https://drive.google.com/open?id=test_agr_valid',
+            'ppn' => 110000,
+            'row_hash' => 'hash_test_master_pribadi',
+        ]);
+
+        $this->assertSame('LENGKAP', app(DocumentAnalysisService::class)->evaluateCompleteness($submission)['cek_dokumen']);
+    }
+
     public function test_can_get_public_form_options(): void
     {
         ProgramSubmission::create([
@@ -1317,7 +1411,7 @@ class ProgramSubmissionTest extends TestCase
         $response->assertJsonPath('success', true);
         $this->assertTrue($response->json('data.has_swapped'));
         $this->assertEquals('swapped', $response->json('data.doc_validation.cn.status'));
-        $this->assertEquals('swapped', $response->json('data.doc_validation.agr.status'));
+        $this->assertNull($response->json('data.doc_validation.agr'));
         $this->assertEquals('BELUM BISA POTONG', $response->json('data.status_potong_purchase'));
     }
 
@@ -1601,58 +1695,45 @@ class ProgramSubmissionTest extends TestCase
         });
     }
 
-    public function test_submit_form_fails_if_agreement_dealer_mismatches(): void
+    public function test_agreement_document_is_not_analyzed_or_sent_to_ai(): void
     {
-        Storage::fake('public');
-        config(['services.ai_router.api_key' => '']);
-        config(['services.openai_compatible.api_key' => '']);
-        Cache::forget(DocumentAnalysisService::CACHE_KEY_CONFIG);
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => json_encode([
+                            'dealer_name' => 'NEWCO CELL',
+                            'cn_program_name' => 'PROGRAM DSA JULI 2026',
+                            'status_potong_purchase' => 'BISA DI POTONG',
+                            'cek_dokumen' => 'LENGKAP',
+                        ]),
+                    ],
+                ]],
+            ], 200),
+        ]);
 
-        $cnFile = UploadedFile::fake()->create('CN_NEWCO_CELL.pdf', 100, 'application/pdf');
-        $agrFile = UploadedFile::fake()->create('AGR_OCEAN_CELL.pdf', 100, 'application/pdf');
+        Cache::put('ai_router_config', [
+            'base_url' => 'https://router.example.com/v1',
+            'api_key' => 'test-key',
+            'model' => 'test-model',
+        ]);
 
-        $response = $this->post('/api/program-submissions/submit-form', [
-            'program_name' => 'PROGRAM DSA JULI 2026',
-            'region' => 'BIG CIREBON',
-            'id_real' => 'BT2026',
+        // Agreement dari dealer & program lain tetap lolos karena Agreement diambil dari data master
+        $result = app(DocumentAnalysisService::class)->inspectDocumentFiles([
             'dealer_name' => 'NEWCO CELL',
-            'sales_name' => 'A HASYIM AKBAR',
-            'credit_note_file' => $cnFile,
-            'agreement_file' => $agrFile,
-        ], ['Accept' => 'application/json']);
-
-        $response->assertStatus(422)
-            ->assertJson([
-                'success' => false,
-                'error_type' => 'AGR_DEALER_MISMATCH',
-            ]);
-    }
-
-    public function test_submit_form_fails_if_agreement_program_mismatches(): void
-    {
-        Storage::fake('public');
-        config(['services.ai_router.api_key' => '']);
-        config(['services.openai_compatible.api_key' => '']);
-        Cache::forget(DocumentAnalysisService::CACHE_KEY_CONFIG);
-
-        $cnFile = UploadedFile::fake()->create('CN_NEWCO_CELL.pdf', 100, 'application/pdf');
-        $agrFile = UploadedFile::fake()->create('AGR_PROGRAM_RENO_8.pdf', 100, 'application/pdf');
-
-        $response = $this->post('/api/program-submissions/submit-form', [
             'program_name' => 'PROGRAM DSA JULI 2026',
-            'region' => 'BIG CIREBON',
-            'id_real' => 'BT2026',
-            'dealer_name' => 'NEWCO CELL',
-            'sales_name' => 'A HASYIM AKBAR',
-            'credit_note_file' => $cnFile,
-            'agreement_file' => $agrFile,
-        ], ['Accept' => 'application/json']);
+        ], [
+            'cn' => UploadedFile::fake()->createWithContent('CN_NEWCO_CELL.pdf', '%PDF-1.4 credit note'),
+            'agr' => UploadedFile::fake()->createWithContent('AGR_OCEAN_CELL_PROGRAM_RENO_8.pdf', '%PDF-1.4 agreement'),
+        ]);
 
-        $response->assertStatus(422)
-            ->assertJson([
-                'success' => false,
-                'error_type' => 'AGR_PROGRAM_MISMATCH',
-            ]);
+        $this->assertFalse($result['agr_dealer_mismatch']);
+        $this->assertFalse($result['agr_program_mismatch']);
+        $this->assertArrayNotHasKey('agr', $result['doc_validation']);
+        $this->assertSame('BISA DI POTONG', $result['status_potong_purchase']);
+        $this->assertStringNotContainsString('AGR', $result['cek_dokumen']);
+
+        Http::assertSent(fn ($request) => ! str_contains(json_encode($request->data()), 'AGREEMENT (AGR)'));
     }
 
     public function test_submit_form_succeeds_when_agreement_dealer_and_program_match(): void
@@ -1780,7 +1861,7 @@ class ProgramSubmissionTest extends TestCase
         $this->assertFalse($result['dealer_mismatch']);
         $this->assertFalse($result['agr_dealer_mismatch']);
         $this->assertEquals('valid', $result['doc_validation']['cn']['status']);
-        $this->assertEquals('valid', $result['doc_validation']['agr']['status']);
+        $this->assertArrayNotHasKey('agr', $result['doc_validation']);
     }
 
     public function test_detects_and_rejects_merged_or_duplicate_documents(): void
@@ -1854,5 +1935,65 @@ class ProgramSubmissionTest extends TestCase
         $response->assertStatus(422);
         $this->assertFalse($response->json('success'));
         $this->assertStringContainsString('tidak sesuai dengan dokumen Credit Note', $response->json('message'));
+    }
+
+    public function test_standard_document_filenames_are_read_as_clean_dealer_and_program_names(): void
+    {
+        $service = app(DocumentAnalysisService::class);
+        $doc = fn (string $name) => ['has_file' => true, 'name' => $name, 'text' => ''];
+
+        $cn = $doc('INVOICE-PROGRAM DSA JANUARI 2026-LA FAMILY SUBANG (DLJH1517) - Telemarketing Big Karawang (1).pdf');
+        $this->assertSame('LA FAMILY SUBANG', $service->extractDealerNameFromCn($cn));
+        $this->assertSame('PROGRAM DSA JANUARI 2026', $service->extractProgramNameFromDoc($cn));
+
+        // Program yang mengandung tanda hubung tetap utuh
+        $this->assertSame('PROGRAM ST Q2 REALME MEI-JUNI 2026', $service->extractProgramNameFromDoc($doc('INVOICE-PROGRAM ST Q2 REALME MEI-JUNI 2026-TOKO ABC (X1).pdf')));
+
+        // Bagian "Telemarketing ..." & kata "Realme" bukan nama dealer
+        $this->assertSame('Cv Top', $service->extractDealerNameFromAgr($doc('Agreement Realme CV Top - Telemarketing Big Karawang.pdf')));
+    }
+
+    public function test_document_inspection_reuses_ai_result_for_same_documents_and_input(): void
+    {
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => json_encode([
+                            'is_complete' => true,
+                            'cek_dokumen' => 'LENGKAP',
+                            'status_potong_purchase' => 'BISA DI POTONG',
+                            'keterangan' => 'OK',
+                            'dpp' => 450450,
+                        ]),
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        Cache::put('ai_router_config', [
+            'base_url' => 'https://router.example.com/v1',
+            'api_key' => 'test-key',
+            'model' => 'test-model',
+        ]);
+
+        $payload = fn (string $dealerName) => [
+            'program_name' => 'PROGRAM DSA AGUSTUS 2026',
+            'region' => 'BIG CIREBON',
+            'id_real' => 'IDME00123',
+            'dealer_name' => $dealerName,
+            'sales_name' => 'ANDI',
+            'credit_note_file' => UploadedFile::fake()->createWithContent('cn.pdf', '%PDF-1.4 credit note'),
+            'agreement_file' => UploadedFile::fake()->createWithContent('agr.pdf', '%PDF-1.4 agreement'),
+        ];
+
+        // Cek saat klik Kirim lalu disimpan: dokumen & isian sama -> AI cukup dipanggil sekali
+        $this->post('/api/program-submissions/pre-validate', $payload('BERKAH CELL'), ['Accept' => 'application/json'])->assertOk();
+        $this->post('/api/program-submissions/pre-validate', $payload('BERKAH CELL'), ['Accept' => 'application/json'])->assertOk();
+        Http::assertSentCount(1);
+
+        // Isian berubah -> dicek ulang ke AI
+        $this->post('/api/program-submissions/pre-validate', $payload('BERKAH CELLULAR'), ['Accept' => 'application/json'])->assertOk();
+        Http::assertSentCount(2);
     }
 }

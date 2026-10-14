@@ -15,22 +15,13 @@
 
     <div class="w-full max-w-[350px] space-y-3">
 
-      <!-- SCM Logo Brand -->
-      <div class="text-center pt-0.5">
-        <img
-          src="/images/scm-logo.png"
-          alt="SCM"
-          class="h-9 sm:h-10 w-auto mx-auto object-contain drop-shadow-2xs"
-        />
-      </div>
-
       <!-- Main Login Card (Compact, Clean Dark Mode) -->
       <div class="bg-white dark:bg-slate-900 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_25px_rgba(0,0,0,0.35)] border border-neutral-200/80 dark:border-slate-800 p-5 sm:p-6 transition-colors">
 
         <!-- Header Title (Clean without top icon box) -->
         <div class="text-center mb-4">
             <h2 class="text-base sm:text-lg font-bold tracking-tight text-neutral-900 dark:text-white">
-              {{ loginMode === 'email' ? 'Sign in' : (otpStep === 'phone' ? 'Masuk via WhatsApp' : 'Verifikasi OTP WhatsApp') }}
+              {{ loginMode === 'email' ? 'Supply Chain Management' : (otpStep === 'phone' ? 'Masuk via WhatsApp' : 'Verifikasi OTP WhatsApp') }}
             </h2>
             <p v-if="loginMode === 'wa'" class="text-[11px] text-neutral-500 dark:text-slate-400 mt-0.5">
               {{ otpStep === 'phone' ? 'Masukkan nomor WA terdaftar di SCM' : `Kode OTP dikirim ke ${waPhone}` }}

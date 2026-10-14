@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ArContact;
 use App\Models\DataProgram;
 use App\Models\Invoice;
 use App\Models\ProgramSubmission;
@@ -461,7 +462,9 @@ class WhatsAppService
      */
     public function sendProgramClaimNotificationToAr(ProgramSubmission $submission, ?string $overridePhone = null): array
     {
-        $phone = $overridePhone ?: config('services.wag.ar_phone', '081224290502');
+        // AR tujuan mengikuti region dealer di Master AR; region yang belum punya AR memakai nomor AR default
+        $arContact = $overridePhone ? null : ArContact::forRegion($submission->areaEnum(), $submission->region);
+        $phone = $overridePhone ?: ($arContact?->whatsapp ?: config('services.wag.ar_phone', '081224290502'));
         $cleanPhone = $this->formatPhone($phone);
 
         if (empty($cleanPhone)) {
@@ -495,7 +498,7 @@ class WhatsAppService
             ['id' => $submission->id, 'role' => 'ar']
         );
 
-        $messageText = $this->buildProgramClaimMessage($submission, $confirmUrl);
+        $messageText = $this->buildProgramClaimMessage($submission, $confirmUrl, $arContact?->name);
         $uuid = Str::uuid()->toString();
 
         $payload = [
@@ -535,7 +538,7 @@ class WhatsAppService
             if ($response->successful() && ($response->status() === 200 || $response->status() === 201)) {
                 return [
                     'success' => true,
-                    'message' => "Notifikasi klaim program {$submission->dealer_name} berhasil dikirim ke WhatsApp AR ({$cleanPhone}).",
+                    'message' => "Notifikasi klaim program {$submission->dealer_name} berhasil dikirim ke WhatsApp AR".($arContact ? " {$arContact->name}" : '')." ({$cleanPhone}).",
                     'provider_id' => $providerMessageId,
                 ];
             }
@@ -602,7 +605,7 @@ class WhatsAppService
     /**
      * Build formatted Indonesian WhatsApp message for AR program claim confirmation.
      */
-    public function buildProgramClaimMessage(ProgramSubmission $submission, string $confirmUrl): string
+    public function buildProgramClaimMessage(ProgramSubmission $submission, string $confirmUrl, ?string $arName = null): string
     {
         $dealerName = $submission->dealer_name ?: '-';
         $idReal = $submission->id_real ?: '-';
@@ -615,7 +618,7 @@ class WhatsAppService
         $lines = [
             '*PEMBERITAHUAN KLAIM TELAH DISETUJUI DEALER (UNTUK TIM AR)*',
             '',
-            'Halo Tim AR, Telemarketing telah mengonfirmasi bahwa dealer berikut SETUJU untuk dipotongkan pada order pembelian mereka:',
+            'Halo '.($arName ?: 'Tim AR').', Telemarketing telah mengonfirmasi bahwa dealer berikut SETUJU untuk dipotongkan pada order pembelian mereka:',
             '',
             "*ID Real:* {$idReal}",
             "*Dealer:* {$dealerName}",
@@ -750,7 +753,9 @@ class WhatsAppService
      */
     public function sendDataProgramClaimNotificationToAr(DataProgram $dp, ?string $overridePhone = null): array
     {
-        $phone = $overridePhone ?: config('services.wag.ar_phone', '081224290502');
+        // AR tujuan mengikuti region (lalu big region) di Master AR; region yang belum punya AR memakai nomor AR default
+        $arContact = $overridePhone ? null : ArContact::forRegion($dp->areaEnum(), $dp->region, $dp->big_region);
+        $phone = $overridePhone ?: ($arContact?->whatsapp ?: config('services.wag.ar_phone', '081224290502'));
         $cleanPhone = $this->formatPhone($phone);
 
         if (empty($cleanPhone)) {
@@ -783,7 +788,7 @@ class WhatsAppService
             ['id' => $dp->id, 'role' => 'ar']
         );
 
-        $messageText = $this->buildDataProgramClaimArMessage($dp, $confirmUrl);
+        $messageText = $this->buildDataProgramClaimArMessage($dp, $confirmUrl, $arContact?->name);
         $uuid = Str::uuid()->toString();
 
         $payload = [
@@ -823,7 +828,7 @@ class WhatsAppService
             if ($response->successful() && ($response->status() === 200 || $response->status() === 201)) {
                 return [
                     'success' => true,
-                    'message' => "Notifikasi klaim program {$dp->dealer_name} berhasil dikirim ke WhatsApp AR ({$cleanPhone}).",
+                    'message' => "Notifikasi klaim program {$dp->dealer_name} berhasil dikirim ke WhatsApp AR".($arContact ? " {$arContact->name}" : '')." ({$cleanPhone}).",
                     'provider_id' => $providerMessageId,
                 ];
             }
@@ -890,7 +895,7 @@ class WhatsAppService
     /**
      * Build formatted Indonesian WhatsApp message for AR DataProgram claim confirmation.
      */
-    public function buildDataProgramClaimArMessage(DataProgram $dp, string $confirmUrl): string
+    public function buildDataProgramClaimArMessage(DataProgram $dp, string $confirmUrl, ?string $arName = null): string
     {
         $dealerName = $dp->dealer_name ?: '-';
         $kodeBt = $dp->kode_bt ?: '-';
@@ -902,7 +907,7 @@ class WhatsAppService
         $lines = [
             '*PEMBERITAHUAN POTONG KLAIM (TIM AR)*',
             '',
-            'Halo Tim AR, dealer telah MENYETUJUI pemotongan saldo insentif program berikut pada invoice order mereka:',
+            'Halo '.($arName ?: 'Tim AR').', dealer telah MENYETUJUI pemotongan saldo insentif program berikut pada invoice order mereka:',
             '',
             "*Kode BT / ID Real:* {$kodeBt}",
             "*Dealer:* {$dealerName}",

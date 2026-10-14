@@ -1,0 +1,240 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\MasterProgram;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Tests\TestCase;
+
+class MasterProgramTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_can_list_master_programs(): void
+    {
+        $response = $this->getJson('/api/programs');
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+        ]);
+        $response->assertJsonStructure([
+            'success',
+            'data' => [
+                'data',
+                'total',
+                'current_page',
+                'last_page',
+            ],
+            'stats' => [
+                'total',
+                'active',
+                'inactive',
+            ],
+            'categories',
+        ]);
+    }
+
+    public function test_can_get_active_program_options(): void
+    {
+        MasterProgram::create([
+            'name' => 'PROGRAM KHUSUS TEST OPTIONS',
+            'category' => 'DSA',
+            'period' => 'Maret 2026',
+            'is_active' => true,
+        ]);
+
+        $response = $this->getJson('/api/programs/options');
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+        $this->assertContains('PROGRAM KHUSUS TEST OPTIONS', $response->json('names'));
+    }
+
+    public function test_can_create_new_master_program(): void
+    {
+        $payload = [
+            'name' => 'PROGRAM PROMOTION RAMADHAN 2026',
+            'code' => 'PRM-RMD-26',
+            'category' => 'PROMOTION',
+            'period' => 'Maret - April 2026',
+            'description' => 'Program promo Ramadhan untuk dealer Realme',
+            'is_active' => true,
+        ];
+
+        $response = $this->postJson('/api/programs', $payload);
+
+        $response->assertStatus(201);
+        $response->assertJson([
+            'success' => true,
+            'data' => [
+                'name' => 'PROGRAM PROMOTION RAMADHAN 2026',
+                'category' => 'PROMOTION',
+            ],
+        ]);
+
+        $this->assertDatabaseHas('master_programs', [
+            'name' => 'PROGRAM PROMOTION RAMADHAN 2026',
+            'category' => 'PROMOTION',
+        ]);
+    }
+
+    public function test_create_program_validates_required_and_unique_name(): void
+    {
+        // 1. Missing name
+        $response = $this->postJson('/api/programs', []);
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['name']);
+
+        // 2. Duplicate name
+        MasterProgram::create([
+            'name' => 'PROGRAM DUPLICATE CHECK',
+            'is_active' => true,
+        ]);
+
+        $dupResponse = $this->postJson('/api/programs', [
+            'name' => 'PROGRAM DUPLICATE CHECK',
+        ]);
+        $dupResponse->assertStatus(422);
+        $dupResponse->assertJsonValidationErrors(['name']);
+    }
+
+    public function test_can_update_master_program(): void
+    {
+        $program = MasterProgram::create([
+            'name' => 'PROGRAM AWAL UPDATE',
+            'category' => 'DSA',
+            'is_active' => true,
+        ]);
+
+        $response = $this->putJson("/api/programs/{$program->id}", [
+            'name' => 'PROGRAM SETELAH UPDATE',
+            'category' => 'SO',
+            'is_active' => false,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'data' => [
+                'id' => $program->id,
+                'name' => 'PROGRAM SETELAH UPDATE',
+                'category' => 'SO',
+                'is_active' => false,
+            ],
+        ]);
+
+        $this->assertDatabaseHas('master_programs', [
+            'id' => $program->id,
+            'name' => 'PROGRAM SETELAH UPDATE',
+            'is_active' => false,
+        ]);
+    }
+
+    public function test_can_toggle_program_status(): void
+    {
+        $program = MasterProgram::create([
+            'name' => 'PROGRAM TOGGLE TEST',
+            'is_active' => true,
+        ]);
+
+        $response = $this->patchJson("/api/programs/{$program->id}/toggle-status");
+
+        $response->assertStatus(200);
+        $this->assertFalse($response->json('data.is_active'));
+
+        $this->assertDatabaseHas('master_programs', [
+            'id' => $program->id,
+            'is_active' => false,
+        ]);
+    }
+
+    public function test_can_delete_master_program(): void
+    {
+        $program = MasterProgram::create([
+            'name' => 'PROGRAM TO DELETE',
+            'is_active' => true,
+        ]);
+
+        $response = $this->deleteJson("/api/programs/{$program->id}");
+
+        $response->assertStatus(200);
+        $this->assertDatabaseMissing('master_programs', [
+            'id' => $program->id,
+        ]);
+    }
+
+    public function test_program_submissions_form_options_includes_master_programs(): void
+    {
+        MasterProgram::create([
+            'name' => 'PROGRAM INCLUDED IN FORM OPTIONS 2026',
+            'is_active' => true,
+        ]);
+
+        $response = $this->getJson('/api/program-submissions/form-options');
+
+        $response->assertStatus(200);
+        $this->assertContains('PROGRAM INCLUDED IN FORM OPTIONS 2026', $response->json('programs'));
+    }
+
+    public function test_new_program_gets_next_sequential_code_when_code_is_empty(): void
+    {
+        MasterProgram::create(['code' => 'PROGRAM 99', 'name' => 'PROGRAM LAMA 99']);
+        MasterProgram::create(['code' => 'PROGRAM 343', 'name' => 'PROGRAM DEALER CLUB C100I AGUSTUS 2026']);
+
+        $this->getJson('/api/programs')->assertJsonPath('next_code', 'PROGRAM 344');
+
+        $this->postJson('/api/programs', [
+            'name' => 'PROGRAM DSA SEPTEMBER 2026',
+            'period' => 'Periode 1-30 September 2026',
+        ])->assertCreated()->assertJsonPath('data.code', 'PROGRAM 344');
+    }
+
+    public function test_program_code_must_be_unique_after_normalization(): void
+    {
+        MasterProgram::create(['code' => 'PROGRAM 326', 'name' => 'PROGRAM ST SPECIAL DEALER MEI 2026']);
+
+        $this->postJson('/api/programs', [
+            'code' => 'program326',
+            'name' => 'PROGRAM LAIN',
+        ])->assertStatus(422)->assertJsonValidationErrors(['code']);
+    }
+
+    public function test_can_import_master_programs_from_excel(): void
+    {
+        MasterProgram::updateOrCreate(['name' => 'PROGRAM DSA MEI 2026'], ['code' => null, 'period' => 'Mei 2026']);
+        $initialCount = MasterProgram::count();
+
+        $spreadsheet = new Spreadsheet;
+        $spreadsheet->getActiveSheet()->fromArray([
+            [null, null, null, null, null, null],
+            ['PROGRAM', 'NAMA PROGRAM', 'PERIODE', 'SALES', 'TELEMARKETING', 'NO WA TELEMARKETING'],
+            ['PROGRAM 325', 'PROGRAM DSA MEI 2026', 'Periode 1-31 Mei 2026', 'ANDI', 'SITI', '081234567890'],
+            ['PROGRAM 326', 'PROGRAM ST SPECIAL DEALER MEI 2026', 'Periode 1-31 Mei 2026', null, null, null],
+            ['PROGRAM 344', null, null, null, null, null],
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'programs').'.xlsx';
+        (new Xlsx($spreadsheet))->save($path);
+
+        $response = $this->post('/api/programs/import', [
+            'file' => new UploadedFile($path, 'programs.xlsx', null, null, true),
+        ], ['Accept' => 'application/json']);
+
+        $response->assertOk()
+            ->assertJsonPath('created', 1)
+            ->assertJsonPath('updated', 1)
+            ->assertJsonPath('skipped', 1);
+
+        // Kolom SALES / TELEMARKETING di file diabaikan (sales & telemarketing ada di Master Dealer)
+        $this->assertDatabaseHas('master_programs', [
+            'code' => 'PROGRAM 325',
+            'name' => 'PROGRAM DSA MEI 2026',
+            'period' => 'Periode 1-31 Mei 2026',
+        ]);
+        $this->assertDatabaseHas('master_programs', ['code' => 'PROGRAM 326', 'name' => 'PROGRAM ST SPECIAL DEALER MEI 2026']);
+        $this->assertEquals($initialCount + 1, MasterProgram::count());
+    }
+}

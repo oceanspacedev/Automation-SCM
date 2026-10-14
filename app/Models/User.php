@@ -28,6 +28,9 @@ class User extends Authenticatable
         'riwayat_program' => 'Riwayat Program',
         'email_logs' => 'Riwayat Email',
         'dashboard' => 'Dashboard',
+        'master_program' => 'Master Program',
+        'master_dealer' => 'Master Dealer',
+        'master_customer' => 'Master Customer',
         'master_user' => 'Master User',
     ];
 
@@ -60,6 +63,9 @@ class User extends Authenticatable
                 'riwayat_program',
                 'email_logs',
                 'dashboard',
+                'master_program',
+                'master_dealer',
+                'master_customer',
                 'master_user',
             ],
             'ar' => [

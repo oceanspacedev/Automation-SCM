@@ -349,7 +349,7 @@
                 <span class="inline-flex items-center gap-1">Region <ChevronDownIcon class="w-3 h-3 text-gray-400" /></span>
               </TableHead>
               <TableHead class="whitespace-nowrap font-semibold text-gray-950">
-                <span class="inline-flex items-center gap-1">ID Real <ChevronDownIcon class="w-3 h-3 text-gray-400" /></span>
+                <span class="inline-flex items-center gap-1">ID Realme <ChevronDownIcon class="w-3 h-3 text-gray-400" /></span>
               </TableHead>
               <TableHead class="min-w-[170px] font-semibold text-gray-950">
                 <span class="inline-flex items-center gap-1">Nama Dealer <ChevronDownIcon class="w-3 h-3 text-gray-400" /></span>
@@ -840,7 +840,7 @@
 
                   <!-- ID Real -->
                   <div>
-                    <label class="block text-xs font-medium text-gray-700 mb-1">ID Real (Kode BT)</label>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">ID Realme (Kode BT)</label>
                     <input
                       v-model="editForm.id_real"
                       type="text"
@@ -1664,12 +1664,22 @@
         </div>
       </Transition>
     </Teleport>
+
+    <!-- Modal Pilihan Kontak Telemarketing -->
+    <TelemarketingSelectModal
+      :is-open="telemarketingModal.isOpen"
+      :target-data="telemarketingModal.target"
+      :is-submitting="isSendingTelemarketing"
+      @close="telemarketingModal.isOpen = false"
+      @send="handleConfirmSendTelemarketing"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import axios from 'axios';
+import TelemarketingSelectModal from '@/components/TelemarketingSelectModal.vue';
 import {
   Search as SearchIcon,
   RefreshCw as RefreshCwIcon,
@@ -2221,22 +2231,42 @@ const quickUpdateKeterangan = async (row, newKeterangan) => {
   }
 };
 
-// Send WhatsApp notification to Telemarketing
-const sendWaToTelemarketing = async (row) => {
+// Modal state for choosing Telemarketing recipient
+const telemarketingModal = reactive({
+  isOpen: false,
+  target: null,
+});
+const isSendingTelemarketing = ref(false);
+
+// Send WhatsApp notification to Telemarketing (opens contact selection modal)
+const sendWaToTelemarketing = (row) => {
   if (!row) return;
-  sendingWaId.value = row.id;
+  telemarketingModal.target = row;
+  telemarketingModal.isOpen = true;
+};
+
+// Handle confirmed send from TelemarketingSelectModal
+const handleConfirmSendTelemarketing = async ({ phone, telemarketing_name, target }) => {
+  if (!target) return;
+  isSendingTelemarketing.value = true;
   isSendingWaModal.value = true;
+  sendingWaId.value = target.id;
 
   try {
-    const res = await axios.post(`/api/program-submissions/${row.id}/send-wa-telemarketing`);
-    syncMessage.value = res.data.message || `Info klaim "${row.dealer_name || row.id_real}" berhasil dikirim ke WhatsApp Telemarketing!`;
+    const res = await axios.post(`/api/program-submissions/${target.id}/send-wa-telemarketing`, {
+      phone,
+      telemarketing_name,
+    });
+    syncMessage.value = res.data.message || `Info klaim "${target.dealer_name || target.id_real}" berhasil dikirim ke WhatsApp Telemarketing!`;
     syncError.value = false;
+    telemarketingModal.isOpen = false;
   } catch (err) {
     syncMessage.value = 'Gagal mengirim WhatsApp ke Telemarketing: ' + (err.response?.data?.message || err.message);
     syncError.value = true;
   } finally {
-    sendingWaId.value = null;
+    isSendingTelemarketing.value = false;
     isSendingWaModal.value = false;
+    sendingWaId.value = null;
   }
 };
 

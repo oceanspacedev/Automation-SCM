@@ -118,4 +118,34 @@ class UserManagementTest extends TestCase
         $this->assertTrue($user->hasPermission('data_program'));
         $this->assertFalse($user->hasPermission('form_program'));
     }
+
+    public function test_can_fetch_active_telemarketing_contacts(): void
+    {
+        User::factory()->create([
+            'name' => 'Siti Telemarketing',
+            'role' => 'telemarketing',
+            'whatsapp' => '6281234567890',
+            'is_active' => true,
+        ]);
+        User::factory()->create([
+            'name' => 'Inactive Telemarketing',
+            'role' => 'telemarketing',
+            'whatsapp' => '628111111111',
+            'is_active' => false,
+        ]);
+        User::factory()->create([
+            'name' => 'Budi SCM',
+            'role' => 'scm',
+            'whatsapp' => '628222222222',
+            'is_active' => true,
+        ]);
+
+        $response = $this->getJson('/api/telemarketing-contacts');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonCount(1, 'contacts')
+            ->assertJsonPath('contacts.0.name', 'Siti Telemarketing')
+            ->assertJsonPath('contacts.0.whatsapp', '6281234567890');
+    }
 }

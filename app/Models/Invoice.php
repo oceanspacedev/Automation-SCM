@@ -26,7 +26,7 @@ class Invoice extends Model
 
     public function draft(): BelongsTo
     {
-        return $this->belongsTo(Draft::class);
+        return $this->belongsTo(Draft::class)->withoutGlobalScope('area');
     }
 
     public function emailLogs(): HasMany

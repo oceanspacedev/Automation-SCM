@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\Customer;
+
 class CustomerLookupService
 {
     /**
@@ -94,6 +96,20 @@ class CustomerLookupService
      */
     public static function getBillToOptions(): array
     {
+        try {
+            $dbCustomers = Customer::where('is_active', true)->orderBy('name')->get();
+            if ($dbCustomers->isNotEmpty()) {
+                return $dbCustomers->map(fn ($c) => [
+                    'code' => $c->code,
+                    'name' => $c->name,
+                    'address' => $c->address ?: '-',
+                    'npwp' => $c->npwp ?: '-',
+                ])->all();
+            }
+        } catch (\Throwable) {
+            // fallback to static
+        }
+
         return array_values(self::$billToOptions);
     }
 
@@ -107,6 +123,27 @@ class CustomerLookupService
         }
 
         $normalized = strtoupper(trim($key));
+
+        try {
+            $customer = Customer::where('is_active', true)
+                ->where(function ($q) use ($normalized) {
+                    $q->where('code', $normalized)
+                        ->orWhere('name', $normalized);
+                })
+                ->first();
+
+            if ($customer) {
+                return [
+                    'code' => $customer->code,
+                    'name' => $customer->name,
+                    'address' => $customer->address ?: '-',
+                    'npwp' => $customer->npwp ?: '-',
+                ];
+            }
+        } catch (\Throwable) {
+            // fallback to static
+        }
+
         if (isset(self::$billToOptions[$normalized])) {
             return self::$billToOptions[$normalized];
         }
@@ -132,6 +169,25 @@ class CustomerLookupService
                 'address' => '-',
                 'npwp' => '-',
             ];
+        }
+
+        try {
+            $customer = Customer::where('is_active', true)
+                ->where(function ($q) use ($normalized) {
+                    $q->where('name', 'like', "%{$normalized}%")
+                        ->orWhere('code', 'like', "%{$normalized}%");
+                })
+                ->first();
+
+            if ($customer) {
+                return [
+                    'name' => $customer->name,
+                    'address' => $customer->address ?: '-',
+                    'npwp' => $customer->npwp ?: '-',
+                ];
+            }
+        } catch (\Throwable) {
+            // fallback
         }
 
         foreach (self::$customers as $key => $info) {

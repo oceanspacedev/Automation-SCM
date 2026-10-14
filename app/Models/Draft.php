@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToArea;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+/**
+ * Draft invoice milik sebuah area; Data Program-nya dikirim ke spreadsheet area tersebut.
+ */
 class Draft extends Model
 {
-    use HasFactory;
+    use BelongsToArea, HasFactory;
 
     protected $guarded = ['id'];
 
@@ -26,5 +30,10 @@ class Draft extends Model
     public function invoice(): HasOne
     {
         return $this->hasOne(Invoice::class);
+    }
+
+    public function dataProgram(): HasOne
+    {
+        return $this->hasOne(DataProgram::class, 'draft_id')->withoutGlobalScope('area');
     }
 }

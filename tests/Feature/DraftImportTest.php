@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Dealer;
 use App\Models\Draft;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -95,6 +96,36 @@ class DraftImportTest extends TestCase
         $this->assertEquals('DLR003', $errorDraft->dealer_code);
 
         @unlink($tempPath);
+    }
+
+    public function test_import_marks_rows_with_empty_or_already_used_cn_number_as_error(): void
+    {
+        Draft::create(['area' => 'jateng', 'dealer_name' => 'TOKO LAMA', 'support_amount' => 1000, 'cn_number' => '2608000045', 'status' => 'ready']);
+
+        $spreadsheet = new Spreadsheet;
+        $row = fn (string $dealer, ?string $cnNumber) => [$dealer, 1000000, 'PROGRAM DSA JULI 2026', $cnNumber, 'DSA'];
+        $spreadsheet->getActiveSheet()->fromArray([
+            ['Dealer Name', 'Support Amount', 'Nama Program', 'No CN', 'DSA/NPS FL'],
+            $row('TOKO A', '2608000043'),
+            $row('TOKO B', null),
+            $row('TOKO C', '2608000043'),
+            $row('TOKO D', '2608000045'),
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'draft_cn').'.xlsx';
+        (new Xlsx($spreadsheet))->save($path);
+
+        $errors = $this->postJson('/api/drafts/import', ['file' => new UploadedFile($path, 'draft.xlsx', null, null, true)])
+            ->assertOk()
+            ->assertJsonPath('data.success', 1)
+            ->assertJsonPath('data.failed', 3)
+            ->json('data.errors');
+
+        $this->assertSame([
+            'No CN wajib diisi karena dipakai sebagai nomor invoice.',
+            'No CN 2608000043 sudah dipakai baris 2 di file ini.',
+            'No CN 2608000045 sudah dipakai draft TOKO LAMA (Jawa Tengah).',
+        ], array_column($errors, 'error'));
+        $this->assertSame('ready', Draft::where('dealer_name', 'TOKO A')->value('status'));
     }
 
     public function test_can_import_excel_with_numbering_row_on_top_and_headers_on_row_2(): void
@@ -206,5 +237,89 @@ class DraftImportTest extends TestCase
         $this->assertEquals('ready', $draft->status);
 
         @unlink($tempPath);
+    }
+
+    public function test_imported_draft_follows_the_area_of_its_store_in_master_dealer(): void
+    {
+        Dealer::create(['area' => 'jateng', 'kode_bt' => 'BT04850', 'id_realme' => 'DLBJ7072', 'dealer_name' => 'CV. BERKAH PANEN RAYA']);
+
+        $spreadsheet = new Spreadsheet;
+        $spreadsheet->getActiveSheet()->fromArray([
+            ['No.', 'Region', 'RSM', 'Dealer Code', 'Kode BT', 'Nama Cust by CSA', 'Dealer Name', 'Realqty', 'NPWP', 'Nama NPWP', 'Jenis NPWP', 'Jenis Pph', 'Support Amount', 'Dpp', 'Dpp Lain', 'Ppn', 'Pph', 'Netpay', 'KODE ITEM', 'NAMA ITEM', 'Alamat', 'Nama Program', 'Periode Program', 'No CN', 'Tanggal Inv', 'REFNOTE', 'DSA/NPS FL'],
+            // Kode BT ditulis "BTO…" di Excel tetap dikenali sebagai BT04850 milik Jawa Tengah
+            ['1', 'SOLO', 'LOGAN', 'DLBJ7072', 'BTO4850', 'CV. BERKAH PANEN RAYA', 'CV BERKAH PANEN RAYA', null, '0312494602526000', 'CV. BERKAH PANEN RAYA', 'BADAN', '2.0%', 17000000, 15315315, 14039039, 1684685, 306306, 16693694, '38000016', 'MARKETING SERVICE FEE', 'JL. MOH. YAMIN', 'PROGRAM PEAKSEASON JULI 2026', 'Periode 1-31 Juli 2026', '2608000044', '10/14/2026', 'REALME - DP SEMARANG', 'NPS FL'],
+            // Toko yang tidak ada di Master Dealer tetap ikut tab tempat import
+            ['2', 'BANDUNG', 'RSM', 'DLXX0001', 'BT99999', 'TOKO BARU', 'TOKO BARU', null, '-', 'TOKO BARU', 'PRIBADI', '2.5%', 1000000, 900901, 0, 0, 22523, 878378, '38000017', 'MARKETING SERVICE FEE', 'JL. BANDUNG', 'PROGRAM PEAKSEASON JULI 2026', 'Periode 1-31 Juli 2026', '2608000046', '10/14/2026', 'REALME - DP BANDUNG', 'NPS FL'],
+        ]);
+        $tempPath = @tempnam(sys_get_temp_dir(), 'test_area_').'.xlsx';
+        (new Xlsx($spreadsheet))->save($tempPath);
+
+        $response = $this->postJson('/api/drafts/import', [
+            'file' => new UploadedFile($tempPath, 'draft_area.xlsx', null, null, true),
+        ], ['X-Area' => 'jabar']);
+
+        $response->assertOk()->assertJsonPath('data.moved_to_area', ['Jawa Tengah' => 1]);
+        $this->assertSame('jateng', Draft::withoutGlobalScopes()->where('kode_bt', 'BTO4850')->value('area'));
+        $this->assertSame('jabar', Draft::withoutGlobalScopes()->where('kode_bt', 'BT99999')->value('area'));
+
+        @unlink($tempPath);
+    }
+
+    public function test_can_manually_create_draft_invoice(): void
+    {
+        $payload = [
+            'dealer_code' => 'TEST-DLR-MANUAL',
+            'dealer_name' => 'Toko Manual Sejahtera',
+            'customer_name' => 'PT TOP TELEMARKETING',
+            'region' => 'BIG BANDUNG',
+            'kode_bt' => 'BT889',
+            'program_name' => 'PROGRAM DSA MARET 2026',
+            'program_period' => 'Maret 2026',
+            'cn_number' => 'CN-MANUAL-001',
+            'invoice_type' => 'NPS FL',
+            'support_amount' => 10000000,
+            'pph_type' => 'BADAN',
+            'npwp_type' => 'BADAN',
+            'real_qty' => 1,
+        ];
+
+        $response = $this->postJson('/api/drafts', $payload);
+
+        $response->assertStatus(201);
+        $response->assertJson([
+            'success' => true,
+            'data' => [
+                'dealer_name' => 'Toko Manual Sejahtera',
+                'dealer_code' => 'TEST-DLR-MANUAL',
+                'status' => 'ready',
+                'invoice_type' => 'NPS FL',
+            ],
+        ]);
+
+        $created = Draft::where('dealer_code', 'TEST-DLR-MANUAL')->first();
+        $this->assertNotNull($created);
+        $this->assertEquals(10000000, (float) $created->support_amount);
+        $this->assertEquals(9009009, (float) $created->dpp);
+        $this->assertEquals(990991, (float) $created->ppn);
+        $this->assertEquals(180180, (float) $created->pph);
+        $this->assertEquals(9819820, (float) $created->netpay);
+        $this->assertTrue($created->validation_notes['is_matched']);
+    }
+
+    public function test_can_delete_draft_invoice(): void
+    {
+        $draft = Draft::create([
+            'no' => '999',
+            'dealer_name' => 'Toko Hapus Test',
+            'program_name' => 'PROGRAM TEST',
+            'support_amount' => 1000000,
+            'status' => 'ready',
+        ]);
+
+        $response = $this->deleteJson("/api/drafts/{$draft->id}");
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+        $this->assertDatabaseMissing('drafts', ['id' => $draft->id]);
     }
 }

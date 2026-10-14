@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Area;
 use App\Models\ProgramSubmission;
 use Exception;
 use Illuminate\Support\Facades\Cache;
@@ -19,47 +20,62 @@ class ProgramSubmissionService
     public const DEFAULT_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1rDYiHsNR43H44g2xyV-igyp1Ijv_jp8v8FblAMHqof8/edit?gid=0#gid=0';
 
     /**
-     * Get configured Google Apps Script Web App URL.
+     * Get configured Google Apps Script Web App URL of an area (defaults to the area selected in AreaContext).
+     * Only Jawa Barat has a built-in default; other areas must be configured first.
      */
-    public function getWebAppUrl(): string
+    public function getWebAppUrl(?Area $area = null): string
     {
-        $url = (string) Cache::get(self::CACHE_KEY_WEBAPP_URL, env('GOOGLE_SHEET_WEBAPP_URL', ''));
+        $area ??= $this->currentArea();
+        $isDefaultArea = $area === Area::default();
+
+        $url = (string) Cache::get($area->settingKey(self::CACHE_KEY_WEBAPP_URL), $isDefaultArea ? env('GOOGLE_SHEET_WEBAPP_URL', '') : '');
 
         if (! empty($url)) {
             return $url;
         }
 
-        return self::DEFAULT_WEBAPP_URL;
+        return $isDefaultArea ? self::DEFAULT_WEBAPP_URL : '';
     }
 
     /**
-     * Save configured Google Apps Script Web App URL.
+     * Save configured Google Apps Script Web App URL of an area.
      */
-    public function setWebAppUrl(string $url): void
+    public function setWebAppUrl(string $url, ?Area $area = null): void
     {
-        Cache::forever(self::CACHE_KEY_WEBAPP_URL, trim($url));
+        Cache::forever(($area ?? $this->currentArea())->settingKey(self::CACHE_KEY_WEBAPP_URL), trim($url));
     }
 
     /**
-     * Get configured Google Spreadsheet URL.
+     * Get configured Google Spreadsheet URL of an area.
      */
-    public function getSpreadsheetUrl(): string
+    public function getSpreadsheetUrl(?Area $area = null): string
     {
-        $url = (string) Cache::get(self::CACHE_KEY_SPREADSHEET_URL, env('PROGRAM_SUBMISSION_SPREADSHEET_URL', ''));
+        $area ??= $this->currentArea();
+        $isDefaultArea = $area === Area::default();
+
+        $url = (string) Cache::get($area->settingKey(self::CACHE_KEY_SPREADSHEET_URL), $isDefaultArea ? env('PROGRAM_SUBMISSION_SPREADSHEET_URL', '') : '');
 
         if (! empty($url)) {
             return $url;
         }
 
-        return self::DEFAULT_SPREADSHEET_URL;
+        return $isDefaultArea ? self::DEFAULT_SPREADSHEET_URL : '';
     }
 
     /**
-     * Save configured Google Spreadsheet URL.
+     * Save configured Google Spreadsheet URL of an area.
      */
-    public function setSpreadsheetUrl(string $url): void
+    public function setSpreadsheetUrl(string $url, ?Area $area = null): void
     {
-        Cache::forever(self::CACHE_KEY_SPREADSHEET_URL, trim($url));
+        Cache::forever(($area ?? $this->currentArea())->settingKey(self::CACHE_KEY_SPREADSHEET_URL), trim($url));
+    }
+
+    /**
+     * The area selected for the current request (Jawa Barat when none is selected).
+     */
+    protected function currentArea(): Area
+    {
+        return app(AreaContext::class)->resolve();
     }
 
     /**
@@ -69,7 +85,7 @@ class ProgramSubmissionService
      */
     public function appendSubmissionToSpreadsheet(ProgramSubmission $submission, ?string $customUrl = null): array
     {
-        $url = trim((string) ($customUrl ?: $this->getWebAppUrl()));
+        $url = trim((string) ($customUrl ?: $this->getWebAppUrl($submission->areaEnum())));
 
         if (empty($url) || ! str_contains($url, 'script.google.com/macros/s/')) {
             return [
@@ -162,7 +178,7 @@ class ProgramSubmissionService
         $url = trim((string) ($customUrl ?: $this->getWebAppUrl()));
 
         if (empty($url)) {
-            throw new Exception('URL Google Apps Script Web App belum diatur. Silakan atur URL Web App terlebih dahulu.');
+            throw new Exception("URL Google Apps Script Web App Form Program {$this->currentArea()->label()} belum diatur. Silakan atur URL Web App terlebih dahulu.");
         }
 
         if ($limit > 0) {
@@ -217,6 +233,12 @@ class ProgramSubmissionService
      */
     public function processSheetRows(array $rows, int $limit = 0): array
     {
+        // Selalu jalankan dalam konteks area agar penghapusan baris hanya menyentuh data area ini
+        $areaContext = app(AreaContext::class);
+        if ($areaContext->current() === null) {
+            return $areaContext->run($this->currentArea(), fn () => $this->processSheetRows($rows, $limit));
+        }
+
         $headerRow = array_map(fn ($col) => strtolower(trim((string) $col)), $rows[0]);
         $dataRows = array_slice($rows, 1);
 
@@ -350,6 +372,11 @@ class ProgramSubmissionService
      */
     public function saveWebhookPayload(array $payload): ProgramSubmission
     {
+        $areaContext = app(AreaContext::class);
+        if ($areaContext->current() === null) {
+            return $areaContext->run($this->currentArea(), fn () => $this->saveWebhookPayload($payload));
+        }
+
         $namedValues = $payload['namedValues'] ?? [];
         $values = $payload['values'] ?? [];
 
