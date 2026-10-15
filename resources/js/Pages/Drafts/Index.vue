@@ -16,85 +16,48 @@
         <p class="text-xs text-gray-500 mt-0.5">Kelola dan terbitkan draft invoice yang diimpor dari Excel.</p>
       </div>
 
-      <!-- Action Buttons (Filament style); di layar kecil tiga tombol sama lebar dengan label pendek -->
+      <!-- Tombol aksi; di layar kecil tiga tombol sama lebar dengan label pendek -->
       <div class="grid grid-cols-3 sm:flex sm:items-center gap-2">
-        <!-- Multi-select Generate Button -->
         <template v-if="selectedIds.length > 0">
           <button
             @click="askGenerateSelected"
             :disabled="generatingBatch || pushingBatch"
-            class="h-9 px-2 sm:px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap"
+            :class="headerButtonClass"
             :title="`Terbitkan ${selectedIds.length} draft terpilih menjadi invoice`"
           >
-            <svg v-if="generatingBatch" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <CheckSquareIcon v-else class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
             <span class="sm:hidden">{{ generatingBatch ? 'Proses...' : `Generate (${selectedIds.length})` }}</span>
             <span class="hidden sm:inline">{{ generatingBatch ? 'Menerbitkan...' : `Generate (${selectedIds.length}) Terpilih` }}</span>
           </button>
-          <!-- Multi-select Kirim ke Data Program -->
           <button
             @click="askPushSelectedToDataProgram"
             :disabled="pushingBatch || generatingBatch"
-            class="h-9 px-2 sm:px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap"
+            :class="headerButtonClass"
             :title="`Kirim ${selectedIds.length} draft terpilih ke Data Program & Google Spreadsheet`"
           >
-            <svg v-if="pushingBatch" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <TableIcon v-else class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
             <span class="sm:hidden">{{ pushingBatch ? 'Mengirim...' : `Kirim DP (${selectedIds.length})` }}</span>
             <span class="hidden sm:inline">{{ pushingBatch ? 'Mengirim...' : `Kirim ke Data Program (${selectedIds.length})` }}</span>
           </button>
-          <button
-            @click="selectedIds = []"
-            class="h-9 px-2 sm:px-3 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium rounded-lg transition cursor-pointer shadow-2xs whitespace-nowrap"
-            title="Batalkan pilihan"
-          >
+          <button @click="selectedIds = []" :class="headerButtonClass" title="Batalkan pilihan">
             <span class="sm:hidden">Batal</span><span class="hidden sm:inline">Batal Pilih</span>
           </button>
         </template>
 
-        <!-- Generate All Invoices (when none selected) -->
         <button
           v-else
           @click="askGenerateAll"
           :disabled="generatingAll"
-          class="h-9 px-2 sm:px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap"
+          :class="headerButtonClass"
           title="Terbitkan invoice untuk semua draft yang berstatus Ready"
         >
-          <svg v-if="generatingAll" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <CheckSquareIcon v-else class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
-          <span class="sm:hidden">{{ generatingAll ? 'Proses...' : 'Generate Semua' }}</span>
+          <span class="sm:hidden">{{ generatingAll ? 'Proses...' : 'Generate' }}</span>
           <span class="hidden sm:inline">{{ generatingAll ? 'Menerbitkan...' : 'Generate Semua Invoice' }}</span>
         </button>
 
-        <button
-          @click="showImportModal = true"
-          class="h-9 px-2 sm:px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition cursor-pointer flex items-center justify-center gap-2 shadow-2xs whitespace-nowrap"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" class="hidden sm:block w-4 h-4 shrink-0">
-            <path fill="#166e40" d="M37 6H17a2 2 0 0 0-2 2v32a2 2 0 0 0 2 2h20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>
-            <path fill="#23a455" d="M37 6H24v36h13a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>
-            <path fill="#2ecc71" opacity=".35" d="M24 13h15v4H24zm0 7h15v4H24zm0 7h15v4H24z"/>
-            <path fill="#107c41" d="M22 13H8a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V15a2 2 0 0 0-2-2z"/>
-            <path fill="#ffffff" d="M12.4 28.5l2.4-4.8 2.4 4.8h2.3l-3.5-6.5 3.3-6.5h-2.3l-2.2 4.7-2.2-4.7h-2.3l3.3 6.5-3.5 6.5h2.3z"/>
-          </svg>
+        <button @click="showImportModal = true" :class="headerButtonClass">
           <span class="sm:hidden">Import</span><span class="hidden sm:inline">Import Excel</span>
         </button>
 
-        <!-- Tambah Manual Button -->
-        <button
-          @click="showCreateModal = true"
-          class="h-9 px-2 sm:px-3.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs whitespace-nowrap"
-        >
-          <PlusIcon class="hidden sm:block w-3.5 h-3.5" />
+        <button @click="showCreateModal = true" :class="headerButtonClass">
           <span class="sm:hidden">Tambah</span><span class="hidden sm:inline">Tambah Manual</span>
         </button>
       </div>
@@ -693,7 +656,6 @@ import {
   Filter as FilterIcon,
   RefreshCw as RefreshCwIcon,
   FileText as FileTextIcon,
-  Plus as PlusIcon,
   Trash2 as Trash2Icon,
   Table as TableIcon,
 } from '@lucide/vue';
@@ -705,6 +667,9 @@ import CreateDraftModal from '@/components/CreateDraftModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import GenerateInvoiceModal from '@/components/GenerateInvoiceModal.vue';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
+
+// Tombol header: tanpa ikon, satu gaya untuk semua aksi
+const headerButtonClass = 'h-9 px-2 sm:px-3.5 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs disabled:opacity-50 transition cursor-pointer whitespace-nowrap';
 
 const drafts = ref([]);
 const loading = ref(false);

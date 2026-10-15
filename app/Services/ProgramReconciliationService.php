@@ -716,9 +716,9 @@ class ProgramReconciliationService
         }
 
         $dataProgram->cek_dokumen = $cekDokumen;
-        // Kolom 'keterangan' adalah input manual tim/spreadsheet dan TIDAK BOLEH diisi oleh AI.
-        // Catatan hasil rekonsiliasi AI disimpan di kolom 'noted'
-        $dataProgram->noted = $keterangan;
+        // 'keterangan' (aging/manual) dan 'noted' (Refnote dari Excel) tidak boleh ditimpa hasil pencocokan;
+        // catatan hasil pencocokan disimpan terpisah di 'match_note'
+        $dataProgram->match_note = $keterangan;
 
         $dataProgram->save();
 
@@ -757,6 +757,7 @@ class ProgramReconciliationService
             'cek_dokumen' => $dataProgram->cek_dokumen,
             'keterangan' => $dataProgram->keterangan,
             'noted' => $dataProgram->noted,
+            'match_note' => $keterangan,
             'ai_note' => $keterangan,
             'drive_transferred' => $transferred,
             'selisih' => $selisih,

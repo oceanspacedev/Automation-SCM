@@ -37,48 +37,32 @@
         <p class="text-xs text-gray-500 mt-0.5">Daftar invoice resmi yang telah diterbitkan.</p>
       </div>
 
-      <!-- Filament Page Actions; di layar kecil dua tombol sama lebar dengan label pendek -->
+      <!-- Tombol aksi; di layar kecil dua tombol sama lebar dengan label pendek -->
       <div class="grid grid-cols-2 sm:flex sm:items-center gap-2">
-        <!-- Multi-select Send Button -->
         <button
           v-if="selectedIds.length > 0"
           @click="askSendBatch"
           :disabled="sendingBatch"
-          class="h-9 px-2 sm:px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap"
+          :class="headerButtonClass"
           :title="`Kirim ${selectedIds.length} invoice terpilih`"
         >
-          <svg v-if="sendingBatch" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <SendIcon v-else class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
           <span class="sm:hidden">{{ sendingBatch ? 'Mengirim...' : `Kirim (${selectedIds.length})` }}</span>
           <span class="hidden sm:inline">{{ sendingBatch ? 'Mengirim...' : `Kirim (${selectedIds.length}) Terpilih` }}</span>
         </button>
 
-        <!-- Send All Button (when nothing specifically selected) -->
         <button
           v-else
           @click="askSendAll"
           :disabled="sendingAll"
-          class="h-9 px-2 sm:px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap"
+          :class="headerButtonClass"
           title="Kirim semua invoice yang belum terkirim via Email & WhatsApp"
         >
-          <svg v-if="sendingAll" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <SendIcon v-else class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
           <span class="sm:hidden">{{ sendingAll ? 'Mengirim...' : 'Kirim Semua' }}</span>
           <span class="hidden sm:inline">{{ sendingAll ? 'Mengirim Semua...' : 'Kirim Semua Notifikasi' }}</span>
         </button>
 
-        <router-link
-          to="/drafts"
-          class="h-9 px-2 sm:px-3 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 shadow-2xs whitespace-nowrap"
-        >
-          <ArrowLeftIcon class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
-          <span>Draft Invoice</span>
+        <router-link :to="`/drafts/${area.value}`" :class="headerButtonClass">
+          Draft Invoice
         </router-link>
       </div>
     </div>
@@ -554,7 +538,6 @@ import {
   MailCheck as MailCheckIcon,
   CheckCircle as CheckCircleIcon,
   AlertCircle as AlertCircleIcon,
-  ArrowLeft as ArrowLeftIcon,
   ChevronRight as ChevronRightIcon,
   ChevronDown as ChevronDownIcon,
   Search as SearchIcon,
@@ -564,9 +547,15 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import AreaTabs from '@/components/AreaTabs.vue';
+import { useArea } from '@/composables/useArea';
 import SendEmailModal from '@/components/SendEmailModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
+
+// Tombol header: tanpa ikon, satu gaya untuk semua aksi
+const headerButtonClass = 'h-9 px-2 sm:px-3.5 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs disabled:opacity-50 transition cursor-pointer whitespace-nowrap';
+
+const { area } = useArea();
 
 const invoices = ref([]);
 const loading = ref(false);

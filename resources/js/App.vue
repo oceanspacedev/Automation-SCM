@@ -21,56 +21,26 @@
           </div>
 
           <div class="hidden lg:flex items-center">
-            <!-- Shadcn-Vue NavigationMenu (Direct Links without Sub-menu) -->
+            <!-- Menu utama (layar lebar) -->
             <NavigationMenu>
               <NavigationMenuList class="flex items-center gap-1">
-                <!-- 1. Draft -->
-                <NavigationMenuItem v-if="canAccess('drafts')">
-                  <NavigationMenuLink as-child>
-                    <router-link
-                      to="/drafts"
-                      :class="[
-                        navigationMenuTriggerStyle(),
-                        isActive('/drafts') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
-                      ]"
-                    >
-                      Draft
-                    </router-link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-
-                <!-- 1. Invoice -->
-                <NavigationMenuItem v-if="canAccess('invoices')">
-                  <NavigationMenuLink as-child>
-                    <router-link
-                      to="/invoices"
-                      :class="[
-                        navigationMenuTriggerStyle(),
-                        isActive('/invoices') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
-                      ]"
-                    >
-                      Invoice
-                    </router-link>
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-
-                <!-- 2. Dropdown Form Program (per area) -->
-                <NavigationMenuItem v-if="canAccess('form_program')">
-                  <Popover v-model:open="isFormProgramOpen">
+                <!-- 1-4. Draft, Invoice, Form Program, Data Program: dropdown per area -->
+                <NavigationMenuItem v-for="menu in areaMenus" :key="menu.path">
+                  <Popover :open="openAreaMenu === menu.path" @update:open="(open) => (openAreaMenu = open ? menu.path : null)">
                     <PopoverTrigger as-child>
                       <button
                         type="button"
                         :class="[
                           navigationMenuTriggerStyle(),
-                          isActive('/form-program') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
+                          isActive(menu.path) && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
                           'gap-1.5 dark:text-slate-200 dark:hover:bg-slate-800'
                         ]"
                       >
-                        <span>Form Program</span>
-                        <span v-if="isActive('/form-program')" class="text-[10px] font-semibold text-gray-500 dark:text-slate-400">{{ activeAreaShort }}</span>
+                        <span>{{ menu.label }}</span>
+                        <span v-if="isActive(menu.path) && route.params.area" class="text-[10px] font-semibold text-gray-500 dark:text-slate-400">{{ activeAreaShort }}</span>
                         <ChevronDownIcon
                           class="w-3.5 h-3.5 text-gray-500 dark:text-slate-400 transition-transform duration-200"
-                          :class="isFormProgramOpen && 'rotate-180'"
+                          :class="openAreaMenu === menu.path && 'rotate-180'"
                         />
                       </button>
                     </PopoverTrigger>
@@ -78,11 +48,11 @@
                       <router-link
                         v-for="area in AREAS"
                         :key="area.value"
-                        :to="`/form-program/${area.value}`"
-                        @click="isFormProgramOpen = false"
+                        :to="`${menu.path}/${area.value}`"
+                        @click="openAreaMenu = null"
                         :class="[
                           'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                          isActive(`/form-program/${area.value}`) ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                          isActive(`${menu.path}/${area.value}`) ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
                         ]"
                       >
                         {{ area.label }}
@@ -91,44 +61,7 @@
                   </Popover>
                 </NavigationMenuItem>
 
-                <!-- 3. Dropdown Data Program (per area) -->
-                <NavigationMenuItem v-if="canAccess('data_program')">
-                  <Popover v-model:open="isDataProgramOpen">
-                    <PopoverTrigger as-child>
-                      <button
-                        type="button"
-                        :class="[
-                          navigationMenuTriggerStyle(),
-                          isActive('/data-program') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
-                          'gap-1.5 dark:text-slate-200 dark:hover:bg-slate-800'
-                        ]"
-                      >
-                        <span>Data Program</span>
-                        <span v-if="isActive('/data-program')" class="text-[10px] font-semibold text-gray-500 dark:text-slate-400">{{ activeAreaShort }}</span>
-                        <ChevronDownIcon
-                          class="w-3.5 h-3.5 text-gray-500 dark:text-slate-400 transition-transform duration-200"
-                          :class="isDataProgramOpen && 'rotate-180'"
-                        />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent align="start" class="w-48 p-1.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl text-xs space-y-0.5">
-                      <router-link
-                        v-for="area in AREAS"
-                        :key="area.value"
-                        :to="`/data-program/${area.value}`"
-                        @click="isDataProgramOpen = false"
-                        :class="[
-                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                          isActive(`/data-program/${area.value}`) ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
-                        ]"
-                      >
-                        {{ area.label }}
-                      </router-link>
-                    </PopoverContent>
-                  </Popover>
-                </NavigationMenuItem>
-
-                <!-- 4. Dropdown Riwayat -->
+                <!-- 5. Dropdown Riwayat -->
                 <NavigationMenuItem v-if="canAccess('riwayat')">
                   <Popover v-model:open="isRiwayatOpen">
                     <PopoverTrigger as-child>
@@ -188,7 +121,7 @@
                   </Popover>
                 </NavigationMenuItem>
 
-                <!-- 5. Dropdown Master Data -->
+                <!-- 6. Dropdown Master Data -->
                 <NavigationMenuItem v-if="canAccess('master')">
                   <Popover v-model:open="isMasterOpen">
                     <PopoverTrigger as-child>
@@ -470,58 +403,39 @@
               </button>
             </div>
       <nav class="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
-        <template v-for="group in mobileNavGroups" :key="group.title || 'utama'">
-          <!-- Menu tanpa sub-menu (Draft, Invoice) -->
-          <template v-if="!group.title">
+        <!-- Sub-menu muncul saat menu diklik -->
+        <div v-for="group in mobileNavGroups" :key="group.title">
+          <button
+            type="button"
+            @click="openMobileGroup = openMobileGroup === group.title ? null : group.title"
+            :class="[
+              'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors cursor-pointer',
+              group.links.some((link) => isActive(link.to)) ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-700 dark:text-slate-300',
+              'hover:bg-gray-100 dark:hover:bg-slate-800'
+            ]"
+          >
+            <span>{{ group.title }}</span>
+            <ChevronDownIcon
+              class="w-4 h-4 text-gray-400 dark:text-slate-500 transition-transform duration-200"
+              :class="openMobileGroup === group.title && 'rotate-180'"
+            />
+          </button>
+          <div v-if="openMobileGroup === group.title" class="pl-3 pb-1 space-y-0.5">
             <router-link
               v-for="link in group.links"
               :key="link.to"
               :to="link.to"
               :class="[
-                'block px-3 py-2.5 rounded-lg text-sm transition-colors',
+                'block px-3 py-2 rounded-lg text-sm transition-colors',
                 isActive(link.to)
                   ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-medium'
-                  : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
+                  : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'
               ]"
             >
               {{ link.label }}
             </router-link>
-          </template>
-
-          <!-- Menu dengan sub-menu: sub-menu muncul saat diklik -->
-          <div v-else>
-            <button
-              type="button"
-              @click="openMobileGroup = openMobileGroup === group.title ? null : group.title"
-              :class="[
-                'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors cursor-pointer',
-                group.links.some((link) => isActive(link.to)) ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-700 dark:text-slate-300',
-                'hover:bg-gray-100 dark:hover:bg-slate-800'
-              ]"
-            >
-              <span>{{ group.title }}</span>
-              <ChevronDownIcon
-                class="w-4 h-4 text-gray-400 dark:text-slate-500 transition-transform duration-200"
-                :class="openMobileGroup === group.title && 'rotate-180'"
-              />
-            </button>
-            <div v-if="openMobileGroup === group.title" class="pl-3 pb-1 space-y-0.5">
-              <router-link
-                v-for="link in group.links"
-                :key="link.to"
-                :to="link.to"
-                :class="[
-                  'block px-3 py-2 rounded-lg text-sm transition-colors',
-                  isActive(link.to)
-                    ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-medium'
-                    : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'
-                ]"
-              >
-                {{ link.label }}
-              </router-link>
-            </div>
           </div>
-        </template>
+        </div>
       </nav>
           </aside>
         </Transition>
@@ -567,8 +481,15 @@ const { isDark, toggleDarkMode, initTheme } = useTheme();
 
 const isRiwayatOpen = ref(false);
 const isMasterOpen = ref(false);
-const isFormProgramOpen = ref(false);
-const isDataProgramOpen = ref(false);
+
+// Menu yang datanya dipisah per area: dropdown Jawa Barat / Jawa Tengah
+const areaMenus = computed(() => [
+  { label: 'Draft', path: '/drafts', feature: 'drafts' },
+  { label: 'Invoice', path: '/invoices', feature: 'invoices' },
+  { label: 'Form Program', path: '/form-program', feature: 'form_program' },
+  { label: 'Data Program', path: '/data-program', feature: 'data_program' },
+].filter((menu) => canAccess(menu.feature)));
+const openAreaMenu = ref(null);
 
 const activeAreaShort = computed(() => findArea(route.params.area).short);
 
@@ -658,15 +579,7 @@ const mobileNavGroups = computed(() => {
   const areaLinks = (path) => AREAS.map((area) => ({ label: area.label, to: `${path}/${area.value}` }));
 
   return [
-    {
-      title: null,
-      links: [
-        canAccess('drafts') && { label: 'Draft', to: '/drafts' },
-        canAccess('invoices') && { label: 'Invoice', to: '/invoices' },
-      ],
-    },
-    canAccess('form_program') && { title: 'Form Program', links: areaLinks('/form-program') },
-    canAccess('data_program') && { title: 'Data Program', links: areaLinks('/data-program') },
+    ...areaMenus.value.map((menu) => ({ title: menu.label, path: menu.path, links: areaLinks(menu.path) })),
     canAccess('riwayat') && {
       title: 'Riwayat',
       links: [
@@ -696,7 +609,9 @@ const mobileNavGroups = computed(() => {
 const currentPageLabel = computed(() => {
   for (const group of mobileNavGroups.value) {
     const link = group.links.find((item) => isActive(item.to));
-    if (link) return group.title ? `${group.title} · ${link.label}` : link.label;
+    if (link) return `${group.title} · ${link.label}`;
+    // Halaman detail (mis. /drafts/12) tidak punya area di URL
+    if (group.path && isActive(group.path)) return group.title;
   }
 
   return isActive('/profile') ? 'Profil' : 'Menu';

@@ -816,6 +816,43 @@ class DataProgramTest extends TestCase
         $this->assertEquals('https://drive.google.com/open?id=test_single_agr', $dpFresh->agrement);
     }
 
+    public function test_reconciliation_keeps_the_refnote_and_stores_the_match_note_separately(): void
+    {
+        $dp = DataProgram::create([
+            'row_hash' => 'hash_refnote_test_dp',
+            'dealer_name' => 'CV SINAR MAKMUR',
+            'kode_bt' => 'BT07777',
+            'program_name' => 'Program C67 4G',
+            'region' => 'BIG BANDUNG',
+            'wajib_pajak' => 'PRIBADI NON PKP',
+            'ppn' => 0,
+            'net_pay' => 750000,
+            'dpp' => 750000,
+            'noted' => 'REALME - DP BANDUNG',
+        ]);
+
+        $submission = ProgramSubmission::create([
+            'row_hash' => 'hash_refnote_test_sub',
+            'dealer_name' => 'CV SINAR MAKMUR',
+            'id_real' => 'BT07777',
+            'program_name' => 'Program C67 4G',
+            'region' => 'BANDUNG',
+            'net_pay' => 750000,
+            'dpp' => 750000,
+            'credit_note_url' => 'https://drive.google.com/open?id=refnote_cn',
+            'agreement_url' => 'https://drive.google.com/open?id=refnote_agr',
+        ]);
+
+        $this->postJson("/api/data-program/{$dp->id}/reconcile", ['force' => true, 'push_to_sheet' => false])
+            ->assertOk()
+            ->assertJsonPath('matched', true)
+            ->assertJsonPath('data.noted', 'REALME - DP BANDUNG');
+
+        $dp->refresh();
+        $this->assertSame('REALME - DP BANDUNG', $dp->noted);
+        $this->assertStringStartsWith("MATCH Test Program #{$submission->id}", $dp->match_note);
+    }
+
     public function test_prioritizes_submission_with_complete_faktur_over_incomplete(): void
     {
         $dp = DataProgram::create([

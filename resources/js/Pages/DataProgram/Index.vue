@@ -1301,8 +1301,8 @@
                 </table>
               </div>
 
-              <p v-if="testRow?.noted || testRow?.keterangan || testResult?.details?.keterangan" class="text-gray-500 leading-relaxed break-words">
-                <span class="text-gray-900">Catatan:</span> {{ testRow?.noted || testRow?.keterangan || testResult?.details?.keterangan }}
+              <p v-if="testRow?.match_note" class="text-gray-500 leading-relaxed break-words">
+                <span class="text-gray-900">Hasil cocok:</span> {{ testRow.match_note }}
               </p>
             </div>
 
