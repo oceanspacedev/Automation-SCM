@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Services\SpreadsheetExport;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CustomerController extends Controller
 {
@@ -13,6 +16,50 @@ class CustomerController extends Controller
      * Display a listing of customers with search, filter, and stats.
      */
     public function index(Request $request): JsonResponse
+    {
+        $perPage = min((int) $request->input('per_page', 20), 100);
+        $customers = $this->filteredQuery($request)->orderBy('name')->paginate($perPage);
+
+        $stats = [
+            'total' => Customer::count(),
+            'active' => Customer::where('is_active', true)->count(),
+            'inactive' => Customer::where('is_active', false)->count(),
+            'with_npwp' => Customer::whereNotNull('npwp')->where('npwp', '!=', '')->where('npwp', '!=', '-')->count(),
+        ];
+
+        return response()->json([
+            'success' => true,
+            'data' => $customers,
+            'stats' => $stats,
+        ]);
+    }
+
+    /**
+     * Export the customers (with the list's search & status filter) to Excel.
+     */
+    public function export(Request $request, SpreadsheetExport $export): StreamedResponse
+    {
+        return $export->download(
+            'master_customer_'.now()->format('Ymd_His').'.xlsx',
+            'Master Customer',
+            ['KODE', 'NAMA CUSTOMER', 'NPWP', 'NAMA NPWP', 'ALAMAT', 'STATUS'],
+            $this->filteredQuery($request)->orderBy('name')->get()->map(fn (Customer $customer) => [
+                $customer->code,
+                $customer->name,
+                $customer->npwp,
+                $customer->npwp_name,
+                $customer->address,
+                $customer->is_active ? 'Aktif' : 'Nonaktif',
+            ])
+        );
+    }
+
+    /**
+     * Customers matching the list's search and status filters.
+     *
+     * @return Builder<Customer>
+     */
+    private function filteredQuery(Request $request): Builder
     {
         $query = Customer::query();
 
@@ -29,21 +76,7 @@ class CustomerController extends Controller
             $query->where('is_active', $isActive);
         }
 
-        $perPage = min((int) $request->input('per_page', 20), 100);
-        $customers = $query->orderBy('name')->paginate($perPage);
-
-        $stats = [
-            'total' => Customer::count(),
-            'active' => Customer::where('is_active', true)->count(),
-            'inactive' => Customer::where('is_active', false)->count(),
-            'with_npwp' => Customer::whereNotNull('npwp')->where('npwp', '!=', '')->where('npwp', '!=', '-')->count(),
-        ];
-
-        return response()->json([
-            'success' => true,
-            'data' => $customers,
-            'stats' => $stats,
-        ]);
+        return $query;
     }
 
     /**

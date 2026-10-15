@@ -39,7 +39,7 @@ const routes = [
   { path: '/dashboard', name: 'dashboard', component: Dashboard, meta: { requiresAuth: true } },
   ...areaRoutes('/drafts', 'drafts.index', DraftsIndex),
   { path: '/drafts/:id', name: 'drafts.detail', component: DraftDetail, props: true, meta: { requiresAuth: true } },
-  { path: '/invoices', name: 'invoices.index', component: InvoicesIndex, meta: { requiresAuth: true } },
+  ...areaRoutes('/invoices', 'invoices.index', InvoicesIndex),
   { path: '/invoices/:id', name: 'invoices.detail', component: InvoiceDetail, props: true, meta: { requiresAuth: true } },
   { path: '/email-logs', name: 'email-logs.index', component: EmailLogsIndex, meta: { requiresAuth: true } },
   { path: '/form-program', redirect: `/test-program/${DEFAULT_AREA}` },

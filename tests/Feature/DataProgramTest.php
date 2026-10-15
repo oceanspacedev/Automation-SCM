@@ -393,24 +393,27 @@ class DataProgramTest extends TestCase
             && array_column($request['rows'], 'no_po') === ['2502200306', '2502200307']);
 
         // Mengisi Tgl Input saja menghitung ulang Lama Pending tanpa menimpa Keterangan yang ditulis manual
-        $this->putJson('/api/data-program/bulk', ['field' => 'tgl_input', 'rows' => [['id' => $second->id, 'value' => '2026-03-01']]])->assertOk();
+        $this->putJson("/api/data-program/{$second->id}", ['tgl_input' => '2026-03-01', 'push_to_sheet' => false])->assertOk();
         $this->assertSame('Menunggu dealer', $second->fresh()->keterangan);
         $this->assertGreaterThan(30, (int) $second->fresh()->lama_pending);
     }
 
-    public function test_bulk_update_rejects_unknown_columns_and_invalid_values(): void
+    public function test_bulk_update_only_accepts_po_and_sj_columns(): void
     {
-        $dp = DataProgram::create(['row_hash' => 'row_5', 'dealer_name' => 'CV OLIVIA']);
+        $dp = DataProgram::create(['row_hash' => 'row_5', 'dealer_name' => 'CV OLIVIA', 'dpp' => 450450]);
 
-        $this->putJson('/api/data-program/bulk', ['field' => 'row_hash', 'rows' => [['id' => $dp->id, 'value' => 'row_9']]])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors(['field']);
+        foreach (['row_hash' => 'row_9', 'dpp' => 1] as $field => $value) {
+            $this->putJson('/api/data-program/bulk', ['field' => $field, 'rows' => [['id' => $dp->id, 'value' => $value]]])
+                ->assertStatus(422)
+                ->assertJsonValidationErrors(['field']);
+        }
 
-        $this->putJson('/api/data-program/bulk', ['field' => 'dpp', 'rows' => [['id' => $dp->id, 'value' => 'empat ratus']]])
+        $this->putJson('/api/data-program/bulk', ['field' => 'no_sj', 'rows' => [['id' => $dp->id, 'value' => str_repeat('9', 101)]]])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['rows.0.value']);
 
         $this->assertSame('row_5', $dp->fresh()->row_hash);
+        $this->assertEquals(450450, $dp->fresh()->dpp);
     }
 
     public function test_reconciliation_fails_when_region_differs(): void

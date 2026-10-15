@@ -175,6 +175,24 @@ class AreaSeparationTest extends TestCase
         $this->assertEquals($jabarPrograms, $jatengPrograms);
     }
 
+    public function test_invoices_follow_their_draft_area_and_cn_numbers_stay_unique_across_areas(): void
+    {
+        Http::fake();
+        $draft = fn (string $area, string $dealer) => Draft::create(['area' => $area, 'dealer_name' => $dealer, 'cn_number' => '2608000043', 'support_amount' => 1000000, 'invoice_type' => 'DSA', 'status' => 'ready']);
+
+        $jatengDraft = $draft('jateng', 'TOKO SOLO');
+        $this->postJson("/api/invoices/generate/{$jatengDraft->id}", [], ['X-Area' => 'jateng'])->assertOk();
+
+        $this->assertDatabaseHas('invoices', ['draft_id' => $jatengDraft->id, 'area' => 'jateng', 'invoice_number' => '2608000043']);
+        $this->getJson('/api/invoices', ['X-Area' => 'jateng'])->assertJsonPath('total', 1);
+        $this->getJson('/api/invoices', ['X-Area' => 'jabar'])->assertJsonPath('total', 0);
+
+        // No CN yang sudah dipakai invoice Jawa Tengah tidak boleh dipakai lagi dari halaman Jawa Barat
+        $jabarDraft = $draft('jabar', 'TOKO BANDUNG');
+        $this->postJson("/api/invoices/generate/{$jabarDraft->id}", [], ['X-Area' => 'jabar'])->assertStatus(422);
+        $this->assertSame('ready', $jabarDraft->fresh()->status);
+    }
+
     public function test_dealers_drafts_and_reconciliation_history_are_listed_per_area(): void
     {
         Dealer::create(['area' => 'jabar', 'id_realme' => 'IDJABAR', 'dealer_name' => 'DEALER BANDUNG']);

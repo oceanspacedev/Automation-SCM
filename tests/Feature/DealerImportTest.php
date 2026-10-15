@@ -9,6 +9,7 @@ use App\Models\MasterProgram;
 use App\Models\Region;
 use App\Services\DataProgramSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -79,6 +80,70 @@ class DealerImportTest extends TestCase
         // Region dari Big Area otomatis masuk Master Region area masing-masing
         $this->assertTrue(Region::withoutGlobalScopes()->where(['area' => 'jateng', 'name' => 'BIG JOGJA'])->exists());
         $this->assertTrue(Region::withoutGlobalScopes()->where(['area' => 'jateng', 'name' => 'BIG SOLO'])->exists());
+    }
+
+    public function test_master_dealer_can_be_imported_from_the_web_without_removing_other_dealers(): void
+    {
+        Dealer::create(['area' => 'jabar', 'kode_bt' => 'BT99999', 'dealer_name' => 'DEALER LAMA']);
+
+        $file = $this->makeMasterFile([
+            $this->row('BT02657', 'AWEI CELL', 'BIG BANDUNG'),
+            $this->row('BT03000', 'TOKO SOLO', 'BIG SOLO', 'REALME - DP SEMARANG'),
+            $this->row('BT05000', 'TOKO TANPA AREA', '-', '-'),
+        ]);
+
+        $this->post('/api/dealers/import', ['file' => new UploadedFile($file, 'Master Customer CV TOP.xlsx', null, null, true)], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('data.imported', 2)
+            ->assertJsonPath('data.per_area', ['Jawa Barat' => 1, 'Jawa Tengah' => 1])
+            ->assertJsonPath('data.skipped.0.kode_bt', 'BT05000')
+            ->assertJsonPath('data.skipped.0.reason', 'Big Area & Reffnote kosong / tidak dikenal');
+
+        $this->assertDatabaseHas('dealers', ['kode_bt' => 'BT99999']);
+        $this->assertDatabaseHas('dealers', ['kode_bt' => 'BT03000', 'area' => 'jateng']);
+
+        $this->get('/api/dealers/import/skipped')->assertOk()->assertDownload('dealer-belum-diimport.xlsx');
+    }
+
+    public function test_exported_dealers_of_an_area_can_be_imported_again_unchanged(): void
+    {
+        Dealer::create([
+            'area' => 'jabar', 'kode_bt' => 'BT02657', 'dealer_name' => 'AWEI CELL', 'id_realme' => 'DLAA0001', 'npwp' => '3277030808650024',
+            'npwp_type' => 'PRIBADI', 'telemarketing' => 'AKHMAD ZULFIKAR', 'telemarketing_phone' => '087778888837', 'region' => 'BIG BANDUNG', 'is_active' => false,
+        ]);
+        Dealer::create(['area' => 'jateng', 'kode_bt' => 'BT03000', 'dealer_name' => 'TOKO SOLO', 'region' => 'BIG SOLO']);
+
+        $rows = $this->downloadedSpreadsheetRows($this->get('/api/dealers/export?area=jabar')->assertOk());
+
+        $this->assertSame(self::HEADER[0], $rows[0][0]);
+        $this->assertCount(2, $rows);
+        $this->assertSame(['BT02657', 'AWEI CELL', 'DLAA0001', 'Disabled', '3277030808650024', '087778888837', 'BIG BANDUNG'], [$rows[1][0], $rows[1][1], $rows[1][4], $rows[1][6], $rows[1][7], $rows[1][12], $rows[1][13]]);
+
+        // File export langsung bisa diimport ulang tanpa mengubah data
+        $file = $this->saveDownloadedSpreadsheet($this->get('/api/dealers/export?area=jabar'));
+        $this->post('/api/dealers/import', ['file' => new UploadedFile($file, 'export.xlsx', null, null, true)], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('data.imported', 1)
+            ->assertJsonPath('data.skipped', []);
+
+        $this->assertDatabaseHas('dealers', ['kode_bt' => 'BT02657', 'area' => 'jabar', 'npwp' => '3277030808650024', 'telemarketing_phone' => '087778888837', 'is_active' => false]);
+        $this->assertDatabaseHas('dealers', ['kode_bt' => 'BT03000', 'area' => 'jateng']);
+    }
+
+    public function test_dealer_import_rejects_files_that_are_not_the_master_dealer_excel(): void
+    {
+        $this->post('/api/dealers/import', ['file' => UploadedFile::fake()->create('dealer.pdf', 10, 'application/pdf')], ['Accept' => 'application/json'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['file']);
+
+        $spreadsheet = new Spreadsheet;
+        $spreadsheet->getActiveSheet()->fromArray([['Kolom A', 'Kolom B'], ['x', 'y']]);
+        $path = tempnam(sys_get_temp_dir(), 'dealers').'.xlsx';
+        (new Xlsx($spreadsheet))->save($path);
+
+        $this->post('/api/dealers/import', ['file' => new UploadedFile($path, 'lain.xlsx', null, null, true)], ['Accept' => 'application/json'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'File tidak bisa diimport: Kolom "ID CUSTOMER" tidak ditemukan di baris header file.');
     }
 
     public function test_dealer_kode_bt_is_required_unique_and_normalized(): void

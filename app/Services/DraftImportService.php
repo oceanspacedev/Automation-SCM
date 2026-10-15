@@ -344,7 +344,7 @@ class DraftImportService
             return "No CN {$cnNumber} sudah dipakai draft {$draft->dealer_name} ({$draft->areaEnum()->label()}).";
         }
 
-        if (Invoice::where('invoice_number', $cnNumber)->exists()) {
+        if (Invoice::withoutGlobalScope('area')->where('invoice_number', $cnNumber)->exists()) {
             return "No CN {$cnNumber} sudah dipakai invoice lain.";
         }
 

@@ -18,17 +18,37 @@
         </p>
       </div>
 
-      <div>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          @click="isImportModalOpen = true"
+          class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
+        >
+          <span>Import Excel</span>
+        </button>
+        <button
+          type="button"
+          @click="downloadExport('/api/dealers/export', { search: searchQuery, region: filterRegion })"
+          class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
+          title="Export dealer area ini sesuai pencarian & filter (format sama dengan file import CV TOP)"
+        >
+          <span>Export Excel</span>
+        </button>
         <button
           type="button"
           @click="openCreateModal"
           class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
         >
-          <PlusIcon class="w-3.5 h-3.5 text-gray-500" />
           <span>Tambah Dealer</span>
         </button>
       </div>
     </div>
+
+    <DealerImportModal
+      :is-open="isImportModalOpen"
+      @close="isImportModalOpen = false"
+      @imported="fetchDealers(1); fetchMasterRegions()"
+    />
 
     <!-- Table Card (Matching Form Program Plain Ordinary Table Style) -->
     <div class="rounded-xl border border-gray-200 bg-white shadow-xs overflow-hidden">
@@ -477,17 +497,19 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import AreaTabs from '@/components/AreaTabs.vue';
+import DealerImportModal from '@/components/DealerImportModal.vue';
+import { downloadExport } from '@/lib/download';
 import {
   ChevronRightIcon,
   ChevronLeftIcon,
   ChevronDownIcon,
   SearchIcon,
   XIcon,
-  PlusIcon,
   PencilIcon,
   Trash2Icon,
 } from 'lucide-vue-next';
 
+const isImportModalOpen = ref(false);
 const dealers = ref([]);
 const totalRows = ref(0);
 const currentPage = ref(1);

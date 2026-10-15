@@ -18,13 +18,19 @@
         </p>
       </div>
 
-      <div>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          @click="downloadExport('/api/regions/export', { search: searchQuery })"
+          class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
+        >
+          <span>Export Excel</span>
+        </button>
         <button
           type="button"
           @click="openCreateModal"
           class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
         >
-          <PlusIcon class="w-3.5 h-3.5 text-gray-500" />
           <span>Tambah Region</span>
         </button>
       </div>
@@ -199,11 +205,11 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import AreaTabs from '@/components/AreaTabs.vue';
 import { useArea } from '@/composables/useArea';
+import { downloadExport } from '@/lib/download';
 import {
   ChevronRight as ChevronRightIcon,
   Search as SearchIcon,
   X as XIcon,
-  Plus as PlusIcon,
   Pencil as PencilIcon,
   Trash2 as Trash2Icon,
 } from 'lucide-vue-next';

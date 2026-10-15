@@ -2,17 +2,107 @@
 
 namespace App\Http\Controllers;
 
+use App\Area;
 use App\Models\Dealer;
+use App\Services\AreaContext;
+use App\Services\DealerImportService;
+use App\Services\SpreadsheetExport;
+use Exception;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DealerController extends Controller
 {
     /**
-     * Display a listing of dealers with search, filter, and stats.
+     * Import Master Dealer from the CV TOP master file. The file holds every area: each store's area
+     * comes from its Big Area (or Reffnote), so one import fills both Jawa Barat and Jawa Tengah.
      */
-    public function index(Request $request): JsonResponse
+    public function import(Request $request, DealerImportService $importer): JsonResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'extensions:xlsx,xls,csv', 'max:20480'],
+            'replace_existing' => ['nullable', 'boolean'],
+        ], [
+            'file.required' => 'Pilih file Excel Master Dealer terlebih dahulu.',
+            'file.extensions' => 'File harus berformat .xlsx, .xls, atau .csv.',
+            'file.max' => 'Ukuran file maksimal 20 MB.',
+        ]);
+
+        set_time_limit(300);
+
+        try {
+            $result = $importer->import($request->file('file')->getRealPath(), $request->boolean('replace_existing'));
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'File tidak bisa diimport: '.$e->getMessage(),
+            ], 422);
+        }
+
+        if ($result['skipped']) {
+            $importer->writeSkippedRows($result['skipped'], $result['header'], $importer->skippedRowsPath());
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$result['imported']} dealer berhasil diimport.",
+            'data' => [
+                'imported' => $result['imported'],
+                'per_area' => collect($result['per_area'])->mapWithKeys(fn (int $count, string $area) => [Area::from($area)->label() => $count])->all(),
+                'regions_created' => $result['regions_created'],
+                'duplicates' => $result['duplicates'],
+                'normalized_kode_bt' => $result['normalized_kode_bt'],
+                'kept_original_kode_bt' => $result['kept_original_kode_bt'],
+                'skipped' => array_map(fn (array $row) => Arr::only($row, ['row', 'kode_bt', 'dealer_name', 'reason']), $result['skipped']),
+            ],
+        ]);
+    }
+
+    /**
+     * Export the dealers of the selected area (with the list's search & filters) in the CV TOP master file layout,
+     * so the file can be edited and imported again.
+     */
+    public function export(Request $request, SpreadsheetExport $export, AreaContext $areaContext): StreamedResponse
+    {
+        $area = $areaContext->resolve();
+
+        $rows = $this->filteredQuery($request)->orderBy('dealer_name')->lazy()->map(fn (Dealer $dealer) => [
+            $dealer->kode_bt,
+            $dealer->dealer_name,
+            $dealer->alias,
+            $dealer->address,
+            $dealer->id_realme,
+            $dealer->gs_name,
+            $dealer->is_active ? 'Enabled' : 'Disabled',
+            $dealer->npwp,
+            $dealer->npwp_name,
+            $dealer->reffnote,
+            $dealer->npwp_type,
+            $dealer->telemarketing,
+            $dealer->telemarketing_phone,
+            $dealer->region,
+            $dealer->sales_person,
+        ]);
+
+        return $export->download(
+            'master_dealer_'.$area->value.'_'.now()->format('Ymd_His').'.xlsx',
+            'Master Dealer '.$area->label(),
+            ['ID Customer', 'Nama Customer', 'Alias', 'Alamat', 'ID GS', 'Nama GS', 'Status GS', 'NPWP/NIK', 'NAMA NPWP/NIK', 'Reffnote', 'Jenis NPWP', 'Telemarketing', 'No. WA Telemarketing', 'Big Area', 'SALES AREA'],
+            $rows
+        );
+    }
+
+    /**
+     * Dealers of the selected area matching the list's search, region and status filters.
+     *
+     * @return Builder<Dealer>
+     */
+    private function filteredQuery(Request $request): Builder
     {
         $query = Dealer::query();
 
@@ -41,8 +131,26 @@ class DealerController extends Controller
             $query->where('is_active', $isActive);
         }
 
+        return $query;
+    }
+
+    /**
+     * Download the rows the last import skipped (with the reason), to complete and import again.
+     */
+    public function downloadSkippedImportRows(DealerImportService $importer): BinaryFileResponse
+    {
+        abort_unless(is_file($importer->skippedRowsPath()), 404, 'Belum ada daftar dealer yang dilewati.');
+
+        return response()->download($importer->skippedRowsPath(), 'dealer-belum-diimport.xlsx');
+    }
+
+    /**
+     * Display a listing of dealers with search, filter, and stats.
+     */
+    public function index(Request $request): JsonResponse
+    {
         $perPage = min((int) $request->input('per_page', 25), 100);
-        $dealers = $query->orderBy('dealer_name')->paginate($perPage);
+        $dealers = $this->filteredQuery($request)->orderBy('dealer_name')->paginate($perPage);
 
         $stats = [
             'total' => Dealer::count(),

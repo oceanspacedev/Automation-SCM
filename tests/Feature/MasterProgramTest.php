@@ -203,6 +203,26 @@ class MasterProgramTest extends TestCase
         ])->assertStatus(422)->assertJsonValidationErrors(['code']);
     }
 
+    public function test_exported_programs_use_the_import_layout_and_can_be_imported_again(): void
+    {
+        MasterProgram::create(['code' => 'PROGRAM 900', 'name' => 'PROGRAM EXPORT AKTIF', 'period' => 'Periode 1-31 Oktober 2026', 'is_active' => true]);
+        MasterProgram::create(['code' => 'PROGRAM 901', 'name' => 'PROGRAM EXPORT NONAKTIF', 'is_active' => false]);
+
+        $response = $this->get('/api/programs/export?search=PROGRAM%20EXPORT&is_active=true')->assertOk();
+        $this->assertSame([
+            ['PROGRAM', 'NAMA PROGRAM', 'PERIODE', 'STATUS'],
+            ['PROGRAM 900', 'PROGRAM EXPORT AKTIF', 'Periode 1-31 Oktober 2026', 'Aktif'],
+        ], $this->downloadedSpreadsheetRows($response));
+
+        MasterProgram::where('code', 'PROGRAM 900')->update(['period' => null]);
+        $file = $this->saveDownloadedSpreadsheet($response);
+
+        $this->post('/api/programs/import', ['file' => new UploadedFile($file, 'export.xlsx', null, null, true)], ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('updated', 1);
+        $this->assertDatabaseHas('master_programs', ['code' => 'PROGRAM 900', 'period' => 'Periode 1-31 Oktober 2026']);
+    }
+
     public function test_can_import_master_programs_from_excel(): void
     {
         MasterProgram::updateOrCreate(['name' => 'PROGRAM DSA MEI 2026'], ['code' => null, 'period' => 'Mei 2026']);

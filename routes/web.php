@@ -34,12 +34,14 @@ Route::match(['get', 'post'], '/dp/confirm/{id}', [ProgramClaimConfirmationContr
 Route::prefix('api')->middleware(SetAreaContext::class)->group(function () {
     // Master Programs
     Route::get('/programs', [MasterProgramController::class, 'index']);
+    Route::get('/programs/export', [MasterProgramController::class, 'export']);
     Route::get('/programs/options', [MasterProgramController::class, 'options']);
     Route::post('/programs', [MasterProgramController::class, 'store']);
     Route::post('/programs/import', [MasterProgramController::class, 'import']);
 
     // Master Regions (per area)
     Route::get('/regions', [RegionController::class, 'index']);
+    Route::get('/regions/export', [RegionController::class, 'export']);
     Route::get('/regions/options', [RegionController::class, 'options']);
     Route::post('/regions', [RegionController::class, 'store']);
     Route::put('/regions/{id}', [RegionController::class, 'update']);
@@ -48,6 +50,7 @@ Route::prefix('api')->middleware(SetAreaContext::class)->group(function () {
 
     // Master AR (per region, per area)
     Route::get('/ar-contacts', [ArContactController::class, 'index']);
+    Route::get('/ar-contacts/export', [ArContactController::class, 'export']);
     Route::post('/ar-contacts', [ArContactController::class, 'store']);
     Route::put('/ar-contacts/{id}', [ArContactController::class, 'update']);
     Route::delete('/ar-contacts/{id}', [ArContactController::class, 'destroy']);
@@ -67,6 +70,7 @@ Route::prefix('api')->middleware(SetAreaContext::class)->group(function () {
 
     // Master Customers
     Route::get('/customers', [CustomerController::class, 'index']);
+    Route::get('/customers/export', [CustomerController::class, 'export']);
     Route::get('/customers/options', [CustomerController::class, 'options']);
     Route::post('/customers', [CustomerController::class, 'store']);
     Route::put('/customers/{id}', [CustomerController::class, 'update']);
@@ -75,8 +79,11 @@ Route::prefix('api')->middleware(SetAreaContext::class)->group(function () {
 
     // Master Dealers
     Route::get('/dealers', [DealerController::class, 'index']);
+    Route::get('/dealers/export', [DealerController::class, 'export']);
     Route::get('/dealers/lookup', [DealerController::class, 'lookup']);
     Route::get('/dealers/suggestions', [DealerController::class, 'searchSuggestions']);
+    Route::post('/dealers/import', [DealerController::class, 'import']);
+    Route::get('/dealers/import/skipped', [DealerController::class, 'downloadSkippedImportRows']);
     Route::post('/dealers', [DealerController::class, 'store']);
     Route::put('/dealers/{id}', [DealerController::class, 'update']);
     Route::delete('/dealers/{id}', [DealerController::class, 'destroy']);

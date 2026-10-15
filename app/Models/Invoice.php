@@ -2,14 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToArea;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * Invoice dari sebuah draft; areanya (Jawa Barat/Jawa Tengah) mengikuti draft tersebut.
+ */
 class Invoice extends Model
 {
-    use HasFactory;
+    use BelongsToArea, HasFactory;
 
     protected $guarded = ['id'];
 

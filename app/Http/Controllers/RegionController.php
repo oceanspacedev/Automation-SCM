@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Region;
 use App\Services\AreaContext;
+use App\Services\SpreadsheetExport;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class RegionController extends Controller
 {
@@ -16,6 +19,37 @@ class RegionController extends Controller
      * List regions of the selected area.
      */
     public function index(Request $request): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => $this->filteredQuery($request)->orderBy('name')->get(),
+        ]);
+    }
+
+    /**
+     * Export the regions of the selected area (with the list's search) to Excel.
+     */
+    public function export(Request $request, SpreadsheetExport $export): StreamedResponse
+    {
+        $area = $this->areaContext->resolve();
+
+        return $export->download(
+            'master_region_'.$area->value.'_'.now()->format('Ymd_His').'.xlsx',
+            'Master Region '.$area->label(),
+            ['REGION', 'STATUS'],
+            $this->filteredQuery($request)->orderBy('name')->get()->map(fn (Region $region) => [
+                $region->name,
+                $region->is_active ? 'Aktif' : 'Nonaktif',
+            ])
+        );
+    }
+
+    /**
+     * Regions of the selected area matching the list's search and status filters.
+     *
+     * @return Builder<Region>
+     */
+    private function filteredQuery(Request $request): Builder
     {
         $query = Region::query();
 
@@ -27,10 +61,7 @@ class RegionController extends Controller
             $query->where('is_active', filter_var($request->input('is_active'), FILTER_VALIDATE_BOOLEAN));
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => $query->orderBy('name')->get(),
-        ]);
+        return $query;
     }
 
     /**

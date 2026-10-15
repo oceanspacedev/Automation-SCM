@@ -241,7 +241,7 @@
               </td>
 
               <!-- ID Real -->
-              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap font-mono text-[11px] text-gray-900">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-900">
                 {{ row.kode_bt || row.program_submission?.id_real || '-' }}
               </td>
 

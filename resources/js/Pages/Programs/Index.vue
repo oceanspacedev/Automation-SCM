@@ -31,15 +31,21 @@
           class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer disabled:opacity-50"
           title="Import Excel dengan kolom PROGRAM, NAMA PROGRAM, PERIODE"
         >
-          <UploadIcon class="w-3.5 h-3.5 text-gray-500" />
           <span>{{ isImporting ? 'Mengimpor...' : 'Import Excel' }}</span>
+        </button>
+        <button
+          type="button"
+          @click="downloadExport('/api/programs/export', { search: searchQuery, is_active: filterStatus })"
+          class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
+          title="Export program sesuai pencarian & filter (format sama dengan file import)"
+        >
+          <span>Export Excel</span>
         </button>
         <button
           type="button"
           @click="openCreateModal"
           class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
         >
-          <PlusIcon class="w-3.5 h-3.5 text-gray-500" />
           <span>Tambah Program</span>
         </button>
       </div>
@@ -338,16 +344,15 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
+import { downloadExport } from '@/lib/download';
 import {
   ChevronRightIcon,
   ChevronLeftIcon,
   ChevronDownIcon,
   SearchIcon,
   XIcon,
-  PlusIcon,
   PencilIcon,
   Trash2Icon,
-  UploadIcon,
 } from 'lucide-vue-next';
 
 const programs = ref([]);

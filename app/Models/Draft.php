@@ -29,7 +29,7 @@ class Draft extends Model
 
     public function invoice(): HasOne
     {
-        return $this->hasOne(Invoice::class);
+        return $this->hasOne(Invoice::class)->withoutGlobalScope('area');
     }
 
     public function dataProgram(): HasOne

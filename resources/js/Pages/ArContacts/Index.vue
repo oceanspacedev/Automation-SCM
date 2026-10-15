@@ -18,13 +18,19 @@
         </p>
       </div>
 
-      <div>
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          @click="downloadExport('/api/ar-contacts/export', { search: searchQuery })"
+          class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
+        >
+          <span>Export Excel</span>
+        </button>
         <button
           type="button"
           @click="openCreateModal"
           class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
         >
-          <PlusIcon class="w-3.5 h-3.5 text-gray-500" />
           <span>Tambah AR</span>
         </button>
       </div>
@@ -77,7 +83,7 @@
               <td class="py-2 px-3 text-center text-gray-500 border-r border-gray-200">{{ index + 1 }}</td>
               <td class="py-2 px-3 font-medium text-gray-900 border-r border-gray-200 whitespace-nowrap">{{ c.region }}</td>
               <td class="py-2 px-3 text-gray-800 border-r border-gray-200 whitespace-nowrap">{{ c.name }}</td>
-              <td class="py-2 px-3 text-gray-700 border-r border-gray-200 whitespace-nowrap font-mono text-[11px]">{{ c.whatsapp }}</td>
+              <td class="py-2 px-3 text-gray-700 border-r border-gray-200 whitespace-nowrap">{{ c.whatsapp }}</td>
               <td class="py-2 px-3 text-center border-r border-gray-200 whitespace-nowrap">
                 <button
                   type="button"
@@ -234,11 +240,11 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import AreaTabs from '@/components/AreaTabs.vue';
 import { useArea } from '@/composables/useArea';
+import { downloadExport } from '@/lib/download';
 import {
   ChevronRight as ChevronRightIcon,
   Search as SearchIcon,
   X as XIcon,
-  Plus as PlusIcon,
   Pencil as PencilIcon,
   Trash2 as Trash2Icon,
 } from 'lucide-vue-next';

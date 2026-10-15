@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\ArContact;
 use App\Services\AreaContext;
+use App\Services\SpreadsheetExport;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ArContactController extends Controller
 {
@@ -17,6 +20,39 @@ class ArContactController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        return response()->json([
+            'success' => true,
+            'data' => $this->filteredQuery($request)->orderBy('region')->get(),
+        ]);
+    }
+
+    /**
+     * Export the AR of each region in the selected area (with the list's search) to Excel.
+     */
+    public function export(Request $request, SpreadsheetExport $export): StreamedResponse
+    {
+        $area = $this->areaContext->resolve();
+
+        return $export->download(
+            'master_ar_'.$area->value.'_'.now()->format('Ymd_His').'.xlsx',
+            'Master AR '.$area->label(),
+            ['REGION', 'NAMA AR', 'NO WHATSAPP', 'STATUS'],
+            $this->filteredQuery($request)->orderBy('region')->get()->map(fn (ArContact $arContact) => [
+                $arContact->region,
+                $arContact->name,
+                $arContact->whatsapp,
+                $arContact->is_active ? 'Aktif' : 'Nonaktif',
+            ])
+        );
+    }
+
+    /**
+     * AR of the selected area matching the list's search.
+     *
+     * @return Builder<ArContact>
+     */
+    private function filteredQuery(Request $request): Builder
+    {
         $query = ArContact::query();
 
         if ($search = trim((string) $request->input('search'))) {
@@ -25,10 +61,7 @@ class ArContactController extends Controller
                 ->orWhere('whatsapp', 'like', "%{$search}%"));
         }
 
-        return response()->json([
-            'success' => true,
-            'data' => $query->orderBy('region')->get(),
-        ]);
+        return $query;
     }
 
     public function store(Request $request): JsonResponse

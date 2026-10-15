@@ -324,7 +324,7 @@
                 <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap text-gray-700">
                   {{ item.note_pph || '-' }}
                 </td>
-                <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800 font-mono text-[11px]">
+                <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                   {{ item.no_faktur || '-' }}
                 </td>
                 <td class="py-2.5 px-3 whitespace-nowrap text-gray-800">
@@ -611,7 +611,7 @@
                   <td class="py-3 px-3 text-center border-r border-gray-100 text-gray-700">
                     {{ selectedItem.note_pph || '-' }}
                   </td>
-                  <td class="py-3 px-3 border-r border-gray-100 text-gray-800 font-mono text-[11px]">
+                  <td class="py-3 px-3 border-r border-gray-100">
                     {{ selectedItem.no_faktur || '-' }}
                   </td>
                   <td class="py-3 px-3 text-gray-800">

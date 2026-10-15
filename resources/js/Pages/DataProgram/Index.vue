@@ -485,32 +485,32 @@
               </td>
 
               <!-- 2. Nama Dealer (Locked) -->
-              <td data-field="dealer_name" class="py-2.5 px-3 w-[180px] min-w-[180px] max-w-[180px] border-r border-gray-100 whitespace-normal sticky z-20 bg-white group-hover:bg-gray-50 transition-colors" style="left: 50px;">
+              <td class="py-2.5 px-3 w-[180px] min-w-[180px] max-w-[180px] border-r border-gray-100 whitespace-normal sticky z-20 bg-white group-hover:bg-gray-50 transition-colors" style="left: 50px;">
                 <div class="text-gray-700 break-words leading-snug" :title="row.dealer_name">{{ row.dealer_name || '-' }}</div>
               </td>
 
               <!-- 3. Program (Locked) -->
-              <td data-field="program" class="py-2.5 px-3 w-[130px] min-w-[130px] max-w-[130px] border-r border-gray-100 whitespace-nowrap sticky z-20 bg-white group-hover:bg-gray-50 transition-colors" style="left: 230px;">
+              <td class="py-2.5 px-3 w-[130px] min-w-[130px] max-w-[130px] border-r border-gray-100 whitespace-nowrap sticky z-20 bg-white group-hover:bg-gray-50 transition-colors" style="left: 230px;">
                 <div class="truncate" :title="row.program">{{ row.program || '-' }}</div>
               </td>
 
               <!-- 4. Kode BT (Locked) -->
-              <td data-field="kode_bt" class="py-2.5 px-3 w-[100px] min-w-[100px] max-w-[100px] border-r border-gray-100 whitespace-nowrap sticky z-20 bg-white group-hover:bg-gray-50 transition-colors" style="left: 360px;">
+              <td class="py-2.5 px-3 w-[100px] min-w-[100px] max-w-[100px] border-r border-gray-100 whitespace-nowrap sticky z-20 bg-white group-hover:bg-gray-50 transition-colors" style="left: 360px;">
                 <div class="truncate" :title="row.kode_bt">{{ row.kode_bt || '-' }}</div>
               </td>
 
               <!-- 5. Nama Program (Locked with divider shadow) -->
-              <td data-field="program_name" class="py-2.5 px-3 w-[240px] min-w-[240px] max-w-[240px] border-r border-gray-100 whitespace-normal sticky z-20 bg-white group-hover:bg-gray-50 transition-colors shadow-[3px_0_6px_-2px_rgba(0,0,0,0.08)]" style="left: 460px;">
+              <td class="py-2.5 px-3 w-[240px] min-w-[240px] max-w-[240px] border-r border-gray-100 whitespace-normal sticky z-20 bg-white group-hover:bg-gray-50 transition-colors shadow-[3px_0_6px_-2px_rgba(0,0,0,0.08)]" style="left: 460px;">
                 <div class="text-gray-700 break-words leading-snug" :title="row.program_name">{{ row.program_name || '-' }}</div>
               </td>
 
               <!-- 6. Periode -->
-              <td data-field="periode" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.periode || '-' }}
               </td>
 
               <!-- 8. Region -->
-              <td data-field="region" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.region || '-' }}
               </td>
 
@@ -520,73 +520,73 @@
               </td>
 
               <!-- 10. ID GS -->
-              <td data-field="id_gs" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.id_gs || '-' }}
               </td>
 
               <!-- 12. Status DL -->
-              <td data-field="status_dl" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.status_dl || '-' }}
               </td>
 
               <!-- 13. Sales Person -->
-              <td data-field="sales_person" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.sales_person || '-' }}
               </td>
 
               <!-- 14. Telemarketing -->
-              <td data-field="telemarketing" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 <div>{{ row.telemarketing || '-' }}</div>
                 <div v-if="row.telemarketing_phone" class="text-[11px] text-gray-500">{{ row.telemarketing_phone }}</div>
               </td>
 
               <!-- 15. Wajib Pajak -->
-              <td data-field="wajib_pajak" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.wajib_pajak || '-' }}
               </td>
 
               <!-- 16. TRF PPH -->
-              <td data-field="trf_pph" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.trf_pph || '-' }}
               </td>
 
               <!-- 17. Incentive -->
-              <td data-field="incentive" class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap font-medium text-gray-900">
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap font-medium text-gray-900">
                 {{ formatRupiah(row.incentive) }}
               </td>
 
               <!-- 18. DPP -->
-              <td data-field="dpp" class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800">
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ formatRupiah(row.dpp) }}
               </td>
 
               <!-- 19. DPP Lain -->
-              <td data-field="dpp_lain" class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800">
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ formatRupiah(row.dpp_lain) }}
               </td>
 
               <!-- 20. PPN -->
-              <td data-field="ppn" class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800">
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ formatRupiah(row.ppn) }}
               </td>
 
               <!-- 21. Nilai PPh -->
-              <td data-field="nilai_pph" class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800">
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ formatRupiah(row.nilai_pph) }}
               </td>
 
               <!-- 22. Net Pay -->
-              <td data-field="net_pay" class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap font-bold text-gray-950">
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap font-bold text-gray-950">
                 {{ formatRupiah(row.net_pay) }}
               </td>
 
               <!-- 23. Cek Pajak Tarif PPh -->
-              <td data-field="cek_pajak_tarif" class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800">
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ formatRupiah(row.cek_pajak_tarif) }}
               </td>
 
               <!-- 24. Selisih -->
-              <td data-field="selisih" class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap">
+              <td class="py-2.5 px-3 text-right border-r border-gray-100 whitespace-nowrap">
                 <span v-if="row.selisih === 0 || row.selisih === '0' || row.selisih === 0.0" class="text-gray-400">0</span>
                 <span v-else-if="row.selisih !== null && row.selisih !== undefined && row.selisih !== ''" class="font-medium text-rose-600">
                   {{ formatRupiah(row.selisih) }}
@@ -595,19 +595,19 @@
               </td>
 
               <!-- 25. Note PPh -->
-              <td data-field="note_pph" class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap text-gray-700">
                 <span v-if="row.note_pph === 'ok'" class="text-emerald-700 font-medium">ok</span>
                 <span v-else-if="row.note_pph" class="text-amber-700">{{ row.note_pph }}</span>
                 <span v-else class="text-gray-300">-</span>
               </td>
 
               <!-- 26. No Faktur Pajak -->
-              <td data-field="no_faktur_pajak" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800 font-mono text-[11px]">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ row.no_faktur_pajak || '-' }}
               </td>
 
               <!-- 27. Ket Faktur Pajak -->
-              <td data-field="ket_faktur_pajak" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ row.ket_faktur_pajak || '-' }}
               </td>
 
@@ -617,32 +617,32 @@
               </td>
 
               <!-- 29. No Transaksi -->
-              <td data-field="no_transaksi" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ row.no_transaksi || '-' }}
               </td>
 
               <!-- 30. Tgl Input -->
-              <td data-field="tgl_input" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ row.tgl_input || '-' }}
               </td>
 
               <!-- 31. Tgl Share CN -->
-              <td data-field="tgl_share_cn" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ row.tgl_share_cn || '-' }}
               </td>
 
               <!-- 32. Lama Pending -->
-              <td data-field="lama_pending" class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.lama_pending || '-' }}
               </td>
 
               <!-- 33. Keterangan -->
-              <td data-field="keterangan" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[200px] truncate text-gray-700" :title="row.keterangan">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[200px] truncate text-gray-700" :title="row.keterangan">
                 {{ row.keterangan || '-' }}
               </td>
 
               <!-- 34. Cek Dokumen -->
-              <td data-field="cek_dokumen" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 <span
                   v-if="row.cek_dokumen"
                   :class="[
@@ -658,7 +658,7 @@
               </td>
 
               <!-- 35. Status Potong By Purchase -->
-              <td data-field="status_potong_purchase" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 <span
                   v-if="row.status_potong_purchase"
                   :class="[
@@ -680,7 +680,7 @@
               </td>
 
               <!-- 36. Status Potong By AR -->
-              <td data-field="status_potong_ar" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 <span
                   v-if="row.status_potong_ar"
                   :class="[
@@ -700,37 +700,37 @@
               </td>
 
               <!-- 37. Tanggal Potong/TF -->
-              <td data-field="tgl_potong_tf" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.tgl_potong_tf || '-' }}
               </td>
 
               <!-- 38. No. UID -->
-              <td data-field="no_uid" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.no_uid || '-' }}
               </td>
 
               <!-- 39. No. Pembayaran -->
-              <td data-field="no_pembayaran" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.no_pembayaran || '-' }}
               </td>
 
               <!-- 40. Tgl Input Bank PPh -->
-              <td data-field="tgl_input_bank_pph" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.tgl_input_bank_pph || '-' }}
               </td>
 
               <!-- 41. T/F -->
-              <td data-field="tf_status" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.tf_status || '-' }}
               </td>
 
               <!-- 42. Tgl Proses -->
-              <td data-field="tgl_proses" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.tgl_proses || '-' }}
               </td>
 
               <!-- 43. Tgl SJ -->
-              <td data-field="tgl_sj" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.tgl_sj || '-' }}
               </td>
 
@@ -740,32 +740,32 @@
               </td>
 
               <!-- 45. Info Bank -->
-              <td data-field="info_bank" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.info_bank || '-' }}
               </td>
 
               <!-- 46. Pending Potongan -->
-              <td data-field="pending_potongan" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.pending_potongan || '-' }}
               </td>
 
               <!-- 47. NPWP -->
-              <td data-field="npwp" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700 font-mono text-[11px]">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.npwp || '-' }}
               </td>
 
               <!-- 48. Nama NPWP -->
-              <td data-field="nama_npwp" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[180px] truncate text-gray-700" :title="row.nama_npwp">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[180px] truncate text-gray-700" :title="row.nama_npwp">
                 {{ row.nama_npwp || '-' }}
               </td>
 
               <!-- 49. Program 2 -->
-              <td data-field="program_2" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[180px] truncate text-gray-700" :title="row.program_2">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[180px] truncate text-gray-700" :title="row.program_2">
                 {{ row.program_2 || '-' }}
               </td>
 
               <!-- 50. CN -->
-              <td data-field="cn" class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
                 <a
                   v-if="isValidUrl(row.cn)"
                   :href="row.cn"
@@ -780,7 +780,7 @@
               </td>
 
               <!-- 51. Agrement -->
-              <td data-field="agrement" class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
                 <a
                   v-if="isValidUrl(row.agrement)"
                   :href="row.agrement"
@@ -795,7 +795,7 @@
               </td>
 
               <!-- 52. Cek FP -->
-              <td data-field="cek_fp" class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
                 <a
                   v-if="isValidUrl(row.cek_fp)"
                   :href="row.cek_fp"
@@ -810,7 +810,7 @@
               </td>
 
               <!-- 53. Cek Evidance -->
-              <td data-field="cek_evidance" class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
                 <a
                   v-if="isValidUrl(row.cek_evidance)"
                   :href="row.cek_evidance"
@@ -825,27 +825,27 @@
               </td>
 
               <!-- 54. Noted -->
-              <td data-field="noted" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[200px] truncate text-gray-700" :title="row.noted">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[200px] truncate text-gray-700" :title="row.noted">
                 {{ row.noted || '-' }}
               </td>
 
               <!-- 55. Norek -->
-              <td data-field="norek" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700 font-mono text-[11px]">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.norek || '-' }}
               </td>
 
               <!-- 56. Namrek -->
-              <td data-field="namrek" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[180px] truncate text-gray-700" :title="row.namrek">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[180px] truncate text-gray-700" :title="row.namrek">
                 {{ row.namrek || '-' }}
               </td>
 
               <!-- 57. Bank -->
-              <td data-field="bank" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.bank || '-' }}
               </td>
 
               <!-- 58. Big Region -->
-              <td data-field="big_region" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.big_region || '-' }}
               </td>
 
@@ -1760,8 +1760,7 @@ const handleDataProgramSaved = (updatedRow) => {
   }, 4000);
 };
 
-// Edit langsung di tabel seperti spreadsheet: klik dua kali untuk mengisi sel, tarik fill handle ke bawah
-const MONEY_FIELDS = ['incentive', 'dpp', 'dpp_lain', 'ppn', 'nilai_pph', 'net_pay', 'selisih'];
+// Kolom No PO, No PO/SJ & No SJ diisi langsung di tabel seperti spreadsheet: klik dua kali untuk mengisi, tarik fill handle ke bawah
 const gridContainer = ref(null);
 
 const saveCells = async (field, changes) => {
@@ -1806,19 +1805,6 @@ const {
   container: gridContainer,
   rows: items,
   save: saveCells,
-  copyFields: MONEY_FIELDS,
-  // Nominal diketik format Indonesia: "450.450" = 450450, "1.250,5" = 1250.5
-  toEditText: (field, value) => {
-    if (value === null || value === undefined || value === '') return '';
-    return MONEY_FIELDS.includes(field) ? Number(value).toLocaleString('id-ID', { maximumFractionDigits: 2 }) : String(value);
-  },
-  fromEditText: (field, text) => {
-    const trimmed = text.trim();
-    if (trimmed === '') return null;
-    if (!MONEY_FIELDS.includes(field)) return trimmed;
-    const amount = Number(trimmed.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.'));
-    return Number.isFinite(amount) ? amount : trimmed;
-  },
 });
 
 // Dropdown Spreadsheet state

@@ -18,6 +18,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DataProgramController extends Controller
 {
+    /**
+     * Columns that can be filled straight in the Data Program table like a spreadsheet (cell edit & drag-to-fill).
+     *
+     * @var array<int, string>
+     */
+    private const GRID_FIELDS = ['no_po', 'no_po_sj', 'no_sj'];
+
     public function __construct(
         protected DataProgramSyncService $syncService,
         protected ProgramReconciliationService $reconciliationService,
@@ -616,7 +623,7 @@ class DataProgramController extends Controller
     }
 
     /**
-     * Set one column on several rows at once (cell edits and drag-to-fill in the Data Program table),
+     * Set No PO, No PO/SJ or No SJ on several rows at once (cell edits and drag-to-fill in the Data Program table),
      * then send those rows to the area's Google Spreadsheet in a single request.
      */
     public function bulkUpdate(Request $request): JsonResponse
@@ -625,7 +632,7 @@ class DataProgramController extends Controller
         $field = $request->input('field');
 
         $validated = $request->validate([
-            'field' => ['required', 'string', Rule::in(array_keys($rules))],
+            'field' => ['required', 'string', Rule::in(self::GRID_FIELDS)],
             'rows' => ['required', 'array', 'min:1', 'max:500'],
             'rows.*.id' => ['required', 'integer'],
             'rows.*.value' => is_string($field) ? ($rules[$field] ?? 'nullable') : 'nullable',
@@ -634,9 +641,7 @@ class DataProgramController extends Controller
         $dataPrograms = DataProgram::whereIn('id', array_column($validated['rows'], 'id'))->get()->keyBy('id');
 
         foreach ($validated['rows'] as $row) {
-            if ($dp = $dataPrograms->get($row['id'])) {
-                $dp->fill($this->withAging($dp, [$validated['field'] => $row['value'] ?? null]))->save();
-            }
+            $dataPrograms->get($row['id'])?->fill([$validated['field'] => $row['value'] ?? null])->save();
         }
 
         $sheetPushResults = [];

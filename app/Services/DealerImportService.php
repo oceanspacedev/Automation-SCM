@@ -197,6 +197,14 @@ class DealerImportService
     }
 
     /**
+     * Where the rows skipped by the last import are saved (see writeSkippedRows).
+     */
+    public function skippedRowsPath(): string
+    {
+        return storage_path('app/dealer-import/dealer-belum-diimport.xlsx');
+    }
+
+    /**
      * Save skipped rows (with the reason) to an Excel file so they can be completed and re-imported.
      *
      * @param  array<int, array{row: int, reason: string, values: array<int, mixed>}>  $skipped

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Customer;
 use App\Models\Dealer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -73,6 +74,18 @@ class MasterDataFeatureTest extends TestCase
             'data',
             'stats',
         ]);
+    }
+
+    public function test_customer_export_follows_search_and_status_filters(): void
+    {
+        Customer::create(['code' => 'CV TOP', 'name' => 'CV TOP SELULAR', 'npwp' => '0313523391426000', 'is_active' => true]);
+        Customer::create(['code' => 'PT LAMA', 'name' => 'PT TOP LAMA', 'is_active' => false]);
+
+        $rows = $this->downloadedSpreadsheetRows($this->get('/api/customers/export?search=TOP&is_active=true')->assertOk());
+
+        $this->assertSame(['KODE', 'NAMA CUSTOMER', 'NPWP', 'NAMA NPWP', 'ALAMAT', 'STATUS'], $rows[0]);
+        $this->assertCount(2, $rows);
+        $this->assertSame(['CV TOP', 'CV TOP SELULAR', '0313523391426000'], array_slice($rows[1], 0, 3));
     }
 
     public function test_can_get_customer_options(): void

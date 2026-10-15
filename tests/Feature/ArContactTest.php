@@ -6,6 +6,7 @@ use App\Area;
 use App\Models\ArContact;
 use App\Models\DataProgram;
 use App\Models\ProgramSubmission;
+use App\Models\Region;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
@@ -37,6 +38,21 @@ class ArContactTest extends TestCase
         $this->getJson('/api/ar-contacts', ['X-Area' => 'jateng'])
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.name', 'DEWI');
+    }
+
+    public function test_region_and_ar_exports_only_contain_the_selected_area(): void
+    {
+        // BIG CIREBON sudah ada di Master Region Jawa Barat dari migration
+        Region::factory()->forArea(Area::Jateng)->create(['name' => 'BIG SOLO']);
+        ArContact::factory()->create(['region' => 'BIG CIREBON', 'name' => 'RINA', 'whatsapp' => '081234567890']);
+        ArContact::factory()->forArea(Area::Jateng)->create(['region' => 'BIG SOLO', 'name' => 'DEWI']);
+
+        $arRows = $this->downloadedSpreadsheetRows($this->get('/api/ar-contacts/export?area=jabar')->assertOk());
+        $this->assertSame([['REGION', 'NAMA AR', 'NO WHATSAPP', 'STATUS'], ['BIG CIREBON', 'RINA', '081234567890', 'Aktif']], $arRows);
+
+        $regionNames = array_column($this->downloadedSpreadsheetRows($this->get('/api/regions/export?area=jateng')->assertOk()), 0);
+        $this->assertContains('BIG SOLO', $regionNames);
+        $this->assertNotContains('BIG CIREBON', $regionNames);
     }
 
     public function test_dealer_setuju_is_forwarded_to_the_ar_of_the_dealer_region(): void

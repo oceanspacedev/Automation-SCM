@@ -3,10 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\MasterProgram;
+use App\Services\SpreadsheetExport;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MasterProgramController extends Controller
 {
@@ -23,6 +26,55 @@ class MasterProgramController extends Controller
      * Display a listing of master programs with search, filter, and stats.
      */
     public function index(Request $request): JsonResponse
+    {
+        $perPage = min((int) $request->input('per_page', 25), 100);
+        $programs = $this->filteredQuery($request)->paginate($perPage);
+
+        $stats = [
+            'total' => MasterProgram::count(),
+            'active' => MasterProgram::where('is_active', true)->count(),
+            'inactive' => MasterProgram::where('is_active', false)->count(),
+        ];
+
+        $categories = MasterProgram::whereNotNull('category')
+            ->where('category', '!=', '')
+            ->distinct()
+            ->orderBy('category')
+            ->pluck('category');
+
+        return response()->json([
+            'success' => true,
+            'data' => $programs,
+            'stats' => $stats,
+            'categories' => $categories,
+            'next_code' => MasterProgram::nextCode(),
+        ]);
+    }
+
+    /**
+     * Export the programs (with the list's search & filters) in the import layout PROGRAM, NAMA PROGRAM, PERIODE.
+     */
+    public function export(Request $request, SpreadsheetExport $export): StreamedResponse
+    {
+        return $export->download(
+            'master_program_'.now()->format('Ymd_His').'.xlsx',
+            'Master Program',
+            ['PROGRAM', 'NAMA PROGRAM', 'PERIODE', 'STATUS'],
+            $this->filteredQuery($request)->get()->map(fn (MasterProgram $program) => [
+                $program->code,
+                $program->name,
+                $program->period,
+                $program->is_active ? 'Aktif' : 'Nonaktif',
+            ])
+        );
+    }
+
+    /**
+     * Programs matching the list's search, category and status filters, newest program code first.
+     *
+     * @return Builder<MasterProgram>
+     */
+    private function filteredQuery(Request $request): Builder
     {
         $query = MasterProgram::query();
 
@@ -47,33 +99,11 @@ class MasterProgramController extends Controller
             $query->where('is_active', $isActive);
         }
 
-        $perPage = min((int) $request->input('per_page', 25), 100);
-        $programs = $query
+        return $query
             ->orderByRaw('code IS NULL')
             ->orderByRaw('LENGTH(code) DESC')
             ->orderByDesc('code')
-            ->orderBy('name')
-            ->paginate($perPage);
-
-        $stats = [
-            'total' => MasterProgram::count(),
-            'active' => MasterProgram::where('is_active', true)->count(),
-            'inactive' => MasterProgram::where('is_active', false)->count(),
-        ];
-
-        $categories = MasterProgram::whereNotNull('category')
-            ->where('category', '!=', '')
-            ->distinct()
-            ->orderBy('category')
-            ->pluck('category');
-
-        return response()->json([
-            'success' => true,
-            'data' => $programs,
-            'stats' => $stats,
-            'categories' => $categories,
-            'next_code' => MasterProgram::nextCode(),
-        ]);
+            ->orderBy('name');
     }
 
     /**

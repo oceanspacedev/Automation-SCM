@@ -7,6 +7,8 @@
       <span class="text-gray-800 font-medium">List</span>
     </div>
 
+    <AreaTabs />
+
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
@@ -465,6 +467,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import AreaTabs from '@/components/AreaTabs.vue';
 import SendEmailModal from '@/components/SendEmailModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';

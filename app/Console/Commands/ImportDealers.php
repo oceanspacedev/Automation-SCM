@@ -52,7 +52,7 @@ class ImportDealers extends Command
         }
 
         if ($result['skipped']) {
-            $path = storage_path('app/dealer-import/dealer-belum-diimport.xlsx');
+            $path = $importer->skippedRowsPath();
             $importer->writeSkippedRows($result['skipped'], $result['header'], $path);
             $this->warn(count($result['skipped'])." baris dilewati, daftarnya: {$path}");
         }
