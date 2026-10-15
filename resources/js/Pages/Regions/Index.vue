@@ -12,26 +12,27 @@
     <!-- Header Page -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Master Region {{ area.label }}</h1>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Master Region {{ area.label }}</h1>
         <p class="text-xs text-gray-500 mt-0.5">
           Daftar region {{ area.label }} yang muncul di form pengajuan program dan Master Dealer.
         </p>
       </div>
 
-      <div class="flex items-center gap-2">
+      <!-- Tombol aksi; di layar kecil dua tombol sama lebar dengan label pendek -->
+      <div class="grid grid-cols-2 sm:flex sm:items-center gap-2">
         <button
           type="button"
           @click="downloadExport('/api/regions/export', { search: searchQuery })"
-          class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
+          class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
         >
-          <span>Export Excel</span>
+          <span class="sm:hidden">Export</span><span class="hidden sm:inline">Export Excel</span>
         </button>
         <button
           type="button"
           @click="openCreateModal"
-          class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
+          class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
         >
-          <span>Tambah Region</span>
+          <span class="sm:hidden">Tambah</span><span class="hidden sm:inline">Tambah Region</span>
         </button>
       </div>
     </div>
@@ -54,7 +55,47 @@
         </div>
       </div>
 
-      <div class="overflow-x-auto">
+      <!-- Layar kecil: satu kartu per region -->
+      <div class="md:hidden">
+        <p v-if="isLoading" class="py-8 text-center text-xs text-gray-500">Memuat data...</p>
+        <p v-else-if="filteredRegions.length === 0" class="py-8 px-4 text-center text-xs text-gray-500">
+          Belum ada region untuk {{ area.label }}. Klik "Tambah Region" untuk menambahkan.
+        </p>
+        <ul v-else class="divide-y divide-gray-100">
+          <li v-for="r in filteredRegions" :key="r.id" class="p-4 space-y-2 text-xs text-gray-700">
+            <div class="flex items-center justify-between gap-3">
+              <p class="min-w-0 text-sm font-medium text-gray-900 break-words">{{ r.name }}</p>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  @click="toggleStatus(r)"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer"
+                  :class="r.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100' : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full" :class="r.is_active ? 'bg-emerald-600' : 'bg-gray-400'"></span>
+                  <span>{{ r.is_active ? 'Aktif' : 'Nonaktif' }}</span>
+                </button>
+                <button
+                  type="button"
+                  @click="openEditModal(r)"
+                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  @click="regionToDelete = r"
+                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer"
+                >
+                  Hapus
+                </button>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="hidden md:block overflow-x-auto">
         <table class="w-full text-left text-xs text-gray-900 border-collapse">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">

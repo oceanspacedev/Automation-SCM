@@ -10,13 +10,14 @@
     <!-- Header Page -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Master Program</h1>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Master Program</h1>
         <p class="text-xs text-gray-500 mt-0.5">
           Daftar kode program, nama program, dan periode resmi Realme. Kode program otomatis terisi saat memilih program di draft.
         </p>
       </div>
 
-      <div class="flex items-center gap-2">
+      <!-- Tombol aksi; di layar kecil tiga tombol sama lebar dengan label pendek -->
+      <div class="grid grid-cols-3 sm:flex sm:items-center gap-2">
         <input
           ref="importInput"
           type="file"
@@ -28,25 +29,26 @@
           type="button"
           @click="importInput?.click()"
           :disabled="isImporting"
-          class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer disabled:opacity-50"
+          class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer disabled:opacity-50 whitespace-nowrap"
           title="Import Excel dengan kolom PROGRAM, NAMA PROGRAM, PERIODE"
         >
-          <span>{{ isImporting ? 'Mengimpor...' : 'Import Excel' }}</span>
+          <span class="sm:hidden">{{ isImporting ? 'Mengimpor...' : 'Import' }}</span>
+          <span class="hidden sm:inline">{{ isImporting ? 'Mengimpor...' : 'Import Excel' }}</span>
         </button>
         <button
           type="button"
           @click="downloadExport('/api/programs/export', { search: searchQuery, is_active: filterStatus })"
-          class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
+          class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
           title="Export program sesuai pencarian & filter (format sama dengan file import)"
         >
-          <span>Export Excel</span>
+          <span class="sm:hidden">Export</span><span class="hidden sm:inline">Export Excel</span>
         </button>
         <button
           type="button"
           @click="openCreateModal"
-          class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
+          class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
         >
-          <span>Tambah Program</span>
+          <span class="sm:hidden">Tambah</span><span class="hidden sm:inline">Tambah Program</span>
         </button>
       </div>
     </div>
@@ -59,9 +61,10 @@
           <span>Total: {{ totalRows }} program</span>
         </div>
 
-        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        <!-- Filter & pencarian; di layar kecil cari di atas, status di bawahnya -->
+        <div class="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-nowrap">
           <!-- Status Filter -->
-          <div class="relative min-w-[120px]">
+          <div class="relative min-w-[120px] col-span-2">
             <select
               v-model="filterStatus"
               @change="fetchPrograms(1)"
@@ -75,7 +78,7 @@
           </div>
 
           <!-- Search Input -->
-          <div class="relative w-full sm:w-64">
+          <div class="relative w-full sm:w-64 col-span-2 order-first sm:order-none">
             <SearchIcon class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
             <input
               type="text"
@@ -96,8 +99,50 @@
         </div>
       </div>
 
+      <!-- Layar kecil: satu kartu per program -->
+      <div class="md:hidden">
+        <p v-if="isLoading" class="py-8 text-center text-xs text-gray-500">Memuat data...</p>
+        <p v-else-if="programs.length === 0" class="py-8 px-4 text-center text-xs text-gray-500">Tidak ada data master program yang ditemukan.</p>
+        <ul v-else class="divide-y divide-gray-100">
+          <li v-for="p in programs" :key="p.id" class="p-4 space-y-2 text-xs text-gray-700">
+            <div class="flex items-start justify-between gap-3">
+              <p class="min-w-0 text-sm font-medium text-gray-900 break-words">{{ p.code || '-' }} · {{ p.name }}</p>
+              <button
+                type="button"
+                @click="toggleStatus(p)"
+                :disabled="p._isToggling"
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer shrink-0"
+                :class="p.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100' : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'"
+              >
+                <span class="w-1.5 h-1.5 rounded-full" :class="p.is_active ? 'bg-emerald-600' : 'bg-gray-400'"></span>
+                <span>{{ p.is_active ? 'Aktif' : 'Nonaktif' }}</span>
+              </button>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <p class="min-w-0 text-gray-500 break-words">{{ p.period || '-' }}</p>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  @click="openEditModal(p)"
+                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  @click="confirmDelete(p)"
+                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer"
+                >
+                  Hapus
+                </button>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
       <!-- Plain Table (Uniform Font & Style) -->
-      <div class="overflow-x-auto">
+      <div class="hidden md:block overflow-x-auto">
         <table class="w-full text-left text-xs text-gray-900 border-collapse">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">

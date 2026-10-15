@@ -121,17 +121,44 @@ class ProgramReconciliationService
      * Check if ID Real (Form Program) matches Kode BT (Data Program).
      * Returns true if match, false if both exist but differ, or null if either is missing.
      */
-    public function isBtMatch(?string $idReal, ?string $kodeBt): ?bool
+    public function isBtMatch(?string $idReal, ?string $kodeBt, ?string $idGs = null): ?bool
     {
         // "BTO…" (huruf O) dan "BT0…" (angka nol) dianggap kode BT yang sama
-        $cleanReal = (string) Dealer::normalizeKodeBt(preg_replace('/[^A-Za-z0-9]/', '', (string) $idReal));
-        $cleanBt = (string) Dealer::normalizeKodeBt(preg_replace('/[^A-Za-z0-9]/', '', (string) $kodeBt));
+        $clean = fn (?string $code) => (string) Dealer::normalizeKodeBt(preg_replace('/[^A-Za-z0-9]/', '', (string) $code));
 
-        if (empty($cleanReal) || empty($cleanBt) || $cleanReal === '-' || $cleanBt === '-') {
+        // ID REALME di Form Program bisa berisi kode BT atau ID Realme (ID GS) toko
+        $cleanReal = $clean($idReal);
+        $dataProgramCodes = array_filter([$clean($kodeBt), $clean($idGs)], fn (string $code) => $code !== '' && $code !== '-');
+
+        if ($cleanReal === '' || $cleanReal === '-' || $dataProgramCodes === []) {
             return null;
         }
 
-        return $cleanReal === $cleanBt;
+        return in_array($cleanReal, $dataProgramCodes, true);
+    }
+
+    /**
+     * The Data Program row of a Form Program submission (same area, store and program) by the matching rules;
+     * without one, the first row of the area whose kode BT equals the submission's ID REALME.
+     */
+    public function dataProgramForSubmission(ProgramSubmission $submission): ?DataProgram
+    {
+        $idReal = trim((string) $submission->id_real);
+        $hasIdReal = $idReal !== '' && $idReal !== '-';
+
+        $best = DataProgram::query()
+            ->where('area', $submission->areaEnum()->value)
+            ->where(fn ($q) => $q->where('dealer_name', 'like', '%'.trim((string) $submission->dealer_name).'%')
+                ->when($hasIdReal, fn ($q) => $q->orWhere('kode_bt', $idReal)->orWhere('id_gs', $idReal)))
+            ->get()
+            ->map(fn (DataProgram $dp) => ['dp' => $dp, 'score' => $this->evaluateMatchScore($dp, $submission)])
+            ->whereNotNull('score')
+            ->sortByDesc('score')
+            ->first();
+
+        return $best['dp'] ?? ($hasIdReal
+            ? DataProgram::where('area', $submission->areaEnum()->value)->where('kode_bt', $idReal)->first()
+            : null);
     }
 
     /**
@@ -189,12 +216,7 @@ class ProgramReconciliationService
             return true;
         }
 
-        $idReal = trim((string) ($submission->id_real ?? ''));
-        $dp = null;
-
-        if (! empty($idReal) && $idReal !== '-') {
-            $dp = DataProgram::where('area', $submission->areaEnum()->value)->where('kode_bt', $idReal)->first();
-        }
+        $dp = $this->dataProgramForSubmission($submission);
 
         if (! $dp && ! empty($submission->dealer_name)) {
             $dp = DataProgram::where('area', $submission->areaEnum()->value)->where('dealer_name', 'like', "%{$submission->dealer_name}%")->first();
@@ -227,7 +249,7 @@ class ProgramReconciliationService
         }
 
         // 2. Strict ID Real / Kode BT Check: If both exist and differ, immediately disqualify!
-        $btMatch = $this->isBtMatch($sub->id_real, $dataProgram->kode_bt);
+        $btMatch = $this->isBtMatch($sub->id_real, $dataProgram->kode_bt, $dataProgram->id_gs);
         if ($btMatch === false) {
             return null;
         }
@@ -413,6 +435,9 @@ class ProgramReconciliationService
             $query->where(function ($q) use ($kodeBt, $dataProgram, $tokens) {
                 if (! empty($kodeBt) && $kodeBt !== '-') {
                     $q->where('id_real', $kodeBt);
+                }
+                if (! empty($dataProgram->id_gs) && $dataProgram->id_gs !== '-') {
+                    $q->orWhere('id_real', $dataProgram->id_gs);
                 }
                 $q->orWhere('dealer_name', 'like', "%{$dataProgram->dealer_name}%");
                 foreach ($tokens as $token) {
@@ -978,7 +1003,7 @@ class ProgramReconciliationService
 
         $query->where(function ($q) use ($idReal, $submission, $tokens) {
             if (! empty($idReal) && $idReal !== '-') {
-                $q->where('kode_bt', $idReal);
+                $q->where('kode_bt', $idReal)->orWhere('id_gs', $idReal);
             }
             $q->orWhere('dealer_name', 'like', "%{$submission->dealer_name}%");
             foreach ($tokens as $token) {

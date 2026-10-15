@@ -1,20 +1,22 @@
 <template>
   <div class="space-y-4 font-sans">
     <!-- Top Bar -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-200">
-      <div class="flex items-center space-x-2.5">
-        <router-link :to="`/drafts/${draft.area || 'jabar'}`" class="text-xs font-medium text-gray-500 hover:text-gray-900 transition">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-200">
+      <!-- Layar kecil: tautan kembali di baris sendiri, judul di bawahnya -->
+      <div class="flex flex-wrap sm:flex-nowrap items-center gap-x-2.5 gap-y-1 min-w-0">
+        <router-link :to="`/drafts/${draft.area || 'jabar'}`" class="basis-full sm:basis-auto text-xs font-medium text-gray-500 hover:text-gray-900 transition">
           ← Kembali ke Draft
         </router-link>
-        <span class="text-gray-300">|</span>
+        <span class="hidden sm:inline text-gray-300">|</span>
         <h1 class="text-lg font-bold tracking-tight text-gray-950">Detail Draft #{{ id }}</h1>
       </div>
 
+      <!-- Layar kecil: status selebar layar, tombol aksi berbagi satu baris sama lebar -->
       <div class="flex flex-wrap items-center gap-2">
         <!-- Status Badges -->
         <span
           v-if="draft.status === 'ready'"
-          class="h-8 px-2.5 bg-gray-50 text-gray-700 border border-gray-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-gray-50 text-gray-700 border border-gray-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 select-none basis-full sm:basis-auto"
           title="Draft siap untuk digenerate menjadi invoice"
         >
           <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
@@ -23,7 +25,7 @@
 
         <span
           v-else-if="draft.status === 'invoiced'"
-          class="h-8 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 select-none basis-full sm:basis-auto"
           title="Invoice telah diterbitkan"
         >
           <CheckCircleIcon class="h-3.5 w-3.5 text-emerald-600" />
@@ -32,7 +34,7 @@
 
         <span
           v-else-if="draft.status === 'error'"
-          class="h-8 px-2.5 bg-rose-50 text-rose-700 border border-rose-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-rose-50 text-rose-700 border border-rose-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 select-none basis-full sm:basis-auto"
           title="Draft memiliki ketidaksesuaian rumus"
         >
           <AlertCircleIcon class="h-3.5 w-3.5 text-rose-600" />
@@ -41,7 +43,7 @@
 
         <span
           v-else-if="draft.status"
-          class="h-8 px-2.5 bg-gray-50 text-gray-700 border border-gray-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none capitalize"
+          class="h-8 px-2.5 bg-gray-50 text-gray-700 border border-gray-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 select-none basis-full sm:basis-auto capitalize"
         >
           <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
           <span>{{ draft.status }}</span>
@@ -50,26 +52,29 @@
           v-if="draft.status !== 'invoiced'"
           @click="validateDraft"
           :disabled="validating"
-          class="h-8 px-3 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition cursor-pointer shadow-2xs"
+          class="h-8 px-2 sm:px-3 flex-1 sm:flex-initial border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition cursor-pointer shadow-2xs whitespace-nowrap"
         >
-          {{ validating ? 'Memvalidasi...' : 'Validasi Ulang Rumus' }}
+          <span class="sm:hidden">{{ validating ? 'Memvalidasi...' : 'Validasi' }}</span>
+          <span class="hidden sm:inline">{{ validating ? 'Memvalidasi...' : 'Validasi Ulang Rumus' }}</span>
         </button>
 
         <button
           v-if="draft.status === 'ready'"
           @click="showGenerateModal = true"
           :disabled="generating"
-          class="h-8 px-3.5 bg-[#1D70F5] text-white text-xs font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 transition cursor-pointer shadow-2xs"
+          class="h-8 px-2 sm:px-3.5 flex-1 sm:flex-initial bg-[#1D70F5] text-white text-xs font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 transition cursor-pointer shadow-2xs whitespace-nowrap"
         >
-          {{ generating ? 'Membuat Invoice...' : 'Generate Invoice' }}
+          <span class="sm:hidden">{{ generating ? 'Proses...' : 'Generate' }}</span>
+          <span class="hidden sm:inline">{{ generating ? 'Membuat Invoice...' : 'Generate Invoice' }}</span>
         </button>
 
         <router-link
           v-if="draft.invoice"
           :to="`/invoices/${draft.invoice.id}`"
-          class="h-8 px-3.5 bg-[#1D70F5] text-white text-xs font-medium rounded-lg hover:bg-blue-600 transition inline-flex items-center shadow-2xs"
+          class="h-8 px-2 sm:px-3.5 flex-1 sm:flex-initial bg-[#1D70F5] text-white text-xs font-medium rounded-lg hover:bg-blue-600 transition inline-flex items-center justify-center shadow-2xs whitespace-nowrap"
         >
-          Lihat Invoice ({{ draft.invoice.invoice_number }}) →
+          <span class="sm:hidden">Lihat Invoice →</span>
+          <span class="hidden sm:inline">Lihat Invoice ({{ draft.invoice.invoice_number }}) →</span>
         </router-link>
       </div>
     </div>
@@ -205,11 +210,11 @@
 
       <!-- Calculation Comparison Table -->
       <div class="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-2xs">
-        <div class="px-4 py-2.5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+        <div class="px-4 py-2.5 border-b border-gray-100 flex justify-between items-center gap-3 bg-gray-50/50">
           <h3 class="text-xs font-semibold text-gray-950">
             Perbandingan Nilai Excel VS Hasil Perhitungan Sistem
           </h3>
-          <div>
+          <div class="shrink-0">
             <span
               v-if="comparison?.is_matched"
               class="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200"
@@ -225,7 +230,50 @@
           </div>
         </div>
 
-        <Table>
+        <!-- Layar kecil: satu blok per komponen perhitungan dengan baris label–nilai -->
+        <ul class="md:hidden divide-y divide-gray-100">
+          <li class="p-4 space-y-2 text-xs text-gray-700">
+            <div class="flex items-start justify-between gap-3">
+              <p class="text-sm font-medium text-gray-900 break-words">Support Amount</p>
+              <span class="text-emerald-700 font-medium shrink-0">MATCH</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-gray-500">Nilai Excel</span>
+              <span class="text-gray-800 text-right">{{ formatCurrency(draft.support_amount) }}</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-gray-500">Hasil Sistem Laravel</span>
+              <span class="text-gray-800 text-right">{{ formatCurrency(comparison?.calculated?.support_amount ?? draft.support_amount) }}</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-gray-500">Selisih</span>
+              <span class="text-gray-500 text-right">Rp 0</span>
+            </div>
+          </li>
+
+          <li v-for="(field, key) in comparisonFields" :key="key" class="p-4 space-y-2 text-xs text-gray-700">
+            <div class="flex items-start justify-between gap-3">
+              <p class="text-sm font-medium text-gray-900 capitalize break-words">{{ key.replace('_', ' ') }}</p>
+              <span class="font-medium shrink-0" :class="field.status === 'MATCH' ? 'text-emerald-700' : 'text-rose-700'">
+                {{ field.status }}
+              </span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-gray-500">Nilai Excel</span>
+              <span class="text-gray-800 text-right">{{ formatCurrency(field.excel) }}</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-gray-500">Hasil Sistem Laravel</span>
+              <span class="text-gray-800 text-right">{{ formatCurrency(field.system) }}</span>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <span class="text-gray-500">Selisih</span>
+              <span class="text-right" :class="field.diff > 0 ? 'text-amber-700 font-medium' : 'text-gray-500'">{{ formatCurrency(field.diff) }}</span>
+            </div>
+          </li>
+        </ul>
+
+        <Table container-class="hidden md:block">
           <TableHeader>
             <TableRow>
               <TableHead>Komponen Perhitungan</TableHead>

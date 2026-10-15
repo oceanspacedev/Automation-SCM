@@ -5,7 +5,7 @@ import router from './router';
 
 // Kirim area aktif (Jabar/Jateng) dari URL halaman ke setiap request API
 axios.interceptors.request.use((config) => {
-  // Form publik lama (/form-realme, /form-submission) tetap milik Jawa Barat
+  // Halaman tanpa area di URL bisa menentukan area bawaan lewat meta.defaultArea
   const route = router.currentRoute.value;
   const area = route?.params?.area || route?.meta?.defaultArea;
   if (area && !config.headers['X-Area']) {

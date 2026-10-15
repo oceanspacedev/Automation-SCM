@@ -4,14 +4,18 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['name', 'email', 'whatsapp', 'role', 'permissions', 'is_active', 'password'])]
-#[Hidden(['password', 'remember_token'])]
+#[Fillable(['name', 'email', 'whatsapp', 'avatar_path', 'role', 'permissions', 'is_active', 'password'])]
+#[Hidden(['password', 'remember_token', 'avatar_path'])]
+#[Appends(['avatar_url'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -47,6 +51,38 @@ class User extends Authenticatable
             'permissions' => 'array',
             'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * Public URL of the profile photo, or null when the user has none.
+     *
+     * @return Attribute<?string, never>
+     */
+    protected function avatarUrl(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->avatar_path ? Storage::disk('public')->url($this->avatar_path) : null);
+    }
+
+    /**
+     * Store a WhatsApp number as 628xxx ("0812…" and "812…" become "62812…"); null when empty.
+     */
+    public static function normalizeWhatsapp(?string $phone): ?string
+    {
+        $clean = preg_replace('/[^0-9]/', '', (string) $phone);
+
+        if ($clean === '') {
+            return null;
+        }
+
+        if (str_starts_with($clean, '08')) {
+            return '628'.substr($clean, 2);
+        }
+
+        if (str_starts_with($clean, '8')) {
+            return '62'.$clean;
+        }
+
+        return $clean;
     }
 
     /**

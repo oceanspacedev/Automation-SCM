@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DataProgram;
 use App\Models\ProgramSubmission;
 use App\Services\DataProgramSyncService;
+use App\Services\ProgramReconciliationService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -14,7 +15,8 @@ class ProgramClaimConfirmationController extends Controller
 {
     public function __construct(
         protected WhatsAppService $waService,
-        protected DataProgramSyncService $dpSyncService
+        protected DataProgramSyncService $dpSyncService,
+        protected ProgramReconciliationService $reconciliationService
     ) {}
 
     /**
@@ -62,7 +64,7 @@ class ProgramClaimConfirmationController extends Controller
                 }
 
                 // Cari dan sinkronkan DataProgram yang cocok jika ada
-                $matchingDp = DataProgram::where('area', $submission->areaEnum()->value)->where('kode_bt', $submission->id_real)->first();
+                $matchingDp = $this->reconciliationService->dataProgramForSubmission($submission);
                 if ($matchingDp) {
                     $matchingDp->update(['status_potong_ar' => 'DEALER SETUJU (PROSES AR)']);
                     $this->pushDpToSpreadsheet($matchingDp);
@@ -75,7 +77,7 @@ class ProgramClaimConfirmationController extends Controller
                     'tgl_potong_tf' => $todayDate,
                 ]);
 
-                $matchingDp = DataProgram::where('area', $submission->areaEnum()->value)->where('kode_bt', $submission->id_real)->first();
+                $matchingDp = $this->reconciliationService->dataProgramForSubmission($submission);
                 if ($matchingDp) {
                     $updateData = [
                         'status_potong_purchase' => 'SUDAH POTONG',
@@ -99,7 +101,7 @@ class ProgramClaimConfirmationController extends Controller
                     'status_potong_ar' => 'PENDING DEALER',
                 ]);
 
-                $matchingDp = DataProgram::where('area', $submission->areaEnum()->value)->where('kode_bt', $submission->id_real)->first();
+                $matchingDp = $this->reconciliationService->dataProgramForSubmission($submission);
                 if ($matchingDp) {
                     $matchingDp->update(['status_potong_ar' => 'PENDING DEALER']);
                     $this->pushDpToSpreadsheet($matchingDp);

@@ -10,30 +10,31 @@
     <!-- Header Page -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Master User</h1>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Master User</h1>
         <p class="text-xs text-gray-500 mt-0.5">
           Daftar akun pengguna, peran, dan pengaturan izin hak akses modul.
         </p>
       </div>
 
-      <div>
+      <!-- Di layar kecil tombol selebar layar -->
+      <div class="grid grid-cols-1 sm:block">
         <button
           type="button"
           @click="openCreateModal"
-          class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-blue-600 bg-[#1D70F5] hover:bg-blue-600 text-white text-xs font-medium shadow-2xs transition cursor-pointer"
+          class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-600 bg-[#1D70F5] hover:bg-blue-600 text-white text-xs font-medium shadow-2xs transition cursor-pointer whitespace-nowrap"
         >
           <span>Tambah Pengguna</span>
         </button>
       </div>
     </div>
 
-    <!-- Pending Approval Banner (Clean & Subtle) -->
+    <!-- Pending Approval Banner (Clean & Subtle); di layar kecil tombol filter turun ke baris kedua -->
     <div
       v-if="pendingCount > 0"
-      class="rounded-lg border border-amber-200 bg-amber-50/70 p-2.5 px-3.5 flex items-center justify-between text-xs text-amber-900"
+      class="rounded-lg border border-amber-200 bg-amber-50/70 p-2.5 px-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 sm:gap-0 text-xs text-amber-900"
     >
       <div class="flex items-center gap-2">
-        <span class="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+        <span class="inline-block w-2 h-2 shrink-0 rounded-full bg-amber-500 animate-pulse"></span>
         <span>Terdapat <strong>{{ pendingCount }}</strong> akun pendaftar baru menunggu persetujuan (ACC).</span>
       </div>
       <button
@@ -53,9 +54,10 @@
           <span>Total: {{ filteredUsers.length }} data</span>
         </div>
 
-        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        <!-- Filter & Cari; di layar kecil cari di atas, peran & status berdampingan -->
+        <div class="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-nowrap">
           <!-- Role Filter -->
-          <div class="relative min-w-[130px]">
+          <div class="relative sm:min-w-[130px]">
             <select
               v-model="filterRole"
               class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 pr-8 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-900 cursor-pointer appearance-none shadow-2xs"
@@ -70,7 +72,7 @@
           </div>
 
           <!-- Status Filter -->
-          <div class="relative min-w-[160px]">
+          <div class="relative sm:min-w-[160px]">
             <select
               v-model="filterStatus"
               class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 pr-8 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-900 cursor-pointer appearance-none shadow-2xs"
@@ -83,7 +85,7 @@
           </div>
 
           <!-- Search Input -->
-          <div class="relative w-full sm:w-64">
+          <div class="relative w-full sm:w-64 col-span-2 order-first sm:order-none">
             <SearchIcon class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
             <input
               type="text"
@@ -103,8 +105,70 @@
         </div>
       </div>
 
+      <!-- Layar kecil: satu kartu per pengguna -->
+      <div class="md:hidden">
+        <div v-if="isLoading" class="py-8 text-center text-xs text-gray-500">Memuat data...</div>
+        <div v-else-if="filteredUsers.length === 0" class="py-8 text-center text-xs text-gray-500">Tidak ada data pengguna.</div>
+        <ul v-else class="divide-y divide-gray-100">
+          <li v-for="user in filteredUsers" :key="user.id" class="p-4 space-y-2 text-xs text-gray-700">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-gray-900 break-words">
+                  {{ user.name }}<span v-if="currentUser?.id === user.id" class="text-gray-400 font-normal ml-1">(Anda)</span>
+                </p>
+                <p class="mt-0.5 text-gray-500 break-words">{{ user.email }}</p>
+              </div>
+              <button
+                type="button"
+                @click="handleToggleStatus(user)"
+                :disabled="currentUser?.id === user.id && user.is_active"
+                class="inline-flex items-center gap-1.5 shrink-0 font-medium cursor-pointer disabled:cursor-not-allowed"
+                :class="user.is_active ? 'text-gray-900' : 'text-amber-700'"
+                :title="user.is_active ? 'Klik untuk nonaktifkan' : 'Klik untuk aktifkan / ACC'"
+              >
+                <span class="w-1.5 h-1.5 rounded-full" :class="user.is_active ? 'bg-emerald-500' : 'bg-amber-500'"></span>
+                {{ user.is_active ? 'Aktif' : 'Menunggu ACC' }}
+              </button>
+            </div>
+
+            <p class="break-words"><span class="text-gray-500">Akses:</span> {{ formatPermissionsDetail(user) || '-' }}</p>
+
+            <div class="flex items-end justify-between gap-3">
+              <p class="min-w-0 text-gray-500 break-words">
+                {{ formatRole(user.role) }} · {{ user.whatsapp ? `+${user.whatsapp}` : '-' }}
+              </p>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button
+                  v-if="!user.is_active"
+                  type="button"
+                  @click="handleApproveUser(user)"
+                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
+                >
+                  ACC
+                </button>
+                <button
+                  type="button"
+                  @click="openEditModal(user)"
+                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  @click="confirmDeleteUser(user)"
+                  :disabled="currentUser?.id === user.id"
+                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Hapus
+                </button>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
       <!-- Clean Ordinary Table -->
-      <div class="overflow-x-auto">
+      <div class="hidden md:block overflow-x-auto">
         <table class="w-full text-left text-xs text-gray-900 border-collapse">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">

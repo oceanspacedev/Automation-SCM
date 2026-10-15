@@ -18,6 +18,7 @@ import DealersIndex from '../Pages/Dealers/Index.vue';
 import ProgramsIndex from '../Pages/Programs/Index.vue';
 import RegionsIndex from '../Pages/Regions/Index.vue';
 import ArContactsIndex from '../Pages/ArContacts/Index.vue';
+import ProfileIndex from '../Pages/Profile/Index.vue';
 import { useAuth } from '../composables/useAuth';
 import { AREA_ROUTE_PATTERN, DEFAULT_AREA } from '../composables/useArea';
 
@@ -42,15 +43,18 @@ const routes = [
   ...areaRoutes('/invoices', 'invoices.index', InvoicesIndex),
   { path: '/invoices/:id', name: 'invoices.detail', component: InvoiceDetail, props: true, meta: { requiresAuth: true } },
   { path: '/email-logs', name: 'email-logs.index', component: EmailLogsIndex, meta: { requiresAuth: true } },
-  { path: '/form-program', redirect: `/test-program/${DEFAULT_AREA}` },
-  { path: '/form-submission', name: 'program-submissions.public-form', component: ProgramPublicForm, meta: { requiresAuth: false, isStandalone: true, defaultArea: DEFAULT_AREA } },
-  { path: '/form-realme', name: 'program-realme.public-form', component: ProgramPublicForm, meta: { requiresAuth: false, isStandalone: true, defaultArea: DEFAULT_AREA } },
-  { path: '/form', redirect: '/form-realme' },
+  // Link form publik lama (sudah tersebar) diarahkan ke form Jawa Barat
+  { path: '/form-submission', redirect: to => ({ path: `/form/${DEFAULT_AREA}`, query: to.query }) },
+  { path: '/form-realme', redirect: to => ({ path: `/form/${DEFAULT_AREA}`, query: to.query }) },
+  { path: '/form', redirect: to => ({ path: `/form/${DEFAULT_AREA}`, query: to.query }) },
   // Form publik per area, contoh: /form/jateng
   { path: `/form/:area(${AREA_ROUTE_PATTERN})`, name: 'program-area.public-form', component: ProgramPublicForm, meta: { requiresAuth: false, isStandalone: true } },
   // Halaman per area (Jabar/Jateng); link lama tanpa area diarahkan ke Jabar
   ...areaRoutes('/data-program', 'data-program.index', DataProgramIndex),
-  ...areaRoutes('/test-program', 'test-program.index', TestProgramIndex),
+  ...areaRoutes('/form-program', 'form-program.index', TestProgramIndex),
+  // Link lama /test-program dan /test-program/:area diarahkan ke /form-program
+  { path: '/test-program', redirect: to => ({ path: `/form-program/${DEFAULT_AREA}`, query: to.query }) },
+  { path: `/test-program/:area(${AREA_ROUTE_PATTERN})`, redirect: to => ({ path: `/form-program/${to.params.area}`, query: to.query }) },
   ...areaRoutes('/riwayat-program', 'program-history.index', ProgramHistoryIndex),
   // Master Program satu daftar untuk semua area; link lama /programs/jabar diarahkan ke /programs
   { path: '/programs', name: 'programs.index', component: ProgramsIndex, meta: { requiresAuth: true } },
@@ -60,6 +64,7 @@ const routes = [
   { path: '/customers', name: 'customers.index', component: CustomersIndex, meta: { requiresAuth: true } },
   ...areaRoutes('/dealers', 'dealers.index', DealersIndex),
   { path: '/users', name: 'users.index', component: UsersIndex, meta: { requiresAuth: true } },
+  { path: '/profile', name: 'profile', component: ProfileIndex, meta: { requiresAuth: true } },
 ];
 
 const router = createRouter({

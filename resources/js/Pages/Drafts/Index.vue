@@ -12,47 +12,49 @@
     <!-- Header & Action Buttons -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Draft Invoice</h1>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Draft Invoice</h1>
         <p class="text-xs text-gray-500 mt-0.5">Kelola dan terbitkan draft invoice yang diimpor dari Excel.</p>
       </div>
 
-      <!-- Action Buttons (Filament style) -->
-      <div class="flex items-center gap-2">
+      <!-- Action Buttons (Filament style); di layar kecil tiga tombol sama lebar dengan label pendek -->
+      <div class="grid grid-cols-3 sm:flex sm:items-center gap-2">
         <!-- Multi-select Generate Button -->
         <template v-if="selectedIds.length > 0">
           <button
             @click="askGenerateSelected"
             :disabled="generatingBatch || pushingBatch"
-            class="h-9 px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center gap-2"
+            class="h-9 px-2 sm:px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap"
             :title="`Terbitkan ${selectedIds.length} draft terpilih menjadi invoice`"
           >
             <svg v-if="generatingBatch" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <CheckSquareIcon v-else class="w-3.5 h-3.5 text-gray-500" />
-            <span>{{ generatingBatch ? 'Menerbitkan...' : `Generate (${selectedIds.length}) Terpilih` }}</span>
+            <CheckSquareIcon v-else class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
+            <span class="sm:hidden">{{ generatingBatch ? 'Proses...' : `Generate (${selectedIds.length})` }}</span>
+            <span class="hidden sm:inline">{{ generatingBatch ? 'Menerbitkan...' : `Generate (${selectedIds.length}) Terpilih` }}</span>
           </button>
           <!-- Multi-select Kirim ke Data Program -->
           <button
             @click="askPushSelectedToDataProgram"
             :disabled="pushingBatch || generatingBatch"
-            class="h-9 px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center gap-2"
+            class="h-9 px-2 sm:px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap"
             :title="`Kirim ${selectedIds.length} draft terpilih ke Data Program & Google Spreadsheet`"
           >
             <svg v-if="pushingBatch" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <TableIcon v-else class="w-3.5 h-3.5 text-gray-500" />
-            <span>{{ pushingBatch ? 'Mengirim...' : `Kirim ke Data Program (${selectedIds.length})` }}</span>
+            <TableIcon v-else class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
+            <span class="sm:hidden">{{ pushingBatch ? 'Mengirim...' : `Kirim DP (${selectedIds.length})` }}</span>
+            <span class="hidden sm:inline">{{ pushingBatch ? 'Mengirim...' : `Kirim ke Data Program (${selectedIds.length})` }}</span>
           </button>
           <button
             @click="selectedIds = []"
-            class="h-9 px-3 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium rounded-lg transition cursor-pointer shadow-2xs"
+            class="h-9 px-2 sm:px-3 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium rounded-lg transition cursor-pointer shadow-2xs whitespace-nowrap"
             title="Batalkan pilihan"
           >
-            <span>Batal Pilih</span>
+            <span class="sm:hidden">Batal</span><span class="hidden sm:inline">Batal Pilih</span>
           </button>
         </template>
 
@@ -61,38 +63,39 @@
           v-else
           @click="askGenerateAll"
           :disabled="generatingAll"
-          class="h-9 px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center gap-2"
+          class="h-9 px-2 sm:px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap"
           title="Terbitkan invoice untuk semua draft yang berstatus Ready"
         >
           <svg v-if="generatingAll" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <CheckSquareIcon v-else class="w-3.5 h-3.5 text-gray-500" />
-          <span>{{ generatingAll ? 'Menerbitkan...' : 'Generate Semua Invoice' }}</span>
+          <CheckSquareIcon v-else class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
+          <span class="sm:hidden">{{ generatingAll ? 'Proses...' : 'Generate Semua' }}</span>
+          <span class="hidden sm:inline">{{ generatingAll ? 'Menerbitkan...' : 'Generate Semua Invoice' }}</span>
         </button>
 
         <button
           @click="showImportModal = true"
-          class="h-9 px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition cursor-pointer flex items-center gap-2 shadow-2xs"
+          class="h-9 px-2 sm:px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition cursor-pointer flex items-center justify-center gap-2 shadow-2xs whitespace-nowrap"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" class="w-4 h-4 shrink-0">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" class="hidden sm:block w-4 h-4 shrink-0">
             <path fill="#166e40" d="M37 6H17a2 2 0 0 0-2 2v32a2 2 0 0 0 2 2h20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>
             <path fill="#23a455" d="M37 6H24v36h13a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>
             <path fill="#2ecc71" opacity=".35" d="M24 13h15v4H24zm0 7h15v4H24zm0 7h15v4H24z"/>
             <path fill="#107c41" d="M22 13H8a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V15a2 2 0 0 0-2-2z"/>
             <path fill="#ffffff" d="M12.4 28.5l2.4-4.8 2.4 4.8h2.3l-3.5-6.5 3.3-6.5h-2.3l-2.2 4.7-2.2-4.7h-2.3l3.3 6.5-3.5 6.5h2.3z"/>
           </svg>
-          <span>Import Excel</span>
+          <span class="sm:hidden">Import</span><span class="hidden sm:inline">Import Excel</span>
         </button>
 
         <!-- Tambah Manual Button -->
         <button
           @click="showCreateModal = true"
-          class="h-9 px-3.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
+          class="h-9 px-2 sm:px-3.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs whitespace-nowrap"
         >
-          <PlusIcon class="w-3.5 h-3.5" />
-          <span>Tambah Manual</span>
+          <PlusIcon class="hidden sm:block w-3.5 h-3.5" />
+          <span class="sm:hidden">Tambah</span><span class="hidden sm:inline">Tambah Manual</span>
         </button>
       </div>
     </div>
@@ -112,7 +115,7 @@
       <!-- Toolbar (Search & Filter like Filament) -->
       <div class="p-3 sm:px-4 sm:py-3.5 border-b border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <!-- Left: Quick Selection Info -->
-        <div class="flex items-center gap-2 text-xs">
+        <div class="flex items-center gap-2 text-xs" :class="selectedIds.length === 0 && 'hidden sm:flex'">
           <span v-if="selectedIds.length > 0" class="font-medium text-gray-900 bg-gray-100 px-2.5 py-1 rounded-md">
             {{ selectedIds.length }} draft terpilih
           </span>
@@ -121,10 +124,10 @@
           </span>
         </div>
 
-        <!-- Right: Direct Filter Dropdowns, Search Box & Filter Popover -->
-        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap self-end sm:self-auto w-full sm:w-auto">
+        <!-- Right: Direct Filter Dropdowns, Search Box & Filter Popover; di layar kecil cari di atas, wilayah & program berdampingan -->
+        <div class="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-nowrap w-full sm:w-auto">
           <!-- Wilayah Filter Dropdown (Kaya Pilih Wilayah) -->
-          <div class="relative min-w-[135px]">
+          <div class="relative sm:min-w-[135px]" :class="programOptions.length === 0 && 'col-span-2'">
             <select
               v-model="filters.region"
               @change="fetchDrafts(1)"
@@ -137,7 +140,7 @@
           </div>
 
           <!-- Program Filter Dropdown (Kaya Pilih Program) -->
-          <div class="relative min-w-[150px]" v-if="programOptions.length > 0">
+          <div class="relative sm:min-w-[150px]" v-if="programOptions.length > 0">
             <select
               v-model="filters.program"
               @change="fetchDrafts(1)"
@@ -149,7 +152,8 @@
             <ChevronDownIcon class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           </div>
 
-          <!-- Search box with Magnifying glass -->
+          <!-- Search box & Filter Popover -->
+          <div class="col-span-2 order-first sm:order-none flex items-center gap-2">
           <div class="relative flex-1 sm:w-60">
             <SearchIcon class="w-4 h-4 text-gray-400 absolute left-3 top-2.5 pointer-events-none" />
             <input
@@ -265,11 +269,127 @@
               </div>
             </PopoverContent>
           </Popover>
+          </div>
         </div>
       </div>
 
+      <!-- Layar kecil: satu kartu per draft -->
+      <div class="md:hidden">
+        <div v-if="loading" class="py-8 text-center text-xs text-gray-500">Memuat data draft...</div>
+        <div v-else-if="drafts.length === 0" class="py-8 px-4 text-center text-xs text-gray-500">
+          Belum ada data draft. Silakan klik tombol <strong>Import</strong>.
+        </div>
+        <template v-else>
+          <label v-if="selectableDrafts.length > 0" class="px-4 py-2.5 border-b border-gray-100 flex items-center gap-3 text-xs text-gray-600 cursor-pointer">
+            <input
+              type="checkbox"
+              :checked="isAllSelected"
+              :indeterminate="isIndeterminate"
+              @change="toggleSelectAll"
+              class="rounded border-gray-300 text-gray-900 focus:ring-0 w-4 h-4 cursor-pointer"
+            />
+            <span>Pilih semua draft Ready</span>
+          </label>
+
+          <ul class="divide-y divide-gray-100">
+            <li
+              v-for="draft in drafts"
+              :key="draft.id"
+              class="p-4 flex gap-3 text-xs text-gray-700"
+              :class="selectedIds.includes(draft.id) && 'bg-gray-50'"
+            >
+              <input
+                type="checkbox"
+                :value="draft.id"
+                v-model="selectedIds"
+                :disabled="draft.status !== 'ready'"
+                class="mt-0.5 rounded border-gray-300 text-gray-900 focus:ring-0 w-4 h-4 cursor-pointer disabled:opacity-30 shrink-0"
+              />
+              <div class="flex-1 min-w-0 space-y-2">
+                <div class="flex items-start justify-between gap-3">
+                  <router-link :to="`/drafts/${draft.id}`" class="min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate">{{ draft.dealer_name || '-' }}</p>
+                    <p class="mt-0.5 text-gray-500">{{ draft.dealer_code || '-' }} · {{ draft.invoice_type || '-' }}</p>
+                  </router-link>
+                  <div class="text-right shrink-0">
+                    <span class="inline-flex items-center gap-1.5 text-gray-900">
+                      <span
+                        class="w-1.5 h-1.5 rounded-full"
+                        :class="draft.status === 'invoiced' ? 'bg-emerald-500' : draft.status === 'ready' ? 'bg-amber-500' : 'bg-rose-500'"
+                      ></span>
+                      {{ draft.status === 'invoiced' ? 'Invoiced' : draft.status === 'ready' ? 'Ready' : 'Error' }}
+                    </span>
+                    <p v-if="draft.data_program" class="mt-0.5 text-[11px] text-gray-500">Masuk Data Program</p>
+                  </div>
+                </div>
+
+                <p class="text-gray-500 truncate">{{ draft.customer_name || '-' }} · {{ draft.invoice_date || '-' }}</p>
+
+                <div class="flex items-end justify-between gap-3">
+                  <div>
+                    <p class="text-sm font-semibold text-gray-950">{{ formatCurrency(draft.netpay) }}</p>
+                    <p class="text-gray-500">Support {{ formatCurrency(draft.support_amount) }}</p>
+                  </div>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <button
+                      v-if="draft.status === 'ready'"
+                      type="button"
+                      @click="askGenerateSingle(draft)"
+                      :disabled="generatingId === draft.id"
+                      class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer disabled:opacity-50"
+                    >
+                      {{ generatingId === draft.id ? 'Proses...' : 'Generate' }}
+                    </button>
+                    <button
+                      v-else-if="draft.status === 'error'"
+                      type="button"
+                      @click="validateDraft(draft.id)"
+                      class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
+                    >
+                      Validasi
+                    </button>
+                    <router-link
+                      v-else-if="draft.status === 'invoiced' && draft.invoice"
+                      :to="`/invoices/${draft.invoice.id}`"
+                      class="h-8 px-2.5 inline-flex items-center rounded-lg border border-gray-300 bg-white text-gray-700 font-medium"
+                    >
+                      Invoice
+                    </router-link>
+                    <button
+                      v-if="draft.status === 'invoiced'"
+                      type="button"
+                      @click="askPushSingleToDataProgram(draft)"
+                      :disabled="pushingId === draft.id"
+                      class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer disabled:opacity-50"
+                    >
+                      {{ pushingId === draft.id ? 'Mengirim...' : 'Data Program' }}
+                    </button>
+                    <button
+                      v-if="draft.status !== 'invoiced'"
+                      type="button"
+                      @click="askDeleteDraft(draft)"
+                      class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </li>
+          </ul>
+
+          <div class="px-4 py-3 border-t border-gray-200 bg-gray-50/80 flex items-center justify-between gap-3 text-xs">
+            <span class="font-semibold text-gray-900">Total</span>
+            <span class="text-right">
+              <span class="font-semibold text-gray-950">{{ formatCurrency(totalNetpay) }}</span>
+              <span class="block text-gray-500">Support {{ formatCurrency(totalSupport) }}</span>
+            </span>
+          </div>
+        </template>
+      </div>
+
       <!-- Table: Styled identically to Test Program for clean spreadsheet look -->
-      <div class="overflow-x-auto">
+      <div class="hidden md:block overflow-x-auto">
         <table class="w-full text-left text-xs text-gray-900 border-collapse">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">

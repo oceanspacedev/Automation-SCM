@@ -10,17 +10,17 @@
     <!-- Header & Page Actions -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Riwayat Email</h1>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Riwayat Email</h1>
         <p class="text-xs text-gray-500 mt-0.5">Histori pengiriman invoice via email dan status pengiriman.</p>
       </div>
 
-      <!-- Action Button (Filament dark button style) -->
-      <div class="flex items-center gap-2">
+      <!-- Action Button (Filament dark button style); di layar kecil tombol selebar layar -->
+      <div class="grid grid-cols-1 sm:flex sm:items-center gap-2">
         <router-link
           to="/invoices"
-          class="h-9 px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs transition inline-flex items-center gap-2 cursor-pointer"
+          class="h-9 px-2 sm:px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs transition inline-flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
         >
-          <MailIcon class="w-4 h-4 text-gray-500" />
+          <MailIcon class="hidden sm:block w-4 h-4 text-gray-500" />
           <span>Kirim Invoice Baru</span>
         </router-link>
       </div>
@@ -30,8 +30,8 @@
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
       <!-- Card Toolbar (Search & Filter like Filament) -->
       <div class="p-3 sm:px-4 sm:py-3.5 border-b border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <!-- Left: Quick count / Selection Info -->
-        <div class="flex items-center gap-2 text-xs text-gray-500">
+        <!-- Left: Quick count / Selection Info; teks keterangan disembunyikan di layar kecil -->
+        <div class="flex items-center gap-2 text-xs text-gray-500" :class="selectedIds.length === 0 && 'hidden sm:flex'">
           <span v-if="selectedIds.length > 0" class="font-medium text-gray-900 bg-gray-100 px-2.5 py-0.5 rounded-md">
             {{ selectedIds.length }} terpilih
           </span>
@@ -119,8 +119,49 @@
         </div>
       </div>
 
+      <!-- Layar kecil: satu kartu per email -->
+      <div class="md:hidden">
+        <div v-if="loading" class="py-8 text-center text-xs text-gray-500">Memuat data riwayat email...</div>
+        <div v-else-if="logs.length === 0" class="py-8 text-center text-xs text-gray-500">Belum ada riwayat pengiriman email.</div>
+        <ul v-else class="divide-y divide-gray-100">
+          <li v-for="log in logs" :key="log.id" class="p-4 space-y-2 text-xs text-gray-700">
+            <div class="flex items-start justify-between gap-3">
+              <router-link :to="`/invoices/${log.invoice_id}`" class="min-w-0">
+                <p class="text-sm font-medium text-gray-900 truncate">{{ log.invoice_number || '-' }}</p>
+                <p class="mt-0.5 text-gray-500 truncate">{{ log.invoice?.dealer_name || '-' }}</p>
+              </router-link>
+              <span class="inline-flex items-center gap-1.5 text-gray-900 shrink-0">
+                <span class="w-1.5 h-1.5 rounded-full" :class="log.status === 'sent' ? 'bg-emerald-500' : 'bg-rose-500'"></span>
+                {{ log.status === 'sent' ? 'Delivered' : 'Failed' }}
+              </span>
+            </div>
+
+            <p class="text-gray-500 break-words">Ke {{ log.recipient_email || '-' }}</p>
+
+            <div class="flex items-end justify-between gap-3">
+              <p class="min-w-0 text-gray-500 break-words">{{ log.sender_name || 'Rebate MSI' }} · {{ formatDateTimeFilament(log.created_at) }}</p>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <router-link
+                  :to="`/invoices/${log.invoice_id}`"
+                  class="h-8 px-2.5 inline-flex items-center rounded-lg border border-gray-300 bg-white text-gray-700 font-medium"
+                >
+                  View
+                </router-link>
+                <a
+                  :href="`/invoices/${log.invoice_id}/pdf`"
+                  target="_blank"
+                  class="h-8 px-2.5 inline-flex items-center rounded-lg border border-gray-300 bg-white text-gray-700 font-medium"
+                >
+                  PDF
+                </a>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
       <!-- Table: Styled identically to Test Program for clean spreadsheet look -->
-      <div class="overflow-x-auto">
+      <div class="hidden md:block overflow-x-auto">
         <table class="w-full text-left text-xs text-gray-900 border-collapse">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">

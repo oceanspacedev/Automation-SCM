@@ -1,93 +1,63 @@
 <template>
-  <div class="min-h-screen flex flex-col justify-center items-center bg-[#F9FAFB] dark:bg-[#0B1120] text-neutral-900 dark:text-slate-100 px-4 py-3 sm:py-6 font-sans transition-colors relative">
-
-    <!-- Subtle Quick Theme Toggle (Top Right) -->
+  <div class="min-h-screen flex flex-col justify-center items-center bg-gray-50 dark:bg-[#0B1120] text-gray-900 dark:text-slate-100 px-4 pt-16 pb-8 font-sans transition-colors relative">
+    <!-- Mode terang/gelap -->
     <button
       type="button"
       @click="toggleDarkMode"
-      class="absolute top-4 right-4 p-2 rounded-lg border border-neutral-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 text-neutral-600 dark:text-slate-300 hover:bg-neutral-100 dark:hover:bg-slate-800 transition cursor-pointer shadow-2xs"
+      class="absolute top-4 right-4 p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition cursor-pointer"
       :title="isDark ? 'Beralih ke Mode Terang' : 'Beralih ke Mode Gelap'"
-      aria-label="Toggle Dark Mode"
+      aria-label="Ganti mode terang/gelap"
     >
-      <Sun v-if="isDark" class="w-4 h-4 text-amber-400" />
-      <Moon v-else class="w-4 h-4 text-neutral-600" />
+      <Sun v-if="isDark" class="w-4 h-4" />
+      <Moon v-else class="w-4 h-4" />
     </button>
 
-    <div class="w-full max-w-[350px] space-y-3">
+    <div class="w-full max-w-sm space-y-4 transition duration-200 ease-out" :class="isLoginSuccess && 'opacity-0 -translate-y-1'">
+      <div class="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm p-6 sm:p-7">
+        <!-- Judul -->
+        <div class="mb-6">
+          <h1 class="text-lg font-semibold tracking-tight text-gray-950 dark:text-white">
+            {{ loginMode === 'email' ? 'Supply Chain Management' : (otpStep === 'phone' ? 'Masuk dengan WhatsApp' : 'Verifikasi kode OTP') }}
+          </h1>
+          <p class="mt-1 text-sm text-gray-500 dark:text-slate-400">
+            {{ loginMode === 'email' ? 'Masuk untuk melanjutkan.' : (otpStep === 'phone' ? 'Masukkan nomor WhatsApp yang terdaftar.' : `Kode OTP dikirim ke ${waPhone}.`) }}
+          </p>
+        </div>
 
-      <!-- Main Login Card (Compact, Clean Dark Mode) -->
-      <div class="bg-white dark:bg-slate-900 rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_25px_rgba(0,0,0,0.35)] border border-neutral-200/80 dark:border-slate-800 p-5 sm:p-6 transition-colors">
+        <!-- Pesan -->
+        <div
+          v-if="errorMessage"
+          class="mb-4 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/40 px-3 py-2.5 text-xs text-red-700 dark:text-red-300 flex items-start justify-between gap-3"
+        >
+          <span>{{ errorMessage }}</span>
+          <button type="button" @click="errorMessage = ''" class="text-red-400 hover:text-red-700 dark:hover:text-red-200 cursor-pointer leading-none" aria-label="Tutup">&times;</button>
+        </div>
+        <div
+          v-if="successMessage"
+          class="mb-4 rounded-lg border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-2.5 text-xs text-emerald-700 dark:text-emerald-300 flex items-start justify-between gap-3"
+        >
+          <span>{{ successMessage }}</span>
+          <button type="button" @click="successMessage = ''" class="text-emerald-500 hover:text-emerald-700 dark:hover:text-emerald-200 cursor-pointer leading-none" aria-label="Tutup">&times;</button>
+        </div>
 
-        <!-- Header Title (Clean without top icon box) -->
-        <div class="text-center mb-4">
-            <h2 class="text-base sm:text-lg font-bold tracking-tight text-neutral-900 dark:text-white">
-              {{ loginMode === 'email' ? 'Supply Chain Management' : (otpStep === 'phone' ? 'Masuk via WhatsApp' : 'Verifikasi OTP WhatsApp') }}
-            </h2>
-            <p v-if="loginMode === 'wa'" class="text-[11px] text-neutral-500 dark:text-slate-400 mt-0.5">
-              {{ otpStep === 'phone' ? 'Masukkan nomor WA terdaftar di SCM' : `Kode OTP dikirim ke ${waPhone}` }}
-            </p>
-          </div>
-
-          <!-- Alert Error Message -->
-          <div
-            v-if="errorMessage"
-            class="mb-3 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50/90 dark:bg-red-950/40 p-2.5 text-[11px] text-red-800 dark:text-red-300 flex items-start justify-between gap-1.5 shadow-2xs"
-          >
-            <div class="flex items-start gap-1.5">
-              <span class="font-bold text-red-600 dark:text-red-400">✕</span>
-              <span>{{ errorMessage }}</span>
-            </div>
-            <button
-              type="button"
-              @click="errorMessage = ''"
-              class="text-red-400 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200 cursor-pointer text-sm leading-none font-bold shrink-0 ml-1"
-            >
-              &times;
-            </button>
-          </div>
-
-          <!-- Alert Success Message (e.g. OTP Sent) -->
-          <div
-            v-if="successMessage"
-            class="mb-3 rounded-lg border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/90 dark:bg-emerald-950/50 p-2.5 text-[11px] text-emerald-800 dark:text-emerald-300 flex items-start justify-between gap-2 shadow-2xs"
-          >
-            <div class="flex items-start gap-2">
-              <CheckCircle2 class="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
-              <span class="leading-snug">{{ successMessage }}</span>
-            </div>
-            <button
-              type="button"
-              @click="successMessage = ''"
-              class="text-emerald-500 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-200 cursor-pointer text-sm leading-none font-bold shrink-0 ml-1"
-            >
-              &times;
-            </button>
-          </div>
-
-        <!-- =================== MODE 1: EMAIL & PASSWORD FORM =================== -->
-        <form v-if="loginMode === 'email'" @submit.prevent="handleEmailSubmit" class="space-y-3">
-          <!-- Username / Email Field -->
+        <!-- =================== MASUK DENGAN EMAIL & PASSWORD =================== -->
+        <form v-if="loginMode === 'email'" @submit.prevent="handleEmailSubmit" class="space-y-4">
           <div>
-            <label for="username-or-email" class="block text-xs font-semibold text-neutral-800 dark:text-slate-200 mb-1">
-              Username atau email<span class="text-red-500 font-bold ml-0.5">*</span>
-            </label>
+            <label for="username-or-email" class="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Username atau email</label>
             <input
               id="username-or-email"
               v-model="form.login"
               type="text"
               required
               autocomplete="username email"
-              placeholder="admin@example.com"
-              class="w-full h-9.5 px-3 rounded-lg bg-[#EBF3FC] dark:bg-slate-800/90 border border-[#D5E3F5] dark:border-slate-700 text-neutral-900 dark:text-white text-xs sm:text-sm placeholder:text-neutral-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#1D70F5]/30 focus:border-[#1D70F5] transition"
+              placeholder="nama@email.com"
+              class="w-full h-10 px-3 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-slate-300 focus:border-gray-900 dark:focus:border-slate-300 transition"
             />
           </div>
 
-          <!-- Password Field with Segmented Eye Toggle -->
           <div>
-            <label for="password" class="block text-xs font-semibold text-neutral-800 dark:text-slate-200 mb-1">
-              Password<span class="text-red-500 font-bold ml-0.5">*</span>
-            </label>
-            <div class="flex rounded-lg border border-[#D5E3F5] dark:border-slate-700 bg-[#EBF3FC] dark:bg-slate-800/90 overflow-hidden focus-within:ring-2 focus-within:ring-[#1D70F5]/30 focus-within:border-[#1D70F5] transition">
+            <label for="password" class="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Password</label>
+            <div class="relative">
               <input
                 id="password"
                 v-model="form.password"
@@ -95,14 +65,14 @@
                 required
                 autocomplete="current-password"
                 placeholder="••••••••"
-                class="h-9.5 flex-1 bg-transparent px-3 text-xs sm:text-sm text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-slate-500 focus:outline-none"
+                class="w-full h-10 pl-3 pr-10 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-slate-300 focus:border-gray-900 dark:focus:border-slate-300 transition"
               />
               <button
                 type="button"
                 @click="showPassword = !showPassword"
-                class="w-10 h-9.5 flex items-center justify-center border-l border-[#D5E3F5] dark:border-slate-700 text-neutral-500 dark:text-slate-400 hover:text-neutral-800 dark:hover:text-white bg-transparent transition cursor-pointer"
+                class="absolute inset-y-0 right-0 w-10 flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer"
                 tabindex="-1"
-                aria-label="Toggle password visibility"
+                :aria-label="showPassword ? 'Sembunyikan password' : 'Tampilkan password'"
               >
                 <Eye v-if="!showPassword" class="h-4 w-4" />
                 <EyeOff v-else class="h-4 w-4" />
@@ -110,104 +80,77 @@
             </div>
           </div>
 
-          <!-- Remember Me Checkbox -->
-          <div class="flex items-center gap-2 pt-0.5">
+          <label for="remember" class="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-400 cursor-pointer select-none">
             <input
               id="remember"
               v-model="form.remember"
               type="checkbox"
-              class="h-3.5 w-3.5 rounded border-neutral-300 dark:border-slate-700 dark:bg-slate-800 text-[#1D70F5] focus:ring-[#1D70F5] cursor-pointer"
+              class="h-4 w-4 rounded border-gray-300 dark:border-slate-600 dark:bg-slate-800 text-gray-900 focus:ring-0 cursor-pointer"
             />
-            <label for="remember" class="text-xs font-medium text-neutral-700 dark:text-slate-300 cursor-pointer select-none">
-              Remember me
-            </label>
-          </div>
+            Ingat saya
+          </label>
 
-          <!-- Blue Sign In Button -->
           <button
             type="submit"
             :disabled="loading || isLoginSuccess"
-            class="w-full h-9.5 rounded-lg bg-[#1D70F5] hover:bg-[#155FD1] active:scale-[0.99] text-white font-semibold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-60"
+            class="w-full h-10 rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-gray-900 text-sm font-medium transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
           >
-            <span v-if="loading && !isLoginSuccess" class="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-            <Check v-else-if="isLoginSuccess" class="h-4 w-4 text-white" />
-            <span>{{ isLoginSuccess ? 'Berhasil masuk...' : (loading ? 'Signing in...' : 'Sign in') }}</span>
+            <span v-if="loading" class="h-4 w-4 border-2 border-white/30 dark:border-gray-900/30 border-t-white dark:border-t-gray-900 rounded-full animate-spin"></span>
+            <span>{{ loading ? 'Memproses...' : 'Masuk' }}</span>
           </button>
 
-          <!-- Divider: ATAU MASUK DENGAN -->
-          <div class="relative flex items-center justify-center my-3 pt-0.5">
-            <div class="border-t border-neutral-200/90 dark:border-slate-800 w-full"></div>
-            <span class="bg-white dark:bg-slate-900 px-2.5 text-[10px] font-bold tracking-wider text-neutral-400 dark:text-slate-500 uppercase whitespace-nowrap absolute">
-              ATAU MASUK DENGAN
-            </span>
+          <div class="flex items-center gap-3 text-xs text-gray-400 dark:text-slate-500">
+            <div class="h-px flex-1 bg-gray-200 dark:bg-slate-800"></div>
+            <span>atau</span>
+            <div class="h-px flex-1 bg-gray-200 dark:bg-slate-800"></div>
           </div>
 
-          <!-- WhatsApp Button -->
           <button
             type="button"
             @click="switchToWhatsApp"
-            class="w-full h-9.5 rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800/90 hover:bg-neutral-50 dark:hover:bg-slate-800 active:scale-[0.99] text-neutral-800 dark:text-slate-200 text-xs sm:text-sm font-semibold transition flex items-center justify-center gap-2 shadow-2xs cursor-pointer"
+            class="w-full h-10 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-200 text-sm font-medium transition cursor-pointer"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              class="h-4.5 w-4.5 fill-[#25D366]"
-            >
-              <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-            </svg>
-            <span>WhatsApp</span>
+            Masuk dengan WhatsApp
           </button>
         </form>
 
-        <!-- =================== MODE 2: WHATSAPP OTP FLOW =================== -->
-        <div v-else class="space-y-3">
-
-          <!-- Step 1: Input Nomor WhatsApp -->
-          <form v-if="otpStep === 'phone'" @submit.prevent="handleSendOtp" class="space-y-3">
+        <!-- =================== MASUK DENGAN WHATSAPP (OTP) =================== -->
+        <div v-else>
+          <!-- Langkah 1: nomor WhatsApp -->
+          <form v-if="otpStep === 'phone'" @submit.prevent="handleSendOtp" class="space-y-4">
             <div>
-              <label for="wa-phone" class="block text-xs font-semibold text-neutral-800 dark:text-slate-200 mb-1">
-                Nomor WhatsApp<span class="text-red-500 font-bold ml-0.5">*</span>
-              </label>
+              <label for="wa-phone" class="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Nomor WhatsApp</label>
               <input
                 id="wa-phone"
                 v-model="waPhone"
                 type="tel"
                 required
                 autofocus
-                placeholder="Contoh: 081234567890"
-                class="w-full h-9.5 px-3 rounded-lg bg-[#EBF3FC] dark:bg-slate-800/90 border border-[#D5E3F5] dark:border-slate-700 text-neutral-900 dark:text-white text-xs sm:text-sm placeholder:text-neutral-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#25D366]/30 focus:border-[#25D366] transition"
+                placeholder="081234567890"
+                class="w-full h-10 px-3 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-slate-300 focus:border-gray-900 dark:focus:border-slate-300 transition"
               />
-              <p class="text-[11px] text-neutral-500 dark:text-slate-400 mt-1">
-                Nomor aktif WhatsApp & terdaftar di sistem SCM.
-              </p>
             </div>
 
             <button
               type="submit"
               :disabled="loading || !waPhone"
-              class="w-full h-9.5 rounded-lg bg-[#25D366] hover:bg-[#1ebc59] active:scale-[0.99] text-white font-semibold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+              class="w-full h-10 rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-gray-900 text-sm font-medium transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <span v-if="loading" class="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-              <span>{{ loading ? 'Mengirim OTP...' : 'Kirim Kode OTP' }}</span>
+              <span v-if="loading" class="h-4 w-4 border-2 border-white/30 dark:border-gray-900/30 border-t-white dark:border-t-gray-900 rounded-full animate-spin"></span>
+              <span>{{ loading ? 'Mengirim kode...' : 'Kirim kode OTP' }}</span>
             </button>
 
-            <button
-              type="button"
-              @click="switchToEmail"
-              class="w-full text-center text-xs text-neutral-500 dark:text-slate-400 hover:text-neutral-800 dark:hover:text-white pt-0.5 cursor-pointer font-medium"
-            >
-              ← Kembali ke Sign in Email
+            <button type="button" @click="switchToEmail" class="w-full text-center text-sm text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white cursor-pointer">
+              Kembali ke masuk dengan email
             </button>
           </form>
 
-          <!-- Step 2: Input & Verifikasi Kode OTP -->
-          <form v-if="otpStep === 'otp'" @submit.prevent="handleVerifyOtp" class="space-y-3">
+          <!-- Langkah 2: kode OTP -->
+          <form v-if="otpStep === 'otp'" @submit.prevent="handleVerifyOtp" class="space-y-4">
             <div>
-              <label class="block text-xs font-semibold text-neutral-800 dark:text-slate-200 mb-1">
-                Kode OTP (6 Digit)<span class="text-red-500 font-bold ml-0.5">*</span>
-              </label>
-
+              <label for="wa-otp" class="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Kode OTP (6 digit)</label>
               <input
+                id="wa-otp"
                 v-model="waOtp"
                 type="text"
                 inputmode="numeric"
@@ -216,77 +159,64 @@
                 autofocus
                 placeholder="000000"
                 @input="onOtpInput"
-                class="h-10 w-full rounded-lg bg-[#EBF3FC] dark:bg-slate-800/90 border border-[#D5E3F5] dark:border-slate-700 text-center text-xl font-bold font-mono tracking-[0.4em] text-neutral-900 dark:text-white placeholder:text-neutral-300 dark:placeholder:text-slate-600 placeholder:tracking-normal focus:outline-none focus:ring-2 focus:ring-[#1D70F5]/30 focus:border-[#1D70F5] transition"
+                class="w-full h-11 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-center text-lg font-semibold tracking-[0.5em] text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-slate-300 focus:border-gray-900 dark:focus:border-slate-300 transition"
               />
             </div>
 
             <button
               type="submit"
               :disabled="loading || cleanOtpLength !== 6 || isLoginSuccess"
-              class="w-full h-9.5 rounded-lg bg-[#1D70F5] hover:bg-[#155FD1] active:scale-[0.99] text-white font-semibold text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
+              class="w-full h-10 rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-gray-900 text-sm font-medium transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <span v-if="loading && !isLoginSuccess" class="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-              <Check v-else-if="isLoginSuccess" class="h-4 w-4 text-white" />
-              <span>{{ isLoginSuccess ? 'Berhasil masuk...' : (loading ? 'Memverifikasi...' : 'Verifikasi & Masuk') }}</span>
+              <span v-if="loading" class="h-4 w-4 border-2 border-white/30 dark:border-gray-900/30 border-t-white dark:border-t-gray-900 rounded-full animate-spin"></span>
+              <span>{{ loading ? 'Memverifikasi...' : 'Verifikasi & masuk' }}</span>
             </button>
 
-            <!-- Navigation & Resend Links -->
-            <div class="flex items-center justify-between text-[11px] text-neutral-600 dark:text-slate-400 pt-0.5">
+            <div class="flex items-center justify-between text-sm">
               <button
                 type="button"
                 @click="otpStep = 'phone'; waOtp = ''; errorMessage = ''; successMessage = ''"
-                class="text-neutral-500 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer underline"
+                class="text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white cursor-pointer"
               >
-                ← Ganti nomor
+                Ganti nomor
               </button>
               <button
                 type="button"
                 @click="handleSendOtp"
                 :disabled="resendCooldown > 0 || loading"
-                class="font-semibold text-neutral-700 dark:text-slate-300 hover:text-neutral-900 dark:hover:text-white cursor-pointer disabled:opacity-40 disabled:cursor-default"
+                class="text-gray-900 dark:text-white font-medium hover:underline cursor-pointer disabled:text-gray-400 disabled:no-underline disabled:cursor-default"
               >
-                {{ resendCooldown > 0 ? `Kirim ulang (${resendCooldown}s)` : 'Kirim ulang OTP' }}
+                {{ resendCooldown > 0 ? `Kirim ulang (${resendCooldown}s)` : 'Kirim ulang kode' }}
               </button>
             </div>
 
-            <button
-              type="button"
-              @click="switchToEmail"
-              class="w-full text-center text-xs text-neutral-500 dark:text-slate-400 hover:text-neutral-800 dark:hover:text-white pt-1 cursor-pointer font-medium block"
-            >
-              ← Kembali ke Sign in Email
+            <button type="button" @click="switchToEmail" class="w-full text-center text-sm text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white cursor-pointer">
+              Kembali ke masuk dengan email
             </button>
           </form>
-
+        </div>
       </div>
 
-    </div>
-
-      <!-- Registration Link & Footer (Compact) -->
-      <div class="text-center text-[11px] text-neutral-500 dark:text-slate-400 space-y-1 pt-0.5">
-        <p>
-          Belum punya akun?
-          <router-link to="/register" class="font-bold text-[#1D70F5] hover:text-[#155FD1] hover:underline ml-1">
-            Daftar di sini
-          </router-link>
-        </p>
-        <p class="text-neutral-400 dark:text-slate-500 text-[10px]">
-          &copy; {{ new Date().getFullYear() }} SCM Supply Chain Management
-        </p>
-      </div>
-
+      <p class="text-center text-sm text-gray-500 dark:text-slate-400">
+        Belum punya akun?
+        <router-link to="/register" class="font-medium text-gray-900 dark:text-white hover:underline">Daftar</router-link>
+      </p>
+      <p class="text-center text-xs text-gray-400 dark:text-slate-500">
+        &copy; {{ new Date().getFullYear() }} Supply Chain Management
+      </p>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import { useTheme } from '@/composables/useTheme';
-import { Eye, EyeOff, Moon, Sun, CheckCircle2, Check } from 'lucide-vue-next';
+import { Eye, EyeOff, Moon, Sun } from 'lucide-vue-next';
 import axios from 'axios';
 
+const route = useRoute();
 const router = useRouter();
 const { login, verifyWaOtp, checkAuth } = useAuth();
 const { isDark, toggleDarkMode, initTheme } = useTheme();
@@ -346,11 +276,11 @@ function onOtpInput(event) {
   }
 }
 
+// Berhasil masuk: tombol tetap "Memproses...", kartu memudar singkat lalu pindah ke halaman tujuan
+// (halaman yang tadi diminta sebelum diarahkan ke login, atau dashboard)
 async function triggerSuccessRedirect() {
   errorMessage.value = '';
-  successMessage.value = 'Login berhasil! Mengalihkan ke dashboard...';
-  isLoginSuccess.value = true;
-  loading.value = false;
+  successMessage.value = '';
 
   try {
     await checkAuth();
@@ -358,9 +288,13 @@ async function triggerSuccessRedirect() {
     // proceed anyway
   }
 
+  isLoginSuccess.value = true;
+  const redirect = route.query.redirect;
+  const target = typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/dashboard';
+
   setTimeout(() => {
-    router.push('/dashboard');
-  }, 250);
+    router.replace(target);
+  }, 200);
 }
 
 // ===== 1. EMAIL & PASSWORD SUBMIT =====

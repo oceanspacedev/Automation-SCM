@@ -870,7 +870,7 @@ const defaultProgramsList = ref([
 
 const programRadioSelection = ref('');
 
-// Area form diambil dari URL (/form/jateng); /form-realme & /form-submission tetap Jawa Barat
+// Area form diambil dari URL (/form/jabar, /form/jateng)
 const { area } = useArea();
 
 const regionOptions = ref(area.value.value === 'jabar' ? [

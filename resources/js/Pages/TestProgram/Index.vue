@@ -12,16 +12,16 @@
     <AreaTabs />
 
     <!-- Header Page -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-      <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Form Program {{ area.label }}</h1>
+    <div class="flex items-start sm:items-center justify-between gap-3">
+      <div class="min-w-0">
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Form Program {{ area.label }}</h1>
         <p class="text-xs text-gray-500 mt-0.5">
           Daftar hasil inputan pengajuan program {{ area.label }} dari formulir web.
         </p>
       </div>
 
       <!-- Action Dropdown -->
-      <div class="relative" ref="dropdownRef">
+      <div class="relative shrink-0" ref="dropdownRef">
         <button
           type="button"
           @click="isDropdownOpen = !isDropdownOpen"
@@ -91,13 +91,13 @@
           <span>Total: {{ pagination.total }} data</span>
         </div>
 
-        <div class="flex items-center gap-2">
-          <!-- Toggle Kolom Finansial (Hidden by default) -->
+        <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+          <!-- Toggle Kolom Finansial (Hidden by default); di layar kecil data tampil sebagai kartu -->
           <button
             type="button"
             @click="showFinancialColumns = !showFinancialColumns"
             :class="showFinancialColumns ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 hover:bg-gray-50 border-gray-300'"
-            class="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg border text-xs font-medium shadow-2xs transition cursor-pointer shrink-0"
+            class="hidden md:inline-flex h-9 px-3 items-center gap-1.5 rounded-lg border text-xs font-medium shadow-2xs transition cursor-pointer shrink-0"
             :title="showFinancialColumns ? 'Sembunyikan 11 kolom finansial' : 'Tampilkan 11 kolom finansial di tabel'"
           >
             <EyeOffIcon v-if="showFinancialColumns" class="w-3.5 h-3.5" />
@@ -106,7 +106,7 @@
           </button>
 
           <!-- Region Filter -->
-          <div class="relative min-w-[140px]">
+          <div class="relative sm:min-w-[140px] order-2 sm:order-none">
             <select
               v-model="selectedRegion"
               @change="applyFilters"
@@ -139,8 +139,41 @@
         </div>
       </div>
 
+      <!-- Layar kecil: satu kartu per pengajuan -->
+      <div class="md:hidden">
+        <p v-if="isLoading" class="py-8 text-center text-xs text-gray-500">Memuat data...</p>
+        <p v-else-if="items.length === 0" class="py-8 text-center text-xs text-gray-500">Belum ada data inputan form.</p>
+        <ul v-else class="divide-y divide-gray-100">
+          <li v-for="item in items" :key="item.id" class="p-4 space-y-2 text-xs text-gray-700">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-gray-900 break-words">{{ item.dealer_name || '-' }}</p>
+                <p class="mt-0.5 text-gray-500">{{ item.id_real || '-' }} · {{ item.region || '-' }}</p>
+              </div>
+              <button
+                type="button"
+                @click="openFinancialModal(item)"
+                class="h-8 px-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium transition cursor-pointer shrink-0"
+              >
+                {{ analyzingRowIds.has(item.id) ? 'Menganalisis...' : 'Lihat' }}
+              </button>
+            </div>
+            <p class="text-gray-900 break-words">{{ item.program_name || '-' }}</p>
+            <p class="text-gray-500">{{ item.sales_name || '-' }} · {{ item.submission_timestamp || '-' }}</p>
+            <div class="flex items-center gap-4">
+              <a v-if="item.credit_note_url" :href="item.credit_note_url" target="_blank" rel="noopener noreferrer" class="text-gray-900 underline">CN</a>
+              <span v-else class="text-gray-400">CN (-)</span>
+              <a v-if="item.agreement_url" :href="item.agreement_url" target="_blank" rel="noopener noreferrer" class="text-gray-900 underline">Agreement</a>
+              <span v-else class="text-gray-400">Agreement (-)</span>
+              <a v-if="item.tax_invoice_url" :href="item.tax_invoice_url" target="_blank" rel="noopener noreferrer" class="text-gray-900 underline">Faktur</a>
+              <span v-else class="text-gray-400">Faktur (-)</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+
       <!-- Plain Ordinary Table (No colors, No AI styling) -->
-      <div class="overflow-x-auto">
+      <div class="hidden md:block overflow-x-auto">
         <table class="w-full text-left text-xs text-gray-900 border-collapse">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">
@@ -363,7 +396,7 @@
             class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 disabled:opacity-40 transition cursor-pointer flex items-center gap-1"
           >
             <ChevronLeftIcon class="w-3.5 h-3.5" />
-            <span>Sebelumnya</span>
+            <span class="hidden sm:inline">Sebelumnya</span>
           </button>
 
           <span class="px-2 font-medium text-gray-900">
@@ -376,7 +409,7 @@
             :disabled="pagination.currentPage >= pagination.lastPage || isLoading"
             class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 disabled:opacity-40 transition cursor-pointer flex items-center gap-1"
           >
-            <span>Selanjutnya</span>
+            <span class="hidden sm:inline">Selanjutnya</span>
             <ChevronRightIcon class="w-3.5 h-3.5" />
           </button>
         </div>
@@ -498,149 +531,69 @@
       @click.self="isFinancialModalOpen = false"
     >
       <div
-        class="bg-white rounded-2xl shadow-xl border border-gray-200 max-w-4xl w-full p-6 space-y-4 animate-in zoom-in-95 duration-150"
+        class="bg-white rounded-xl shadow-xl border border-gray-200 max-w-2xl w-full flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150"
         role="dialog"
         aria-modal="true"
       >
-        <div class="flex items-start justify-between pb-3 border-b border-gray-100">
-          <div>
-            <div class="flex items-center gap-2">
-              <h3 class="text-base font-bold text-gray-900">Detail Finansial & Pajak</h3>
-              <span v-if="analyzingRowIds.has(selectedItem.id)" class="inline-flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-medium">
-                <RefreshCwIcon class="w-3 h-3 animate-spin" />
-                Menganalisis AI...
-              </span>
-            </div>
-            <p class="text-xs text-gray-500 mt-1">
-              Dealer: <strong class="text-gray-900">{{ selectedItem.dealer_name || '-' }}</strong>
-              <span v-if="selectedItem.id_real" class="text-gray-400"> ({{ selectedItem.id_real }})</span>
-              &bull; Program: <strong class="text-gray-800">{{ selectedItem.program_name || '-' }}</strong>
-              &bull; Region: {{ selectedItem.region || '-' }}
+        <!-- Header -->
+        <div class="px-6 pt-5 pb-4 border-b border-gray-100 flex items-start justify-between gap-4 shrink-0">
+          <div class="min-w-0">
+            <h3 class="text-base font-semibold text-gray-950">
+              Detail Finansial & Pajak
+              <span v-if="analyzingRowIds.has(selectedItem.id)" class="ml-1.5 text-xs font-normal text-amber-600">Menganalisis AI…</span>
+            </h3>
+            <p class="mt-0.5 text-xs text-gray-500 truncate">
+              {{ selectedItem.dealer_name || '-' }}<template v-if="selectedItem.id_real"> · {{ selectedItem.id_real }}</template>
+              · {{ selectedItem.program_name || '-' }}<template v-if="selectedItem.region"> · {{ selectedItem.region }}</template>
             </p>
           </div>
-          <div class="flex items-center gap-2">
-            <button
-              type="button"
-              @click="analyzeRowWithAi(selectedItem)"
-              :disabled="analyzingRowIds.has(selectedItem.id)"
-              class="h-8 px-3 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium transition cursor-pointer shadow-2xs disabled:opacity-50"
-              title="Analisis dokumen baris ini dengan AI sekarang"
-            >
-              <RefreshCwIcon v-if="analyzingRowIds.has(selectedItem.id)" class="w-3.5 h-3.5 animate-spin text-gray-500" />
-              <BotIcon v-else class="w-3.5 h-3.5 text-gray-600" />
-              <span>{{ analyzingRowIds.has(selectedItem.id) ? 'Menganalisis...' : 'Analisis AI Ulang' }}</span>
-            </button>
-            <button
-              type="button"
-              @click="isFinancialModalOpen = false"
-              class="p-1.5 text-gray-400 hover:text-gray-600 rounded-md transition cursor-pointer"
-            >
-              <XIcon class="w-4 h-4" />
-            </button>
+          <button type="button" @click="isFinancialModalOpen = false" class="p-1 -m-1 text-gray-400 hover:text-gray-700 cursor-pointer shrink-0" title="Tutup">
+            <XIcon class="w-4 h-4" />
+          </button>
+        </div>
+
+        <div class="px-6 py-5 space-y-5 overflow-y-auto text-xs">
+          <!-- Ringkasan -->
+          <dl class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3">
+            <div v-for="item in financialSummary(selectedItem)" :key="item.label" class="min-w-0">
+              <dt class="text-gray-500">{{ item.label }}</dt>
+              <dd class="mt-0.5 text-gray-900 truncate" :title="item.value">{{ item.value || '-' }}</dd>
+            </div>
+          </dl>
+
+          <!-- Rincian Finansial & Pajak -->
+          <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 border-t border-gray-100">
+            <div v-for="row in financialRows(selectedItem)" :key="row.label" class="flex items-center justify-between gap-4 py-2.5 border-b border-gray-100">
+              <dt class="text-gray-500">{{ row.label }}</dt>
+              <dd class="text-gray-900 text-right">{{ row.value }}</dd>
+            </div>
+          </dl>
+
+          <!-- Dokumen -->
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span class="text-gray-500">Dokumen</span>
+            <template v-for="doc in financialDocuments(selectedItem)" :key="doc.label">
+              <a v-if="doc.url" :href="doc.url" target="_blank" rel="noopener noreferrer" class="text-gray-900 underline hover:text-gray-600">{{ doc.label }}</a>
+              <span v-else class="text-gray-400">{{ doc.label }} (-)</span>
+            </template>
           </div>
         </div>
 
-        <!-- Ringkasan Status Dokumen & Potong -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-          <div class="p-2.5 rounded-lg bg-gray-50 border border-gray-200">
-            <span class="text-gray-500 text-[11px] block">Status Potong Purchase:</span>
-            <span class="font-semibold text-gray-900">{{ selectedItem.status_potong_purchase || '-' }}</span>
-          </div>
-          <div class="p-2.5 rounded-lg bg-gray-50 border border-gray-200">
-            <span class="text-gray-500 text-[11px] block">Cek Dokumen:</span>
-            <span class="font-semibold text-gray-900">{{ selectedItem.cek_dokumen || '-' }}</span>
-          </div>
-          <div class="p-2.5 rounded-lg bg-gray-50 border border-gray-200">
-            <span class="text-gray-500 text-[11px] block">Sales (DM):</span>
-            <span class="font-semibold text-gray-900">{{ selectedItem.sales_name || '-' }}</span>
-          </div>
-          <div class="p-2.5 rounded-lg bg-gray-50 border border-gray-200">
-            <span class="text-gray-500 text-[11px] block">Waktu Submit:</span>
-            <span class="font-semibold text-gray-900">{{ selectedItem.submission_timestamp || '-' }}</span>
-          </div>
-        </div>
-
-        <!-- Tabel 11 Kolom Finansial & Pajak -->
-        <div class="space-y-1.5">
-          <label class="text-xs font-semibold text-gray-900 block">Tabel Rincian Finansial & Pajak</label>
-          <div class="overflow-x-auto border border-gray-200 rounded-xl shadow-2xs">
-            <table class="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">
-                  <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200">Incentive</th>
-                  <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200">DPP</th>
-                  <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200">DPP Lain</th>
-                  <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200">PPN</th>
-                  <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200">Nilai PPh</th>
-                  <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200">Net Pay</th>
-                  <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200">Cek Pajak</th>
-                  <th scope="col" class="py-2.5 px-3 text-right border-r border-gray-200">Selisih</th>
-                  <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Note PPh</th>
-                  <th scope="col" class="py-2.5 px-3 border-r border-gray-200">No Faktur</th>
-                  <th scope="col" class="py-2.5 px-3">Tgl Faktur</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100 bg-white">
-                <tr class="whitespace-nowrap font-normal">
-                  <td class="py-3 px-3 text-right border-r border-gray-100 font-semibold text-gray-900">
-                    {{ formatRupiah(selectedItem.incentive) }}
-                  </td>
-                  <td class="py-3 px-3 text-right border-r border-gray-100 text-gray-800">
-                    {{ formatRupiah(selectedItem.dpp) }}
-                  </td>
-                  <td class="py-3 px-3 text-right border-r border-gray-100 text-gray-800">
-                    {{ formatRupiah(selectedItem.dpp_lain) }}
-                  </td>
-                  <td class="py-3 px-3 text-right border-r border-gray-100 text-gray-800">
-                    {{ formatRupiah(selectedItem.ppn) }}
-                  </td>
-                  <td class="py-3 px-3 text-right border-r border-gray-100 text-gray-800">
-                    {{ formatRupiah(selectedItem.nilai_pph) }}
-                  </td>
-                  <td class="py-3 px-3 text-right border-r border-gray-100 font-bold text-gray-950">
-                    {{ formatRupiah(selectedItem.net_pay) }}
-                  </td>
-                  <td class="py-3 px-3 text-right border-r border-gray-100 text-gray-800">
-                    {{ formatRupiah(selectedItem.cek_pajak_tarif_pph) }}
-                  </td>
-                  <td class="py-3 px-3 text-right border-r border-gray-100">
-                    <span v-if="selectedItem.selisih === 0 || selectedItem.selisih === '0' || selectedItem.selisih === 0.0" class="text-gray-400">0</span>
-                    <span v-else-if="selectedItem.selisih !== null && selectedItem.selisih !== undefined">{{ formatRupiah(selectedItem.selisih) }}</span>
-                    <span v-else class="text-gray-300">-</span>
-                  </td>
-                  <td class="py-3 px-3 text-center border-r border-gray-100 text-gray-700">
-                    {{ selectedItem.note_pph || '-' }}
-                  </td>
-                  <td class="py-3 px-3 border-r border-gray-100">
-                    {{ selectedItem.no_faktur || '-' }}
-                  </td>
-                  <td class="py-3 px-3 text-gray-800">
-                    {{ selectedItem.tgl_faktur || '-' }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- Dokumen Pendukung Links -->
-        <div class="pt-2 flex items-center justify-between text-xs border-t border-gray-100">
-          <div class="flex items-center gap-3">
-            <span class="text-gray-500 font-medium">Dokumen:</span>
-            <a v-if="selectedItem.credit_note_url" :href="selectedItem.credit_note_url" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline hover:text-blue-800">Lihat CN</a>
-            <span v-else class="text-gray-400">CN (-)</span>
-
-            <a v-if="selectedItem.agreement_url" :href="selectedItem.agreement_url" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline hover:text-blue-800">Lihat Agr</a>
-            <span v-else class="text-gray-400">Agr (-)</span>
-
-            <a v-if="selectedItem.tax_invoice_url" :href="selectedItem.tax_invoice_url" target="_blank" rel="noopener noreferrer" class="text-blue-600 underline hover:text-blue-800">Lihat Faktur</a>
-            <span v-else class="text-gray-400">Faktur (-)</span>
-          </div>
-
+        <!-- Footer -->
+        <div class="px-6 py-3.5 border-t border-gray-100 flex items-center justify-between gap-2 text-xs shrink-0">
+          <button
+            type="button"
+            @click="analyzeRowWithAi(selectedItem)"
+            :disabled="analyzingRowIds.has(selectedItem.id)"
+            class="h-8 px-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium transition cursor-pointer disabled:opacity-50"
+            title="Analisis dokumen pengajuan ini dengan AI sekarang"
+          >
+            {{ analyzingRowIds.has(selectedItem.id) ? 'Menganalisis...' : 'Analisis AI Ulang' }}
+          </button>
           <button
             type="button"
             @click="isFinancialModalOpen = false"
-            class="px-4 h-8 text-xs font-medium rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 transition cursor-pointer"
+            class="h-8 px-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium transition cursor-pointer"
           >
             Tutup
           </button>
@@ -669,15 +622,14 @@ import {
   MoreHorizontal as MoreHorizontalIcon,
   Eye as EyeIcon,
   EyeOff as EyeOffIcon,
-  Bot as BotIcon,
 } from 'lucide-vue-next';
 import { useArea, DEFAULT_AREA } from '@/composables/useArea';
 
 // ===== AREA (Jabar/Jateng) =====
 const { area } = useArea();
 const isDefaultArea = area.value.value === DEFAULT_AREA;
-// Jabar tetap memakai link form lama agar link yang sudah tersebar tidak berubah
-const publicFormUrl = isDefaultArea ? '/form-submission' : `/form/${area.value.value}`;
+// Form publik per area: /form/jabar, /form/jateng (link lama /form-submission diarahkan ke /form/jabar)
+const publicFormUrl = `/form/${area.value.value}`;
 
 // ===== DROPDOWN =====
 const isDropdownOpen = ref(false);
@@ -700,6 +652,42 @@ function formatRupiah(val) {
   const num = Number(val);
   if (isNaN(num)) return '-';
   return 'Rp ' + Math.round(num).toLocaleString('id-ID');
+}
+
+// Isi modal Detail Finansial & Pajak
+function financialSummary(item) {
+  return [
+    { label: 'Status potong', value: item.status_potong_purchase },
+    { label: 'Cek dokumen', value: item.cek_dokumen },
+    { label: 'Sales (DM)', value: item.sales_name },
+    { label: 'Waktu submit', value: item.submission_timestamp },
+  ];
+}
+
+function financialRows(item) {
+  const selisih = item.selisih === null || item.selisih === undefined || item.selisih === '' ? '-' : Number(item.selisih) === 0 ? '0' : formatRupiah(item.selisih);
+
+  return [
+    { label: 'Incentive', value: formatRupiah(item.incentive) },
+    { label: 'DPP', value: formatRupiah(item.dpp) },
+    { label: 'DPP Lain', value: formatRupiah(item.dpp_lain) },
+    { label: 'PPN', value: formatRupiah(item.ppn) },
+    { label: 'Nilai PPh', value: formatRupiah(item.nilai_pph) },
+    { label: 'Net Pay', value: formatRupiah(item.net_pay) },
+    { label: 'Cek Pajak', value: formatRupiah(item.cek_pajak_tarif_pph) },
+    { label: 'Selisih', value: selisih },
+    { label: 'Note PPh', value: item.note_pph || '-' },
+    { label: 'No Faktur', value: item.no_faktur || '-' },
+    { label: 'Tgl Faktur', value: item.tgl_faktur || '-' },
+  ];
+}
+
+function financialDocuments(item) {
+  return [
+    { label: 'Credit Note', url: item.credit_note_url },
+    { label: 'Agreement', url: item.agreement_url },
+    { label: 'Faktur Pajak', url: item.tax_invoice_url },
+  ];
 }
 
 function openFinancialModal(item) {

@@ -11,17 +11,18 @@
 
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-      <div>
-        <div class="flex items-center gap-2.5">
-          <h1 class="text-2xl font-bold tracking-tight text-gray-950">Invoices</h1>
+      <div class="min-w-0">
+        <!-- Layar kecil: badge Google turun ke baris berikutnya bila tidak muat -->
+        <div class="flex flex-wrap md:flex-nowrap items-center gap-x-2.5 gap-y-1">
+          <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Invoices</h1>
           <!-- Google Connection Status Badge -->
           <span
             v-if="googleStatus.is_connected"
-            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-normal bg-gray-50 text-gray-600 border border-gray-200"
+            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-normal bg-gray-50 text-gray-600 border border-gray-200 max-w-full"
             :title="`Terhubung dengan akun Google: ${googleStatus.account_email}`"
           >
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-            <span>Gmail: {{ googleStatus.account_email }}</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+            <span class="truncate">Gmail: {{ googleStatus.account_email }}</span>
           </span>
           <a
             v-else
@@ -36,22 +37,23 @@
         <p class="text-xs text-gray-500 mt-0.5">Daftar invoice resmi yang telah diterbitkan.</p>
       </div>
 
-      <!-- Filament Page Actions -->
-      <div class="flex items-center gap-2">
+      <!-- Filament Page Actions; di layar kecil dua tombol sama lebar dengan label pendek -->
+      <div class="grid grid-cols-2 sm:flex sm:items-center gap-2">
         <!-- Multi-select Send Button -->
         <button
           v-if="selectedIds.length > 0"
           @click="askSendBatch"
           :disabled="sendingBatch"
-          class="h-9 px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center gap-2"
+          class="h-9 px-2 sm:px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap"
           :title="`Kirim ${selectedIds.length} invoice terpilih`"
         >
           <svg v-if="sendingBatch" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <SendIcon v-else class="w-3.5 h-3.5 text-gray-500" />
-          <span>{{ sendingBatch ? 'Mengirim...' : `Kirim (${selectedIds.length}) Terpilih` }}</span>
+          <SendIcon v-else class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
+          <span class="sm:hidden">{{ sendingBatch ? 'Mengirim...' : `Kirim (${selectedIds.length})` }}</span>
+          <span class="hidden sm:inline">{{ sendingBatch ? 'Mengirim...' : `Kirim (${selectedIds.length}) Terpilih` }}</span>
         </button>
 
         <!-- Send All Button (when nothing specifically selected) -->
@@ -59,22 +61,23 @@
           v-else
           @click="askSendAll"
           :disabled="sendingAll"
-          class="h-9 px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center gap-2"
+          class="h-9 px-2 sm:px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg shadow-2xs disabled:opacity-50 transition cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap"
           title="Kirim semua invoice yang belum terkirim via Email & WhatsApp"
         >
           <svg v-if="sendingAll" class="animate-spin -ml-0.5 h-3.5 w-3.5 text-gray-500" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <SendIcon v-else class="w-3.5 h-3.5 text-gray-500" />
-          <span>{{ sendingAll ? 'Mengirim Semua...' : 'Kirim Semua Notifikasi' }}</span>
+          <SendIcon v-else class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
+          <span class="sm:hidden">{{ sendingAll ? 'Mengirim...' : 'Kirim Semua' }}</span>
+          <span class="hidden sm:inline">{{ sendingAll ? 'Mengirim Semua...' : 'Kirim Semua Notifikasi' }}</span>
         </button>
 
         <router-link
           to="/drafts"
-          class="h-9 px-3 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center gap-1.5 shadow-2xs"
+          class="h-9 px-2 sm:px-3 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 shadow-2xs whitespace-nowrap"
         >
-          <ArrowLeftIcon class="w-3.5 h-3.5 text-gray-500" />
+          <ArrowLeftIcon class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
           <span>Draft Invoice</span>
         </router-link>
       </div>
@@ -94,8 +97,8 @@
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
       <!-- Toolbar (Search & Filter like Filament) -->
       <div class="p-3 sm:px-4 sm:py-3.5 border-b border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <!-- Left: Quick Selection Info -->
-        <div class="flex items-center gap-2 text-xs">
+        <!-- Left: Quick Selection Info; teks keterangan disembunyikan di layar kecil -->
+        <div class="flex items-center gap-2 text-xs" :class="selectedIds.length === 0 && 'hidden sm:flex'">
           <span v-if="selectedIds.length > 0" class="font-medium text-gray-900 bg-gray-100 px-2.5 py-1 rounded-md">
             {{ selectedIds.length }} invoice terpilih
           </span>
@@ -200,8 +203,101 @@
         </div>
       </div>
 
+      <!-- Layar kecil: satu kartu per invoice -->
+      <div class="md:hidden">
+        <div v-if="loading" class="py-8 text-center text-xs text-gray-500">Memuat data invoice...</div>
+        <div v-else-if="invoices.length === 0" class="py-8 px-4 text-center text-xs text-gray-500">
+          Belum ada invoice yang dibuat. Silakan generate invoice dari menu <strong>Draft</strong>.
+        </div>
+        <template v-else>
+          <label v-if="selectableInvoices.length > 0" class="px-4 py-2.5 border-b border-gray-100 flex items-center gap-3 text-xs text-gray-600 cursor-pointer">
+            <input
+              type="checkbox"
+              :checked="isAllSelected"
+              :indeterminate="isIndeterminate"
+              @change="toggleSelectAll"
+              class="rounded border-gray-300 text-gray-900 focus:ring-0 w-4 h-4 cursor-pointer"
+            />
+            <span>Pilih semua yang belum dikirim</span>
+          </label>
+
+          <ul class="divide-y divide-gray-100">
+            <li
+              v-for="inv in invoices"
+              :key="inv.id"
+              class="p-4 flex gap-3 text-xs text-gray-700"
+              :class="selectedIds.includes(inv.id) && 'bg-gray-50'"
+            >
+              <input
+                type="checkbox"
+                :value="inv.id"
+                v-model="selectedIds"
+                :disabled="isAlreadySent(inv) || !hasDestination(inv)"
+                class="mt-0.5 rounded border-gray-300 text-gray-900 focus:ring-0 w-4 h-4 cursor-pointer disabled:opacity-30 shrink-0"
+              />
+              <div class="flex-1 min-w-0 space-y-2">
+                <div class="flex items-start justify-between gap-3">
+                  <router-link :to="`/invoices/${inv.id}`" class="min-w-0">
+                    <p class="text-sm font-medium text-gray-900 break-words">{{ inv.invoice_number }}</p>
+                    <p class="mt-0.5 text-gray-500">{{ inv.invoice_type || '-' }} · {{ inv.invoice_date || '-' }}</p>
+                  </router-link>
+                  <p class="text-sm font-semibold text-gray-950 whitespace-nowrap shrink-0">{{ formatCurrency(inv.netpay) }}</p>
+                </div>
+
+                <p class="text-gray-800 truncate">{{ inv.dealer_code }} - {{ inv.dealer_name }}</p>
+                <p class="text-gray-500 truncate">{{ inv.customer_name || '-' }}</p>
+
+                <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                  <span class="inline-flex items-center gap-1.5 text-gray-900">
+                    <span
+                      class="w-1.5 h-1.5 rounded-full"
+                      :class="inv.status === 'sent' ? 'bg-emerald-500' : (inv.status === 'paid' ? 'bg-blue-500' : (inv.status === 'cancelled' ? 'bg-rose-500' : 'bg-gray-400'))"
+                    ></span>
+                    {{ inv.status === 'sent' ? 'DELIVERED' : (inv.status ? inv.status.toUpperCase() : 'GENERATED') }}
+                  </span>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <router-link
+                      :to="`/invoices/${inv.id}`"
+                      class="h-8 px-2.5 inline-flex items-center rounded-lg border border-gray-300 bg-white text-gray-700 font-medium"
+                    >
+                      Lihat
+                    </router-link>
+                    <a
+                      :href="`/invoices/${inv.id}/pdf`"
+                      target="_blank"
+                      class="h-8 px-2.5 inline-flex items-center rounded-lg border border-gray-300 bg-white text-gray-700 font-medium"
+                    >
+                      PDF
+                    </a>
+                    <span
+                      v-if="isAlreadySent(inv)"
+                      class="h-8 px-2.5 inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 text-gray-400 font-medium select-none"
+                    >
+                      Terkirim
+                    </span>
+                    <button
+                      v-else
+                      type="button"
+                      @click="openEmailModal(inv)"
+                      class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
+                    >
+                      Kirim
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </li>
+          </ul>
+
+          <div class="px-4 py-3 border-t border-gray-200 bg-gray-50/80 flex items-center justify-between gap-3 text-xs">
+            <span class="font-semibold text-gray-900">Total Netpay (Halaman ini)</span>
+            <span class="font-semibold text-gray-950 whitespace-nowrap">{{ formatCurrency(totalNetpay) }}</span>
+          </div>
+        </template>
+      </div>
+
       <!-- Table: Styled identically to Test Program for clean spreadsheet look -->
-      <div class="overflow-x-auto">
+      <div class="hidden md:block overflow-x-auto">
         <table class="w-full text-left text-xs text-gray-900 border-collapse">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">

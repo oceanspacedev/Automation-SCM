@@ -10,27 +10,28 @@
     <!-- Header Page -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Master Customer</h1>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Master Customer</h1>
         <p class="text-xs text-gray-500 mt-0.5">
           Daftar entitas badan usaha/hukum, NPWP, dan alamat resmi Bill-To faktur.
         </p>
       </div>
 
-      <div class="flex items-center gap-2">
+      <!-- Tombol aksi; di layar kecil dua tombol sama lebar dengan label pendek -->
+      <div class="grid grid-cols-2 sm:flex sm:items-center gap-2">
         <button
           type="button"
           @click="downloadExport('/api/customers/export', { search: searchQuery, is_active: filterStatus })"
-          class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
+          class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
           title="Export customer sesuai pencarian & filter"
         >
-          <span>Export Excel</span>
+          <span class="sm:hidden">Export</span><span class="hidden sm:inline">Export Excel</span>
         </button>
         <button
           type="button"
           @click="openCreateModal"
-          class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
+          class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
         >
-          <span>Tambah Customer</span>
+          <span class="sm:hidden">Tambah</span><span class="hidden sm:inline">Tambah Customer</span>
         </button>
       </div>
     </div>
@@ -43,9 +44,10 @@
           <span>Total: {{ totalRows }} data</span>
         </div>
 
-        <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        <!-- Filter & pencarian; di layar kecil cari di atas, status di bawahnya -->
+        <div class="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-nowrap">
           <!-- Status Filter -->
-          <div class="relative min-w-[140px]">
+          <div class="relative min-w-[140px] col-span-2">
             <select
               v-model="filterStatus"
               @change="fetchCustomers(1)"
@@ -59,7 +61,7 @@
           </div>
 
           <!-- Search Input -->
-          <div class="relative w-full sm:w-64">
+          <div class="relative w-full sm:w-64 col-span-2 order-first sm:order-none">
             <SearchIcon class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
             <input
               type="text"
@@ -80,8 +82,48 @@
         </div>
       </div>
 
+      <!-- Layar kecil: satu kartu per customer -->
+      <div class="md:hidden">
+        <p v-if="isLoading" class="py-8 text-center text-xs text-gray-500">Memuat data...</p>
+        <p v-else-if="customers.length === 0" class="py-8 px-4 text-center text-xs text-gray-500">Tidak ada data customer yang ditemukan.</p>
+        <ul v-else class="divide-y divide-gray-100">
+          <li v-for="c in customers" :key="c.id" class="p-4 space-y-2 text-xs text-gray-700">
+            <div class="flex items-start justify-between gap-3">
+              <p class="min-w-0 text-sm font-medium text-gray-900 break-words">{{ c.code || '-' }} · {{ c.name || '-' }}</p>
+              <button
+                type="button"
+                @click="toggleCustomerStatus(c)"
+                class="text-xs hover:underline cursor-pointer shrink-0"
+                :class="c.is_active ? 'text-gray-700' : 'text-gray-400'"
+              >
+                {{ c.is_active ? 'Aktif' : 'Nonaktif' }}
+              </button>
+            </div>
+            <div class="flex items-center justify-between gap-3">
+              <p class="min-w-0 text-gray-500 break-words">NPWP {{ c.npwp && c.npwp !== '-' ? c.npwp : '-' }}</p>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  @click="openEditModal(c)"
+                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  @click="confirmDelete(c)"
+                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer"
+                >
+                  Hapus
+                </button>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
       <!-- Plain Ordinary Table (Uniform Font & Style) -->
-      <div class="overflow-x-auto">
+      <div class="hidden md:block overflow-x-auto">
         <table class="w-full text-left text-xs text-gray-900 border-collapse">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">
@@ -180,8 +222,9 @@
         v-if="totalRows > 0"
         class="p-3 sm:px-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-600"
       >
+        <!-- Layar kecil: label "Menampilkan" disembunyikan agar tidak melebar -->
         <div class="flex items-center gap-2">
-          <span>Menampilkan {{ fromRow }} - {{ toRow }} dari {{ totalRows }} data</span>
+          <span><span class="hidden sm:inline">Menampilkan </span>{{ fromRow }} - {{ toRow }} dari {{ totalRows }} data</span>
           <select
             v-model="perPage"
             @change="fetchCustomers(1)"

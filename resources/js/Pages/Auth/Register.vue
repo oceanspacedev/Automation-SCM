@@ -1,169 +1,150 @@
 <template>
-  <div class="min-h-screen flex flex-col justify-center items-center bg-white px-4 py-12 sm:px-6 font-sans">
-    <div class="w-full max-w-[420px] space-y-6">
-      <!-- Logo & Header -->
-      <div class="text-center space-y-2">
-        <img
-          src="/images/scm-logo.png"
-          alt="SCM"
-          class="h-10 sm:h-11 w-auto mx-auto object-contain mb-2"
-        />
-        <h1 class="text-2xl font-bold tracking-tight text-neutral-900">
-          {{ isSuccess ? 'Pendaftaran Berhasil' : 'Daftar Akun Baru' }}
-        </h1>
-        <p class="text-sm text-neutral-500">
-          {{ isSuccess ? 'Akun Anda sedang menunggu persetujuan (ACC) oleh Admin' : 'Lengkapi formulir berikut untuk membuat akun SCM' }}
-        </p>
-      </div>
-
-      <!-- SUCCESS SCREEN (Clean, No Slop) -->
-      <div v-if="isSuccess" class="space-y-4 pt-2">
-        <router-link
-          to="/login"
-          class="h-10 w-full rounded-lg bg-[#1D70F5] hover:bg-blue-600 text-white text-sm font-medium transition flex items-center justify-center cursor-pointer shadow-xs"
-        >
-          Kembali ke Halaman Login
-        </router-link>
-      </div>
-
-      <!-- REGISTRATION FORM -->
-      <div v-else class="space-y-4">
-        <!-- Error Message -->
-        <div
-          v-if="errorMessage"
-          class="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800 flex items-center justify-between"
-        >
-          <span>{{ errorMessage }}</span>
-          <button
-            type="button"
-            @click="errorMessage = ''"
-            class="text-red-500 hover:text-red-900 cursor-pointer font-bold ml-2 text-base"
-          >
-            &times;
-          </button>
+  <div class="min-h-screen flex flex-col justify-center items-center bg-gray-50 dark:bg-[#0B1120] text-gray-900 dark:text-slate-100 px-4 py-8 font-sans transition-colors">
+    <div class="w-full max-w-md space-y-4">
+      <div class="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm p-6 sm:p-7">
+        <!-- Judul -->
+        <div class="mb-6">
+          <h1 class="text-lg font-semibold tracking-tight text-gray-950 dark:text-white">
+            {{ isSuccess ? 'Pendaftaran berhasil' : 'Daftar akun' }}
+          </h1>
+          <p class="mt-1 text-sm text-gray-500 dark:text-slate-400">
+            {{ isSuccess ? 'Akun Anda menunggu persetujuan (ACC) dari admin.' : 'Lengkapi data berikut untuk membuat akun SCM.' }}
+          </p>
         </div>
 
-        <form @submit.prevent="handleSubmit" class="space-y-3.5">
-          <!-- Nama Lengkap -->
-          <div>
-            <label for="reg-name" class="block text-xs font-medium text-neutral-700 mb-1">Nama Lengkap</label>
-            <input
-              id="reg-name"
-              v-model="form.name"
-              type="text"
-              required
-              placeholder="Contoh: Budi Santoso"
-              class="h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#1D70F5] focus:border-[#1D70F5] transition"
-            />
+        <!-- Berhasil daftar -->
+        <router-link
+          v-if="isSuccess"
+          to="/login"
+          class="w-full h-10 rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-gray-900 text-sm font-medium transition flex items-center justify-center"
+        >
+          Kembali ke halaman masuk
+        </router-link>
+
+        <!-- Formulir pendaftaran -->
+        <template v-else>
+          <div
+            v-if="errorMessage"
+            class="mb-4 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/40 px-3 py-2.5 text-xs text-red-700 dark:text-red-300 flex items-start justify-between gap-3"
+          >
+            <span>{{ errorMessage }}</span>
+            <button type="button" @click="errorMessage = ''" class="text-red-400 hover:text-red-700 dark:hover:text-red-200 cursor-pointer leading-none" aria-label="Tutup">&times;</button>
           </div>
 
-          <!-- Email -->
-          <div>
-            <label for="reg-email" class="block text-xs font-medium text-neutral-700 mb-1">Email</label>
-            <input
-              id="reg-email"
-              v-model="form.email"
-              type="email"
-              required
-              autocomplete="email"
-              placeholder="nama@email.com"
-              class="h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#1D70F5] focus:border-[#1D70F5] transition"
-            />
-          </div>
-
-          <!-- WhatsApp & Peran (2 Kolom) -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <form @submit.prevent="handleSubmit" class="space-y-4">
             <div>
-              <label for="reg-wa" class="block text-xs font-medium text-neutral-700 mb-1">No. WhatsApp</label>
+              <label for="reg-name" class="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Nama lengkap</label>
               <input
-                id="reg-wa"
-                v-model="form.whatsapp"
-                type="tel"
+                id="reg-name"
+                v-model="form.name"
+                type="text"
                 required
-                placeholder="08xxxxxxxxxx"
-                class="h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#1D70F5] focus:border-[#1D70F5] transition"
+                placeholder="Budi Santoso"
+                class="w-full h-10 px-3 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-slate-300 focus:border-gray-900 dark:focus:border-slate-300 transition"
               />
             </div>
 
             <div>
-              <label for="reg-role" class="block text-xs font-medium text-neutral-700 mb-1">Peran / Departemen</label>
-              <div class="relative">
-                <select
-                  id="reg-role"
-                  v-model="form.role"
+              <label for="reg-email" class="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Email</label>
+              <input
+                id="reg-email"
+                v-model="form.email"
+                type="email"
+                required
+                autocomplete="email"
+                placeholder="nama@email.com"
+                class="w-full h-10 px-3 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-slate-300 focus:border-gray-900 dark:focus:border-slate-300 transition"
+              />
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label for="reg-wa" class="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">No. WhatsApp</label>
+                <input
+                  id="reg-wa"
+                  v-model="form.whatsapp"
+                  type="tel"
                   required
-                  class="h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 pr-8 text-xs text-neutral-900 focus:outline-none focus:ring-1 focus:ring-[#1D70F5] focus:border-[#1D70F5] transition appearance-none cursor-pointer"
-                >
-                  <option value="scm">SCM</option>
-                  <option value="ar">AR</option>
-                  <option value="telemarketing">Telemarketing</option>
-                </select>
-                <ChevronDownIcon class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400" />
+                  placeholder="08xxxxxxxxxx"
+                  class="w-full h-10 px-3 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-slate-300 focus:border-gray-900 dark:focus:border-slate-300 transition"
+                />
+              </div>
+
+              <div>
+                <label for="reg-role" class="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Peran</label>
+                <div class="relative">
+                  <select
+                    id="reg-role"
+                    v-model="form.role"
+                    required
+                    class="w-full h-10 pl-3 pr-8 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-slate-300 focus:border-gray-900 dark:focus:border-slate-300 transition appearance-none cursor-pointer"
+                  >
+                    <option value="scm">SCM</option>
+                    <option value="ar">AR</option>
+                    <option value="telemarketing">Telemarketing</option>
+                  </select>
+                  <ChevronDownIcon class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Password -->
-          <div>
-            <label for="reg-password" class="block text-xs font-medium text-neutral-700 mb-1">Password</label>
-            <div class="relative">
+            <div>
+              <label for="reg-password" class="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Password</label>
+              <div class="relative">
+                <input
+                  id="reg-password"
+                  v-model="form.password"
+                  :type="showPassword ? 'text' : 'password'"
+                  required
+                  autocomplete="new-password"
+                  placeholder="Minimal 6 karakter"
+                  class="w-full h-10 pl-3 pr-10 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-slate-300 focus:border-gray-900 dark:focus:border-slate-300 transition"
+                />
+                <button
+                  type="button"
+                  @click="showPassword = !showPassword"
+                  class="absolute inset-y-0 right-0 w-10 flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-white cursor-pointer"
+                  tabindex="-1"
+                  :aria-label="showPassword ? 'Sembunyikan password' : 'Tampilkan password'"
+                >
+                  <EyeIcon v-if="!showPassword" class="h-4 w-4" />
+                  <EyeOffIcon v-else class="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label for="reg-password-confirm" class="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Konfirmasi password</label>
               <input
-                id="reg-password"
-                v-model="form.password"
+                id="reg-password-confirm"
+                v-model="form.password_confirmation"
                 :type="showPassword ? 'text' : 'password'"
                 required
                 autocomplete="new-password"
-                placeholder="Minimal 6 karakter"
-                class="h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 pr-10 text-xs text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#1D70F5] focus:border-[#1D70F5] transition"
+                placeholder="Ulangi password"
+                class="w-full h-10 px-3 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-slate-300 focus:border-gray-900 dark:focus:border-slate-300 transition"
               />
-              <button
-                type="button"
-                @click="showPassword = !showPassword"
-                class="absolute inset-y-0 right-0 pr-3 flex items-center text-neutral-400 hover:text-neutral-700 cursor-pointer"
-                tabindex="-1"
-              >
-                <EyeIcon v-if="!showPassword" class="h-4 w-4" />
-                <EyeOffIcon v-else class="h-4 w-4" />
-              </button>
             </div>
-          </div>
 
-          <!-- Konfirmasi Password -->
-          <div>
-            <label for="reg-password-confirm" class="block text-xs font-medium text-neutral-700 mb-1">Konfirmasi Password</label>
-            <input
-              id="reg-password-confirm"
-              v-model="form.password_confirmation"
-              :type="showPassword ? 'text' : 'password'"
-              required
-              autocomplete="new-password"
-              placeholder="Ulangi password"
-              class="h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-[#1D70F5] focus:border-[#1D70F5] transition"
-            />
-          </div>
-
-          <!-- Submit Button -->
-          <button
-            type="submit"
-            :disabled="loading"
-            class="h-10 w-full rounded-lg bg-[#1D70F5] hover:bg-blue-600 text-white text-sm font-medium transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:opacity-50"
-          >
-            <span v-if="loading" class="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-            <span>{{ loading ? 'Mendaftarkan...' : 'Daftar Akun' }}</span>
-          </button>
-        </form>
-
-        <div class="text-center text-xs text-neutral-600 pt-2 border-t border-neutral-100">
-          Sudah punya akun?
-          <router-link to="/login" class="font-semibold text-[#1D70F5] hover:underline ml-1">
-            Masuk di sini
-          </router-link>
-        </div>
+            <button
+              type="submit"
+              :disabled="loading"
+              class="w-full h-10 rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-gray-900 text-sm font-medium transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <span v-if="loading" class="h-4 w-4 border-2 border-white/30 dark:border-gray-900/30 border-t-white dark:border-t-gray-900 rounded-full animate-spin"></span>
+              <span>{{ loading ? 'Mendaftarkan...' : 'Daftar' }}</span>
+            </button>
+          </form>
+        </template>
       </div>
 
-      <div class="text-center text-xs text-neutral-400">
-        &copy; {{ new Date().getFullYear() }} SCM
-      </div>
+      <p v-if="!isSuccess" class="text-center text-sm text-gray-500 dark:text-slate-400">
+        Sudah punya akun?
+        <router-link to="/login" class="font-medium text-gray-900 dark:text-white hover:underline">Masuk</router-link>
+      </p>
+      <p class="text-center text-xs text-gray-400 dark:text-slate-500">
+        &copy; {{ new Date().getFullYear() }} Supply Chain Management
+      </p>
     </div>
   </div>
 </template>

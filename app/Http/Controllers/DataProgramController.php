@@ -433,7 +433,7 @@ class DataProgramController extends Controller
 
             $criteriaMatch = [
                 'region' => $matchedSubmission ? $this->reconciliationService->isRegionMatch($matchedSubmission->region, $dp->region, $dp->big_region) : false,
-                'kode_bt' => $matchedSubmission ? $this->reconciliationService->isBtMatch($matchedSubmission->id_real, $dp->kode_bt) : null,
+                'kode_bt' => $matchedSubmission ? $this->reconciliationService->isBtMatch($matchedSubmission->id_real, $dp->kode_bt, $dp->id_gs) : null,
                 'dealer' => $matchedSubmission ? ($this->reconciliationService->normalizeDealerName($matchedSubmission->dealer_name) === $this->reconciliationService->normalizeDealerName($dp->dealer_name)) : false,
                 'program' => $matchedSubmission ? ($this->reconciliationService->normalizeProgramName($matchedSubmission->program_name) === $this->reconciliationService->normalizeProgramName($dp->program_name)) : false,
                 'financial' => $result['is_financial_match'],

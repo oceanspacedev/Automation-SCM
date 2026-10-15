@@ -544,6 +544,31 @@ class DataProgramTest extends TestCase
         $this->assertNull($dp->fresh()->cn);
     }
 
+    public function test_form_id_realme_matches_the_id_gs_of_a_data_program_row(): void
+    {
+        // Data Program dari draft memakai kode BT; Form Program berisi ID Realme (ID GS) toko yang sama
+        $dp = DataProgram::create([
+            'row_hash' => 'draft_1', 'dealer_name' => '6003 MOBILE', 'kode_bt' => 'BT07238', 'id_gs' => 'DLUQ3270',
+            'program_name' => 'PROGRAM PEAKSEASON JULI 2026', 'region' => 'BANDUNG', 'dpp' => 835701, 'net_pay' => 814808,
+        ]);
+        $submission = ProgramSubmission::create([
+            'row_hash' => 'hash_id_gs_sub', 'dealer_name' => '6003 MOBILE', 'id_real' => 'DLUQ3270',
+            'program_name' => 'PROGRAM PEAKSEASON JULI 2026', 'region' => 'BIG BANDUNG', 'dpp' => 835701, 'net_pay' => 814808,
+        ]);
+        // ID Realme toko lain tetap dianggap beda
+        $otherStore = ProgramSubmission::create([
+            'row_hash' => 'hash_other_gs_sub', 'dealer_name' => '6003 MOBILE', 'id_real' => 'DLXX0001',
+            'program_name' => 'PROGRAM PEAKSEASON JULI 2026', 'region' => 'BIG BANDUNG',
+        ]);
+
+        $service = app(ProgramReconciliationService::class);
+
+        $this->assertNotNull($service->evaluateMatchScore($dp, $submission));
+        $this->assertNull($service->evaluateMatchScore($dp, $otherStore));
+        $this->assertTrue($service->dataProgramForSubmission($submission)->is($dp));
+        $this->assertSame($submission->id, $service->findMatchingSubmission($dp)?->id);
+    }
+
     public function test_reconciliation_succeeds_when_all_four_criteria_match(): void
     {
         $dp = DataProgram::create([

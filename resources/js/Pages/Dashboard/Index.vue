@@ -10,17 +10,18 @@
     <!-- Header Page (Filament style) -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Dashboard Ringkasan</h1>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Dashboard Ringkasan</h1>
         <p class="text-xs text-gray-500 mt-0.5">Ringkasan status metrik operasional draft dan invoice.</p>
       </div>
 
-      <div class="flex items-center gap-2">
+      <!-- Layar kecil: tombol refresh selebar layar -->
+      <div class="grid grid-cols-1 sm:flex sm:items-center gap-2">
         <button
           @click="fetchMetrics"
           :disabled="loading"
-          class="h-9 px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition cursor-pointer shadow-2xs flex items-center gap-1.5 disabled:opacity-50"
+          class="h-9 px-2 sm:px-3.5 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition cursor-pointer shadow-2xs flex items-center justify-center gap-1.5 disabled:opacity-50 whitespace-nowrap"
         >
-          <RefreshCwIcon :class="['w-3.5 h-3.5 text-gray-500', loading && 'animate-spin']" />
+          <RefreshCwIcon :class="['hidden sm:block w-3.5 h-3.5 text-gray-500', loading && 'animate-spin']" />
           <span>Refresh Data</span>
         </button>
       </div>
@@ -81,20 +82,20 @@
         </table>
       </div>
 
-      <!-- Navigasi Cepat (Filament style) -->
-      <div class="flex flex-wrap items-center gap-3 pt-1">
+      <!-- Navigasi Cepat (Filament style); di layar kecil dua tombol sama lebar dengan label pendek -->
+      <div class="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-3 pt-1">
         <router-link
           to="/drafts"
-          class="h-9 px-4 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center gap-1.5 shadow-2xs"
+          class="h-9 px-2 sm:px-4 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 shadow-2xs whitespace-nowrap"
         >
-          <span>Lihat Daftar Draft & Import</span>
+          <span class="sm:hidden">Draft & Import</span><span class="hidden sm:inline">Lihat Daftar Draft & Import</span>
           <ChevronRightIcon class="w-3.5 h-3.5 text-gray-400" />
         </router-link>
         <router-link
           to="/invoices"
-          class="h-9 px-4 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center gap-1.5 shadow-2xs"
+          class="h-9 px-2 sm:px-4 border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 shadow-2xs whitespace-nowrap"
         >
-          <span>Lihat Daftar Invoice</span>
+          <span class="sm:hidden">Daftar Invoice</span><span class="hidden sm:inline">Lihat Daftar Invoice</span>
           <ChevronRightIcon class="w-3.5 h-3.5 text-gray-400" />
         </router-link>
       </div>

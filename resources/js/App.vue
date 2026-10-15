@@ -7,7 +7,20 @@
     >
       <div class="w-full mx-auto px-4 sm:px-6">
         <div class="flex justify-between items-center h-16">
-          <div class="flex items-center">
+          <!-- Layar kecil: tombol menu + nama halaman yang sedang dibuka -->
+          <div class="flex lg:hidden items-center gap-2 min-w-0">
+            <button
+              type="button"
+              @click="isMobileNavOpen = true"
+              class="w-9 h-9 -ml-1.5 rounded-lg flex items-center justify-center text-gray-700 dark:text-slate-200 hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer shrink-0"
+              title="Buka menu"
+            >
+              <MenuIcon class="w-5 h-5" />
+            </button>
+            <span class="text-sm font-semibold text-gray-900 dark:text-slate-100 truncate">{{ currentPageLabel }}</span>
+          </div>
+
+          <div class="hidden lg:flex items-center">
             <!-- Shadcn-Vue NavigationMenu (Direct Links without Sub-menu) -->
             <NavigationMenu>
               <NavigationMenuList class="flex items-center gap-1">
@@ -49,12 +62,12 @@
                         type="button"
                         :class="[
                           navigationMenuTriggerStyle(),
-                          isActive('/test-program') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
+                          isActive('/form-program') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
                           'gap-1.5 dark:text-slate-200 dark:hover:bg-slate-800'
                         ]"
                       >
                         <span>Form Program</span>
-                        <span v-if="isActive('/test-program')" class="text-[10px] font-semibold text-gray-500 dark:text-slate-400">{{ activeAreaShort }}</span>
+                        <span v-if="isActive('/form-program')" class="text-[10px] font-semibold text-gray-500 dark:text-slate-400">{{ activeAreaShort }}</span>
                         <ChevronDownIcon
                           class="w-3.5 h-3.5 text-gray-500 dark:text-slate-400 transition-transform duration-200"
                           :class="isFormProgramOpen && 'rotate-180'"
@@ -65,11 +78,11 @@
                       <router-link
                         v-for="area in AREAS"
                         :key="area.value"
-                        :to="`/test-program/${area.value}`"
+                        :to="`/form-program/${area.value}`"
                         @click="isFormProgramOpen = false"
                         :class="[
                           'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                          isActive(`/test-program/${area.value}`) ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                          isActive(`/form-program/${area.value}`) ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
                         ]"
                       >
                         {{ area.label }}
@@ -301,7 +314,7 @@
                       ]"
                     />
 
-                    <div class="flex items-center gap-1.5">
+                    <div class="hidden sm:flex items-center gap-1.5">
                       <span v-if="aiStatus.isRunning" class="font-medium text-emerald-900 dark:text-emerald-200">
                         AI Memproses
                         <span v-if="aiStatus.runningInfo?.total" class="font-mono text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 ml-0.5">
@@ -362,7 +375,7 @@
                   <div class="pt-1 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
                     <span class="text-gray-400 dark:text-slate-500 font-mono">Model: {{ aiStatus.currentModel || 'ag/gemini-3-flash' }}</span>
                     <router-link
-                      to="/test-program"
+                      to="/form-program"
                       class="text-gray-900 dark:text-slate-200 hover:text-black dark:hover:text-white font-medium hover:underline flex items-center gap-1"
                     >
                       <span>Ke Form Program</span>
@@ -373,139 +386,49 @@
               </Popover>
             </div>
 
-            <!-- Profile Popover -->
+            <!-- Profile Popover: inisial nama, isi akun, mode gelap & keluar -->
             <Popover>
               <PopoverTrigger as-child>
                 <button
                   type="button"
-                  class="w-9 h-9 rounded-full border border-neutral-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-neutral-100 dark:hover:bg-slate-700 flex items-center justify-center text-neutral-700 dark:text-slate-200 transition cursor-pointer shadow-2xs focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
-                  title="Akun Saya"
+                  class="w-9 h-9 rounded-full overflow-hidden border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center justify-center text-sm font-medium text-gray-700 dark:text-slate-200 transition cursor-pointer focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-white"
+                  :title="user.name || 'Akun Saya'"
                 >
-                  <UserIcon class="w-4 h-4 text-neutral-700 dark:text-slate-200" />
+                  <img v-if="user.avatar_url" :src="user.avatar_url" alt="" class="w-full h-full object-cover" />
+                  <span v-else>{{ userInitial }}</span>
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="end" class="w-52 p-1.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl text-xs space-y-1">
-                <!-- Info Akun -->
-                <div class="px-3 py-2 border-b border-gray-100 dark:border-slate-800">
-                  <div class="font-semibold text-xs text-gray-900 dark:text-slate-100 leading-tight">
-                    {{ user.name || 'Admin SCM' }}
-                  </div>
-                  <div class="text-[11px] text-gray-500 dark:text-slate-400 truncate mt-0.5">
-                    {{ user.email || 'admin@scm.com' }}
-                  </div>
+              <PopoverContent align="end" class="w-56 p-1.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl text-sm">
+                <div class="px-3 py-2 mb-1 border-b border-gray-100 dark:border-slate-800">
+                  <p class="font-medium text-gray-900 dark:text-slate-100 truncate">{{ user.name || 'Admin SCM' }}</p>
+                  <p class="text-xs text-gray-500 dark:text-slate-400 truncate mt-0.5">{{ user.email || '-' }}</p>
                 </div>
 
-                <!-- Menu Master Links -->
                 <router-link
-                  v-if="canAccess('master_program')"
-                  to="/programs"
+                  to="/profile"
                   :class="[
-                    'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                    isActive('/programs')
-                      ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
-                      : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                    'block px-3 py-2 rounded-lg transition-colors',
+                    isActive('/profile') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-medium' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
                   ]"
                 >
-                  Program
+                  Profil
                 </router-link>
 
-                <router-link
-                  v-if="canAccess('master_program')"
-                  to="/regions"
-                  :class="[
-                    'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                    isActive('/regions')
-                      ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
-                      : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
-                  ]"
-                >
-                  Region
-                </router-link>
-
-                <router-link
-                  v-if="canAccess('master_program')"
-                  to="/ar"
-                  :class="[
-                    'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                    isActive('/ar')
-                      ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
-                      : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
-                  ]"
-                >
-                  AR
-                </router-link>
-
-                <router-link
-                  v-if="canAccess('master_dealer')"
-                  to="/dealers"
-                  :class="[
-                    'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                    isActive('/dealers')
-                      ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
-                      : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
-                  ]"
-                >
-                  Dealer
-                </router-link>
-
-                <router-link
-                  v-if="canAccess('master_customer')"
-                  to="/customers"
-                  :class="[
-                    'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                    isActive('/customers')
-                      ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
-                      : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
-                  ]"
-                >
-                  Customer
-                </router-link>
-
-                <router-link
-                  v-if="canAccess('master_user')"
-                  to="/users"
-                  :class="[
-                    'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                    isActive('/users')
-                      ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
-                      : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
-                  ]"
-                >
-                  User
-                </router-link>
-
-                <!-- Toggle Mode Gelap (Clean & Eye-Friendly) -->
                 <button
                   @click="toggleDarkMode"
                   type="button"
-                  class="w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-xs font-medium text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white cursor-pointer select-none"
+                  class="w-full flex items-center justify-between px-3 py-2 rounded-lg text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors cursor-pointer select-none"
                 >
-                  <div class="flex items-center gap-2">
-                    <MoonIcon v-if="!isDark" class="w-3.5 h-3.5 text-gray-500 dark:text-slate-400" />
-                    <SunIcon v-else class="w-3.5 h-3.5 text-amber-400" />
-                    <span>Mode Gelap</span>
-                  </div>
-                  <!-- Clean iOS/Shadcn style toggle switch -->
-                  <div
-                    :class="[
-                      'w-7 h-4 rounded-full transition-colors relative flex items-center p-0.5',
-                      isDark ? 'bg-[#1D70F5]' : 'bg-gray-300 dark:bg-slate-700'
-                    ]"
-                  >
-                    <div
-                      :class="[
-                        'w-3 h-3 rounded-full bg-white shadow-2xs transition-transform transform',
-                        isDark ? 'translate-x-3' : 'translate-x-0'
-                      ]"
-                    ></div>
-                  </div>
+                  <span>Mode Gelap</span>
+                  <span :class="['w-8 h-[18px] rounded-full p-0.5 flex items-center transition-colors', isDark ? 'bg-gray-900 dark:bg-white' : 'bg-gray-300 dark:bg-slate-700']">
+                    <span :class="['w-3.5 h-3.5 rounded-full transition-transform', isDark ? 'translate-x-3.5 bg-white dark:bg-gray-900' : 'bg-white']"></span>
+                  </span>
                 </button>
 
-                <!-- Tombol Keluar -->
                 <button
                   @click="handleLogout"
                   type="button"
-                  class="w-full text-left block px-3 py-2 rounded-lg transition-colors text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 cursor-pointer"
+                  class="w-full text-left px-3 py-2 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
                 >
                   Keluar
                 </button>
@@ -514,6 +437,95 @@
           </div>
         </div>
       </div>
+
+      <!-- Menu layar kecil: laci dari kiri, setinggi layar, sisa layar digelapkan -->
+      <Teleport to="body">
+        <Transition
+          enter-active-class="transition-opacity duration-200"
+          enter-from-class="opacity-0"
+          leave-active-class="transition-opacity duration-150"
+          leave-to-class="opacity-0"
+        >
+          <div v-if="isMobileNavOpen" class="lg:hidden fixed inset-0 z-50 bg-black/30" @click="isMobileNavOpen = false"></div>
+        </Transition>
+        <Transition
+          enter-active-class="transition-transform duration-200 ease-out"
+          enter-from-class="-translate-x-full"
+          leave-active-class="transition-transform duration-150 ease-in"
+          leave-to-class="-translate-x-full"
+        >
+          <aside
+            v-if="isMobileNavOpen"
+            class="lg:hidden fixed inset-y-0 left-0 z-50 w-72 max-w-[80%] bg-white dark:bg-slate-900 shadow-xl flex flex-col"
+          >
+            <div class="h-16 px-4 border-b border-gray-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+              <span class="text-sm font-semibold text-gray-900 dark:text-slate-100">Menu</span>
+              <button
+                type="button"
+                @click="isMobileNavOpen = false"
+                class="w-9 h-9 -mr-1.5 rounded-lg flex items-center justify-center text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 cursor-pointer"
+                title="Tutup menu"
+              >
+                <XIcon class="w-5 h-5" />
+              </button>
+            </div>
+      <nav class="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
+        <template v-for="group in mobileNavGroups" :key="group.title || 'utama'">
+          <!-- Menu tanpa sub-menu (Draft, Invoice) -->
+          <template v-if="!group.title">
+            <router-link
+              v-for="link in group.links"
+              :key="link.to"
+              :to="link.to"
+              :class="[
+                'block px-3 py-2.5 rounded-lg text-sm transition-colors',
+                isActive(link.to)
+                  ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-medium'
+                  : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800'
+              ]"
+            >
+              {{ link.label }}
+            </router-link>
+          </template>
+
+          <!-- Menu dengan sub-menu: sub-menu muncul saat diklik -->
+          <div v-else>
+            <button
+              type="button"
+              @click="openMobileGroup = openMobileGroup === group.title ? null : group.title"
+              :class="[
+                'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors cursor-pointer',
+                group.links.some((link) => isActive(link.to)) ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-700 dark:text-slate-300',
+                'hover:bg-gray-100 dark:hover:bg-slate-800'
+              ]"
+            >
+              <span>{{ group.title }}</span>
+              <ChevronDownIcon
+                class="w-4 h-4 text-gray-400 dark:text-slate-500 transition-transform duration-200"
+                :class="openMobileGroup === group.title && 'rotate-180'"
+              />
+            </button>
+            <div v-if="openMobileGroup === group.title" class="pl-3 pb-1 space-y-0.5">
+              <router-link
+                v-for="link in group.links"
+                :key="link.to"
+                :to="link.to"
+                :class="[
+                  'block px-3 py-2 rounded-lg text-sm transition-colors',
+                  isActive(link.to)
+                    ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-medium'
+                    : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800'
+                ]"
+              >
+                {{ link.label }}
+              </router-link>
+            </div>
+          </div>
+        </template>
+      </nav>
+          </aside>
+        </Transition>
+      </Teleport>
     </header>
 
     <!-- Main Content -->
@@ -524,7 +536,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { useAuth } from '@/composables/useAuth';
@@ -539,16 +551,13 @@ import {
 } from '@/components/ui/navigation-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
-  User as UserIcon,
-  LogOut as LogOutIcon,
   Bot as BotIcon,
   CheckCircle2 as CheckCircle2Icon,
   Loader2 as Loader2Icon,
   ExternalLink as ExternalLinkIcon,
   ChevronDown as ChevronDownIcon,
-  Users as UsersIcon,
-  Moon as MoonIcon,
-  Sun as SunIcon,
+  Menu as MenuIcon,
+  X as XIcon,
 } from 'lucide-vue-next';
 
 const route = useRoute();
@@ -563,15 +572,15 @@ const isDataProgramOpen = ref(false);
 
 const activeAreaShort = computed(() => findArea(route.params.area).short);
 
+// Huruf pertama nama akun untuk tombol menu profil
+const userInitial = computed(() => (user.value?.name || user.value?.email || 'A').trim().charAt(0).toUpperCase());
+
 const isLoginPage = computed(() => route.path === '/login');
 const isStandalonePage = computed(() => {
   return (
     route.meta?.isStandalone === true ||
     route.path === '/login' ||
-    route.path === '/register' ||
-    route.path === '/form-submission' ||
-    route.path === '/form-realme' ||
-    route.path === '/form'
+    route.path === '/register'
   );
 });
 
@@ -640,6 +649,68 @@ const canAccess = (feature) => {
 
   return false;
 };
+
+// Menu layar kecil: semua menu navigasi atas, dikelompokkan seperti dropdown desktop
+const isMobileNavOpen = ref(false);
+const openMobileGroup = ref(null);
+
+const mobileNavGroups = computed(() => {
+  const areaLinks = (path) => AREAS.map((area) => ({ label: area.label, to: `${path}/${area.value}` }));
+
+  return [
+    {
+      title: null,
+      links: [
+        canAccess('drafts') && { label: 'Draft', to: '/drafts' },
+        canAccess('invoices') && { label: 'Invoice', to: '/invoices' },
+      ],
+    },
+    canAccess('form_program') && { title: 'Form Program', links: areaLinks('/form-program') },
+    canAccess('data_program') && { title: 'Data Program', links: areaLinks('/data-program') },
+    canAccess('riwayat') && {
+      title: 'Riwayat',
+      links: [
+        canAccess('riwayat_program') && { label: 'Riwayat Program', to: '/riwayat-program' },
+        canAccess('email_logs') && { label: 'Riwayat Email', to: '/email-logs' },
+        canAccess('dashboard') && { label: 'Dashboard', to: '/dashboard' },
+      ],
+    },
+    canAccess('master') && {
+      title: 'Master',
+      links: [
+        canAccess('master_program') && { label: 'Program', to: '/programs' },
+        canAccess('master_program') && { label: 'Region', to: '/regions' },
+        canAccess('master_program') && { label: 'AR', to: '/ar' },
+        canAccess('master_dealer') && { label: 'Dealer', to: '/dealers' },
+        canAccess('master_customer') && { label: 'Customer', to: '/customers' },
+        canAccess('master_user') && { label: 'User', to: '/users' },
+      ],
+    },
+  ]
+    .filter(Boolean)
+    .map((group) => ({ ...group, links: group.links.filter(Boolean) }))
+    .filter((group) => group.links.length > 0);
+});
+
+// Nama halaman yang sedang dibuka, mis. "Form Program · Jawa Barat"
+const currentPageLabel = computed(() => {
+  for (const group of mobileNavGroups.value) {
+    const link = group.links.find((item) => isActive(item.to));
+    if (link) return group.title ? `${group.title} · ${link.label}` : link.label;
+  }
+
+  return isActive('/profile') ? 'Profil' : 'Menu';
+});
+
+watch(() => route.fullPath, () => {
+  isMobileNavOpen.value = false;
+  openMobileGroup.value = null;
+});
+
+// Halaman di belakang laci menu tidak ikut ter-scroll
+watch(isMobileNavOpen, (open) => {
+  document.body.style.overflow = open ? 'hidden' : '';
+});
 
 const handleLogout = async () => {
   await logout();

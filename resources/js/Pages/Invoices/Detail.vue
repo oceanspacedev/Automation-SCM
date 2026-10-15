@@ -1,23 +1,25 @@
 <template>
   <div class="space-y-4 font-sans">
     <!-- Top Bar -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-200">
-      <div class="flex items-center space-x-2.5">
-        <router-link :to="`/invoices/${invoice.area || 'jabar'}`" class="text-xs font-medium text-gray-500 hover:text-gray-900 transition">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-200">
+      <!-- Layar kecil: tautan kembali di baris sendiri, judul di bawahnya -->
+      <div class="flex flex-wrap sm:flex-nowrap items-center gap-x-2.5 gap-y-1 min-w-0">
+        <router-link :to="`/invoices/${invoice.area || 'jabar'}`" class="basis-full sm:basis-auto text-xs font-medium text-gray-500 hover:text-gray-900 transition">
           ← Kembali ke Daftar Invoice
         </router-link>
-        <span class="text-gray-300">|</span>
-        <h1 class="text-lg font-bold tracking-tight text-gray-950">Invoice {{ invoice.invoice_number }}</h1>
+        <span class="hidden sm:inline text-gray-300">|</span>
+        <h1 class="text-lg font-bold tracking-tight text-gray-950 min-w-0 break-words">Invoice {{ invoice.invoice_number }}</h1>
         <span class="text-xs font-medium text-gray-500">
           ({{ invoice.invoice_type }})
         </span>
       </div>
 
+      <!-- Layar kecil: status selebar layar, tombol aksi berbagi satu baris sama lebar -->
       <div class="flex flex-wrap items-center gap-2">
         <!-- Status Badges -->
         <span
           v-if="invoice.status === 'sent' && invoice.email_sent_at && invoice.whatsapp_sent_at"
-          class="h-8 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 select-none basis-full sm:basis-auto"
           title="Invoice ini sudah dikirim ke Email dan WhatsApp"
         >
           <CheckCircleIcon class="h-3.5 w-3.5 text-emerald-600" />
@@ -26,7 +28,7 @@
 
         <span
           v-else-if="invoice.email_sent_at && !invoice.whatsapp_sent_at"
-          class="h-8 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 select-none basis-full sm:basis-auto"
           title="Email sudah terkirim"
         >
           <CheckCircleIcon class="h-3.5 w-3.5 text-emerald-600" />
@@ -35,7 +37,7 @@
 
         <span
           v-else-if="!invoice.email_sent_at && invoice.whatsapp_sent_at"
-          class="h-8 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 select-none basis-full sm:basis-auto"
           title="WhatsApp sudah terkirim"
         >
           <CheckCircleIcon class="h-3.5 w-3.5 text-emerald-600" />
@@ -44,7 +46,7 @@
 
         <span
           v-else-if="invoice.status === 'sent'"
-          class="h-8 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 select-none basis-full sm:basis-auto"
           title="Invoice sudah terkirim"
         >
           <CheckCircleIcon class="h-3.5 w-3.5 text-emerald-600" />
@@ -53,7 +55,7 @@
 
         <span
           v-else-if="invoice.status === 'paid'"
-          class="h-8 px-2.5 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-blue-50 text-blue-700 border border-blue-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 select-none basis-full sm:basis-auto"
         >
           <span class="w-1.5 h-1.5 rounded-full bg-blue-600"></span>
           <span>Paid</span>
@@ -61,7 +63,7 @@
 
         <span
           v-else-if="invoice.status === 'failed'"
-          class="h-8 px-2.5 bg-rose-50 text-rose-700 border border-rose-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-rose-50 text-rose-700 border border-rose-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 select-none basis-full sm:basis-auto"
         >
           <AlertCircleIcon class="h-3.5 w-3.5 text-rose-600" />
           <span>Gagal Terkirim</span>
@@ -69,7 +71,7 @@
 
         <span
           v-else-if="invoice.status === 'generated'"
-          class="h-8 px-2.5 bg-gray-50 text-gray-700 border border-gray-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none"
+          class="h-8 px-2.5 bg-gray-50 text-gray-700 border border-gray-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 select-none basis-full sm:basis-auto"
           title="Invoice telah digenerate, siap dikirim"
         >
           <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
@@ -78,7 +80,7 @@
 
         <span
           v-else-if="invoice.status"
-          class="h-8 px-2.5 bg-gray-50 text-gray-700 border border-gray-200 text-xs font-medium rounded-lg inline-flex items-center gap-1.5 select-none capitalize"
+          class="h-8 px-2.5 bg-gray-50 text-gray-700 border border-gray-200 text-xs font-medium rounded-lg inline-flex items-center justify-center gap-1.5 select-none basis-full sm:basis-auto capitalize"
         >
           <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
           <span>{{ invoice.status }}</span>
@@ -89,25 +91,25 @@
           v-if="!(invoice.email_sent_at && invoice.whatsapp_sent_at)"
           @click="showEmailModal = true"
           :disabled="quickSending"
-          class="h-8 px-3 bg-[#1D70F5] text-white hover:bg-blue-600 text-xs font-medium rounded-lg transition inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-2xs"
+          class="h-8 px-2 sm:px-3 flex-1 sm:flex-initial bg-[#1D70F5] text-white hover:bg-blue-600 text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-2xs whitespace-nowrap"
           title="Pilih pengirim dan kirim invoice"
         >
-          <SendIcon class="w-3.5 h-3.5" />
-          <span>Kirim Notifikasi</span>
+          <SendIcon class="hidden sm:block w-3.5 h-3.5" />
+          <span class="sm:hidden">Kirim</span><span class="hidden sm:inline">Kirim Notifikasi</span>
         </button>
 
         <a
           :href="`/invoices/${invoice.id}/preview`"
           target="_blank"
-          class="h-8 px-3 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center shadow-2xs"
+          class="h-8 px-2 sm:px-3 flex-1 sm:flex-initial border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center justify-center shadow-2xs whitespace-nowrap"
         >
-          Preview Invoice
+          <span class="sm:hidden">Preview</span><span class="hidden sm:inline">Preview Invoice</span>
         </a>
         <a
           :href="`/invoices/${invoice.id}/pdf`"
-          class="h-8 px-3 border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center shadow-2xs"
+          class="h-8 px-2 sm:px-3 flex-1 sm:flex-initial border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center justify-center shadow-2xs whitespace-nowrap"
         >
-          Download PDF
+          <span class="sm:hidden">PDF</span><span class="hidden sm:inline">Download PDF</span>
         </a>
       </div>
     </div>

@@ -10,6 +10,7 @@ use App\Http\Controllers\DraftImportController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\MasterProgramController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProgramClaimConfirmationController;
 use App\Http\Controllers\ProgramSubmissionController;
 use App\Http\Controllers\RegionController;
@@ -94,6 +95,14 @@ Route::prefix('api')->middleware(SetAreaContext::class)->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
+
+    // Profil akun yang sedang login
+    Route::middleware('auth')->group(function () {
+        Route::put('/profile', [ProfileController::class, 'update']);
+        Route::post('/profile/photo', [ProfileController::class, 'updatePhoto']);
+        Route::delete('/profile/photo', [ProfileController::class, 'destroyPhoto']);
+        Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
+    });
 
     // Auth (WhatsApp OTP)
     Route::post('/auth/wa-otp/send', [AuthController::class, 'sendWaOtp']);

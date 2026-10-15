@@ -84,7 +84,7 @@ class UserController extends Controller
             'is_active' => ['boolean'],
         ]);
 
-        $cleanWa = $this->cleanWhatsappNumber($validated['whatsapp'] ?? null);
+        $cleanWa = User::normalizeWhatsapp($validated['whatsapp'] ?? null);
 
         // Jika permissions kosong / tidak diisi, gunakan default permissions berdasarkan role
         $permissions = $validated['permissions'] ?? User::getDefaultPermissionsForRole($validated['role']);
@@ -144,7 +144,7 @@ class UserController extends Controller
 
         $user->name = $validated['name'];
         $user->email = $validated['email'];
-        $user->whatsapp = $this->cleanWhatsappNumber($validated['whatsapp'] ?? null);
+        $user->whatsapp = User::normalizeWhatsapp($validated['whatsapp'] ?? null);
         $user->role = $validated['role'];
         $user->is_active = $targetActive;
 
@@ -254,31 +254,6 @@ class UserController extends Controller
             'message' => "Akun {$user->name} berhasil disetujui (ACC) dan sekarang sudah aktif.",
             'data' => $user,
         ]);
-    }
-
-    /**
-     * Standardisasi nomor WhatsApp ke format 628xxx
-     */
-    private function cleanWhatsappNumber(?string $phone): ?string
-    {
-        if (empty($phone)) {
-            return null;
-        }
-
-        $clean = preg_replace('/[^0-9]/', '', $phone);
-        if (empty($clean)) {
-            return null;
-        }
-
-        if (str_starts_with($clean, '08')) {
-            return '628'.substr($clean, 2);
-        }
-
-        if (str_starts_with($clean, '8')) {
-            return '62'.$clean;
-        }
-
-        return $clean;
     }
 
     /**

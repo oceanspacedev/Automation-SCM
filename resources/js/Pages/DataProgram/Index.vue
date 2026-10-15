@@ -14,32 +14,33 @@
     <!-- Header Page (Filament style) -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Data Program {{ area.label }}</h1>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Data Program {{ area.label }}</h1>
         <p class="text-xs text-gray-500 mt-0.5">
           Sinkronisasi master data program (56 kolom) {{ area.label }} langsung dari Google Spreadsheet.
         </p>
       </div>
 
-      <!-- Action Buttons (Spreadsheet Dropdown & Direct Sync) -->
-      <div class="flex flex-wrap items-center gap-2">
+      <!-- Action Buttons (Spreadsheet Dropdown & Direct Sync); di layar kecil dua tombol sama lebar dengan label pendek -->
+      <div class="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2">
         <!-- Dropdown Spreadsheet -->
         <div class="relative" ref="spreadsheetDropdownRef">
           <button
             type="button"
             @click="showSpreadsheetDropdown = !showSpreadsheetDropdown"
-            class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer"
+            class="h-9 w-full sm:w-auto px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer whitespace-nowrap"
             title="Menu aksi Spreadsheet & Export"
           >
             <RefreshCwIcon v-if="isSyncing" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
-            <FileSpreadsheetIcon v-else class="w-3.5 h-3.5 text-gray-500" />
-            <span>{{ isSyncing ? 'Menyinkronkan...' : 'Spreadsheet' }}</span>
+            <FileSpreadsheetIcon v-else class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
+            <span class="sm:hidden">{{ isSyncing ? 'Sinkron...' : 'Spreadsheet' }}</span>
+            <span class="hidden sm:inline">{{ isSyncing ? 'Menyinkronkan...' : 'Spreadsheet' }}</span>
             <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 ml-0.5 transition-transform duration-150" :class="showSpreadsheetDropdown && 'rotate-180'" />
           </button>
 
-          <!-- Dropdown Menu -->
+          <!-- Dropdown Menu; di layar kecil rata kiri agar tidak keluar layar -->
           <div
             v-if="showSpreadsheetDropdown"
-            class="absolute right-0 top-full mt-1.5 w-48 bg-white rounded-lg shadow-lg border border-gray-200 p-1 z-30 font-sans"
+            class="absolute left-0 sm:left-auto sm:right-0 top-full mt-1.5 w-48 bg-white rounded-lg shadow-lg border border-gray-200 p-1 z-30 font-sans"
           >
             <button
               type="button"
@@ -88,12 +89,13 @@
           <button
             type="button"
             @click="showReconcileDropdown = !showReconcileDropdown"
-            class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer"
+            class="h-9 w-full sm:w-auto px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer whitespace-nowrap"
             title="Menu sinkronisasi & pencocokan Test Program"
           >
             <RefreshCwIcon v-if="isSyncing || isReconciling" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
-            <CheckCircleIcon v-else class="w-3.5 h-3.5 text-gray-500" />
-            <span>{{ isSyncing ? 'Menyinkronkan...' : (isReconciling ? 'Mencocokkan...' : 'Cocokkan Test Program') }}</span>
+            <CheckCircleIcon v-else class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
+            <span class="sm:hidden">{{ isSyncing ? 'Sinkron...' : (isReconciling ? 'Mencocokkan...' : 'Cocokkan') }}</span>
+            <span class="hidden sm:inline">{{ isSyncing ? 'Menyinkronkan...' : (isReconciling ? 'Mencocokkan...' : 'Cocokkan Test Program') }}</span>
             <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 ml-0.5 transition-transform duration-150" :class="showReconcileDropdown && 'rotate-180'" />
           </button>
 
@@ -162,8 +164,8 @@
 
     <!-- Filament Table Card -->
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      <!-- Toolbar (Search & Filter like Filament) -->
-      <div class="p-3 sm:px-4 sm:py-3.5 border-b border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      <!-- Toolbar (Search & Filter like Filament); di layar kecil cari di baris sendiri, Auto-Refresh & filter di bawahnya -->
+      <div class="p-3 sm:px-4 sm:py-3.5 border-b border-gray-100 grid grid-cols-[1fr_auto] items-center sm:flex sm:flex-row justify-between gap-3">
         <!-- Left: Auto-Refresh & status -->
         <div class="flex items-center gap-3 text-xs text-gray-500">
           <label class="inline-flex items-center gap-1.5 cursor-pointer select-none">
@@ -180,9 +182,9 @@
         </div>
 
         <!-- Right: Search Box & Filter Popover -->
-        <div class="flex items-center gap-2 self-end sm:self-auto w-full sm:w-auto">
+        <div class="contents sm:flex items-center gap-2 sm:self-auto sm:w-auto">
           <!-- Search box with Magnifying glass -->
-          <div class="relative flex-1 sm:w-72">
+          <div class="relative flex-1 sm:w-72 col-span-2 order-first sm:order-none">
             <SearchIcon class="w-4 h-4 text-gray-400 absolute left-3 top-2.5 pointer-events-none" />
             <input
               v-model="filters.search"
@@ -354,8 +356,87 @@
         </div>
       </div>
 
+      <!-- Layar kecil: satu kartu per data program -->
+      <div class="md:hidden">
+        <p v-if="isLoading && items.length === 0" class="py-8 text-center text-xs text-gray-500">Memuat data program...</p>
+        <div v-else-if="items.length === 0" class="py-8 px-4 space-y-1.5 text-center text-xs text-gray-500">
+          <p class="font-medium text-gray-800">Belum ada data program yang tersimpan.</p>
+          <p>Klik tombol <strong>"Sinkronkan Sekarang"</strong> di atas untuk memuat data dari spreadsheet Anda.</p>
+        </div>
+        <ul v-else class="divide-y divide-gray-100">
+          <li v-for="row in items" :key="row.id" class="p-4 space-y-2 text-xs text-gray-700">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-gray-900 break-words">{{ row.dealer_name || '-' }}</p>
+              <p class="mt-0.5 text-gray-500 break-words">{{ row.kode_bt || '-' }} · {{ row.program || '-' }}</p>
+            </div>
+            <p class="text-gray-900 break-words">{{ row.program_name || '-' }}</p>
+            <p class="text-gray-500 break-words">{{ row.region || '-' }} · {{ row.telemarketing || '-' }}</p>
+            <div v-if="row.status_potong_purchase || row.cek_dokumen" class="flex flex-wrap items-center gap-x-4 gap-y-1 text-gray-900">
+              <span v-if="row.status_potong_purchase" class="inline-flex items-center gap-1.5">
+                <span
+                  class="w-1.5 h-1.5 rounded-full shrink-0"
+                  :class="
+                    row.status_potong_purchase === 'BISA DI POTONG'
+                      ? 'bg-emerald-500'
+                      : row.status_potong_purchase === 'SUDAH POTONG'
+                      ? 'bg-sky-500'
+                      : row.status_potong_purchase === 'DONE TRANSFER'
+                      ? 'bg-violet-500'
+                      : row.status_potong_purchase === 'BELUM BISA POTONG'
+                      ? 'bg-rose-500'
+                      : 'bg-gray-400'
+                  "
+                ></span>
+                {{ row.status_potong_purchase }}
+              </span>
+              <span v-if="row.cek_dokumen" class="inline-flex items-center gap-1.5">
+                <span
+                  class="w-1.5 h-1.5 rounded-full shrink-0"
+                  :class="row.cek_dokumen === 'LENGKAP' || row.cek_dokumen === 'OK' ? 'bg-emerald-500' : 'bg-amber-500'"
+                ></span>
+                <span><span class="text-gray-500">Dokumen</span> {{ row.cek_dokumen }}</span>
+              </span>
+            </div>
+            <p v-if="row.no_po" class="text-gray-500 break-words">No PO <span class="text-gray-900">{{ row.no_po }}</span></p>
+
+            <div class="flex items-end justify-between gap-3">
+              <div class="min-w-0">
+                <p class="text-sm font-semibold text-gray-950">{{ formatRupiah(row.net_pay) }}</p>
+                <p class="text-gray-500">Net Pay</p>
+              </div>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  @click="testMatchSingleRow(row)"
+                  :disabled="reconcilingRowId === row.id"
+                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer disabled:opacity-50"
+                >
+                  {{ reconcilingRowId === row.id ? 'Menguji...' : 'Lihat' }}
+                </button>
+                <button
+                  type="button"
+                  @click="openEditModal(row)"
+                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
+                >
+                  Edit
+                </button>
+                <button
+                  v-if="row.status_potong_purchase === 'BISA DI POTONG'"
+                  type="button"
+                  @click="sendWaToTelemarketing(row)"
+                  :disabled="sendingWaId === row.id"
+                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer disabled:opacity-50"
+                >
+                  {{ sendingWaId === row.id ? 'Mengirim...' : 'WA' }}
+                </button>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
       <!-- Table: Styled identically to Test Program for clean spreadsheet look -->
-      <div ref="gridContainer" class="relative overflow-auto max-h-[calc(100vh-240px)]" @scroll="refreshBoxes">
+      <div ref="gridContainer" class="hidden md:block relative overflow-auto max-h-[calc(100vh-240px)]" @scroll="refreshBoxes">
         <table class="w-full text-left text-xs text-gray-900 border-collapse">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">
@@ -1153,378 +1234,104 @@
       >
         <div
           v-if="showTestModal"
-          class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/50 backdrop-blur-xs font-sans"
+          class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/40 backdrop-blur-xs font-sans"
           @click.self="showTestModal = false"
         >
-          <div class="relative w-full max-w-3xl sm:max-w-4xl bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden font-sans my-4 flex flex-col max-h-[90vh]">
-            <!-- Modal Header -->
-            <div class="px-6 py-4 border-b border-gray-200 bg-white flex items-center justify-between gap-4 shrink-0">
-              <div class="flex items-center gap-3 min-w-0">
-                <div class="w-9 h-9 rounded-lg bg-gray-100 border border-gray-200 text-gray-600 flex items-center justify-center shrink-0">
-                  <ShieldCheckIcon class="w-4 h-4" />
-                </div>
-                <div class="min-w-0">
-                  <h3 class="text-base font-semibold text-gray-900 leading-snug">Hasil Uji Kecocokan Data Program</h3>
-                  <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500 mt-0.5">
-                    <span class="font-medium text-gray-800">{{ testRow?.dealer_name || '-' }}</span>
-                    <span v-if="testRow?.kode_bt" class="text-gray-500 font-medium">({{ testRow.kode_bt }})</span>
-                    <span class="text-gray-300">&bull;</span>
-                    <span class="text-gray-600 truncate max-w-md">{{ testRow?.program_name }}</span>
-                  </div>
-                </div>
+          <div class="w-full max-w-3xl bg-white rounded-xl shadow-xl border border-gray-200 flex flex-col max-h-[90vh]">
+            <!-- Header -->
+            <div class="px-4 sm:px-6 pt-5 pb-4 border-b border-gray-100 flex items-start justify-between gap-4 shrink-0">
+              <div class="min-w-0">
+                <h3 class="text-base font-semibold text-gray-950">Hasil Uji Kecocokan</h3>
+                <p class="mt-0.5 text-xs text-gray-500 truncate">
+                  {{ testRow?.dealer_name || '-' }}<template v-if="testRow?.kode_bt"> · {{ testRow.kode_bt }}</template> · {{ testRow?.program_name || '-' }}
+                </p>
               </div>
-              <button
-                type="button"
-                @click="showTestModal = false"
-                class="w-8 h-8 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition cursor-pointer shrink-0"
-                title="Tutup Modal"
-              >
+              <button type="button" @click="showTestModal = false" class="p-1 -m-1 text-gray-400 hover:text-gray-700 cursor-pointer shrink-0" title="Tutup">
                 <XIcon class="w-4 h-4" />
               </button>
             </div>
 
-            <!-- Modal Body -->
-            <div class="px-6 py-5 space-y-4 overflow-y-auto flex-1 text-xs">
-              <!-- Ringkasan Status Card -->
-              <div
-                v-if="testResult?.matched"
-                class="p-3.5 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-between gap-4"
-              >
-                <div class="flex items-center gap-3 min-w-0">
-                  <CheckCircleIcon class="w-5 h-5 text-emerald-600 shrink-0" />
-                  <div class="min-w-0">
-                    <span class="text-sm font-semibold text-gray-900 block">
-                      Berhasil dicocokkan dengan Test Program #{{ testResult.details?.submission_id }}
-                    </span>
-                    <div class="flex items-center gap-2 flex-wrap text-xs text-gray-600 mt-0.5">
-                      <span>Status Potong: <strong class="text-gray-800 font-medium">{{ testResult?.details?.status_potong_purchase || testRow?.status_potong_purchase || '-' }}</strong></span>
-                      <span class="text-gray-300">&bull;</span>
-                      <span>Cek Dokumen: <strong class="text-gray-800 font-medium">{{ testResult?.details?.cek_dokumen || testRow?.cek_dokumen || '-' }}</strong></span>
-                    </div>
-                  </div>
-                </div>
-                <div class="shrink-0">
-                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <CheckIcon class="w-3.5 h-3.5" />
-                    <span>Sesuai</span>
-                  </span>
-                </div>
+            <div class="px-4 sm:px-6 py-5 space-y-5 overflow-y-auto text-xs">
+              <!-- Ringkasan -->
+              <div class="space-y-1">
+                <p class="flex items-center gap-2 text-sm font-medium text-gray-950">
+                  <span class="w-2 h-2 rounded-full shrink-0" :class="testResult?.matched ? 'bg-emerald-500' : 'bg-amber-500'"></span>
+                  <span>{{ testResult?.matched ? `Cocok dengan Form Program #${testResult.details?.submission_id}` : 'Belum ada Form Program yang cocok' }}</span>
+                </p>
+                <p class="pl-4 text-gray-500">
+                  Status potong <span class="text-gray-900">{{ testResult?.details?.status_potong_purchase || testRow?.status_potong_purchase || '-' }}</span>
+                  <span class="mx-1.5 text-gray-300">·</span>
+                  Cek dokumen <span class="text-gray-900">{{ testResult?.details?.cek_dokumen || testRow?.cek_dokumen || '-' }}</span>
+                  <span class="mx-1.5 text-gray-300">·</span>
+                  <span class="text-gray-900">{{ testResult?.details?.is_pkp ? 'PKP' : 'Non-PKP' }}</span><template v-if="testRow?.wajib_pajak && testRow.wajib_pajak !== '-'"> ({{ testRow.wajib_pajak }})</template>
+                </p>
               </div>
 
-              <div
-                v-else
-                class="p-3.5 rounded-lg border border-gray-200 bg-gray-50 flex items-center justify-between gap-4"
-              >
-                <div class="flex items-center gap-3 min-w-0">
-                  <AlertCircleIcon class="w-5 h-5 text-amber-600 shrink-0" />
-                  <div class="min-w-0">
-                    <span class="text-sm font-semibold text-gray-900 block">
-                      Belum ditemukan data Test Program yang cocok
-                    </span>
-                    <div class="flex items-center gap-2 flex-wrap text-xs text-gray-600 mt-0.5">
-                      <span>Status Potong: <strong class="text-gray-800 font-medium">{{ testRow?.status_potong_purchase || '-' }}</strong></span>
-                      <span class="text-gray-300">&bull;</span>
-                      <span>Cek Dokumen: <strong class="text-gray-800 font-medium">{{ testRow?.cek_dokumen || '-' }}</strong></span>
-                    </div>
-                  </div>
-                </div>
-                <div class="shrink-0">
-                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                    <AlertCircleIcon class="w-3.5 h-3.5" />
-                    <span>Belum Cocok</span>
-                  </span>
-                </div>
-              </div>
-
-              <!-- Tabel Komparasi -->
-              <div class="rounded-lg border border-gray-200 overflow-hidden bg-white">
-                <table class="w-full text-xs text-left">
-                  <thead class="bg-gray-50 border-b border-gray-200 text-gray-600 text-xs font-semibold">
+              <!-- Perbandingan Data Program vs Form Program; di layar kecil tabel digeser di dalam kotaknya -->
+              <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                  <thead class="border-b border-gray-200 text-gray-500">
                     <tr>
-                      <th class="px-4 py-2.5 w-[25%] font-medium text-gray-600">Parameter</th>
-                      <th class="px-4 py-2.5 w-[33%] font-medium text-gray-600">Data Program (Master)</th>
-                      <th class="px-4 py-2.5 w-[33%] font-medium text-gray-600">Test Program (Respon Web)</th>
-                      <th class="px-3 py-2.5 w-[9%] text-center font-medium text-gray-600">Hasil</th>
+                      <th class="py-2 pr-4 w-[22%] font-medium"></th>
+                      <th class="py-2 pr-4 w-[32%] font-medium">Data Program</th>
+                      <th class="py-2 pr-4 w-[32%] font-medium">Form Program</th>
+                      <th class="py-2 text-right font-medium">Hasil</th>
                     </tr>
                   </thead>
-                  <tbody class="divide-y divide-gray-100 text-gray-800">
-                    <!-- 1. Region -->
-                    <tr class="hover:bg-gray-50/50 transition-colors">
-                      <td class="px-4 py-2.5 text-gray-600 font-medium">Region</td>
-                      <td class="px-4 py-2.5 text-gray-800">{{ testRow?.region || testRow?.big_region || '-' }}</td>
-                      <td class="px-4 py-2.5 text-gray-800">{{ testResult?.details?.submission?.region || '-' }}</td>
-                      <td class="px-3 py-2.5 text-center">
-                        <span v-if="testResult?.details?.criteria_match?.region" class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
-                          <CheckIcon class="w-3.5 h-3.5" /> Cocok
-                        </span>
-                        <span v-else class="inline-flex items-center gap-1 text-xs font-medium text-rose-600">
-                          <XIcon class="w-3.5 h-3.5" /> Beda
-                        </span>
-                      </td>
+                  <tbody class="divide-y divide-gray-100 text-gray-900">
+                    <tr v-for="item in testComparisonRows" :key="item.label">
+                      <td class="py-2.5 pr-4 text-gray-500">{{ item.label }}</td>
+                      <td class="py-2.5 pr-4">{{ item.dataProgram || '-' }}</td>
+                      <td class="py-2.5 pr-4">{{ item.form || '-' }}</td>
+                      <td class="py-2.5 text-right whitespace-nowrap" :class="testResultClass(item.result)">{{ item.result }}</td>
                     </tr>
-
-                    <!-- 2. Kode BT / ID Real -->
-                    <tr class="hover:bg-gray-50/50 transition-colors">
-                      <td class="px-4 py-2.5 text-gray-600 font-medium">Kode BT / ID Real</td>
-                      <td class="px-4 py-2.5 text-gray-800">
-                        {{ testRow?.kode_bt || '-' }}
+                    <tr v-for="doc in testDocumentRows" :key="doc.label">
+                      <td class="py-2.5 pr-4 text-gray-500">{{ doc.label }}</td>
+                      <td class="py-2.5 pr-4">
+                        <a v-if="isValidUrl(doc.dataProgram)" :href="doc.dataProgram" target="_blank" rel="noopener noreferrer" class="underline hover:text-gray-600">Lihat berkas</a>
+                        <span v-else class="text-gray-400">-</span>
                       </td>
-                      <td class="px-4 py-2.5 text-gray-800">
-                        {{ testResult?.details?.submission?.id_real || '-' }}
+                      <td class="py-2.5 pr-4">
+                        <a v-if="isValidUrl(doc.form)" :href="doc.form" target="_blank" rel="noopener noreferrer" class="underline hover:text-gray-600">Lihat berkas</a>
+                        <span v-else class="text-gray-400">-</span>
                       </td>
-                      <td class="px-3 py-2.5 text-center">
-                        <span v-if="testResult?.details?.criteria_match?.kode_bt" class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
-                          <CheckIcon class="w-3.5 h-3.5" /> Cocok
-                        </span>
-                        <span v-else-if="testResult?.details?.criteria_match?.kode_bt === false" class="inline-flex items-center gap-1 text-xs font-medium text-rose-600">
-                          <XIcon class="w-3.5 h-3.5" /> Beda
-                        </span>
-                        <span v-else class="text-xs text-gray-400">
-                          Opsional
-                        </span>
-                      </td>
-                    </tr>
-
-                    <!-- 3. Nama Dealer -->
-                    <tr class="hover:bg-gray-50/50 transition-colors">
-                      <td class="px-4 py-2.5 text-gray-600 font-medium">Nama Dealer</td>
-                      <td class="px-4 py-2.5 text-gray-900 font-medium">{{ testRow?.dealer_name || '-' }}</td>
-                      <td class="px-4 py-2.5 text-gray-900 font-medium">{{ testResult?.details?.submission?.dealer_name || '-' }}</td>
-                      <td class="px-3 py-2.5 text-center">
-                        <span v-if="testResult?.details?.criteria_match?.dealer" class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
-                          <CheckIcon class="w-3.5 h-3.5" /> Cocok
-                        </span>
-                        <span v-else class="inline-flex items-center gap-1 text-xs font-medium text-rose-600">
-                          <XIcon class="w-3.5 h-3.5" /> Beda
-                        </span>
-                      </td>
-                    </tr>
-
-                    <!-- 4. Nama Program -->
-                    <tr class="hover:bg-gray-50/50 transition-colors">
-                      <td class="px-4 py-2.5 text-gray-600 font-medium">Nama Program</td>
-                      <td class="px-4 py-2.5 text-gray-800">{{ testRow?.program_name || '-' }}</td>
-                      <td class="px-4 py-2.5 text-gray-800">{{ testResult?.details?.submission?.program_name || '-' }}</td>
-                      <td class="px-3 py-2.5 text-center">
-                        <span v-if="testResult?.details?.criteria_match?.program" class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
-                          <CheckIcon class="w-3.5 h-3.5" /> Cocok
-                        </span>
-                        <span v-else class="inline-flex items-center gap-1 text-xs font-medium text-rose-600">
-                          <XIcon class="w-3.5 h-3.5" /> Beda
-                        </span>
-                      </td>
-                    </tr>
-
-                    <!-- 5. Nominal Finansial (DPP / Net Pay) -->
-                    <tr class="hover:bg-gray-50/50 transition-colors">
-                      <td class="px-4 py-2.5 text-gray-600 font-medium">Nominal (DPP / Net)</td>
-                      <td class="px-4 py-2.5 font-semibold text-gray-900">{{ formatRupiah(testRow?.net_pay || testRow?.dpp) }}</td>
-                      <td class="px-4 py-2.5 font-semibold text-gray-900">{{ formatRupiah(testResult?.details?.submission?.net_pay || testResult?.details?.submission?.dpp) }}</td>
-                      <td class="px-3 py-2.5 text-center">
-                        <span v-if="testResult?.details?.financial_match || testResult?.details?.criteria_match?.financial" class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
-                          <CheckIcon class="w-3.5 h-3.5" /> Cocok
-                        </span>
-                        <span v-else class="text-xs text-gray-500 font-medium">
-                          {{ testResult?.details?.selisih ? formatRupiah(testResult.details.selisih) : '-' }}
-                        </span>
-                      </td>
-                    </tr>
-
-                    <!-- 6. Dokumen CN -->
-                    <tr class="hover:bg-gray-50/50 transition-colors">
-                      <td class="px-4 py-2.5 text-gray-600 font-medium">Dokumen CN</td>
-                      <td class="px-4 py-2.5">
-                        <a
-                          v-if="isValidUrl(testRow?.cn)"
-                          :href="testRow.cn"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="inline-flex items-center gap-1 text-xs text-gray-700 hover:text-gray-900 underline"
-                        >
-                          <span>Buka Berkas</span>
-                          <ExternalLinkIcon class="w-3 h-3 text-gray-400" />
-                        </a>
-                        <span v-else class="text-gray-400 text-xs">Tidak ada berkas</span>
-                      </td>
-                      <td class="px-4 py-2.5">
-                        <a
-                          v-if="isValidUrl(testResult?.details?.submission?.credit_note_url)"
-                          :href="testResult.details.submission.credit_note_url"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="inline-flex items-center gap-1 text-xs text-gray-700 hover:text-gray-900 underline"
-                        >
-                          <span>Buka Berkas</span>
-                          <ExternalLinkIcon class="w-3 h-3 text-gray-400" />
-                        </a>
-                        <span v-else class="text-gray-400 text-xs">Tidak ada berkas</span>
-                      </td>
-                      <td class="px-3 py-2.5 text-center">
-                        <span v-if="isValidUrl(testRow?.cn) || isValidUrl(testResult?.details?.submission?.credit_note_url)" class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
-                          <CheckIcon class="w-3.5 h-3.5" /> Ada
-                        </span>
-                        <span v-else class="inline-flex items-center gap-1 text-xs font-medium text-rose-600">
-                          <XIcon class="w-3.5 h-3.5" /> Kosong
-                        </span>
-                      </td>
-                    </tr>
-
-                    <!-- 7. Dokumen Agreement -->
-                    <tr class="hover:bg-gray-50/50 transition-colors">
-                      <td class="px-4 py-2.5 text-gray-600 font-medium">Dokumen Agreement</td>
-                      <td class="px-4 py-2.5">
-                        <a
-                          v-if="isValidUrl(testRow?.agrement)"
-                          :href="testRow.agrement"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="inline-flex items-center gap-1 text-xs text-gray-700 hover:text-gray-900 underline"
-                        >
-                          <span>Buka Berkas</span>
-                          <ExternalLinkIcon class="w-3 h-3 text-gray-400" />
-                        </a>
-                        <span v-else class="text-gray-400 text-xs">Tidak ada berkas</span>
-                      </td>
-                      <td class="px-4 py-2.5">
-                        <a
-                          v-if="isValidUrl(testResult?.details?.submission?.agreement_url)"
-                          :href="testResult.details.submission.agreement_url"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="inline-flex items-center gap-1 text-xs text-gray-700 hover:text-gray-900 underline"
-                        >
-                          <span>Buka Berkas</span>
-                          <ExternalLinkIcon class="w-3 h-3 text-gray-400" />
-                        </a>
-                        <span v-else class="text-gray-400 text-xs">Tidak ada berkas</span>
-                      </td>
-                      <td class="px-3 py-2.5 text-center">
-                        <span v-if="isValidUrl(testRow?.agrement) || isValidUrl(testResult?.details?.submission?.agreement_url)" class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
-                          <CheckIcon class="w-3.5 h-3.5" /> Ada
-                        </span>
-                        <span v-else class="inline-flex items-center gap-1 text-xs font-medium text-rose-600">
-                          <XIcon class="w-3.5 h-3.5" /> Kosong
-                        </span>
-                      </td>
-                    </tr>
-
-                    <!-- 8. Dokumen Faktur Pajak -->
-                    <tr class="hover:bg-gray-50/50 transition-colors">
-                      <td class="px-4 py-2.5 text-gray-600 font-medium">Dokumen Faktur Pajak</td>
-                      <td class="px-4 py-2.5">
-                        <a
-                          v-if="isValidUrl(testRow?.cek_fp)"
-                          :href="testRow.cek_fp"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="inline-flex items-center gap-1 text-xs text-gray-700 hover:text-gray-900 underline"
-                        >
-                          <span>Buka Berkas</span>
-                          <ExternalLinkIcon class="w-3 h-3 text-gray-400" />
-                        </a>
-                        <span v-else-if="!testResult?.details?.is_pkp" class="text-gray-400 text-xs">Bebas FP (Non-PKP)</span>
-                        <span v-else class="text-gray-400 text-xs">Tidak ada berkas</span>
-                      </td>
-                      <td class="px-4 py-2.5">
-                        <a
-                          v-if="isValidUrl(testResult?.details?.submission?.tax_invoice_url)"
-                          :href="testResult.details.submission.tax_invoice_url"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="inline-flex items-center gap-1 text-xs text-gray-700 hover:text-gray-900 underline"
-                        >
-                          <span>Buka Berkas</span>
-                          <ExternalLinkIcon class="w-3 h-3 text-gray-400" />
-                        </a>
-                        <span v-else-if="!testResult?.details?.is_pkp" class="text-gray-400 text-xs">Bebas FP (Non-PKP)</span>
-                        <span v-else class="text-gray-400 text-xs">Tidak ada berkas</span>
-                      </td>
-                      <td class="px-3 py-2.5 text-center">
-                        <span v-if="!testResult?.details?.is_pkp" class="text-xs text-gray-500">
-                          Bebas FP
-                        </span>
-                        <span v-else-if="isValidUrl(testRow?.cek_fp) || isValidUrl(testResult?.details?.submission?.tax_invoice_url)" class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700">
-                          <CheckIcon class="w-3.5 h-3.5" /> Ada
-                        </span>
-                        <span v-else class="inline-flex items-center gap-1 text-xs font-medium text-rose-600">
-                          <XIcon class="w-3.5 h-3.5" /> Kosong
-                        </span>
-                      </td>
-                    </tr>
-
-                    <!-- 9. Wajib Pajak & Aturan -->
-                    <tr class="hover:bg-gray-50/50 transition-colors">
-                      <td class="px-4 py-2.5 text-gray-600 font-medium">Wajib Pajak & Aturan</td>
-                      <td colspan="3" class="px-4 py-2.5">
-                        <div class="flex items-center gap-2 flex-wrap">
-                          <span
-                            v-if="testResult?.details?.is_pkp"
-                            class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200"
-                          >
-                            PKP
-                          </span>
-                          <span
-                            v-else
-                            class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200"
-                          >
-                            NON-PKP
-                          </span>
-                          <span class="text-xs text-gray-600">
-                            {{ testResult?.details?.is_pkp ? 'Wajib melampirkan Faktur Pajak yang sah bersama CN & Agreement' : 'Cukup melampirkan dokumen CN & Agreement (Bebas Faktur Pajak)' }}
-                          </span>
-                          <span v-if="testRow?.wajib_pajak && testRow.wajib_pajak !== '-'" class="text-xs text-gray-500">
-                            ({{ testRow.wajib_pajak }})
-                          </span>
-                        </div>
-                      </td>
+                      <td class="py-2.5 text-right whitespace-nowrap" :class="testResultClass(doc.result)">{{ doc.result }}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
 
-              <!-- Catatan Rekonsiliasi Card -->
-              <div
-                v-if="testRow?.noted || testRow?.keterangan || testResult?.details?.keterangan"
-                class="p-3 rounded-lg border border-gray-200 bg-gray-50 text-xs text-gray-700 flex items-start gap-2.5"
-              >
-                <InfoIcon class="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
-                <div class="min-w-0 flex-1 space-y-0.5">
-                  <span class="font-medium text-gray-900 block">Catatan Rekonsiliasi</span>
-                  <p class="text-xs text-gray-600 leading-relaxed break-words">
-                    {{ testRow?.noted || testRow?.keterangan || testResult?.details?.keterangan }}
-                  </p>
-                </div>
-              </div>
+              <p v-if="testRow?.noted || testRow?.keterangan || testResult?.details?.keterangan" class="text-gray-500 leading-relaxed break-words">
+                <span class="text-gray-900">Catatan:</span> {{ testRow?.noted || testRow?.keterangan || testResult?.details?.keterangan }}
+              </p>
             </div>
 
-            <!-- Modal Footer -->
-            <div class="px-6 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between gap-3 text-xs shrink-0">
+            <!-- Footer -->
+            <div class="px-4 sm:px-6 py-3.5 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
               <div class="flex items-center gap-2">
                 <button
                   type="button"
                   @click="testMatchSingleRow(testRow, true)"
                   :disabled="reconcilingRowId === testRow?.id"
-                  class="h-9 px-3.5 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition cursor-pointer flex items-center gap-1.5 font-medium disabled:opacity-50 text-xs"
-                  title="Uji ulang pencocokan baris ini"
+                  class="h-8 px-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium transition cursor-pointer disabled:opacity-50"
+                  title="Cocokkan ulang baris ini dengan Form Program"
                 >
-                  <RefreshCwIcon :class="['w-3.5 h-3.5 text-gray-500', reconcilingRowId === testRow?.id && 'animate-spin']" />
-                  <span>{{ reconcilingRowId === testRow?.id ? 'Menguji...' : 'Uji Ulang (Paksa)' }}</span>
+                  {{ reconcilingRowId === testRow?.id ? 'Menguji...' : 'Uji Ulang' }}
                 </button>
                 <button
                   type="button"
                   @click="openHistoryModal(testRow)"
-                  class="h-9 px-3.5 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 transition cursor-pointer flex items-center gap-1.5 font-medium text-xs"
-                  title="Lihat riwayat pencocokan untuk baris ini"
+                  class="h-8 px-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium transition cursor-pointer"
+                  title="Riwayat pencocokan baris ini"
                 >
-                  <HistoryIcon class="w-3.5 h-3.5 text-gray-500" />
-                  <span>Riwayat Baris Ini</span>
+                  Riwayat
                 </button>
               </div>
-              <div class="flex items-center gap-2">
+              <div class="ml-auto flex items-center gap-2">
                 <button
                   type="button"
                   @click="showTestModal = false"
-                  class="h-9 px-4 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium transition cursor-pointer text-xs"
+                  class="h-8 px-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium transition cursor-pointer"
                 >
                   Tutup
                 </button>
@@ -1533,12 +1340,10 @@
                   type="button"
                   @click="sendWaToTelemarketing(testRow)"
                   :disabled="sendingWaId === testRow?.id"
-                  class="h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition cursor-pointer flex items-center gap-2 font-medium disabled:opacity-50 text-xs"
-                  title="Kirim info klaim ini ke WhatsApp Telemarketing"
+                  class="h-8 px-4 rounded-lg bg-gray-900 hover:bg-gray-800 text-white font-medium transition cursor-pointer disabled:opacity-50"
                 >
-                  <RefreshCwIcon v-if="sendingWaId === testRow?.id" class="w-3.5 h-3.5 animate-spin" />
-                  <SendIcon v-else class="w-3.5 h-3.5" />
-                  <span>Kirim ke WA Telemarketing</span>
+                  <span class="sm:hidden">{{ sendingWaId === testRow?.id ? 'Mengirim...' : 'Kirim WA' }}</span>
+                  <span class="hidden sm:inline">{{ sendingWaId === testRow?.id ? 'Mengirim...' : 'Kirim ke WA Telemarketing' }}</span>
                 </button>
               </div>
             </div>
@@ -1658,7 +1463,6 @@ import {
   Send as SendIcon,
   Info as InfoIcon,
   ArrowRight as ArrowRightIcon,
-  ShieldCheck as ShieldCheckIcon,
   History as HistoryIcon,
   Eye as EyeIcon,
   Pencil as PencilIcon,
@@ -2132,6 +1936,58 @@ const reconcilingRowId = ref(null);
 const showTestModal = ref(false);
 const testResult = ref(null);
 const testRow = ref(null);
+
+// Baris perbandingan Data Program vs Form Program di modal Hasil Uji Kecocokan
+const testComparisonRows = computed(() => {
+  const details = testResult.value?.details || {};
+  const form = details.submission || null;
+  const row = testRow.value || {};
+  const criteria = details.criteria_match || {};
+  const result = (matched) => (!form ? '-' : matched ? 'Cocok' : 'Beda');
+
+  let amountResult = '-';
+  if (form && (details.financial_match || criteria.financial)) amountResult = 'Cocok';
+  else if (form && details.selisih) amountResult = `Selisih ${formatRupiah(details.selisih)}`;
+
+  return [
+    { label: 'Region', dataProgram: row.region || row.big_region, form: form?.region, result: result(criteria.region) },
+    {
+      label: 'Kode BT / ID Realme',
+      dataProgram: row.kode_bt,
+      form: form?.id_real,
+      result: !form ? '-' : criteria.kode_bt === true ? 'Cocok' : criteria.kode_bt === false ? 'Beda' : 'Opsional',
+    },
+    { label: 'Dealer', dataProgram: row.dealer_name, form: form?.dealer_name, result: result(criteria.dealer) },
+    { label: 'Program', dataProgram: row.program_name, form: form?.program_name, result: result(criteria.program) },
+    {
+      label: 'Net Pay',
+      dataProgram: formatRupiah(row.net_pay || row.dpp),
+      form: form ? formatRupiah(form.net_pay || form.dpp) : null,
+      result: amountResult,
+    },
+  ];
+});
+
+const testDocumentRows = computed(() => {
+  const details = testResult.value?.details || {};
+  const form = details.submission || {};
+  const row = testRow.value || {};
+
+  return [
+    { label: 'Credit Note', dataProgram: row.cn, form: form.credit_note_url, required: true },
+    { label: 'Agreement', dataProgram: row.agrement, form: form.agreement_url, required: true },
+    { label: 'Faktur Pajak', dataProgram: row.cek_fp, form: form.tax_invoice_url, required: !!details.is_pkp },
+  ].map((doc) => ({
+    ...doc,
+    result: isValidUrl(doc.dataProgram) || isValidUrl(doc.form) ? 'Ada' : doc.required ? 'Kosong' : 'Tidak wajib',
+  }));
+});
+
+const testResultClass = (result) => {
+  if (result === 'Cocok' || result === 'Ada') return 'text-emerald-700';
+  if (result === 'Beda' || result === 'Kosong' || String(result).startsWith('Selisih')) return 'text-rose-600';
+  return 'text-gray-400';
+};
 
 const testMatchSingleRow = async (row, force = false) => {
   reconcilingRowId.value = row.id;

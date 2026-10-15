@@ -12,22 +12,22 @@
     <!-- Header Page -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-2xl font-bold tracking-tight text-gray-950">Riwayat Program</h1>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Riwayat Program</h1>
         <p class="text-xs text-gray-500 mt-0.5">
           Audit dan histori pencocokan antara Data Program dengan Test Program.
         </p>
       </div>
 
-      <!-- Action Buttons (Filament style) -->
-      <div class="flex flex-wrap items-center gap-2">
+      <!-- Action Buttons (Filament style); di layar kecil dua tombol sama lebar dengan label pendek -->
+      <div class="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2">
         <button
           type="button"
           @click="fetchLogs(1)"
           :disabled="loading"
-          class="h-9 px-3 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer disabled:opacity-50"
+          class="h-9 px-2 sm:px-3 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer disabled:opacity-50 whitespace-nowrap"
           title="Muat ulang data riwayat"
         >
-          <RefreshCwIcon :class="['w-3.5 h-3.5 text-gray-500', loading && 'animate-spin text-gray-900']" />
+          <RefreshCwIcon :class="['hidden sm:block w-3.5 h-3.5 text-gray-500', loading && 'animate-spin text-gray-900']" />
           <span>{{ loading ? 'Memuat...' : 'Refresh' }}</span>
         </button>
 
@@ -35,12 +35,13 @@
           type="button"
           @click="handleTriggerBatchReconcile"
           :disabled="isReconciling"
-          class="h-9 px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer disabled:opacity-50"
+          class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer disabled:opacity-50 whitespace-nowrap"
           title="Jalankan pencocokan batch"
         >
           <RefreshCwIcon v-if="isReconciling" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
-          <CheckCircleIcon v-else class="w-3.5 h-3.5 text-gray-500" />
-          <span>{{ isReconciling ? 'Mencocokkan...' : 'Cocokkan Test Program' }}</span>
+          <CheckCircleIcon v-else class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
+          <span class="sm:hidden">{{ isReconciling ? 'Proses...' : 'Cocokkan' }}</span>
+          <span class="hidden sm:inline">{{ isReconciling ? 'Mencocokkan...' : 'Cocokkan Test Program' }}</span>
         </button>
       </div>
     </div>
@@ -169,8 +170,81 @@
         </div>
       </div>
 
+      <!-- Layar kecil: satu kartu per riwayat pencocokan -->
+      <div class="md:hidden">
+        <div v-if="loading && logs.length === 0" class="py-8 text-center text-xs text-gray-500">Memuat data riwayat program...</div>
+        <div v-else-if="logs.length === 0" class="py-8 px-4 text-center text-xs text-gray-500">
+          Belum ada data riwayat yang tersimpan. Silakan klik tombol <strong>Cocokkan</strong> di atas.
+        </div>
+        <ul v-else class="divide-y divide-gray-100">
+          <li v-for="row in logs" :key="row.id" class="p-4 space-y-2 text-xs text-gray-700">
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-gray-900 break-words">{{ row.dealer_name || '-' }}</p>
+                <p class="mt-0.5 text-gray-500">
+                  {{ row.kode_bt || row.program_submission?.id_real || '-' }} · {{ formatTimestamp(row.created_at).date }} {{ formatTimestamp(row.created_at).time }}
+                </p>
+              </div>
+              <span class="inline-flex items-center gap-1.5 text-gray-900 shrink-0">
+                <span
+                  class="w-1.5 h-1.5 rounded-full"
+                  :class="row.status === 'MATCHED' ? 'bg-emerald-500' : row.status === 'DOC_INCOMPLETE' ? 'bg-amber-500' : row.status === 'NOMINAL_MISMATCH' ? 'bg-rose-500' : 'bg-gray-400'"
+                ></span>
+                {{ row.status === 'MATCHED' ? 'Sesuai' : row.status === 'DOC_INCOMPLETE' ? 'Dokumen Kurang' : row.status === 'NOMINAL_MISMATCH' ? 'Selisih' : row.status === 'NO_MATCH' ? 'Belum Ada Form' : row.status }}
+              </span>
+            </div>
+
+            <p class="text-gray-900 break-words">{{ row.program_name || '-' }}</p>
+
+            <div class="grid grid-cols-3 gap-2">
+              <div class="min-w-0">
+                <p class="text-gray-500">Data Program</p>
+                <p class="text-sm font-semibold text-gray-950 break-words">{{ formatRupiah(row.dp_amount) }}</p>
+              </div>
+              <div class="min-w-0">
+                <p class="text-gray-500">Test Program</p>
+                <p class="text-sm font-medium text-gray-900 break-words">
+                  {{ row.submission_amount ? formatRupiah(row.submission_amount) : (row.program_submission_id ? '0' : '-') }}
+                </p>
+              </div>
+              <div class="min-w-0">
+                <p class="text-gray-500">Selisih</p>
+                <p v-if="row.selisih === 0 || row.selisih === '0' || row.selisih === 0.0" class="text-sm text-gray-400">0</p>
+                <p v-else-if="row.selisih !== null && row.selisih !== undefined && row.selisih !== ''" class="text-sm font-medium text-rose-600 break-words">
+                  {{ formatRupiah(row.selisih) }}
+                </p>
+                <p v-else class="text-sm text-gray-400">-</p>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex items-center gap-3 min-w-0">
+                <span class="text-gray-500">Dokumen</span>
+                <template v-if="row.program_submission">
+                  <a v-if="isValidUrl(row.program_submission.credit_note_url)" :href="row.program_submission.credit_note_url" target="_blank" rel="noopener noreferrer" class="text-gray-900 underline">CN</a>
+                  <a v-if="isValidUrl(row.program_submission.agreement_url)" :href="row.program_submission.agreement_url" target="_blank" rel="noopener noreferrer" class="text-gray-900 underline">Agr</a>
+                  <a v-if="isValidUrl(row.program_submission.tax_invoice_url)" :href="row.program_submission.tax_invoice_url" target="_blank" rel="noopener noreferrer" class="text-gray-900 underline">Faktur</a>
+                  <span
+                    v-if="!isValidUrl(row.program_submission.credit_note_url) && !isValidUrl(row.program_submission.agreement_url) && !isValidUrl(row.program_submission.tax_invoice_url)"
+                    class="text-gray-400"
+                  >-</span>
+                </template>
+                <span v-else class="text-gray-400">-</span>
+              </div>
+              <button
+                type="button"
+                @click="openDetailModal(row)"
+                class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer shrink-0"
+              >
+                Detail
+              </button>
+            </div>
+          </li>
+        </ul>
+      </div>
+
       <!-- Table: Styled identically to Test Program for clean spreadsheet look -->
-      <div class="overflow-x-auto">
+      <div class="hidden md:block overflow-x-auto">
         <table class="w-full text-left text-xs text-gray-900 border-collapse">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">
@@ -395,9 +469,9 @@
           @click.self="showDetailModal = false"
         >
           <div class="relative w-full max-w-2xl bg-white rounded-xl shadow-xl border border-gray-200 overflow-hidden font-sans my-6">
-            <!-- Modal Header -->
-            <div class="px-6 py-4 border-b border-gray-200 bg-gray-50/70 flex items-center justify-between">
-              <div>
+            <!-- Modal Header; di layar kecil padding lebih rapat dan teks panjang terpotong agar tombol tutup tetap terlihat -->
+            <div class="px-4 sm:px-6 py-4 border-b border-gray-200 bg-gray-50/70 flex items-center justify-between gap-3">
+              <div class="min-w-0">
                 <h3 class="text-sm font-semibold text-gray-900">Detail Riwayat Rekonsiliasi</h3>
                 <p class="text-xs text-gray-500 mt-0.5 truncate">
                   Dealer: <strong class="text-gray-800">{{ selectedLog?.dealer_name || '-' }}</strong>
@@ -408,14 +482,14 @@
               <button
                 type="button"
                 @click="showDetailModal = false"
-                class="w-8 h-8 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition cursor-pointer"
+                class="w-8 h-8 shrink-0 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition cursor-pointer"
               >
                 <XIcon class="w-4 h-4" />
               </button>
             </div>
 
             <!-- Modal Body (Tabel Polos) -->
-            <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+            <div class="p-4 sm:p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
               <!-- Ringkasan Hasil Catatan -->
               <div class="p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 flex items-center justify-between">
                 <div>
@@ -535,7 +609,7 @@
             </div>
 
             <!-- Modal Footer -->
-            <div class="px-6 py-3 border-t border-gray-200 bg-gray-50/70 flex items-center justify-end">
+            <div class="px-4 sm:px-6 py-3 border-t border-gray-200 bg-gray-50/70 flex items-center justify-end">
               <button
                 type="button"
                 @click="showDetailModal = false"
