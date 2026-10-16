@@ -59,7 +59,7 @@ class InvoiceGenerator
             if ($invoiceNumber === '') {
                 throw new Exception('No CN belum diisi. Nomor invoice diambil dari No CN di file draft.');
             }
-            if (Invoice::withoutGlobalScope('area')->where('invoice_number', $invoiceNumber)->exists()) {
+            if (Invoice::withoutGlobalScopes(['area', 'brand'])->where('invoice_number', $invoiceNumber)->exists()) {
                 throw new Exception("No CN {$invoiceNumber} sudah dipakai invoice lain. Periksa lagi No CN di file draft.");
             }
 
@@ -86,6 +86,7 @@ class InvoiceGenerator
             // 5. Create Invoice record
             $invoice = Invoice::create([
                 'area' => $lockedDraft->areaEnum()->value,
+                'brand' => $lockedDraft->brand,
                 'invoice_number' => $invoiceNumber,
                 'draft_id' => $lockedDraft->id,
                 'invoice_type' => $invoiceType,

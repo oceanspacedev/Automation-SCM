@@ -9,7 +9,7 @@
           <div class="h-2.5 bg-[#ea580c]"></div>
           <div class="p-6 sm:p-8 space-y-4">
             <h1 class="text-2xl sm:text-3xl font-normal text-gray-950 tracking-tight">
-              PROGRAM REALME {{ area.short }}
+              PROGRAM {{ brandLabel }} {{ area.short }}
             </h1>
             <p class="text-sm text-gray-800 font-normal">
               Tanggapan Anda telah direkam.
@@ -38,7 +38,7 @@
           
           <div class="p-6 sm:p-8">
             <h1 class="text-2xl sm:text-3xl font-normal text-gray-950 tracking-tight">
-              PROGRAM REALME {{ area.short }}
+              PROGRAM {{ brandLabel }} {{ area.short }}
             </h1>
           </div>
         </div>
@@ -52,7 +52,7 @@
             <label class="block text-sm sm:text-base font-medium text-gray-900">
               NAMA PROGRAM <span class="text-rose-500">*</span>
             </label>
-            <p class="text-xs text-gray-500">Pilih salah satu program Realme yang diajukan.</p>
+            <p class="text-xs text-gray-500">Pilih salah satu program {{ brand.name }} yang diajukan.</p>
           </div>
 
           <div class="space-y-2.5 pt-1">
@@ -78,29 +78,6 @@
                 {{ prog }}
               </span>
             </label>
-            </div>
-
-            <!-- Option "Yang lain:" -->
-            <div class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition group">
-              <input
-                type="radio"
-                name="program_name_radio"
-                value="__OTHER__"
-                v-model="programRadioSelection"
-                class="w-4 h-4 text-orange-600 focus:ring-orange-500 border-gray-300 cursor-pointer shrink-0"
-                @change="handleOtherProgramSelected"
-              />
-              <div class="flex items-center gap-2 flex-1 min-w-0">
-                <span class="text-xs sm:text-sm text-gray-800 shrink-0">Yang lain:</span>
-                <input
-                  type="text"
-                  v-model="form.program_custom"
-                  @focus="programRadioSelection = '__OTHER__'; form.program_name = form.program_custom"
-                  @input="form.program_name = form.program_custom"
-                  placeholder="Ketik nama program..."
-                  class="flex-1 min-w-0 text-xs sm:text-sm border-b border-gray-300 focus:border-orange-500 focus:outline-none py-1 bg-transparent transition"
-                />
-              </div>
             </div>
           </div>
 
@@ -192,17 +169,16 @@
             <button
               type="button"
               @click="toggleDealerDropdown"
-              class="w-full h-11 px-3.5 border rounded-lg flex items-center justify-between gap-2 bg-white text-left text-sm transition cursor-pointer"
-              :class="validationErrors.id_real ? 'border-rose-500' : isDealerDropdownOpen ? 'border-orange-500 ring-2 ring-orange-100' : 'border-gray-300 hover:border-gray-400'"
+              :class="[pickerTriggerClass, validationErrors.id_real ? 'border-rose-500' : isDealerDropdownOpen ? 'border-orange-500' : 'border-gray-300 hover:border-gray-400']"
             >
               <span v-if="form.id_real" class="flex items-baseline gap-2 min-w-0 flex-1">
                 <span class="text-gray-900 truncate">{{ form.dealer_name || form.id_real }}</span>
                 <span
                   v-if="form.dealer_name && form.dealer_name.toLowerCase() !== form.id_real.toLowerCase()"
-                  class="text-xs text-gray-400 shrink-0"
+                  class="text-[11px] sm:text-xs text-gray-500 shrink-0"
                 >{{ form.id_real }}</span>
               </span>
-              <span v-else class="text-gray-400 flex-1">Pilih ID Realme / toko</span>
+              <span v-else class="text-gray-400 flex-1">Pilih toko</span>
 
               <span class="flex items-center gap-1 shrink-0">
                 <span
@@ -224,10 +200,7 @@
             </button>
 
             <!-- Dropdown Menu -->
-            <div
-              v-if="isDealerDropdownOpen"
-              class="absolute left-0 top-full mt-1.5 w-full bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden"
-            >
+            <div v-if="isDealerDropdownOpen" :class="pickerPanelClass">
               <!-- Search -->
               <div class="relative border-b border-gray-100">
                 <SearchIcon class="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -236,7 +209,7 @@
                   v-model="dealerSearchQuery"
                   @input="handleDealerSearchQueryInput"
                   placeholder="Cari kode BT, ID Realme, atau nama toko"
-                  class="w-full h-11 pl-10 pr-9 text-sm bg-transparent focus:outline-none text-gray-900 placeholder:text-gray-400"
+                  :class="pickerSearchClass"
                 />
                 <button
                   v-if="dealerSearchQuery"
@@ -265,28 +238,27 @@
               </div>
 
               <!-- List of Dealers -->
-              <div class="overflow-y-auto max-h-64 pb-1">
+              <div :class="pickerListClass">
                 <button
                   v-for="item in dealerSuggestions"
                   :key="item.id"
                   type="button"
                   @click="selectDealerSuggestion(item)"
-                  class="w-full px-3.5 py-2 flex items-center gap-3 text-left hover:bg-gray-50 transition cursor-pointer"
-                  :class="form.id_real === item.id_realme && 'bg-orange-50/60'"
+                  :class="[pickerOptionClass, form.id_real === item.id_realme && 'bg-orange-50/60']"
                 >
                   <span class="min-w-0 flex-1">
-                    <span class="block text-sm text-gray-900 truncate">
+                    <span class="block text-gray-900 truncate">
                       {{ (item.dealer_name && item.dealer_name !== '.' && item.dealer_name !== '-') ? item.dealer_name : item.id_realme }}
                     </span>
                     <!-- Kode BT · ID Realme (· region bila menampilkan semua wilayah) -->
-                    <span class="block text-xs text-gray-400 truncate">
+                    <span class="block mt-0.5 text-[11px] sm:text-xs text-gray-500 truncate">
                       {{ [item.kode_bt, item.id_realme !== item.kode_bt ? item.id_realme : null, !(filterDealersByRegion && form.region) ? item.region : null].filter(Boolean).join(' · ') }}
                     </span>
                   </span>
                   <CheckIcon v-if="form.id_real === item.id_realme" class="w-4 h-4 text-orange-600 shrink-0" />
                 </button>
 
-                <p v-if="dealerSuggestions.length === 0" class="px-3.5 py-6 text-center text-xs text-gray-500">
+                <p v-if="dealerSuggestions.length === 0" class="px-3.5 py-6 text-center text-xs sm:text-sm text-gray-500">
                   Toko tidak ditemukan.
                 </p>
               </div>
@@ -295,7 +267,7 @@
               <button
                 type="button"
                 @click="switchToManualIdInput"
-                class="w-full px-3.5 py-2.5 border-t border-gray-100 text-left text-xs text-gray-500 hover:bg-gray-50 cursor-pointer"
+                class="w-full px-3.5 py-2.5 border-t border-gray-100 text-left text-xs sm:text-sm text-gray-500 hover:bg-gray-50 cursor-pointer"
               >
                 Toko tidak ada di daftar? <span class="text-gray-900 underline">Ketik ID manual</span>
               </button>
@@ -372,69 +344,62 @@
             NAMA SALES (DM) <span class="text-rose-500">*</span>
           </label>
 
-          <!-- Custom Searchable Dropdown Matching Google Form Select -->
-          <div class="pt-1 relative" ref="salesDropdownRef">
+          <!-- Pemilih sales: gaya sama dengan pemilih toko -->
+          <div class="pt-1 relative w-full sm:max-w-md" ref="salesDropdownRef">
             <button
               type="button"
               @click="isSalesDropdownOpen = !isSalesDropdownOpen"
-              class="w-full sm:w-72 h-10 px-3.5 border rounded-lg flex items-center justify-between text-xs sm:text-sm bg-white hover:bg-gray-50 transition cursor-pointer"
-              :class="validationErrors.sales_name ? 'border-rose-500' : 'border-gray-300 focus:border-orange-500'"
+              :class="[pickerTriggerClass, validationErrors.sales_name ? 'border-rose-500' : isSalesDropdownOpen ? 'border-orange-500' : 'border-gray-300 hover:border-gray-400']"
             >
-              <span :class="form.sales_name ? 'text-gray-900 font-medium' : 'text-gray-400'">
-                {{ form.sales_name || 'Pilih' }}
+              <span class="truncate flex-1" :class="form.sales_name ? 'text-gray-900' : 'text-gray-400'">
+                {{ form.sales_name || 'Pilih sales' }}
               </span>
-              <ChevronDownIcon class="w-4 h-4 text-gray-400 transition-transform duration-150" :class="isSalesDropdownOpen && 'rotate-180'" />
+              <ChevronDownIcon class="w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200" :class="isSalesDropdownOpen && 'rotate-180'" />
             </button>
 
-            <!-- Dropdown Menu -->
-            <div
-              v-if="isSalesDropdownOpen"
-              class="absolute left-0 top-full mt-1.5 w-full sm:w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50 p-2 space-y-1 max-h-72 flex flex-col"
-            >
-              <div class="px-2 pt-1 pb-1">
+            <div v-if="isSalesDropdownOpen" :class="pickerPanelClass">
+              <div class="relative border-b border-gray-100">
+                <SearchIcon class="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   v-model="salesSearchQuery"
-                  placeholder="Cari nama sales..."
-                  class="w-full px-2.5 py-1.5 text-xs rounded-md border border-gray-200 bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-orange-500"
+                  placeholder="Cari nama sales"
+                  :class="pickerSearchClass"
                 />
               </div>
 
-              <div class="overflow-y-auto flex-1 divide-y divide-gray-50">
+              <div :class="pickerListClass">
                 <button
                   v-for="sales in filteredSalesList"
                   :key="sales"
                   type="button"
                   @click="selectSales(sales)"
-                  class="w-full text-left px-3 py-2 text-xs hover:bg-orange-50 hover:text-orange-950 rounded-lg flex items-center justify-between transition cursor-pointer"
-                  :class="form.sales_name === sales ? 'bg-orange-50 text-orange-900 font-semibold' : 'text-gray-700'"
+                  :class="[pickerOptionClass, form.sales_name === sales && 'bg-orange-50/60']"
                 >
-                  <span class="truncate">{{ sales }}</span>
-                  <CheckIcon v-if="form.sales_name === sales" class="w-3.5 h-3.5 text-orange-600 shrink-0 ml-1" />
+                  <span class="min-w-0 flex-1 truncate text-gray-900">{{ sales }}</span>
+                  <CheckIcon v-if="form.sales_name === sales" class="w-4 h-4 text-orange-600 shrink-0" />
                 </button>
 
-                <div v-if="filteredSalesList.length === 0" class="p-3 text-center text-xs text-gray-400">
-                  Sales tidak ditemukan. Ketik nama manual di bawah.
-                </div>
+                <p v-if="filteredSalesList.length === 0" class="px-3.5 py-6 text-center text-xs sm:text-sm text-gray-500">
+                  Sales tidak ditemukan. Ketik nama di bawah.
+                </p>
               </div>
 
-              <!-- Manual Sales Input Option -->
-              <div class="pt-2 border-t border-gray-100 p-1">
-                <div class="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    v-model="form.sales_custom"
-                    placeholder="Atau ketik sales baru..."
-                    class="flex-1 px-2.5 py-1 text-xs border border-gray-200 rounded-md focus:outline-none focus:border-orange-500"
-                  />
-                  <button
-                    type="button"
-                    @click="applyCustomSales"
-                    class="px-2.5 py-1 text-xs font-medium bg-gray-900 text-white rounded-md hover:bg-gray-800 transition cursor-pointer shrink-0"
-                  >
-                    Gunakan
-                  </button>
-                </div>
+              <!-- Sales baru (belum ada di daftar) -->
+              <div class="px-3.5 py-2.5 border-t border-gray-100 flex items-center gap-2">
+                <input
+                  type="text"
+                  v-model="form.sales_custom"
+                  placeholder="Atau ketik sales baru"
+                  class="flex-1 min-w-0 h-8 px-2.5 text-xs sm:text-sm text-gray-900 placeholder:text-gray-400 border border-gray-300 rounded-md focus:outline-none focus:border-orange-500"
+                />
+                <button
+                  type="button"
+                  @click="applyCustomSales"
+                  class="h-8 px-3 text-xs font-medium bg-gray-900 text-white rounded-md hover:bg-gray-800 transition cursor-pointer shrink-0"
+                >
+                  Gunakan
+                </button>
               </div>
             </div>
           </div>
@@ -452,7 +417,7 @@
               NO. WHATSAPP SALES / TOKO (AKTIF)
             </label>
             <p class="text-xs text-gray-500 mt-0.5">
-              Untuk pengiriman notifikasi otomatis konfirmasi status potong klaim dari sistem SCM Realme.
+              Untuk pengiriman notifikasi otomatis konfirmasi status potong klaim dari sistem SCM.
             </p>
           </div>
 
@@ -775,7 +740,7 @@
 
         <!-- Google Form bottom footer notes -->
         <div class="pt-6 text-center space-y-1 text-xs text-gray-500">
-          <p>Formulir Pengajuan Program REALME {{ area.label }}</p>
+          <p>Formulir Pengajuan Program {{ brandLabel }} {{ area.label }}</p>
           <p class="text-[11px] text-gray-400">Jangan pernah mengirimkan sandi melalui formulir ini.</p>
         </div>
       </form>
@@ -839,6 +804,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import axios from 'axios';
 import { useArea } from '@/composables/useArea';
+import { useBrands } from '@/composables/useBrands';
 import {
   UploadCloud as UploadCloudIcon,
   FileText as FileTextIcon,
@@ -868,10 +834,21 @@ const defaultProgramsList = ref([
   'PROGRAM DSA AGUSTUS 2026',
 ]);
 
-const programRadioSelection = ref('');
 
-// Area form diambil dari URL (/form/jabar, /form/jateng)
+// Pemilih toko & sales memakai gaya yang sama (ukuran teks mengikuti isian lain: xs di HP, sm di layar lebar)
+const pickerTriggerClass = 'w-full h-10 px-3.5 border rounded-lg flex items-center justify-between gap-2 bg-white text-left text-xs sm:text-sm transition cursor-pointer';
+const pickerPanelClass = 'absolute left-0 top-full mt-1.5 w-full bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden';
+const pickerSearchClass = 'w-full h-10 pl-10 pr-9 text-xs sm:text-sm bg-transparent focus:outline-none text-gray-900 placeholder:text-gray-400';
+const pickerListClass = 'overflow-y-auto max-h-64 py-1 [scrollbar-width:thin]';
+const pickerOptionClass = 'w-full px-3.5 py-2 flex items-center gap-3 text-left text-xs sm:text-sm hover:bg-gray-50 transition cursor-pointer';
+
+// Area form diambil dari URL (/form/realme/jabar, /form/realme/jateng)
 const { area } = useArea();
+
+// Brand form diambil dari URL (/form/realme/jabar); nama tampilannya dari Master Brand
+const { brand, loadBrands } = useBrands();
+const brandLabel = computed(() => brand.value.name.toUpperCase());
+loadBrands();
 
 const regionOptions = ref(area.value.value === 'jabar' ? [
   'BIG BANDUNG',
@@ -887,7 +864,6 @@ const salesDropdownRef = ref(null);
 
 const form = reactive({
   program_name: '',
-  program_custom: '',
   region: '',
   id_real: '',
   kode_bt: '',
@@ -1022,7 +998,8 @@ const analysisRows = computed(() => {
   if (isDealerFilled) {
     compare('cn_dealer', 'cn', 'Nama dealer di Credit Note', form.dealer_name, aiAnalysis.extractedDealerName, aiAnalysis.dealerMismatch, applyDealerFromCn);
   }
-  compare('cn_program', 'cn', 'Program di Credit Note', form.program_name, aiAnalysis.extractedCnProgramName, aiAnalysis.cnProgramMismatch, applyProgramFromCn);
+  compare('cn_program', 'cn', 'Program di Credit Note', form.program_name, aiAnalysis.extractedCnProgramName, aiAnalysis.cnProgramMismatch,
+    defaultProgramsList.value.includes(aiAnalysis.extractedCnProgramName) ? applyProgramFromCn : null);
 
   for (const { docKey, slot, label } of DOCUMENT_SLOTS) {
     if (!filePreviews[slot] || !aiAnalysis.docValidation?.[docKey]) continue;
@@ -1148,22 +1125,10 @@ async function fetchFormOptions() {
 }
 
 // ================= HANDLERS =================
+// Program hanya bisa dipilih dari daftar Master Program
 function handleProgramChange(prog) {
-  if (defaultProgramsList.value.includes(prog)) {
-    programRadioSelection.value = prog;
-    form.program_name = prog;
-    form.program_custom = '';
-  } else {
-    programRadioSelection.value = '__OTHER__';
-    form.program_custom = prog;
-    form.program_name = prog;
-  }
-  validationErrors.program_name = '';
-}
-
-function handleOtherProgramSelected() {
-  programRadioSelection.value = '__OTHER__';
-  form.program_name = form.program_custom;
+  if (!defaultProgramsList.value.includes(prog)) return;
+  form.program_name = prog;
   validationErrors.program_name = '';
 }
 
@@ -1644,7 +1609,6 @@ async function handleSubmit() {
 function handleClearForm() {
   if (confirm('Kosongkan semua isian dan hapus dokumen yang dipilih?')) {
     form.program_name = '';
-    form.program_custom = '';
     form.region = '';
     form.id_real = '';
     form.dealer_name = '';
@@ -1652,7 +1616,6 @@ function handleClearForm() {
     form.sales_name = '';
     form.sales_custom = '';
     form.whatsapp = '';
-    programRadioSelection.value = '';
 
     files.credit_note = null;
     files.agreement = null;

@@ -4,15 +4,15 @@
     <div class="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
       <span>Master Data</span>
       <ChevronRightIcon class="w-3.5 h-3.5 text-gray-400" />
-      <span class="text-gray-800">Master Customer</span>
+      <span class="text-gray-800">Master Badan Usaha</span>
     </div>
 
     <!-- Header Page -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Master Customer</h1>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Master Badan Usaha</h1>
         <p class="text-xs text-gray-500 mt-0.5">
-          Daftar entitas badan usaha/hukum, NPWP, dan alamat resmi Bill-To faktur.
+          Badan usaha (CV TOP SELULAR, PT RISM, ...) beserta NPWP dan alamat resmi yang dicetak sebagai Bill To di invoice.
         </p>
       </div>
 
@@ -22,7 +22,7 @@
           type="button"
           @click="downloadExport('/api/customers/export', { search: searchQuery, is_active: filterStatus })"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
-          title="Export customer sesuai pencarian & filter"
+          title="Export badan usaha sesuai pencarian & filter"
         >
           <span class="sm:hidden">Export</span><span class="hidden sm:inline">Export Excel</span>
         </button>
@@ -31,7 +31,7 @@
           @click="openCreateModal"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
         >
-          <span class="sm:hidden">Tambah</span><span class="hidden sm:inline">Tambah Customer</span>
+          <span class="sm:hidden">Tambah</span><span class="hidden sm:inline">Tambah Badan Usaha</span>
         </button>
       </div>
     </div>
@@ -82,10 +82,10 @@
         </div>
       </div>
 
-      <!-- Layar kecil: satu kartu per customer -->
+      <!-- Layar kecil: satu kartu per badan usaha -->
       <div class="md:hidden">
         <p v-if="isLoading" class="py-8 text-center text-xs text-gray-500">Memuat data...</p>
-        <p v-else-if="customers.length === 0" class="py-8 px-4 text-center text-xs text-gray-500">Tidak ada data customer yang ditemukan.</p>
+        <p v-else-if="customers.length === 0" class="py-8 px-4 text-center text-xs text-gray-500">Tidak ada data badan usaha yang ditemukan.</p>
         <ul v-else class="divide-y divide-gray-100">
           <li v-for="c in customers" :key="c.id" class="p-4 space-y-2 text-xs text-gray-700">
             <div class="flex items-start justify-between gap-3">
@@ -129,7 +129,7 @@
             <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">
               <th scope="col" class="py-2.5 px-3 text-center w-12 border-r border-gray-200">No</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Kode</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Nama Customer / PT</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Nama Badan Usaha</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">NPWP</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Alamat Bill-To</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
@@ -144,7 +144,7 @@
             </tr>
             <tr v-else-if="customers.length === 0">
               <td colspan="7" class="py-8 text-center text-gray-500">
-                Tidak ada data customer yang ditemukan.
+                Tidak ada data badan usaha yang ditemukan.
               </td>
             </tr>
             <tr
@@ -164,7 +164,7 @@
                 {{ c.code || '-' }}
               </td>
 
-              <!-- 3. Nama Customer -->
+              <!-- 3. Nama Badan Usaha -->
               <td class="py-2.5 px-3 border-r border-gray-100 whitespace-normal min-w-[180px] max-w-[240px] break-words leading-snug">
                 {{ c.name || '-' }}
               </td>
@@ -198,7 +198,7 @@
                     type="button"
                     @click="openEditModal(c)"
                     class="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition cursor-pointer"
-                    title="Edit Customer"
+                    title="Edit Badan Usaha"
                   >
                     <PencilIcon class="w-3.5 h-3.5" />
                   </button>
@@ -206,7 +206,7 @@
                     type="button"
                     @click="confirmDelete(c)"
                     class="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
-                    title="Hapus Customer"
+                    title="Hapus Badan Usaha"
                   >
                     <Trash2Icon class="w-3.5 h-3.5" />
                   </button>
@@ -268,7 +268,7 @@
       <div class="bg-white rounded-xl max-w-lg w-full p-5 shadow-xl border border-gray-200 space-y-4 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between border-b border-gray-200 pb-2.5">
           <h3 class="text-sm font-bold text-gray-950">
-            {{ isEditMode ? 'Edit Master Customer' : 'Tambah Master Customer' }}
+            {{ isEditMode ? 'Edit Badan Usaha' : 'Tambah Badan Usaha' }}
           </h3>
           <button
             type="button"
@@ -281,10 +281,10 @@
 
         <form @submit.prevent="submitForm" class="space-y-3.5 text-xs">
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <!-- Kode Customer -->
+            <!-- Kode Badan Usaha -->
             <div>
               <label class="block font-medium text-gray-900 mb-1">
-                Kode Customer <span class="text-rose-500">*</span>
+                Kode Badan Usaha <span class="text-rose-500">*</span>
               </label>
               <input
                 type="text"
@@ -295,7 +295,7 @@
               />
             </div>
 
-            <!-- Nama Customer -->
+            <!-- Nama Badan Usaha -->
             <div>
               <label class="block font-medium text-gray-900 mb-1">
                 Nama Badan Usaha/PT <span class="text-rose-500">*</span>
@@ -372,7 +372,7 @@
               :disabled="isSaving"
               class="h-8 px-4 rounded-lg bg-gray-900 hover:bg-gray-800 text-white text-xs font-medium cursor-pointer disabled:opacity-50"
             >
-              <span>{{ isSaving ? 'Menyimpan...' : 'Simpan Customer' }}</span>
+              <span>{{ isSaving ? 'Menyimpan...' : 'Simpan Badan Usaha' }}</span>
             </button>
           </div>
         </form>
@@ -385,9 +385,9 @@
       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
     >
       <div class="bg-white rounded-xl max-w-sm w-full p-5 shadow-lg border border-gray-200 space-y-3">
-        <h3 class="text-sm font-bold text-gray-950">Hapus Master Customer</h3>
+        <h3 class="text-sm font-bold text-gray-950">Hapus Badan Usaha</h3>
         <p class="text-xs text-gray-600">
-          Hapus customer <strong class="text-gray-900">{{ customerToDelete.name }}</strong> ({{ customerToDelete.code }})?
+          Hapus badan usaha <strong class="text-gray-900">{{ customerToDelete.name }}</strong> ({{ customerToDelete.code }})?
         </p>
         <div class="flex items-center justify-end gap-2 pt-2">
           <button
@@ -474,7 +474,7 @@ async function fetchCustomers(page = 1) {
       perPage.value = res.data.data.per_page || 20;
     }
   } catch (e) {
-    alert('Gagal memuat data customer: ' + (e.response?.data?.message || e.message));
+    alert('Gagal memuat data badan usaha: ' + (e.response?.data?.message || e.message));
   } finally {
     isLoading.value = false;
   }

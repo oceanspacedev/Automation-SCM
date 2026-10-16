@@ -34,7 +34,7 @@ class User extends Authenticatable
         'dashboard' => 'Dashboard',
         'master_program' => 'Master Program',
         'master_dealer' => 'Master Dealer',
-        'master_customer' => 'Master Customer',
+        'master_customer' => 'Master Badan Usaha',
         'master_user' => 'Master User',
     ];
 

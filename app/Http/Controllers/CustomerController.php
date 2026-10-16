@@ -40,9 +40,9 @@ class CustomerController extends Controller
     public function export(Request $request, SpreadsheetExport $export): StreamedResponse
     {
         return $export->download(
-            'master_customer_'.now()->format('Ymd_His').'.xlsx',
-            'Master Customer',
-            ['KODE', 'NAMA CUSTOMER', 'NPWP', 'NAMA NPWP', 'ALAMAT', 'STATUS'],
+            'master_badan_usaha_'.now()->format('Ymd_His').'.xlsx',
+            'Master Badan Usaha',
+            ['KODE', 'NAMA BADAN USAHA', 'NPWP', 'NAMA NPWP', 'ALAMAT', 'STATUS'],
             $this->filteredQuery($request)->orderBy('name')->get()->map(fn (Customer $customer) => [
                 $customer->code,
                 $customer->name,
@@ -116,7 +116,7 @@ class CustomerController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Master Customer berhasil ditambahkan.',
+            'message' => 'Badan usaha berhasil ditambahkan.',
             'data' => $customer,
         ], 201);
     }
@@ -144,7 +144,7 @@ class CustomerController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Master Customer berhasil diperbarui.',
+            'message' => 'Badan usaha berhasil diperbarui.',
             'data' => $customer,
         ]);
     }
@@ -159,7 +159,7 @@ class CustomerController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Master Customer berhasil dihapus.',
+            'message' => 'Badan usaha berhasil dihapus.',
         ]);
     }
 
@@ -174,7 +174,7 @@ class CustomerController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Status Customer berhasil diperbarui.',
+            'message' => 'Status badan usaha berhasil diperbarui.',
             'data' => $customer,
         ]);
     }

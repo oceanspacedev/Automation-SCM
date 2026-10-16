@@ -237,7 +237,7 @@ class ProgramClaimConfirmationController extends Controller
                 'no_faktur_pajak' => $dp->no_faktur_pajak,
                 'ket_faktur_pajak' => $dp->ket_faktur_pajak,
                 'noted' => $dp->noted,
-            ]], null, $dp->areaEnum());
+            ]], null, $dp->areaEnum(), $dp->brand);
         } catch (\Throwable $e) {
             Log::warning("Gagal push status potong ke spreadsheet untuk DP ID {$dp->id}: {$e->getMessage()}");
         }

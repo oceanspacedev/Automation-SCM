@@ -35,13 +35,20 @@ Dibangun dengan **Laravel 13 (PHP 8.3+)**, **Vue 3** (SPA) dan **Tailwind CSS v4
 | :--- | :--- |
 | **Draft** | Impor file Excel klaim (DSA / NPS FL / REGULAR), validasi rumus pajak, lalu terbitkan jadi invoice. |
 | **Invoice** | Daftar invoice resmi: lihat, cetak/unduh PDF, kirim lewat email (Gmail API / SMTP) dan WhatsApp. |
-| **Form Program** | Formulir publik untuk sales (`/form/jabar`, `/form/jateng`) mengirim dokumen klaim (Credit Note, Agreement, Faktur Pajak). Dokumen dicek AI. |
+| **Form Program** | Formulir publik untuk sales (mis. `/form/realme/jabar`) mengirim dokumen klaim (Credit Note, Agreement, Faktur Pajak). Dokumen dicek AI. |
 | **Data Program** | Daftar klaim (56 kolom) per area. Baris otomatis dibuat saat invoice terbit, lalu dicocokkan dengan Form Program. |
 | **Riwayat** | Riwayat Program (log pencocokan), Riwayat Email, dan Dashboard ringkasan. |
-| **Master** | Program, Region, AR, Dealer, Customer (Bill To), User. Bisa import & export Excel. |
+| **Master** | Brand, Program, Region, AR, Dealer, Badan Usaha (Bill To), User. Bisa import & export Excel. |
 | **Profil** | Ubah foto, nama, email, WhatsApp, dan password akun sendiri. |
 
-**Area.** Draft, Invoice, Form Program, Data Program, Riwayat Program, Dealer, Region, dan AR dipisah per area lewat tab **Jawa Barat / Jawa Tengah** (URL berakhiran `/jabar` atau `/jateng`). Master Program, Customer, dan User dipakai bersama semua area.
+**Brand & area.** Data dikelompokkan per **brand** (Realme, Oppo, ... dari **Master → Brand**) lalu per **area** (Jawa Barat / Jawa Tengah):
+
+- **Per brand & area:** Draft, Invoice, Form Program, Data Program, dan Riwayat Program. URL-nya `/<menu>/<brand>/<area>`, mis. `/data-program/realme/jabar`. Di menu atas, klik Draft / Invoice / Form Program / Data Program, pilih brand, lalu pilih area. Di halamannya juga ada tab brand dan tab area.
+- **Per brand:** Master Program (tiap brand punya kode program sendiri).
+- **Per area (dipakai semua brand):** Dealer, Region, dan AR.
+- **Dipakai bersama:** Badan Usaha dan User.
+
+Data lama dan link lama (`/form/jabar`, `/data-program/jabar`, dst.) otomatis milik / diarahkan ke **Realme**.
 
 ---
 
@@ -57,7 +64,7 @@ flowchart TD
     E --> F[Kirim invoice ke dealer<br/>Email & WhatsApp]
     E -->|Otomatis| G[Baris Data Program<br/>BELUM MATCH TEST]
 
-    S[Sales isi Form Program<br/>/form/jabar · /form/jateng] --> T[AI cek dokumen<br/>CN · Agreement · Faktur]
+    S[Sales isi Form Program<br/>/form/brand/area] --> T[AI cek dokumen<br/>CN · Agreement · Faktur]
     T -->|Ada masalah| S
     T -->|Lolos| U[Pengajuan Form Program]
 
@@ -80,7 +87,7 @@ flowchart TD
 2. Sistem menghitung ulang DPP, DPP Lain, PPN, PPh, dan Net Pay dari Support Amount (lihat [rumus](#perhitungan-pajak)) lalu membandingkannya dengan angka di Excel. Status draft:
    - **Ready**: siap diterbitkan.
    - **Error**: ada masalah, misalnya No CN kosong atau sudah dipakai, atau tipe invoice tidak dikenal. Draft error tidak bisa diedit; hapus, perbaiki Excel, lalu import ulang.
-3. Klik **Generate** per baris, **Generate (n) Terpilih**, atau **Generate Semua Invoice**, lalu pilih **Bill To** (customer penagih).
+3. Klik **Generate** per baris, **Generate (n) Terpilih**, atau **Generate Semua Invoice**, lalu pilih **Bill To** (badan usaha dari Master Badan Usaha, mis. CV TOP SELULAR).
 4. **Nomor invoice = No CN** dari Excel. No CN wajib diisi dan unik di semua area. Invoice yang sudah terbit otomatis dibuatkan baris **Data Program** di area yang sama.
 5. Draft bisa juga dibuat manual lewat **Tambah Manual** (No CN tetap wajib).
 
@@ -106,12 +113,13 @@ flowchart TD
 
 Formulir publik tanpa login:
 
-| Area | URL |
+| Brand & area | URL |
 | :--- | :--- |
-| Jawa Barat | `/form/jabar` (link lama `/form-submission` & `/form-realme` diarahkan ke sini) |
-| Jawa Tengah | `/form/jateng` |
+| Realme Jawa Barat | `/form/realme/jabar` (link lama `/form/jabar`, `/form-submission` & `/form-realme` diarahkan ke sini) |
+| Realme Jawa Tengah | `/form/realme/jateng` |
+| Brand lain | `/form/<kode-brand>/jabar` · `/form/<kode-brand>/jateng` (kode brand terlihat di Master Brand) |
 
-1. Sales memilih **Nama Program** (dari Master Program).
+1. Sales memilih **Nama Program** (dari Master Program brand tersebut).
 2. Sales mencari toko di **ID REALME** dengan kode BT, ID Realme (ID GS), atau nama toko dari Master Dealer. Region dan nama dealer terisi otomatis.
 3. Isi Nama Sales, lalu unggah dokumen:
    - **Credit Note (CN)**: wajib.
@@ -214,11 +222,12 @@ sequenceDiagram
 ### Master
 | Menu | Isi | Import / Export |
 | :--- | :--- | :--- |
-| **Program** | Kode program (mis. PROGRAM 345), nama, periode. Satu daftar untuk semua area. Nama program di draft otomatis mengisi kodenya. | Import & export Excel (kolom PROGRAM, NAMA PROGRAM, PERIODE) |
+| **Brand** | Brand program (Realme, Oppo, ...): nama, kode URL (dibuat otomatis, tidak berubah), urutan, status. Brand aktif muncul di menu Draft, Invoice, Form Program, dan Data Program. Brand yang sudah punya data tidak bisa dihapus, cukup dinonaktifkan. | — |
+| **Program** | Kode program (mis. PROGRAM 345), nama, periode. Satu daftar per brand untuk semua area (tab brand di atas halaman). Nama program di draft otomatis mengisi kodenya. | Import & export Excel (kolom PROGRAM, NAMA PROGRAM, PERIODE) |
 | **Region** | Region per area (dipakai di Form Program & Master Dealer). | Export |
 | **AR** | AR per region: nama & nomor WhatsApp penerima WA "dealer setuju dipotong". | Export |
 | **Dealer** | Toko dari file Master Customer CV TOP: kode BT, nama, alias, ID Realme/Nama GS, Jenis NPWP, NPWP, region, telemarketing (+ nomor WA), sales, status. | Import (file CV TOP; satu file untuk semua area) & export dengan format yang sama |
-| **Customer** | Pihak Bill To invoice (kode, nama, NPWP, alamat). | Export |
+| **Badan Usaha** | Badan usaha Bill To invoice (CV TOP SELULAR, PT RISM, PT MSI, ...): kode, nama, NPWP, alamat. Dulu bernama Master Customer; link lama `/customers` diarahkan ke `/badan-usaha`. | Export |
 | **User** | Akun pengguna, peran, akses per menu, persetujuan (ACC). | — |
 
 **Import Master Dealer:** area tiap toko diambil dari kolom **Big Area** (atau **Reffnote** bila Big Area kosong). Toko tanpa keduanya dilewati dan bisa diunduh sebagai daftar *dealer belum diimport*. Pilih **Tambah & perbarui** (aman) atau **Ganti semua** (hapus semua dealer lama di kedua area).
@@ -286,7 +295,7 @@ Isi koneksi database dan layanan lain di `.env` (lihat [Konfigurasi `.env`](#kon
 
 ```bash
 php artisan migrate --seed      # tabel + akun admin + akun email pengirim
-php artisan db:seed --class=MasterDataSeeder      # customer Bill To
+php artisan db:seed --class=MasterDataSeeder      # badan usaha Bill To (CV TOP, PT RISM, PT MSI)
 php artisan db:seed --class=MasterProgramSeeder   # master program
 php artisan storage:link        # foto profil & PDF invoice di storage/app/public
 ```
@@ -413,8 +422,9 @@ vendor/bin/pint --dirty
 | `dealers` | Master Dealer per area (kode BT unik). |
 | `regions` | Master Region per area. |
 | `ar_contacts` | Master AR per region per area. |
-| `master_programs` | Master Program (kode unik, dipakai semua area). |
-| `customers` | Customer Bill To. |
+| `brands` | Master Brand (Realme, Oppo, ...); kode URL-nya dipakai di kolom `brand` tabel data. |
+| `master_programs` | Master Program per brand (kode unik per brand, dipakai semua area). |
+| `customers` | Master Badan Usaha (Bill To invoice). |
 | `email_accounts` | Akun pengirim email invoice. |
 | `email_logs`, `whatsapp_logs` | Log pengiriman invoice. |
 

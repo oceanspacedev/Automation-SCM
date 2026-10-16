@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToArea;
+use App\Models\Concerns\BelongsToBrand;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class DataProgram extends Model
 {
-    use BelongsToArea;
+    use BelongsToArea, BelongsToBrand;
 
     protected $guarded = ['id'];
 
@@ -41,6 +42,6 @@ class DataProgram extends Model
      */
     public function draft(): BelongsTo
     {
-        return $this->belongsTo(Draft::class, 'draft_id')->withoutGlobalScope('area');
+        return $this->belongsTo(Draft::class, 'draft_id')->withoutGlobalScopes(['area', 'brand']);
     }
 }

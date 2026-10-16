@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToBrand;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class MasterProgram extends Model
 {
-    use HasFactory;
+    use BelongsToBrand, HasFactory;
 
     public const CODE_PREFIX = 'PROGRAM';
 

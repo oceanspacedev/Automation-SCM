@@ -15,6 +15,6 @@ class EmailLog extends Model
 
     public function invoice(): BelongsTo
     {
-        return $this->belongsTo(Invoice::class)->withoutGlobalScope('area');
+        return $this->belongsTo(Invoice::class)->withoutGlobalScopes(['area', 'brand']);
     }
 }

@@ -3,17 +3,18 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToArea;
+use App\Models\Concerns\BelongsToBrand;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Invoice dari sebuah draft; areanya (Jawa Barat/Jawa Tengah) mengikuti draft tersebut.
+ * Invoice dari sebuah draft; area (Jawa Barat/Jawa Tengah) dan brandnya mengikuti draft tersebut.
  */
 class Invoice extends Model
 {
-    use BelongsToArea, HasFactory;
+    use BelongsToArea, BelongsToBrand, HasFactory;
 
     protected $guarded = ['id'];
 
@@ -30,7 +31,7 @@ class Invoice extends Model
 
     public function draft(): BelongsTo
     {
-        return $this->belongsTo(Draft::class)->withoutGlobalScope('area');
+        return $this->belongsTo(Draft::class)->withoutGlobalScopes(['area', 'brand']);
     }
 
     public function emailLogs(): HasMany
@@ -41,6 +42,22 @@ class Invoice extends Model
     public function whatsappLogs(): HasMany
     {
         return $this->hasMany(WhatsAppLog::class);
+    }
+
+    /**
+     * Display name of the invoice's brand (e.g. "Realme").
+     */
+    public function brandName(): string
+    {
+        return Brand::nameFor($this->brand);
+    }
+
+    /**
+     * Link where the dealer uploads this program's documents (CN, Agreement, Faktur Pajak).
+     */
+    public function documentUploadUrl(?string $baseUrl = null): string
+    {
+        return Brand::documentUploadUrl($this->brand, $this->areaEnum(), $baseUrl ?? url('/'));
     }
 
     public function getTerbilangAttribute(): string

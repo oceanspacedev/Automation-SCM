@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToArea;
+use App\Models\Concerns\BelongsToBrand;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  */
 class Draft extends Model
 {
-    use BelongsToArea, HasFactory;
+    use BelongsToArea, BelongsToBrand, HasFactory;
 
     protected $guarded = ['id'];
 
@@ -29,11 +30,11 @@ class Draft extends Model
 
     public function invoice(): HasOne
     {
-        return $this->hasOne(Invoice::class)->withoutGlobalScope('area');
+        return $this->hasOne(Invoice::class)->withoutGlobalScopes(['area', 'brand']);
     }
 
     public function dataProgram(): HasOne
     {
-        return $this->hasOne(DataProgram::class, 'draft_id')->withoutGlobalScope('area');
+        return $this->hasOne(DataProgram::class, 'draft_id')->withoutGlobalScopes(['area', 'brand']);
     }
 }

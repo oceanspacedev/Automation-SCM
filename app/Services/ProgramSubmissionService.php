@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Area;
+use App\Models\Brand;
 use App\Models\ProgramSubmission;
+use Closure;
 use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -20,54 +22,56 @@ class ProgramSubmissionService
     public const DEFAULT_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1rDYiHsNR43H44g2xyV-igyp1Ijv_jp8v8FblAMHqof8/edit?gid=0#gid=0';
 
     /**
-     * Get configured Google Apps Script Web App URL of an area (defaults to the area selected in AreaContext).
-     * Only Jawa Barat has a built-in default; other areas must be configured first.
+     * Get configured Google Apps Script Web App URL of a brand & area (defaults to the brand & area selected for the request).
+     * Only Realme Jawa Barat has a built-in default; others must be configured first.
      */
-    public function getWebAppUrl(?Area $area = null): string
+    public function getWebAppUrl(?Area $area = null, ?string $brand = null): string
     {
         $area ??= $this->currentArea();
-        $isDefaultArea = $area === Area::default();
+        $brand ??= $this->currentBrand();
+        $isDefaultScope = Brand::isDefaultScope($area, $brand);
 
-        $url = (string) Cache::get($area->settingKey(self::CACHE_KEY_WEBAPP_URL), $isDefaultArea ? env('GOOGLE_SHEET_WEBAPP_URL', '') : '');
+        $url = (string) Cache::get(Brand::settingKey(self::CACHE_KEY_WEBAPP_URL, $area, $brand), $isDefaultScope ? env('GOOGLE_SHEET_WEBAPP_URL', '') : '');
 
         if (! empty($url)) {
             return $url;
         }
 
-        return $isDefaultArea ? self::DEFAULT_WEBAPP_URL : '';
+        return $isDefaultScope ? self::DEFAULT_WEBAPP_URL : '';
     }
 
     /**
-     * Save configured Google Apps Script Web App URL of an area.
+     * Save configured Google Apps Script Web App URL of the selected brand & area.
      */
     public function setWebAppUrl(string $url, ?Area $area = null): void
     {
-        Cache::forever(($area ?? $this->currentArea())->settingKey(self::CACHE_KEY_WEBAPP_URL), trim($url));
+        Cache::forever(Brand::settingKey(self::CACHE_KEY_WEBAPP_URL, $area ?? $this->currentArea(), $this->currentBrand()), trim($url));
     }
 
     /**
-     * Get configured Google Spreadsheet URL of an area.
+     * Get configured Google Spreadsheet URL of a brand & area.
      */
-    public function getSpreadsheetUrl(?Area $area = null): string
+    public function getSpreadsheetUrl(?Area $area = null, ?string $brand = null): string
     {
         $area ??= $this->currentArea();
-        $isDefaultArea = $area === Area::default();
+        $brand ??= $this->currentBrand();
+        $isDefaultScope = Brand::isDefaultScope($area, $brand);
 
-        $url = (string) Cache::get($area->settingKey(self::CACHE_KEY_SPREADSHEET_URL), $isDefaultArea ? env('PROGRAM_SUBMISSION_SPREADSHEET_URL', '') : '');
+        $url = (string) Cache::get(Brand::settingKey(self::CACHE_KEY_SPREADSHEET_URL, $area, $brand), $isDefaultScope ? env('PROGRAM_SUBMISSION_SPREADSHEET_URL', '') : '');
 
         if (! empty($url)) {
             return $url;
         }
 
-        return $isDefaultArea ? self::DEFAULT_SPREADSHEET_URL : '';
+        return $isDefaultScope ? self::DEFAULT_SPREADSHEET_URL : '';
     }
 
     /**
-     * Save configured Google Spreadsheet URL of an area.
+     * Save configured Google Spreadsheet URL of the selected brand & area.
      */
     public function setSpreadsheetUrl(string $url, ?Area $area = null): void
     {
-        Cache::forever(($area ?? $this->currentArea())->settingKey(self::CACHE_KEY_SPREADSHEET_URL), trim($url));
+        Cache::forever(Brand::settingKey(self::CACHE_KEY_SPREADSHEET_URL, $area ?? $this->currentArea(), $this->currentBrand()), trim($url));
     }
 
     /**
@@ -79,13 +83,46 @@ class ProgramSubmissionService
     }
 
     /**
+     * The brand selected for the current request (Realme when none is selected).
+     */
+    protected function currentBrand(): string
+    {
+        return app(BrandContext::class)->resolve();
+    }
+
+    /**
+     * Run a callback with the current area & brand selected,
+     * so spreadsheet syncs only create, update, and delete rows of that area & brand.
+     *
+     * @template TReturn
+     *
+     * @param  Closure(): TReturn  $callback
+     * @return TReturn
+     */
+    protected function inScope(Closure $callback): mixed
+    {
+        return app(AreaContext::class)->run(
+            $this->currentArea(),
+            fn () => app(BrandContext::class)->run($this->currentBrand(), $callback)
+        );
+    }
+
+    /**
+     * Whether both an area and a brand are selected (so queries are limited to them).
+     */
+    protected function isScoped(): bool
+    {
+        return app(AreaContext::class)->current() !== null && app(BrandContext::class)->current() !== null;
+    }
+
+    /**
      * Append a newly submitted form row to the Google Spreadsheet via Google Apps Script Web App.
      *
      * @return array{success: bool, message: string}
      */
     public function appendSubmissionToSpreadsheet(ProgramSubmission $submission, ?string $customUrl = null): array
     {
-        $url = trim((string) ($customUrl ?: $this->getWebAppUrl($submission->areaEnum())));
+        $url = trim((string) ($customUrl ?: $this->getWebAppUrl($submission->areaEnum(), $submission->brand)));
 
         if (empty($url) || ! str_contains($url, 'script.google.com/macros/s/')) {
             return [
@@ -233,10 +270,9 @@ class ProgramSubmissionService
      */
     public function processSheetRows(array $rows, int $limit = 0): array
     {
-        // Selalu jalankan dalam konteks area agar penghapusan baris hanya menyentuh data area ini
-        $areaContext = app(AreaContext::class);
-        if ($areaContext->current() === null) {
-            return $areaContext->run($this->currentArea(), fn () => $this->processSheetRows($rows, $limit));
+        // Selalu jalankan dalam konteks area & brand agar penghapusan baris hanya menyentuh data area & brand ini
+        if (! $this->isScoped()) {
+            return $this->inScope(fn () => $this->processSheetRows($rows, $limit));
         }
 
         $headerRow = array_map(fn ($col) => strtolower(trim((string) $col)), $rows[0]);
@@ -372,9 +408,8 @@ class ProgramSubmissionService
      */
     public function saveWebhookPayload(array $payload): ProgramSubmission
     {
-        $areaContext = app(AreaContext::class);
-        if ($areaContext->current() === null) {
-            return $areaContext->run($this->currentArea(), fn () => $this->saveWebhookPayload($payload));
+        if (! $this->isScoped()) {
+            return $this->inScope(fn () => $this->saveWebhookPayload($payload));
         }
 
         $namedValues = $payload['namedValues'] ?? [];

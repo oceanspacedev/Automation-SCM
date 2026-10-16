@@ -24,7 +24,7 @@
             <!-- Menu utama (layar lebar) -->
             <NavigationMenu>
               <NavigationMenuList class="flex items-center gap-1">
-                <!-- 1-4. Draft, Invoice, Form Program, Data Program: dropdown per area -->
+                <!-- 1-4. Draft, Invoice, Form Program, Data Program: dropdown per brand → area -->
                 <NavigationMenuItem v-for="menu in areaMenus" :key="menu.path">
                   <Popover :open="openAreaMenu === menu.path" @update:open="(open) => (openAreaMenu = open ? menu.path : null)">
                     <PopoverTrigger as-child>
@@ -37,26 +37,30 @@
                         ]"
                       >
                         <span>{{ menu.label }}</span>
-                        <span v-if="isActive(menu.path) && route.params.area" class="text-[10px] font-semibold text-gray-500 dark:text-slate-400">{{ activeAreaShort }}</span>
+                        <span v-if="isActive(menu.path) && route.params.area" class="text-[10px] font-semibold text-gray-500 dark:text-slate-400 uppercase">{{ activeBrandName }} · {{ activeAreaShort }}</span>
                         <ChevronDownIcon
                           class="w-3.5 h-3.5 text-gray-500 dark:text-slate-400 transition-transform duration-200"
                           :class="openAreaMenu === menu.path && 'rotate-180'"
                         />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent align="start" class="w-48 p-1.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl text-xs space-y-0.5">
-                      <router-link
-                        v-for="area in AREAS"
-                        :key="area.value"
-                        :to="`${menu.path}/${area.value}`"
-                        @click="openAreaMenu = null"
-                        :class="[
-                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                          isActive(`${menu.path}/${area.value}`) ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
-                        ]"
-                      >
-                        {{ area.label }}
-                      </router-link>
+                    <PopoverContent align="start" class="w-52 max-h-[70vh] overflow-y-auto p-1.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl text-xs">
+                      <!-- Brand dari Master Brand; tiap brand punya Jawa Barat & Jawa Tengah -->
+                      <div v-for="(brand, index) in navBrands" :key="brand.slug" :class="index > 0 && 'mt-1 pt-1 border-t border-gray-100 dark:border-slate-800'">
+                        <p class="px-3 pt-1.5 pb-1 text-[11px] font-semibold text-gray-400 dark:text-slate-500">{{ brand.name }}</p>
+                        <router-link
+                          v-for="area in AREAS"
+                          :key="area.value"
+                          :to="`${menu.path}/${brand.slug}/${area.value}`"
+                          @click="openAreaMenu = null"
+                          :class="[
+                            'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                            isActive(`${menu.path}/${brand.slug}/${area.value}`) ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                          ]"
+                        >
+                          {{ area.label }}
+                        </router-link>
+                      </div>
                     </PopoverContent>
                   </Popover>
                 </NavigationMenuItem>
@@ -129,7 +133,7 @@
                         type="button"
                         :class="[
                           navigationMenuTriggerStyle(),
-                          (isActive('/dealers') || isActive('/customers') || isActive('/users') || isActive('/programs') || isActive('/regions') || isActive('/ar')) && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
+                          masterColumns.some((column) => column.some((link) => isActive(link.to))) && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
                           'gap-1.5 dark:text-slate-200 dark:hover:bg-slate-800'
                         ]"
                       >
@@ -140,78 +144,24 @@
                         />
                       </button>
                     </PopoverTrigger>
-                    <PopoverContent align="start" class="w-48 p-1.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl text-xs space-y-0.5">
-                      <router-link
-                        v-if="canAccess('master_program')"
-                        to="/programs"
-                        @click="isMasterOpen = false"
-                        :class="[
-                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                          isActive('/programs') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
-                        ]"
-                      >
-                        Program
-                      </router-link>
-
-                      <router-link
-                        v-if="canAccess('master_program')"
-                        to="/regions"
-                        @click="isMasterOpen = false"
-                        :class="[
-                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                          isActive('/regions') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
-                        ]"
-                      >
-                        Region
-                      </router-link>
-
-                      <router-link
-                        v-if="canAccess('master_program')"
-                        to="/ar"
-                        @click="isMasterOpen = false"
-                        :class="[
-                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                          isActive('/ar') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
-                        ]"
-                      >
-                        AR
-                      </router-link>
-
-                      <router-link
-                        v-if="canAccess('master_dealer')"
-                        to="/dealers"
-                        @click="isMasterOpen = false"
-                        :class="[
-                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                          isActive('/dealers') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
-                        ]"
-                      >
-                        Dealer
-                      </router-link>
-
-                      <router-link
-                        v-if="canAccess('master_customer')"
-                        to="/customers"
-                        @click="isMasterOpen = false"
-                        :class="[
-                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                          isActive('/customers') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
-                        ]"
-                      >
-                        Customer
-                      </router-link>
-
-                      <router-link
-                        v-if="canAccess('master_user')"
-                        to="/users"
-                        @click="isMasterOpen = false"
-                        :class="[
-                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                          isActive('/users') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
-                        ]"
-                      >
-                        User
-                      </router-link>
+                    <!-- Dua kolom supaya daftar Master tidak memanjang ke bawah -->
+                    <PopoverContent align="start" :class="[masterColumns.length > 1 ? 'w-80' : 'w-48', 'p-1.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl text-xs']">
+                      <div :class="['grid gap-1.5 divide-x divide-gray-100 dark:divide-slate-800', masterColumns.length > 1 ? 'grid-cols-2' : 'grid-cols-1']">
+                        <div v-for="(column, index) in masterColumns" :key="index" :class="['space-y-0.5', index > 0 && 'pl-1.5']">
+                          <router-link
+                            v-for="link in column"
+                            :key="link.to"
+                            :to="link.to"
+                            @click="isMasterOpen = false"
+                            :class="[
+                              'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                              isActive(link.to) ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                            ]"
+                          >
+                            {{ link.label }}
+                          </router-link>
+                        </div>
+                      </div>
                     </PopoverContent>
                   </Popover>
                 </NavigationMenuItem>
@@ -444,7 +394,7 @@
 
     <!-- Main Content -->
     <main :class="['flex-1 w-full', isStandalonePage ? 'p-0 m-0' : 'mx-auto px-4 sm:px-6 py-5']">
-      <router-view :key="`${route.name}-${route.params.area || ''}`" />
+      <router-view :key="`${route.name}-${route.params.brand || ''}-${route.params.area || ''}`" />
     </main>
   </div>
 </template>
@@ -456,6 +406,7 @@ import axios from 'axios';
 import { useAuth } from '@/composables/useAuth';
 import { useTheme } from '@/composables/useTheme';
 import { AREAS, findArea } from '@/composables/useArea';
+import { DEFAULT_BRAND, brandName, useBrands } from '@/composables/useBrands';
 import {
   NavigationMenu,
   NavigationMenuItem,
@@ -492,6 +443,11 @@ const areaMenus = computed(() => [
 const openAreaMenu = ref(null);
 
 const activeAreaShort = computed(() => findArea(route.params.area).short);
+
+// Brand dari Master Brand (yang aktif) untuk menu; Realme tetap tampil selama daftar belum termuat
+const { activeBrands, loadBrands } = useBrands();
+const navBrands = computed(() => (activeBrands.value.length ? activeBrands.value : [{ slug: DEFAULT_BRAND, name: brandName(DEFAULT_BRAND) }]));
+const activeBrandName = computed(() => brandName(route.params.brand));
 
 // Huruf pertama nama akun untuk tombol menu profil
 const userInitial = computed(() => (user.value?.name || user.value?.email || 'A').trim().charAt(0).toUpperCase());
@@ -571,12 +527,30 @@ const canAccess = (feature) => {
   return false;
 };
 
+// Menu Master dibagi dua kolom: program & wilayah, lalu toko, badan usaha & akun
+const masterColumns = computed(() => [
+  [
+    canAccess('master_program') && { label: 'Brand', to: '/brands' },
+    canAccess('master_program') && { label: 'Program', to: '/programs' },
+    canAccess('master_program') && { label: 'Region', to: '/regions' },
+    canAccess('master_program') && { label: 'AR', to: '/ar' },
+  ],
+  [
+    canAccess('master_dealer') && { label: 'Dealer', to: '/dealers' },
+    canAccess('master_customer') && { label: 'Badan Usaha', to: '/badan-usaha' },
+    canAccess('master_user') && { label: 'User', to: '/users' },
+  ],
+].map((column) => column.filter(Boolean)).filter((column) => column.length > 0));
+
 // Menu layar kecil: semua menu navigasi atas, dikelompokkan seperti dropdown desktop
 const isMobileNavOpen = ref(false);
 const openMobileGroup = ref(null);
 
 const mobileNavGroups = computed(() => {
-  const areaLinks = (path) => AREAS.map((area) => ({ label: area.label, to: `${path}/${area.value}` }));
+  const areaLinks = (path) => navBrands.value.flatMap((brand) => AREAS.map((area) => ({
+    label: `${brand.name} · ${area.label}`,
+    to: `${path}/${brand.slug}/${area.value}`,
+  })));
 
   return [
     ...areaMenus.value.map((menu) => ({ title: menu.label, path: menu.path, links: areaLinks(menu.path) })),
@@ -588,17 +562,7 @@ const mobileNavGroups = computed(() => {
         canAccess('dashboard') && { label: 'Dashboard', to: '/dashboard' },
       ],
     },
-    canAccess('master') && {
-      title: 'Master',
-      links: [
-        canAccess('master_program') && { label: 'Program', to: '/programs' },
-        canAccess('master_program') && { label: 'Region', to: '/regions' },
-        canAccess('master_program') && { label: 'AR', to: '/ar' },
-        canAccess('master_dealer') && { label: 'Dealer', to: '/dealers' },
-        canAccess('master_customer') && { label: 'Customer', to: '/customers' },
-        canAccess('master_user') && { label: 'User', to: '/users' },
-      ],
-    },
+    canAccess('master') && { title: 'Master', links: masterColumns.value.flat() },
   ]
     .filter(Boolean)
     .map((group) => ({ ...group, links: group.links.filter(Boolean) }))
@@ -687,6 +651,11 @@ onMounted(() => {
     }
   }, 4000);
 });
+
+// Daftar brand untuk menu dimuat setelah login
+watch(user, (value) => {
+  if (value) loadBrands();
+}, { immediate: true });
 
 onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer);

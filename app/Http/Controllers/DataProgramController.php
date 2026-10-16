@@ -423,7 +423,7 @@ class DataProgramController extends Controller
                         'no_faktur_pajak' => $dp->no_faktur_pajak,
                         'ket_faktur_pajak' => $dp->ket_faktur_pajak,
                         'noted' => $dp->noted,
-                    ]], null, $dp->areaEnum());
+                    ]], null, $dp->areaEnum(), $dp->brand);
                 } catch (\Throwable $e) {
                     Log::warning("Push single row reconcile to spreadsheet failed: {$e->getMessage()}");
                 }
@@ -608,7 +608,7 @@ class DataProgramController extends Controller
         $sheetPushResult = null;
         if ($pushToSheet) {
             try {
-                $sheetPushResult = $this->syncService->pushUpdatesToSpreadsheet([$this->spreadsheetRow($dp)], null, $dp->areaEnum());
+                $sheetPushResult = $this->syncService->pushUpdatesToSpreadsheet([$this->spreadsheetRow($dp)], null, $dp->areaEnum(), $dp->brand);
             } catch (\Throwable $e) {
                 Log::warning("Push single row update to spreadsheet failed: {$e->getMessage()}");
             }
@@ -645,12 +645,13 @@ class DataProgramController extends Controller
         }
 
         $sheetPushResults = [];
-        foreach ($dataPrograms->groupBy(fn (DataProgram $dp) => $dp->areaEnum()->value) as $areaRows) {
+        foreach ($dataPrograms->groupBy(fn (DataProgram $dp) => $dp->brand.'|'.$dp->areaEnum()->value) as $areaRows) {
             try {
                 $sheetPushResults[] = $this->syncService->pushUpdatesToSpreadsheet(
                     $areaRows->map(fn (DataProgram $dp) => $this->spreadsheetRow($dp))->values()->all(),
                     null,
-                    $areaRows->first()->areaEnum()
+                    $areaRows->first()->areaEnum(),
+                    $areaRows->first()->brand
                 );
             } catch (\Throwable $e) {
                 Log::warning("Push bulk update to spreadsheet failed: {$e->getMessage()}");

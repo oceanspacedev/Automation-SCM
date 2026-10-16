@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Area;
 use App\Console\Commands\AutoAnalyzeProgramAiCommand;
+use App\Models\Brand;
 use App\Models\DataProgram;
 use App\Models\Dealer;
 use App\Models\MasterProgram;
 use App\Models\ProgramSubmission;
 use App\Models\Region;
 use App\Services\AreaContext;
+use App\Services\BrandContext;
 use App\Services\DataProgramSyncService;
 use App\Services\DocumentAnalysisService;
 use App\Services\ProgramSubmissionService;
@@ -430,7 +432,7 @@ class ProgramSubmissionController extends Controller
                             'no_faktur_pajak' => $matchingDp->no_faktur_pajak,
                             'ket_faktur_pajak' => $matchingDp->ket_faktur_pajak,
                             'noted' => $matchingDp->noted,
-                        ]]);
+                        ]], null, $matchingDp->areaEnum(), $matchingDp->brand);
                     } catch (\Throwable $e) {
                         Log::warning("Gagal push matching DP saat update submission: {$e->getMessage()}");
                     }
@@ -1028,6 +1030,7 @@ class ProgramSubmissionController extends Controller
         ];
 
         $area = $this->areaContext->resolve();
+        $brand = Brand::query()->where('slug', app(BrandContext::class)->resolve())->first();
         $regions = Region::withoutGlobalScope('area')
             ->where('area', $area->value)
             ->where('is_active', true)
@@ -1035,7 +1038,7 @@ class ProgramSubmissionController extends Controller
             ->pluck('name')
             ->all();
 
-        $sales = Cache::remember($area->settingKey('program_submissions_sales_list_v2'), 300, function () use ($area) {
+        $sales = Cache::remember(Brand::settingKey('program_submissions_sales_list_v2', $area, $brand->slug), 300, function () use ($area) {
             return ProgramSubmission::withoutGlobalScope('area')
                 ->where('area', $area->value)
                 ->whereNotNull('sales_name')
@@ -1048,7 +1051,7 @@ class ProgramSubmissionController extends Controller
                 ->all();
         });
 
-        // Master Program satu daftar untuk semua area: form Jawa Barat & Jawa Tengah menampilkan program yang sama
+        // Master Program per brand, satu daftar untuk semua area: form Jawa Barat & Jawa Tengah menampilkan program yang sama
         $masterPrograms = MasterProgram::where('is_active', true)
             ->orderBy('name')
             ->pluck('name')
@@ -1070,7 +1073,10 @@ class ProgramSubmissionController extends Controller
                 ->values()
                 ->all();
 
-            $allPrograms = array_values(array_unique(array_merge($defaultPrograms, $dbPrograms)));
+            // Daftar program bawaan hanya milik Realme; brand lain memakai Master Program-nya sendiri
+            $allPrograms = $brand->slug === Brand::DEFAULT_SLUG
+                ? array_values(array_unique(array_merge($defaultPrograms, $dbPrograms)))
+                : $dbPrograms;
         }
 
         return response()->json([
@@ -1078,6 +1084,7 @@ class ProgramSubmissionController extends Controller
             'regions' => $regions,
             'sales' => $sales,
             'area' => ['value' => $area->value, 'label' => $area->label()],
+            'brand' => ['value' => $brand->slug, 'label' => $brand->name],
         ]);
     }
 

@@ -148,6 +148,7 @@ class ProgramReconciliationService
 
         $best = DataProgram::query()
             ->where('area', $submission->areaEnum()->value)
+            ->where('brand', $submission->brand)
             ->where(fn ($q) => $q->where('dealer_name', 'like', '%'.trim((string) $submission->dealer_name).'%')
                 ->when($hasIdReal, fn ($q) => $q->orWhere('kode_bt', $idReal)->orWhere('id_gs', $idReal)))
             ->get()
@@ -157,7 +158,7 @@ class ProgramReconciliationService
             ->first();
 
         return $best['dp'] ?? ($hasIdReal
-            ? DataProgram::where('area', $submission->areaEnum()->value)->where('kode_bt', $idReal)->first()
+            ? DataProgram::where('area', $submission->areaEnum()->value)->where('brand', $submission->brand)->where('kode_bt', $idReal)->first()
             : null);
     }
 
@@ -219,7 +220,7 @@ class ProgramReconciliationService
         $dp = $this->dataProgramForSubmission($submission);
 
         if (! $dp && ! empty($submission->dealer_name)) {
-            $dp = DataProgram::where('area', $submission->areaEnum()->value)->where('dealer_name', 'like', "%{$submission->dealer_name}%")->first();
+            $dp = DataProgram::where('area', $submission->areaEnum()->value)->where('brand', $submission->brand)->where('dealer_name', 'like', "%{$submission->dealer_name}%")->first();
         }
 
         if ($dp) {
@@ -238,8 +239,8 @@ class ProgramReconciliationService
      */
     public function evaluateMatchScore(DataProgram $dataProgram, ProgramSubmission $sub): ?int
     {
-        // 0. Data Program & Form Program dari area berbeda (Jabar/Jateng) tidak boleh saling dicocokkan
-        if ($dataProgram->areaEnum() !== $sub->areaEnum()) {
+        // 0. Data Program & Form Program dari area (Jabar/Jateng) atau brand berbeda tidak boleh saling dicocokkan
+        if ($dataProgram->areaEnum() !== $sub->areaEnum() || $dataProgram->brand !== $sub->brand) {
             return null;
         }
 
@@ -428,7 +429,7 @@ class ProgramReconciliationService
         $candidates = $preloadedSubmissions;
 
         if ($candidates === null) {
-            $query = ProgramSubmission::query()->where('area', $dataProgram->areaEnum()->value);
+            $query = ProgramSubmission::query()->where('area', $dataProgram->areaEnum()->value)->where('brand', $dataProgram->brand);
             $tokens = array_filter(explode(' ', $dpDealerNorm), fn ($t) => strlen($t) >= 3);
             $kodeBt = trim((string) ($dataProgram->kode_bt ?? ''));
 
@@ -904,7 +905,7 @@ class ProgramReconciliationService
                     ];
 
                     $rowIndex = (int) str_replace('row_', '', (string) $dp->row_hash);
-                    $rowsToPush[$dp->areaEnum()->value][] = [
+                    $rowsToPush[$dp->brand.'|'.$dp->areaEnum()->value][] = [
                         'row_index' => $rowIndex > 0 ? $rowIndex : null,
                         'kode_bt' => $dp->kode_bt,
                         'dealer_name' => $dp->dealer_name,
@@ -957,10 +958,11 @@ class ProgramReconciliationService
 
         $sheetPushResult = null;
         if (! empty($rowsToPush) && ! empty($options['push_to_sheet'])) {
-            // Tiap area dikirim ke spreadsheet Data Program area masing-masing
-            foreach ($rowsToPush as $areaValue => $areaRows) {
+            // Tiap brand & area dikirim ke spreadsheet Data Program masing-masing
+            foreach ($rowsToPush as $scope => $areaRows) {
+                [$brand, $areaValue] = explode('|', (string) $scope);
                 try {
-                    $sheetPushResult = app(DataProgramSyncService::class)->pushUpdatesToSpreadsheet($areaRows, null, Area::from($areaValue));
+                    $sheetPushResult = app(DataProgramSyncService::class)->pushUpdatesToSpreadsheet($areaRows, null, Area::from($areaValue), $brand);
                 } catch (\Throwable $e) {
                     Log::warning('Push to spreadsheet failed: '.$e->getMessage());
                 }
@@ -998,8 +1000,8 @@ class ProgramReconciliationService
 
         $idReal = trim((string) ($submission->id_real ?? ''));
 
-        // Find candidate DataProgram by Kode BT or Dealer Name (hanya dalam area yang sama)
-        $query = DataProgram::query()->where('area', $submission->areaEnum()->value);
+        // Find candidate DataProgram by Kode BT or Dealer Name (hanya dalam area & brand yang sama)
+        $query = DataProgram::query()->where('area', $submission->areaEnum()->value)->where('brand', $submission->brand);
         $tokens = array_filter(explode(' ', $subDealerNorm), fn ($t) => strlen($t) >= 3);
 
         $query->where(function ($q) use ($idReal, $submission, $tokens) {
@@ -1049,7 +1051,7 @@ class ProgramReconciliationService
             // Push updated row directly to Google Spreadsheet master if configured
             try {
                 $rowIndex = (int) str_replace('row_', '', (string) $bestDp->row_hash);
-                app(DataProgramSyncService::class)->pushUpdatesToSpreadsheet(area: $bestDp->areaEnum(), rowsToUpdate: [[
+                app(DataProgramSyncService::class)->pushUpdatesToSpreadsheet(area: $bestDp->areaEnum(), brand: $bestDp->brand, rowsToUpdate: [[
                     'row_index' => $rowIndex > 0 ? $rowIndex : null,
                     'kode_bt' => $bestDp->kode_bt,
                     'dealer_name' => $bestDp->dealer_name,

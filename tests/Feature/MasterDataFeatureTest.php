@@ -83,7 +83,7 @@ class MasterDataFeatureTest extends TestCase
 
         $rows = $this->downloadedSpreadsheetRows($this->get('/api/customers/export?search=TOP&is_active=true')->assertOk());
 
-        $this->assertSame(['KODE', 'NAMA CUSTOMER', 'NPWP', 'NAMA NPWP', 'ALAMAT', 'STATUS'], $rows[0]);
+        $this->assertSame(['KODE', 'NAMA BADAN USAHA', 'NPWP', 'NAMA NPWP', 'ALAMAT', 'STATUS'], $rows[0]);
         $this->assertCount(2, $rows);
         $this->assertSame(['CV TOP', 'CV TOP SELULAR', '0313523391426000'], array_slice($rows[1], 0, 3));
     }

@@ -157,7 +157,7 @@
 
                 <div>
                   <label class="block font-medium text-gray-700 mb-1">
-                    Customer by CSA (Bill To)
+                    Badan Usaha (Bill To)
                   </label>
                   <div class="relative">
                     <select
@@ -165,11 +165,11 @@
                       @change="handleCustomerSelectChange"
                       class="w-full h-8.5 px-3 pr-7 rounded-lg border border-gray-300 bg-white text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-900 appearance-none cursor-pointer"
                     >
-                      <option value="">Pilih Customer (Bill-To)</option>
+                      <option value="">Pilih Badan Usaha (Bill To)</option>
                       <option v-for="c in customerOptions" :key="c.id" :value="c.name">
                         {{ c.code }} - {{ c.name }}
                       </option>
-                      <option value="__OTHER__">+ Customer Lainnya (Input Manual)...</option>
+                      <option value="__OTHER__">+ Badan Usaha Lainnya (Input Manual)...</option>
                     </select>
                     <ChevronDownIcon class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
                   </div>
@@ -177,7 +177,7 @@
                     v-if="selectedCustomer === '__OTHER__'"
                     v-model="form.customer_name"
                     type="text"
-                    placeholder="Ketik nama customer / PT..."
+                    placeholder="Ketik nama badan usaha..."
                     class="mt-1.5 w-full h-8.5 px-3 rounded-lg border border-gray-300 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 transition"
                   />
                 </div>

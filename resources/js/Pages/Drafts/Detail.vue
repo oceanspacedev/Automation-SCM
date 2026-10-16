@@ -4,7 +4,7 @@
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-200">
       <!-- Layar kecil: tautan kembali di baris sendiri, judul di bawahnya -->
       <div class="flex flex-wrap sm:flex-nowrap items-center gap-x-2.5 gap-y-1 min-w-0">
-        <router-link :to="`/drafts/${draft.area || 'jabar'}`" class="basis-full sm:basis-auto text-xs font-medium text-gray-500 hover:text-gray-900 transition">
+        <router-link :to="`/drafts/${draft.brand || 'realme'}/${draft.area || 'jabar'}`" class="basis-full sm:basis-auto text-xs font-medium text-gray-500 hover:text-gray-900 transition">
           ← Kembali ke Draft
         </router-link>
         <span class="hidden sm:inline text-gray-300">|</span>

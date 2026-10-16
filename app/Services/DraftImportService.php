@@ -340,11 +340,11 @@ class DraftImportService
             return "No CN {$cnNumber} sudah dipakai baris {$cnNumbersInFile[$cnNumber]} di file ini.";
         }
 
-        if ($draft = Draft::withoutGlobalScope('area')->where('cn_number', $cnNumber)->first()) {
+        if ($draft = Draft::withoutGlobalScopes(['area', 'brand'])->where('cn_number', $cnNumber)->first()) {
             return "No CN {$cnNumber} sudah dipakai draft {$draft->dealer_name} ({$draft->areaEnum()->label()}).";
         }
 
-        if (Invoice::withoutGlobalScope('area')->where('invoice_number', $cnNumber)->exists()) {
+        if (Invoice::withoutGlobalScopes(['area', 'brand'])->where('invoice_number', $cnNumber)->exists()) {
             return "No CN {$cnNumber} sudah dipakai invoice lain.";
         }
 

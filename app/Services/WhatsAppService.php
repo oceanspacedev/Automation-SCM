@@ -226,7 +226,7 @@ class WhatsAppService
         $lines[] = 'Catatan:';
         $lines[] = '1. Tanda tangan & cap maks. 30 hari sejak tanggal terbit.';
         $lines[] = '2. Untuk Dealer PKP, terbitkan Faktur Pajak sesuai tanggal berjalan jika lewat tgl 5.';
-        $lines[] = '3. Dokumen Realme upload ke: https://bit.ly/ProgramRealmeJabar';
+        $lines[] = '3. Dokumen '.$invoice->brandName().' upload ke: '.$invoice->documentUploadUrl($this->resolveBaseUrl());
         $lines[] = '';
         $lines[] = 'Terima kasih atas kerja sama Anda.';
         $lines[] = '';
@@ -596,7 +596,7 @@ class WhatsAppService
             $confirmUrl,
             '',
             '_(Tautan ini aktif selama 7 hari)_',
-            '_Pesan otomatis dari Sistem SCM Invoice & Program Realme_',
+            '_Pesan otomatis dari Sistem SCM_',
         ];
 
         return implode("\n", $lines);
@@ -636,7 +636,7 @@ class WhatsAppService
             $confirmUrl,
             '',
             '_(Tautan ini aktif selama 7 hari)_',
-            '_Pesan otomatis dari Sistem SCM Invoice & Program Realme_',
+            '_Pesan otomatis dari Sistem SCM_',
         ];
 
         return implode("\n", $lines);
@@ -886,7 +886,7 @@ class WhatsAppService
             $confirmUrl,
             '',
             '_(Tautan ini aktif selama 7 hari)_',
-            '_Pesan otomatis dari Sistem SCM Automation Realme_',
+            '_Pesan otomatis dari Sistem SCM_',
         ];
 
         return implode("\n", $lines);
@@ -923,7 +923,7 @@ class WhatsAppService
             $confirmUrl,
             '',
             '_(Tautan ini aktif selama 7 hari)_',
-            '_Pesan otomatis dari Sistem SCM Automation Realme_',
+            '_Pesan otomatis dari Sistem SCM_',
         ];
 
         return implode("\n", $lines);

@@ -82,8 +82,8 @@
         </p>
 
         <p>
-            Untuk semua dokumen Program Realme (agr, credit note/invoice dan faktur pajak) mohon dapat di upload melalui link google form berikut yah:<br>
-            <a href="https://bit.ly/ProgramRealmeJabar" target="_blank" style="color: #2563eb; text-decoration: underline;">https://bit.ly/ProgramRealmeJabar</a>
+            Untuk semua dokumen Program {{ $invoice->brandName() }} (agr, credit note/invoice dan faktur pajak) mohon dapat di upload melalui link google form berikut yah:<br>
+            <a href="{{ $invoice->documentUploadUrl() }}" target="_blank" style="color: #2563eb; text-decoration: underline;">{{ $invoice->documentUploadUrl() }}</a>
         </p>
 
         <p>Terima kasih.</p>

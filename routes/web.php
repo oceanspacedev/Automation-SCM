@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ArContactController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DataProgramController;
 use App\Http\Controllers\DealerController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\ProgramSubmissionController;
 use App\Http\Controllers\RegionController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\SetAreaContext;
+use App\Http\Middleware\SetBrandContext;
 use Illuminate\Support\Facades\Route;
 
 // Google OAuth Authentication
@@ -31,8 +33,16 @@ Route::match(['get', 'post'], '/p/confirm/{id}', [ProgramClaimConfirmationContro
 Route::match(['get', 'post'], '/dp/confirm/{id}', [ProgramClaimConfirmationController::class, 'confirmDataProgram'])->name('data-programs.confirm');
 
 // API Endpoints
-// Area (Jabar/Jateng) dipilih lewat header X-Area atau parameter ?area=, default Jabar
-Route::prefix('api')->middleware(SetAreaContext::class)->group(function () {
+// Area (Jabar/Jateng) dipilih lewat header X-Area atau parameter ?area=, default Jabar;
+// brand (Realme, Oppo, ...) lewat header X-Brand atau parameter ?brand=, default Realme
+Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class])->group(function () {
+    // Master Brand (Realme, Oppo, ...)
+    Route::get('/brands', [BrandController::class, 'index']);
+    Route::post('/brands', [BrandController::class, 'store']);
+    Route::put('/brands/{id}', [BrandController::class, 'update']);
+    Route::delete('/brands/{id}', [BrandController::class, 'destroy']);
+    Route::patch('/brands/{id}/toggle-status', [BrandController::class, 'toggleStatus']);
+
     // Master Programs
     Route::get('/programs', [MasterProgramController::class, 'index']);
     Route::get('/programs/export', [MasterProgramController::class, 'export']);

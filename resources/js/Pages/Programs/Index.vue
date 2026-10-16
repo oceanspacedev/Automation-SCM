@@ -7,12 +7,14 @@
       <span class="text-gray-800">Master Program</span>
     </div>
 
+    <BrandTabs />
+
     <!-- Header Page -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Master Program</h1>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Master Program {{ brand.name }}</h1>
         <p class="text-xs text-gray-500 mt-0.5">
-          Daftar kode program, nama program, dan periode resmi Realme. Kode program otomatis terisi saat memilih program di draft.
+          Daftar kode program, nama program, dan periode resmi {{ brand.name }}. Kode program otomatis terisi saat memilih program di draft.
         </p>
       </div>
 
@@ -390,6 +392,8 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { downloadExport } from '@/lib/download';
+import BrandTabs from '@/components/BrandTabs.vue';
+import { useBrands } from '@/composables/useBrands';
 import {
   ChevronRightIcon,
   ChevronLeftIcon,
@@ -399,6 +403,8 @@ import {
   PencilIcon,
   Trash2Icon,
 } from 'lucide-vue-next';
+
+const { brand } = useBrands();
 
 const programs = ref([]);
 const totalRows = ref(0);

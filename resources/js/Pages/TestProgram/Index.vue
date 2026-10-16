@@ -624,12 +624,14 @@ import {
   EyeOff as EyeOffIcon,
 } from 'lucide-vue-next';
 import { useArea, DEFAULT_AREA } from '@/composables/useArea';
+import { useBrands } from '@/composables/useBrands';
 
 // ===== AREA (Jabar/Jateng) =====
 const { area } = useArea();
+const { brand } = useBrands();
 const isDefaultArea = area.value.value === DEFAULT_AREA;
-// Form publik per area: /form/jabar, /form/jateng (link lama /form-submission diarahkan ke /form/jabar)
-const publicFormUrl = `/form/${area.value.value}`;
+// Form publik per brand & area: /form/realme/jabar, /form/realme/jateng (link lama /form/jabar diarahkan ke Realme)
+const publicFormUrl = `/form/${brand.value.slug}/${area.value.value}`;
 
 // ===== DROPDOWN =====
 const isDropdownOpen = ref(false);

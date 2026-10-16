@@ -3,11 +3,13 @@
 namespace App\Services;
 
 use App\Area;
+use App\Models\Brand;
 use App\Models\DataProgram;
 use App\Models\Dealer;
 use App\Models\Draft;
 use App\Models\MasterProgram;
 use Carbon\Carbon;
+use Closure;
 use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -21,21 +23,22 @@ class DataProgramSyncService
     public const DEFAULT_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1AFEAxjycq50heaxJeAH9YjpVWFs3GeprplJDOJMzjSU/export?format=csv&gid=241795572';
 
     /**
-     * Get configured Google Sheet CSV URL of an area (defaults to the area selected in AreaContext).
-     * Only Jawa Barat has a built-in default spreadsheet; other areas must be configured first.
+     * Get configured Google Sheet CSV URL of a brand & area (defaults to the brand & area selected for the request).
+     * Only Realme Jawa Barat has a built-in default spreadsheet; others must be configured first.
      */
-    public function getSpreadsheetUrl(?Area $area = null): string
+    public function getSpreadsheetUrl(?Area $area = null, ?string $brand = null): string
     {
         $area ??= $this->currentArea();
-        $isDefaultArea = $area === Area::default();
+        $brand ??= $this->currentBrand();
+        $isDefaultScope = Brand::isDefaultScope($area, $brand);
 
-        $url = (string) Cache::get($area->settingKey(self::CACHE_KEY_SPREADSHEET_URL), $isDefaultArea ? env('DATA_PROGRAM_SPREADSHEET_URL', '') : '');
+        $url = (string) Cache::get(Brand::settingKey(self::CACHE_KEY_SPREADSHEET_URL, $area, $brand), $isDefaultScope ? env('DATA_PROGRAM_SPREADSHEET_URL', '') : '');
 
         if (! empty($url)) {
             return $url;
         }
 
-        return $isDefaultArea ? self::DEFAULT_SPREADSHEET_URL : '';
+        return $isDefaultScope ? self::DEFAULT_SPREADSHEET_URL : '';
     }
 
     public const CACHE_KEY_WEBAPP_URL = 'data_program_webapp_url';
@@ -43,40 +46,41 @@ class DataProgramSyncService
     public const DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbwJRdSbhKwKWlU4T6Haxu1oWwiYQLef4c-IKYyAVd_sIAY2Z2UukEFQirWKox5qDebtXQ/exec';
 
     /**
-     * Get configured Google Apps Script Web App URL of an area for pushing updates.
+     * Get configured Google Apps Script Web App URL of a brand & area for pushing updates.
      */
-    public function getWebAppUrl(?Area $area = null): string
+    public function getWebAppUrl(?Area $area = null, ?string $brand = null): string
     {
         $area ??= $this->currentArea();
-        $isDefaultArea = $area === Area::default();
+        $brand ??= $this->currentBrand();
+        $isDefaultScope = Brand::isDefaultScope($area, $brand);
 
-        $url = (string) Cache::get($area->settingKey(self::CACHE_KEY_WEBAPP_URL), $isDefaultArea ? env('DATA_PROGRAM_WEBAPP_URL', '') : '');
+        $url = (string) Cache::get(Brand::settingKey(self::CACHE_KEY_WEBAPP_URL, $area, $brand), $isDefaultScope ? env('DATA_PROGRAM_WEBAPP_URL', '') : '');
         if (! empty($url) && str_contains($url, 'script.google.com/macros/s/')) {
             return $url;
         }
 
-        $sheetUrl = (string) Cache::get($area->settingKey(self::CACHE_KEY_SPREADSHEET_URL), $isDefaultArea ? env('DATA_PROGRAM_SPREADSHEET_URL', '') : '');
+        $sheetUrl = (string) Cache::get(Brand::settingKey(self::CACHE_KEY_SPREADSHEET_URL, $area, $brand), $isDefaultScope ? env('DATA_PROGRAM_SPREADSHEET_URL', '') : '');
         if (! empty($sheetUrl) && str_contains($sheetUrl, 'script.google.com/macros/s/')) {
             return $sheetUrl;
         }
 
-        return $isDefaultArea ? self::DEFAULT_WEBAPP_URL : '';
+        return $isDefaultScope ? self::DEFAULT_WEBAPP_URL : '';
     }
 
     /**
-     * Set configured Google Apps Script Web App URL of an area.
+     * Set configured Google Apps Script Web App URL of the selected brand & area.
      */
     public function setWebAppUrl(string $url, ?Area $area = null): void
     {
-        Cache::forever(($area ?? $this->currentArea())->settingKey(self::CACHE_KEY_WEBAPP_URL), trim($url));
+        Cache::forever(Brand::settingKey(self::CACHE_KEY_WEBAPP_URL, $area ?? $this->currentArea(), $this->currentBrand()), trim($url));
     }
 
     /**
-     * Set configured Google Sheet CSV URL of an area.
+     * Set configured Google Sheet CSV URL of the selected brand & area.
      */
     public function setSpreadsheetUrl(string $url, ?Area $area = null): void
     {
-        Cache::forever(($area ?? $this->currentArea())->settingKey(self::CACHE_KEY_SPREADSHEET_URL), trim($url));
+        Cache::forever(Brand::settingKey(self::CACHE_KEY_SPREADSHEET_URL, $area ?? $this->currentArea(), $this->currentBrand()), trim($url));
     }
 
     /**
@@ -85,6 +89,39 @@ class DataProgramSyncService
     protected function currentArea(): Area
     {
         return app(AreaContext::class)->resolve();
+    }
+
+    /**
+     * The brand selected for the current request (Realme when none is selected).
+     */
+    protected function currentBrand(): string
+    {
+        return app(BrandContext::class)->resolve();
+    }
+
+    /**
+     * Run a callback with an area & brand selected (the current ones by default),
+     * so spreadsheet syncs only create, update, and delete rows of that area & brand.
+     *
+     * @template TReturn
+     *
+     * @param  Closure(): TReturn  $callback
+     * @return TReturn
+     */
+    protected function inScope(Closure $callback, ?Area $area = null, ?string $brand = null): mixed
+    {
+        return app(AreaContext::class)->run(
+            $area ?? $this->currentArea(),
+            fn () => app(BrandContext::class)->run($brand ?? $this->currentBrand(), $callback)
+        );
+    }
+
+    /**
+     * Whether both an area and a brand are selected (so queries are limited to them).
+     */
+    protected function isScoped(): bool
+    {
+        return app(AreaContext::class)->current() !== null && app(BrandContext::class)->current() !== null;
     }
 
     /**
@@ -137,8 +174,8 @@ class DataProgramSyncService
             throw new Exception("URL Google Spreadsheet Data Program {$area->label()} belum diatur.");
         }
 
-        // Selalu jalankan dalam konteks area agar penghapusan baris hanya menyentuh data area ini
-        return app(AreaContext::class)->run($area, function () use ($url, $limit) {
+        // Selalu jalankan dalam konteks area & brand agar penghapusan baris hanya menyentuh data area & brand ini
+        return $this->inScope(function () use ($url, $limit) {
             if (str_contains($url, 'script.google.com/macros/s/')) {
                 return $this->syncFromWebAppUrl($url, $limit);
             }
@@ -215,7 +252,7 @@ class DataProgramSyncService
         }
 
         // Otomatis fallback ke Google Sheet CSV export stream (jauh lebih cepat untuk 21.000+ baris data)
-        $csvUrl = $this->currentArea() === Area::default()
+        $csvUrl = Brand::isDefaultScope($this->currentArea(), $this->currentBrand())
             ? self::DEFAULT_SPREADSHEET_URL
             : $this->getSpreadsheetUrl();
 
@@ -243,9 +280,9 @@ class DataProgramSyncService
      * }> $rowsToUpdate
      * @return array{success: bool, updated_count: int, message: string}
      */
-    public function pushUpdatesToSpreadsheet(array $rowsToUpdate, ?string $customUrl = null, ?Area $area = null): array
+    public function pushUpdatesToSpreadsheet(array $rowsToUpdate, ?string $customUrl = null, ?Area $area = null, ?string $brand = null): array
     {
-        $url = trim((string) ($customUrl ?: $this->getWebAppUrl($area)));
+        $url = trim((string) ($customUrl ?: $this->getWebAppUrl($area, $brand)));
 
         if (empty($url) || ! str_contains($url, 'script.google.com/macros/s/')) {
             return [
@@ -353,10 +390,9 @@ class DataProgramSyncService
      */
     public function syncDraftToDataProgram(Draft $draft, bool $pushToSpreadsheet = true): array
     {
-        // Data Program draft disimpan & dikirim ke spreadsheet milik area draft tersebut
-        $areaContext = app(AreaContext::class);
-        if ($areaContext->current() !== $draft->areaEnum()) {
-            return $areaContext->run($draft->areaEnum(), fn () => $this->syncDraftToDataProgram($draft, $pushToSpreadsheet));
+        // Data Program draft disimpan & dikirim ke spreadsheet milik area & brand draft tersebut
+        if (app(AreaContext::class)->current() !== $draft->areaEnum() || app(BrandContext::class)->current() !== $draft->brand) {
+            return $this->inScope(fn () => $this->syncDraftToDataProgram($draft, $pushToSpreadsheet), $draft->areaEnum(), $draft->brand);
         }
 
         $rowHash = sprintf('draft_%d', $draft->id);
@@ -516,10 +552,10 @@ class DataProgramSyncService
      */
     public function pushDraftsToSpreadsheet(array $dataPrograms, ?string $customUrl = null): array
     {
-        // Kirim tiap area ke spreadsheet area masing-masing
+        // Kirim tiap brand & area ke spreadsheet masing-masing
         $groups = collect($dataPrograms)
             ->filter(fn ($dp) => $dp instanceof DataProgram)
-            ->groupBy(fn (DataProgram $dp) => $dp->areaEnum()->value);
+            ->groupBy(fn (DataProgram $dp) => $dp->brand.'|'.$dp->areaEnum()->value);
 
         if ($customUrl === null && $groups->count() > 1) {
             $results = $groups->map(fn ($group) => $this->pushDraftsToSpreadsheet($group->all()));
@@ -531,8 +567,8 @@ class DataProgramSyncService
             ];
         }
 
-        $area = $groups->isNotEmpty() ? Area::from($groups->keys()->first()) : null;
-        $url = trim((string) ($customUrl ?: $this->getWebAppUrl($area)));
+        [$brand, $area] = $groups->isNotEmpty() ? explode('|', (string) $groups->keys()->first()) : [null, null];
+        $url = trim((string) ($customUrl ?: $this->getWebAppUrl($area ? Area::from($area) : null, $brand)));
 
         if (empty($url) || ! str_contains($url, 'script.google.com/macros/s/')) {
             return [
@@ -643,9 +679,8 @@ class DataProgramSyncService
      */
     public function syncFromCsvUrl(string $url, int $limit = 0): array
     {
-        $areaContext = app(AreaContext::class);
-        if ($areaContext->current() === null) {
-            return $areaContext->run($this->currentArea(), fn () => $this->syncFromCsvUrl($url, $limit));
+        if (! $this->isScoped()) {
+            return $this->inScope(fn () => $this->syncFromCsvUrl($url, $limit));
         }
 
         // Convert standard edit/view link to CSV export URL if needed
@@ -836,6 +871,7 @@ class DataProgramSyncService
 
         return [
             'area' => $this->currentArea()->value,
+            'brand' => $this->currentBrand(),
             'row_hash' => $rowHash,
             'dealer_name' => $dealerName ?: null,
             'program' => $program ?: null,
@@ -906,9 +942,8 @@ class DataProgramSyncService
      */
     public function saveWebhookPayload(array $payload): array
     {
-        $areaContext = app(AreaContext::class);
-        if ($areaContext->current() === null) {
-            return $areaContext->run($this->currentArea(), fn () => $this->saveWebhookPayload($payload));
+        if (! $this->isScoped()) {
+            return $this->inScope(fn () => $this->saveWebhookPayload($payload));
         }
 
         $batch = [];
@@ -1082,6 +1117,6 @@ class DataProgramSyncService
             'updated_at',
         ];
 
-        DataProgram::upsert($batch, ['area', 'row_hash'], $updateColumns);
+        DataProgram::upsert($batch, ['brand', 'area', 'row_hash'], $updateColumns);
     }
 }

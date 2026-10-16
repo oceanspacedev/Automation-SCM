@@ -61,7 +61,7 @@
           <span class="hidden sm:inline">{{ sendingAll ? 'Mengirim Semua...' : 'Kirim Semua Notifikasi' }}</span>
         </button>
 
-        <router-link :to="`/drafts/${area.value}`" :class="headerButtonClass">
+        <router-link :to="`/drafts/${brand.slug}/${area.value}`" :class="headerButtonClass">
           Draft Invoice
         </router-link>
       </div>
@@ -548,6 +548,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import AreaTabs from '@/components/AreaTabs.vue';
 import { useArea } from '@/composables/useArea';
+import { useBrands } from '@/composables/useBrands';
 import SendEmailModal from '@/components/SendEmailModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
@@ -556,6 +557,7 @@ import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 const headerButtonClass = 'h-9 px-2 sm:px-3.5 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs disabled:opacity-50 transition cursor-pointer whitespace-nowrap';
 
 const { area } = useArea();
+const { brand } = useBrands();
 
 const invoices = ref([]);
 const loading = ref(false);

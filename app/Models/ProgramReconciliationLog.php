@@ -4,13 +4,15 @@ namespace App\Models;
 
 use App\Area;
 use App\Models\Concerns\BelongsToArea;
+use App\Models\Concerns\BelongsToBrand;
 use App\Services\AreaContext;
+use App\Services\BrandContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ProgramReconciliationLog extends Model
 {
-    use BelongsToArea;
+    use BelongsToArea, BelongsToBrand;
 
     public const STATUS_MATCHED = 'MATCHED';
 
@@ -46,15 +48,29 @@ class ProgramReconciliationLog extends Model
      */
     protected function areaForNewRecord(): Area
     {
-        $area = $this->data_program_id
-            ? DataProgram::withoutGlobalScope('area')->whereKey($this->data_program_id)->value('area')
+        return Area::fromInput($this->describedRowValue('area')) ?? app(AreaContext::class)->resolve();
+    }
+
+    /**
+     * A log belongs to the brand of the Data Program / Form Program row it describes.
+     */
+    protected function brandForNewRecord(): string
+    {
+        return $this->describedRowValue('brand') ?? app(BrandContext::class)->resolve();
+    }
+
+    /**
+     * A column of the Data Program row this log describes, else of its Form Program row.
+     */
+    private function describedRowValue(string $column): ?string
+    {
+        $value = $this->data_program_id
+            ? DataProgram::withoutGlobalScopes(['area', 'brand'])->whereKey($this->data_program_id)->value($column)
             : null;
 
-        $area ??= $this->program_submission_id
-            ? ProgramSubmission::withoutGlobalScope('area')->withTrashed()->whereKey($this->program_submission_id)->value('area')
-            : null;
-
-        return Area::fromInput($area) ?? app(AreaContext::class)->resolve();
+        return $value ?? ($this->program_submission_id
+            ? ProgramSubmission::withoutGlobalScopes(['area', 'brand'])->withTrashed()->whereKey($this->program_submission_id)->value($column)
+            : null);
     }
 
     /**
@@ -62,7 +78,7 @@ class ProgramReconciliationLog extends Model
      */
     public function dataProgram(): BelongsTo
     {
-        return $this->belongsTo(DataProgram::class, 'data_program_id')->withoutGlobalScope('area');
+        return $this->belongsTo(DataProgram::class, 'data_program_id')->withoutGlobalScopes(['area', 'brand']);
     }
 
     /**
@@ -70,6 +86,6 @@ class ProgramReconciliationLog extends Model
      */
     public function programSubmission(): BelongsTo
     {
-        return $this->belongsTo(ProgramSubmission::class, 'program_submission_id')->withoutGlobalScope('area');
+        return $this->belongsTo(ProgramSubmission::class, 'program_submission_id')->withoutGlobalScopes(['area', 'brand']);
     }
 }
