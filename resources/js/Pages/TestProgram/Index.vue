@@ -27,7 +27,6 @@
           @click="isDropdownOpen = !isDropdownOpen"
           class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
         >
-          <MoreHorizontalIcon class="w-3.5 h-3.5 text-gray-500" />
           <span>Aksi</span>
           <ChevronDownIcon class="w-3 h-3 text-gray-400 transition-transform duration-150" :class="{ 'rotate-180': isDropdownOpen }" />
         </button>
@@ -42,10 +41,9 @@
             target="_blank"
             rel="noopener noreferrer"
             @click="isDropdownOpen = false"
-            class="flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+            class="block px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer"
           >
-            <ExternalLinkIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
-            <span>Buka Form Input</span>
+            Buka Form Input
           </a>
 
           <a
@@ -53,19 +51,17 @@
             target="_blank"
             rel="noopener noreferrer"
             @click="isDropdownOpen = false"
-            class="flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+            class="block px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer"
           >
-            <FileSpreadsheetIcon class="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <span>Buka Spreadsheet</span>
+            Buka Spreadsheet
           </a>
 
           <button
             type="button"
             @click="openConfigModal(); isDropdownOpen = false"
-            class="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer"
+            class="w-full text-left px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer"
           >
-            <SettingsIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
-            <span>Integrasi Sheet</span>
+            Integrasi Sheet
           </button>
 
           <div class="h-px bg-gray-100 mx-3 my-1"></div>
@@ -74,10 +70,9 @@
             type="button"
             @click="fetchSubmissions(); isDropdownOpen = false"
             :disabled="isLoading"
-            class="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
+            class="w-full text-left px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
           >
-            <RefreshCwIcon :class="['w-3.5 h-3.5 text-gray-400 shrink-0', isLoading && 'animate-spin']" />
-            <span>{{ isLoading ? 'Memuat...' : 'Refresh Data' }}</span>
+            {{ isLoading ? 'Memuat...' : 'Refresh Data' }}
           </button>
         </div>
       </div>
@@ -614,12 +609,10 @@ import {
   RefreshCw as RefreshCwIcon,
   ExternalLink as ExternalLinkIcon,
   FileSpreadsheet as FileSpreadsheetIcon,
-  Settings as SettingsIcon,
   Copy as CopyIcon,
   Check as CheckIcon,
   Search as SearchIcon,
   X as XIcon,
-  MoreHorizontal as MoreHorizontalIcon,
   Eye as EyeIcon,
   EyeOff as EyeOffIcon,
 } from 'lucide-vue-next';

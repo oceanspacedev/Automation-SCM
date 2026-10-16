@@ -10,238 +10,133 @@
     >
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/40 backdrop-blur-xs font-sans overflow-y-auto"
+        class="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/40 backdrop-blur-xs font-sans"
         @click.self="close"
       >
-        <div class="bg-white rounded-2xl shadow-xl border border-gray-200 w-full max-w-4xl overflow-hidden flex flex-col max-h-[85vh] my-auto">
-          <!-- Header Simple -->
-          <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
-            <div class="flex items-center gap-3">
-              <div class="w-8 h-8 rounded-lg bg-gray-100 text-gray-700 flex items-center justify-center border border-gray-200 shrink-0">
-                <HistoryIcon class="w-4 h-4" />
-              </div>
-              <div>
-                <div class="flex items-center gap-2">
-                  <h3 class="text-sm font-bold text-gray-900">Riwayat Pencocokan Test Program</h3>
-                  <button
-                    v-if="filters.data_program_id"
-                    type="button"
-                    @click="clearRowIdFilter"
-                    class="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-200 flex items-center gap-1 cursor-pointer transition"
-                    title="Hapus filter baris ini"
-                  >
-                    <span>Filter: {{ filteredRowName || 'Baris Ini' }}</span>
-                    <XIcon class="w-3 h-3 text-gray-500" />
-                  </button>
-                </div>
-                <p class="text-[11px] text-gray-500 mt-0.5">
-                  Daftar hasil pencocokan data program dengan pengajuan dealer di Test Program.
-                </p>
-              </div>
+        <div class="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-4xl flex flex-col max-h-[90vh]" role="dialog" aria-modal="true">
+          <!-- Header -->
+          <div class="px-5 sm:px-6 pt-5 pb-4 border-b border-gray-100 flex items-start justify-between gap-4 shrink-0">
+            <div class="min-w-0">
+              <h3 class="text-base font-semibold text-gray-950">Riwayat Pencocokan</h3>
+              <p class="mt-0.5 text-xs text-gray-500">
+                <template v-if="filters.data_program_id">
+                  {{ filteredRowName || 'Baris ini' }} ·
+                  <button type="button" @click="clearRowIdFilter" class="text-gray-700 underline hover:text-gray-950 cursor-pointer">Tampilkan semua</button>
+                </template>
+                <template v-else>Hasil pencocokan Data Program dengan pengajuan Form Program.</template>
+              </p>
             </div>
-
-            <button
-              type="button"
-              @click="close"
-              class="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition cursor-pointer"
-              title="Tutup"
-            >
+            <button type="button" @click="close" class="p-1 -m-1 text-gray-400 hover:text-gray-700 cursor-pointer shrink-0" title="Tutup">
               <XIcon class="w-4 h-4" />
             </button>
           </div>
 
-          <!-- Controls: Segmented Tabs (Semua / Sesuai / Gagal) & Search -->
-          <div class="px-5 py-3 border-b border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-gray-50/50 shrink-0">
-            <!-- Simple Tab Pills -->
-            <div class="inline-flex p-1 rounded-lg bg-gray-200/70 text-xs">
+          <!-- Tab status & pencarian -->
+          <div class="px-5 sm:px-6 py-3 border-b border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
+            <div class="inline-flex self-start items-center gap-1 p-1 rounded-lg border border-gray-200 bg-gray-50 text-xs">
               <button
+                v-for="tab in tabs"
+                :key="tab.key"
                 type="button"
-                @click="setTab('all')"
+                @click="setTab(tab.key)"
                 :class="[
-                  'px-3 py-1 rounded-md text-xs font-medium transition cursor-pointer',
-                  activeTab === 'all'
-                    ? 'bg-white text-gray-900 shadow-2xs font-semibold'
-                    : 'text-gray-600 hover:text-gray-900'
+                  'h-7 px-3 inline-flex items-center gap-1.5 rounded-md font-medium transition cursor-pointer',
+                  activeTab === tab.key ? 'bg-white text-gray-900 shadow-2xs border border-gray-200' : 'text-gray-500 hover:text-gray-900'
                 ]"
               >
-                Semua
-                <span class="ml-1 text-[11px] text-gray-400 font-normal">({{ stats.total || 0 }})</span>
-              </button>
-
-              <button
-                type="button"
-                @click="setTab('matched')"
-                :class="[
-                  'px-3 py-1 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5',
-                  activeTab === 'matched'
-                    ? 'bg-white text-emerald-800 shadow-2xs font-semibold'
-                    : 'text-gray-600 hover:text-emerald-700'
-                ]"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                <span>Sesuai</span>
-                <span class="text-[11px] text-gray-400 font-normal">({{ stats.matched || 0 }})</span>
-              </button>
-
-              <button
-                type="button"
-                @click="setTab('failed')"
-                :class="[
-                  'px-3 py-1 rounded-md text-xs font-medium transition cursor-pointer flex items-center gap-1.5',
-                  activeTab === 'failed'
-                    ? 'bg-white text-rose-800 shadow-2xs font-semibold'
-                    : 'text-gray-600 hover:text-rose-700'
-                ]"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                <span>Gagal / Belum Cocok</span>
-                <span class="text-[11px] text-gray-400 font-normal">({{ stats.failed || 0 }})</span>
+                {{ tab.label }}
+                <span class="text-gray-400 font-normal tabular-nums">{{ stats[tab.stat] || 0 }}</span>
               </button>
             </div>
 
-            <!-- Single Clean Search -->
             <div class="relative w-full sm:w-64">
-              <SearchIcon class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+              <SearchIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
               <input
+                id="history-search"
                 v-model="filters.search"
                 @input="debounceFetch"
                 type="text"
-                placeholder="Cari dealer, program..."
-                class="h-8 w-full pl-8 pr-3 text-xs bg-white border border-gray-200 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-400"
+                placeholder="Cari dealer atau program"
+                class="h-9 w-full pl-9 pr-3 text-xs bg-white border border-gray-300 rounded-lg text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900"
               />
             </div>
           </div>
 
-          <!-- Flat Clean List / Table -->
-          <div class="flex-1 overflow-y-auto min-h-[250px]">
-            <!-- Loading -->
-            <div v-if="loading" class="py-16 text-center text-xs text-gray-400">
-              <RefreshCwIcon class="w-5 h-5 animate-spin mx-auto text-gray-400 mb-2" />
-              Memuat riwayat...
-            </div>
+          <!-- Daftar riwayat -->
+          <div class="flex-1 overflow-y-auto min-h-[240px] [scrollbar-width:thin]">
+            <p v-if="loading" class="py-16 text-center text-xs text-gray-500">Memuat riwayat...</p>
 
-            <!-- Empty -->
-            <div v-else-if="logs.length === 0" class="py-16 text-center text-xs text-gray-500">
-              <p class="font-medium text-gray-700">Tidak ada riwayat pencocokan</p>
-              <p class="text-[11px] text-gray-400 mt-0.5">
-                {{ activeTab === 'matched' ? 'Belum ada data yang berhasil cocok.' : (activeTab === 'failed' ? 'Tidak ada data yang gagal.' : 'Belum ada riwayat tercatat.') }}
+            <div v-else-if="logs.length === 0" class="py-16 px-6 text-center">
+              <p class="text-sm text-gray-700">Belum ada riwayat</p>
+              <p class="text-xs text-gray-500 mt-0.5">
+                {{ activeTab === 'matched' ? 'Belum ada data yang cocok.' : (activeTab === 'failed' ? 'Tidak ada data yang belum cocok.' : 'Riwayat muncul setelah Cocokkan Test Program dijalankan.') }}
               </p>
             </div>
 
-            <!-- Clean Flat Table -->
-            <table v-else class="w-full text-left text-xs border-collapse">
-              <thead class="bg-gray-50/80 text-[11px] font-semibold text-gray-500 border-b border-gray-100 sticky top-0 z-10">
-                <tr>
-                  <th class="py-2.5 px-4">Dealer & Program</th>
-                  <th class="py-2.5 px-3 w-[150px]">Status</th>
-                  <th class="py-2.5 px-3">Keterangan</th>
-                  <th class="py-2.5 px-4 w-[130px] text-right">Waktu</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-gray-100">
-                <tr
-                  v-for="log in logs"
-                  :key="log.id"
-                  class="hover:bg-gray-50/60 transition"
-                >
-                  <!-- Dealer & Program -->
-                  <td class="py-3 px-4 align-top">
-                    <div class="font-semibold text-gray-900 text-xs">
-                      {{ log.dealer_name || '-' }}
-                    </div>
-                    <div class="text-[11px] text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                      <span>{{ log.program_name || '-' }}</span>
-                      <span v-if="log.kode_bt" class="font-mono text-gray-400">&bull; {{ log.kode_bt }}</span>
-                    </div>
-                  </td>
+            <template v-else>
+              <!-- Judul kolom (layar lebar) -->
+              <div :class="[rowGridClass, 'hidden md:grid py-2.5 bg-gray-50 border-b border-gray-100 text-[11px] font-medium text-gray-500 sticky top-0 z-10']">
+                <span>Dealer & program</span>
+                <span>Status</span>
+                <span>Keterangan</span>
+                <span class="text-right">Waktu</span>
+              </div>
 
-                  <!-- Status -->
-                  <td class="py-3 px-3 align-top whitespace-nowrap">
-                    <span
-                      :class="[
-                        'inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium border',
-                        log.status === 'MATCHED'
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                          : 'bg-rose-50 text-rose-800 border-rose-200'
-                      ]"
-                    >
-                      <span
-                        class="w-1.5 h-1.5 rounded-full"
-                        :class="log.status === 'MATCHED' ? 'bg-emerald-500' : 'bg-rose-500'"
-                      ></span>
-                      {{ log.status === 'MATCHED' ? 'Sesuai' : getFailLabel(log.status) }}
-                    </span>
-                  </td>
+              <ul class="divide-y divide-gray-100">
+                <li v-for="log in logs" :key="log.id" :class="[rowGridClass, 'py-3 text-xs']">
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate">{{ log.dealer_name || '-' }}</p>
+                    <p class="mt-0.5 text-gray-500 truncate">
+                      {{ log.program_name || '-' }}<template v-if="log.kode_bt"> · {{ log.kode_bt }}</template>
+                    </p>
+                  </div>
 
-                  <!-- Keterangan & Dokumen -->
-                  <td class="py-3 px-3 align-top text-xs text-gray-700">
-                    <div>{{ getCleanDescription(log) }}</div>
-                    <!-- Link Dokumen kecil jika ada -->
-                    <div
-                      v-if="log.program_submission && (log.program_submission.credit_note_url || log.program_submission.agreement_url || log.program_submission.tax_invoice_url)"
-                      class="flex items-center gap-2 mt-1 text-[11px]"
-                    >
-                      <span class="text-gray-400 text-[10px]">Dokumen:</span>
-                      <a
-                        v-if="log.program_submission.credit_note_url"
-                        :href="log.program_submission.credit_note_url"
-                        target="_blank"
-                        class="text-indigo-600 hover:underline flex items-center gap-0.5"
-                      >
-                        <ExternalLinkIcon class="w-2.5 h-2.5" /> CN
-                      </a>
-                      <a
-                        v-if="log.program_submission.agreement_url"
-                        :href="log.program_submission.agreement_url"
-                        target="_blank"
-                        class="text-indigo-600 hover:underline flex items-center gap-0.5"
-                      >
-                        <ExternalLinkIcon class="w-2.5 h-2.5" /> Agr
-                      </a>
-                      <a
-                        v-if="log.program_submission.tax_invoice_url"
-                        :href="log.program_submission.tax_invoice_url"
-                        target="_blank"
-                        class="text-indigo-600 hover:underline flex items-center gap-0.5"
-                      >
-                        <ExternalLinkIcon class="w-2.5 h-2.5" /> Faktur
-                      </a>
-                    </div>
-                  </td>
+                  <p class="inline-flex items-center gap-1.5 font-medium" :class="log.status === 'MATCHED' ? 'text-emerald-700' : 'text-rose-700'">
+                    <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="log.status === 'MATCHED' ? 'bg-emerald-500' : 'bg-rose-500'"></span>
+                    {{ log.status === 'MATCHED' ? 'Sesuai' : getFailLabel(log.status) }}
+                  </p>
 
-                  <!-- Waktu -->
-                  <td class="py-3 px-4 align-top text-right whitespace-nowrap text-[11px] text-gray-500">
-                    <div class="text-gray-800 font-medium">{{ formatDateDisplay(log.created_at) }}</div>
-                    <div class="text-gray-400 text-[10px] mt-0.5">{{ formatTimeDisplay(log.created_at) }}</div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                  <div class="min-w-0 text-gray-700">
+                    <p>{{ getCleanDescription(log) }}</p>
+                    <p v-if="documentLinks(log).length" class="mt-1 flex items-center gap-2.5 text-gray-500">
+                      <a
+                        v-for="doc in documentLinks(log)"
+                        :key="doc.label"
+                        :href="doc.url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-gray-700 underline hover:text-gray-950"
+                      >{{ doc.label }}</a>
+                    </p>
+                  </div>
+
+                  <p class="text-gray-500 md:text-right whitespace-nowrap tabular-nums">
+                    <span class="text-gray-900">{{ formatDateDisplay(log.created_at) }}</span>
+                    <span class="md:block md:mt-0.5"> {{ formatTimeDisplay(log.created_at) }}</span>
+                  </p>
+                </li>
+              </ul>
+            </template>
           </div>
 
-          <!-- Simple Pagination Footer -->
-          <div class="px-5 py-2.5 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between text-xs shrink-0">
-            <span class="text-gray-500 text-[11px]">
-              Total {{ pagination.total || 0 }} data
-            </span>
-
-            <div class="flex items-center gap-1">
+          <!-- Halaman -->
+          <div class="px-5 sm:px-6 py-3 border-t border-gray-100 flex items-center justify-between gap-3 text-xs shrink-0">
+            <span class="text-gray-500">{{ pagination.total || 0 }} riwayat</span>
+            <div class="flex items-center gap-2">
               <button
                 type="button"
                 @click="changePage(pagination.current_page - 1)"
                 :disabled="pagination.current_page <= 1 || loading"
-                class="h-7 px-2.5 rounded border border-gray-200 bg-white text-[11px] text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                :class="pageButtonClass"
               >
                 Sebelumnya
               </button>
-              <span class="text-[11px] px-2 text-gray-600 font-medium">
-                {{ pagination.current_page }} / {{ pagination.last_page || 1 }}
-              </span>
+              <span class="text-gray-600 tabular-nums">{{ pagination.current_page }} / {{ pagination.last_page || 1 }}</span>
               <button
                 type="button"
                 @click="changePage(pagination.current_page + 1)"
                 :disabled="pagination.current_page >= pagination.last_page || loading"
-                class="h-7 px-2.5 rounded border border-gray-200 bg-white text-[11px] text-gray-700 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                :class="pageButtonClass"
               >
                 Selanjutnya
               </button>
@@ -256,13 +151,7 @@
 <script setup>
 import { ref, reactive, watch } from 'vue';
 import axios from 'axios';
-import {
-  History as HistoryIcon,
-  Search as SearchIcon,
-  RefreshCw as RefreshCwIcon,
-  X as XIcon,
-  ExternalLink as ExternalLinkIcon,
-} from 'lucide-vue-next';
+import { Search as SearchIcon, X as XIcon } from 'lucide-vue-next';
 
 const props = defineProps({
   modelValue: {
@@ -284,6 +173,16 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:modelValue']);
+
+const tabs = [
+  { key: 'all', label: 'Semua', stat: 'total' },
+  { key: 'matched', label: 'Sesuai', stat: 'matched' },
+  { key: 'failed', label: 'Belum cocok', stat: 'failed' },
+];
+
+// Satu baris riwayat: bertumpuk di HP, empat kolom di layar lebar
+const rowGridClass = 'px-5 sm:px-6 grid gap-1.5 md:grid-cols-[minmax(0,1.2fr)_130px_minmax(0,1.6fr)_96px] md:gap-4 md:items-start';
+const pageButtonClass = 'h-8 px-3 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer';
 
 const loading = ref(false);
 const logs = ref([]);
@@ -403,7 +302,7 @@ const getFailLabel = (status) => {
     case 'NOMINAL_MISMATCH':
       return 'Selisih Nominal';
     case 'NO_MATCH':
-      return 'Pengajuan Belum Ada';
+      return 'Belum ada form';
     case 'ERROR':
       return 'Error';
     default:
@@ -414,19 +313,30 @@ const getFailLabel = (status) => {
 const getCleanDescription = (log) => {
   if (log.status === 'MATCHED') {
     const nominal = log.dp_amount ? formatRupiah(log.dp_amount) : '';
-    return nominal ? `Nominal ${nominal} sesuai • Dokumen lengkap (Siap Potong)` : 'Finansial & Dokumen sesuai';
+    return nominal ? `Nominal ${nominal} sesuai, dokumen lengkap.` : 'Nominal dan dokumen sesuai.';
   }
   if (log.status === 'NOMINAL_MISMATCH') {
-    return `Selisih: ${formatRupiah(log.selisih)} (Data: ${formatRupiah(log.dp_amount)} vs Test: ${formatRupiah(log.submission_amount)})`;
+    return `Selisih ${formatRupiah(log.selisih)}: Data Program ${formatRupiah(log.dp_amount)}, Form Program ${formatRupiah(log.submission_amount)}.`;
   }
   if (log.status === 'DOC_INCOMPLETE') {
     const missing = log.missing_docs && log.missing_docs.length > 0 ? log.missing_docs.join(', ') : 'Dokumen';
-    return `Finansial cocok, tetapi ${missing} belum diupload`;
+    return `Nominal cocok, ${missing} belum diunggah.`;
   }
   if (log.status === 'NO_MATCH') {
-    return 'Belum ada data Test Program dari dealer yang cocok';
+    return 'Belum ada pengajuan Form Program yang cocok.';
   }
   return log.notes || 'Pencocokan belum berhasil';
+};
+
+// Link dokumen dari pengajuan yang dicocokkan (CN, Agreement, Faktur)
+const documentLinks = (log) => {
+  const sub = log.program_submission;
+  if (!sub) return [];
+  return [
+    { label: 'CN', url: sub.credit_note_url },
+    { label: 'Agreement', url: sub.agreement_url },
+    { label: 'Faktur', url: sub.tax_invoice_url },
+  ].filter((doc) => doc.url);
 };
 
 watch(

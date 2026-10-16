@@ -40,7 +40,7 @@
           <!-- Dropdown Menu; di layar kecil rata kiri agar tidak keluar layar -->
           <div
             v-if="showSpreadsheetDropdown"
-            class="absolute left-0 sm:left-auto sm:right-0 top-full mt-1.5 w-48 bg-white rounded-lg shadow-lg border border-gray-200 p-1 z-30 font-sans"
+            class="absolute left-0 sm:left-auto sm:right-0 top-full mt-1.5 w-48 bg-white rounded-lg shadow-lg border border-gray-200 p-1 z-50 font-sans"
           >
             <button
               type="button"
@@ -102,7 +102,7 @@
           <!-- Dropdown Menu -->
           <div
             v-if="showReconcileDropdown"
-            class="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-lg shadow-lg border border-gray-200 p-1 z-30 font-sans"
+            class="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-lg shadow-lg border border-gray-200 p-1 z-50 font-sans"
           >
             <!-- 1. Sinkronkan Sekarang -->
             <button
@@ -425,8 +425,9 @@
                   type="button"
                   @click="sendWaToTelemarketing(row)"
                   :disabled="sendingWaId === row.id"
-                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer disabled:opacity-50"
+                  class="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer disabled:opacity-50"
                 >
+                  <WhatsAppIcon v-if="sendingWaId !== row.id" class="w-3.5 h-3.5 text-[#25D366]" />
                   {{ sendingWaId === row.id ? 'Mengirim...' : 'WA' }}
                 </button>
               </div>
@@ -967,7 +968,7 @@
                     title="Kirim ke WhatsApp Telemarketing"
                   >
                     <RefreshCwIcon v-if="sendingWaId === row.id" class="w-3 h-3 animate-spin text-emerald-600" />
-                    <SendIcon v-else class="w-3.5 h-3.5 text-emerald-600" />
+                    <WhatsAppIcon v-else class="w-3.5 h-3.5 text-[#25D366]" />
                     <span>WA</span>
                   </button>
                 </div>
@@ -1441,6 +1442,7 @@
 import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import axios from 'axios';
 import AreaTabs from '@/components/AreaTabs.vue';
+import WhatsAppIcon from '@/components/WhatsAppIcon.vue';
 import TelemarketingSelectModal from '@/components/TelemarketingSelectModal.vue';
 import { useArea } from '@/composables/useArea';
 import EditDataProgramModal from '@/components/EditDataProgramModal.vue';
@@ -1460,7 +1462,6 @@ import {
   Filter as FilterIcon,
   X as XIcon,
   Zap as ZapIcon,
-  Send as SendIcon,
   Info as InfoIcon,
   ArrowRight as ArrowRightIcon,
   History as HistoryIcon,
