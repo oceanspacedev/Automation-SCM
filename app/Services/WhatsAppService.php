@@ -18,6 +18,11 @@ use Illuminate\Support\Str;
 class WhatsAppService
 {
     /**
+     * How many days the confirmation link sent to telemarketing and AR stays valid.
+     */
+    public const CONFIRM_LINK_DAYS = 30;
+
+    /**
      * Send invoice notification message via WAGHub WhatsApp Gateway.
      *
      * @return array{success: bool, message: string, provider_id: ?string}
@@ -384,10 +389,10 @@ class WhatsAppService
             URL::forceRootUrl($baseUrl);
         }
 
-        // Generate signed confirmation URL valid for 7 days (1 week)
+        // Generate signed confirmation URL valid for CONFIRM_LINK_DAYS days
         $confirmUrl = URL::temporarySignedRoute(
             'program-submissions.confirm',
-            now()->addDays(7),
+            now()->addDays(self::CONFIRM_LINK_DAYS),
             ['id' => $submission->id, 'role' => 'telemarketing']
         );
 
@@ -491,10 +496,10 @@ class WhatsAppService
             URL::forceRootUrl($baseUrl);
         }
 
-        // Generate signed confirmation URL valid for 7 days (1 week)
+        // Generate signed confirmation URL valid for CONFIRM_LINK_DAYS days
         $confirmUrl = URL::temporarySignedRoute(
             'program-submissions.confirm',
-            now()->addDays(7),
+            now()->addDays(self::CONFIRM_LINK_DAYS),
             ['id' => $submission->id, 'role' => 'ar']
         );
 
@@ -595,7 +600,7 @@ class WhatsAppService
             '👉 *[ KLIK: KONFIRMASI KEPUTUSAN DEALER ]*',
             $confirmUrl,
             '',
-            '_(Tautan ini aktif selama 7 hari)_',
+            '_(Tautan ini aktif selama '.self::CONFIRM_LINK_DAYS.' hari)_',
             '_Pesan otomatis dari Sistem SCM_',
         ];
 
@@ -635,7 +640,7 @@ class WhatsAppService
             '👉 *[ KLIK: KONFIRMASI PEMOTONGAN AR ]*',
             $confirmUrl,
             '',
-            '_(Tautan ini aktif selama 7 hari)_',
+            '_(Tautan ini aktif selama '.self::CONFIRM_LINK_DAYS.' hari)_',
             '_Pesan otomatis dari Sistem SCM_',
         ];
 
@@ -678,7 +683,7 @@ class WhatsAppService
 
         $confirmUrl = URL::temporarySignedRoute(
             'data-programs.confirm',
-            now()->addDays(7),
+            now()->addDays(self::CONFIRM_LINK_DAYS),
             ['id' => $dp->id, 'role' => 'telemarketing']
         );
 
@@ -784,7 +789,7 @@ class WhatsAppService
 
         $confirmUrl = URL::temporarySignedRoute(
             'data-programs.confirm',
-            now()->addDays(7),
+            now()->addDays(self::CONFIRM_LINK_DAYS),
             ['id' => $dp->id, 'role' => 'ar']
         );
 
@@ -885,7 +890,7 @@ class WhatsAppService
             '👉 *[ KLIK: KONFIRMASI KEPUTUSAN DEALER ]*',
             $confirmUrl,
             '',
-            '_(Tautan ini aktif selama 7 hari)_',
+            '_(Tautan ini aktif selama '.self::CONFIRM_LINK_DAYS.' hari)_',
             '_Pesan otomatis dari Sistem SCM_',
         ];
 
@@ -922,7 +927,7 @@ class WhatsAppService
             '👉 *[ KLIK: KONFIRMASI PEMOTONGAN AR ]*',
             $confirmUrl,
             '',
-            '_(Tautan ini aktif selama 7 hari)_',
+            '_(Tautan ini aktif selama '.self::CONFIRM_LINK_DAYS.' hari)_',
             '_Pesan otomatis dari Sistem SCM_',
         ];
 

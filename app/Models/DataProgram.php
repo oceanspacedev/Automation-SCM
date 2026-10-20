@@ -24,6 +24,7 @@ class DataProgram extends Model
             'nilai_pph' => 'float',
             'net_pay' => 'float',
             'selisih' => 'float',
+            'telemarketing_notified_at' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

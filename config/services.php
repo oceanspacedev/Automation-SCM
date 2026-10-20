@@ -44,6 +44,12 @@ return [
         'telemarketing_phone' => env('TELEMARKETING_DEFAULT_PHONE', env('AR_DEFAULT_PHONE', '081224290502')),
     ],
 
+    // WA ke telemarketing (program:notify-telemarketing): jamnya diatur di Master Jadwal Otomatis;
+    // AUTO_MATCH_SEND_WA=false mematikan WhatsApp ke telemarketing apa pun pengaturan di master
+    'auto_match' => [
+        'send_whatsapp' => env('AUTO_MATCH_SEND_WA', true),
+    ],
+
     'waghub' => [
         'url' => env('WAG_URL', 'https://waghub.mekayastudio.com'),
         'token' => env('WAG_TOKEN'),

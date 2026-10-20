@@ -867,10 +867,14 @@ class DataProgramController extends Controller
             ], 422);
         }
 
+        // Sudah dikirim manual: cron auto-match tidak mengirim ulang
+        $dp->forceFill(['telemarketing_notified_at' => now()])->save();
+
         return response()->json([
             'success' => true,
             'message' => $result['message'],
             'provider_id' => $result['provider_id'] ?? null,
+            'telemarketing_notified_at' => $dp->telemarketing_notified_at,
         ]);
     }
 

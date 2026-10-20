@@ -20,6 +20,7 @@ import RegionsIndex from '../Pages/Regions/Index.vue';
 import ArContactsIndex from '../Pages/ArContacts/Index.vue';
 import ProfileIndex from '../Pages/Profile/Index.vue';
 import BrandsIndex from '../Pages/Brands/Index.vue';
+import SchedulesIndex from '../Pages/Schedules/Index.vue';
 import { useAuth } from '../composables/useAuth';
 import { AREA_ROUTE_PATTERN, DEFAULT_AREA } from '../composables/useArea';
 import { BRAND_ROUTE_PATTERN, DEFAULT_BRAND } from '../composables/useBrands';
@@ -83,6 +84,7 @@ const routes = [
   { path: '/customers', redirect: '/badan-usaha' },
   ...areaRoutes('/dealers', 'dealers.index', DealersIndex),
   { path: '/users', name: 'users.index', component: UsersIndex, meta: { requiresAuth: true } },
+  { path: '/jadwal-otomatis', name: 'schedules.index', component: SchedulesIndex, meta: { requiresAuth: true } },
   { path: '/profile', name: 'profile', component: ProfileIndex, meta: { requiresAuth: true } },
 ];
 

@@ -159,7 +159,7 @@ sequenceDiagram
     participant TM as Telemarketing
     participant SYS as Sistem
     participant AR as AR (per region)
-    DP->>TM: Kirim WA Telemarketing (link berlaku 7 hari)
+    DP->>TM: Kirim WA Telemarketing (link berlaku 30 hari)
     TM->>SYS: Buka link, pilih "Dealer Setuju" atau "Tunda"
     alt Dealer setuju
         SYS->>DP: Status AR = DEALER SETUJU (PROSES AR)
@@ -171,9 +171,10 @@ sequenceDiagram
     end
 ```
 
-- Tombol **WA** / **Kirim ke WA Telemarketing** muncul di Data Program untuk baris **BISA DI POTONG**. Nomor tujuan diambil dari telemarketing toko di Master Dealer (bisa dipilih ulang saat mengirim).
+- **Otomatis:** cron `program:auto-match` jalan **setiap menit** dan mencocokkan baris Data Program yang belum bisa dipotong dengan Form Program-nya, tanpa mengirim WA. Baris tanpa pengajuan, atau yang tidak berubah sejak dicek, dilewati. WA ke telemarketing toko dikirim terpisah oleh cron `program:notify-telemarketing` pada jam yang diatur di **Master → Jadwal Otomatis** (bawaan 09:00 dan 14:00 WIB): semua baris **BISA DI POTONG** yang belum dikirimi, sekali per baris. Waktu kirimnya tampil di tombol WA dan di **Lihat**.
+- **Manual:** tombol **WA** / **Kirim ke WA Telemarketing** muncul di Data Program untuk baris **BISA DI POTONG**. Nomor tujuan diambil dari telemarketing toko di Master Dealer (bisa dipilih ulang saat mengirim). Baris yang sudah dikirim manual tidak dikirim ulang oleh cron.
 - **AR tujuan** dicari dari **Master AR** berdasarkan region dealer (Region, lalu Big Region). Kalau region belum punya AR aktif, WA dikirim ke nomor AR default (`AR_DEFAULT_PHONE`).
-- Link konfirmasi ditandatangani (*signed URL*) dan kedaluwarsa 7 hari setelah dikirim.
+- Link konfirmasi ditandatangani (*signed URL*) dan kedaluwarsa 30 hari setelah dikirim.
 
 ### 7. Akun & Hak Akses
 
@@ -303,14 +304,15 @@ php artisan storage:link        # foto profil & PDF invoice di storage/app/publi
 Jalankan aplikasi:
 
 ```bash
-composer run dev                # server Laravel + Vite sekaligus
+composer run dev                # server Laravel, queue, scheduler, dan Vite sekaligus
 ```
 
-atau di dua terminal terpisah:
+atau di terminal terpisah:
 
 ```bash
 php artisan serve
 npm run dev
+php artisan schedule:work       # wajib agar Jadwal Otomatis jalan
 ```
 
 Buka `http://localhost:8000`. Akun bawaan dari seeder:
@@ -351,6 +353,7 @@ php artisan dealers:import "Master Customer CV TOP.xlsx" --keep-existing
 Link spreadsheet per area (termasuk Jawa Tengah) juga bisa diatur langsung dari aplikasi lewat menu **Spreadsheet** / **Aksi**; pengaturan dari aplikasi menimpa nilai `.env`.
 | `ENABLE_AUTO_SYNC_SCHEDULE` | `true` untuk menyalakan sinkron Data Program terjadwal di lingkungan `local`. |
 | `ENABLE_AUTO_AI_SCHEDULE` | `true` untuk menyalakan analisis AI terjadwal di lingkungan `local`. |
+| `AUTO_MATCH_SEND_WA` | `false` mematikan WA ke telemarketing dari cron `program:notify-telemarketing`, apa pun pengaturan di Master Jadwal Otomatis (bawaan `true`). |
 
 Jangan pernah commit nilai rahasia (`*_KEY`, `*_SECRET`, `*_TOKEN`, password) ke repository.
 
@@ -364,12 +367,21 @@ Jangan pernah commit nilai rahasia (`*_KEY`, `*_SECRET`, `*_TOKEN`, password) ke
 | `php artisan data-program:sync [--limit=0]` | Sinkron Data Program dari Google Spreadsheet. |
 | `php artisan program:auto-analyze-ai --year=2026 --limit=15` | Analisis AI pengajuan Form Program yang belum dianalisis. |
 | `php artisan program:refresh-completeness` | Perbarui status kelengkapan pengajuan Non-PKP. |
+| `php artisan program:auto-match [--limit=200]` | Cocokkan Data Program dengan Form Program (tanpa WA). |
+| `php artisan program:notify-telemarketing [--limit=200]` | WA ke telemarketing untuk baris yang BISA DI POTONG dan belum pernah dikirimi. |
 
-Di luar lingkungan `local`, `data-program:sync` dan `program:auto-analyze-ai` dijadwalkan **setiap menit**. Agar jadwal berjalan, pasang cron:
+Di luar lingkungan `local`, `data-program:sync` dan `program:auto-analyze-ai` dijadwalkan **setiap menit**. `program:auto-match` juga jalan **setiap menit**, di semua lingkungan. `program:notify-telemarketing` mengikuti **Master → Jadwal Otomatis**: aktif/nonaktif, pada jam tertentu (WIB, bawaan 09:00 dan 14:00) atau setiap 5 menit sampai 6 jam, di hari yang dipilih. Di halaman itu juga ada tombol **Jalankan sekarang** dan hasil jalan terakhir.
+
+Semua jadwal di atas hanya jalan bila **scheduler Laravel** berjalan. `php artisan serve` dan `queue:work` saja tidak cukup.
+
+- **Lokal:** `composer run dev` sudah ikut menjalankan scheduler (proses `scheduler`). Bila server dan queue dijalankan terpisah, buka satu terminal lagi untuk `php artisan schedule:work` dan biarkan terbuka.
+- **Server:** pasang cron:
 
 ```cron
 * * * * * cd /path/ke/aplikasi && php artisan schedule:run >> /dev/null 2>&1
 ```
+
+Scheduler mencatat detak setiap menit. Bila detak terakhir lebih dari 2 menit lalu, **Master → Jadwal Otomatis** menampilkan peringatan *Scheduler belum berjalan*. Setelah scheduler dinyalakan, tunggu sekitar satu menit lalu klik **Periksa lagi**.
 
 ---
 
@@ -425,6 +437,7 @@ vendor/bin/pint --dirty
 | `brands` | Master Brand (Realme, Oppo, ...); kode URL-nya dipakai di kolom `brand` tabel data. |
 | `master_programs` | Master Program per brand (kode unik per brand, dipakai semua area). |
 | `customers` | Master Badan Usaha (Bill To invoice). |
+| `automation_schedules` | Master Jadwal Otomatis: kapan tugas otomatis (WA ke telemarketing) berjalan dan hasil jalan terakhirnya. |
 | `email_accounts` | Akun pengirim email invoice. |
 | `email_logs`, `whatsapp_logs` | Log pengiriman invoice. |
 
@@ -438,6 +451,7 @@ vendor/bin/pint --dirty
 | Foto profil / PDF tidak tampil | Jalankan `php artisan storage:link` dan pastikan `APP_URL` benar. |
 | Analisis dokumen hasilnya aneh (DPP kosong, nama dealer salah) | AI router sedang error, sehingga yang dipakai pembacaan cadangan. Cek `storage/logs/laravel.log` ("AI vision call … returned HTTP …"), ganti model di `.env`, lalu klik **Analisis AI Ulang**. |
 | WA tidak terkirim | Cek `WAG_URL` dan `WAG_TOKEN`, serta nomor tujuan (format 08… / 628…). |
+| Jadwal Otomatis tidak pernah jalan / muncul peringatan *Scheduler belum berjalan* | Scheduler Laravel mati. Jalankan `php artisan schedule:work` (lokal) atau pasang cron `php artisan schedule:run` (server). Lihat [Perintah Artisan & Scheduler](#perintah-artisan--scheduler). |
 | Email invoice gagal | Hubungkan ulang Google Workspace dari halaman Invoice, atau cek `MAIL_*`. |
 | Data Program tidak cocok padahal datanya sama | Pastikan area, region, nama dealer, nama program, dan nominal sama; ID REALME di form harus kode BT atau ID GS toko yang sama. Lihat detail di **Data Program → Lihat**. |
 | Import draft banyak yang Error | Biasanya No CN kosong atau sudah dipakai, atau tipe invoice tidak dikenal. Lihat pesan per baris di hasil import. |

@@ -945,8 +945,40 @@ class DataProgramTest extends TestCase
 
         Http::assertSent(function ($request) {
             return str_contains($request['message']['text'], 'PEMBERITAHUAN KLAIM BISA DIPOTONG')
-                && str_contains($request['message']['text'], 'BT03663');
+                && str_contains($request['message']['text'], 'BT03663')
+                && str_contains($request['message']['text'], 'Tautan ini aktif selama 30 hari');
         });
+    }
+
+    public function test_telemarketing_confirmation_link_stays_valid_for_30_days(): void
+    {
+        config(['services.wag.token' => 'fake_token', 'services.wag.url' => 'https://waghub.mekayastudio.com']);
+        Http::fake(['https://waghub.mekayastudio.com/api/v1/messages' => Http::response(['success' => true, 'data' => ['id' => 'msg_123']], 200)]);
+
+        $dp = DataProgram::create([
+            'row_hash' => 'hash_wa_tm_link',
+            'dealer_name' => 'CV PRIMA PRESTASI ABADI',
+            'kode_bt' => 'BT03663',
+            'program_name' => 'PROGRAM PROMOTION NOTE 80',
+            'status_potong_purchase' => 'BISA DI POTONG',
+            'net_pay' => 98197,
+        ]);
+
+        $this->postJson("/api/data-program/{$dp->id}/send-wa-telemarketing")->assertOk();
+
+        $confirmUrl = null;
+        Http::assertSent(function ($request) use (&$confirmUrl) {
+            preg_match('#https?://\S+/dp/confirm/\S+#', $request['message']['text'], $match);
+            $confirmUrl = $match[0] ?? null;
+
+            return $confirmUrl !== null;
+        });
+
+        $this->travel(29)->days();
+        $this->get($confirmUrl)->assertOk();
+
+        $this->travel(2)->days();
+        $this->get($confirmUrl)->assertForbidden();
     }
 
     public function test_telemarketing_can_confirm_setuju_and_forward_to_ar(): void

@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AutomationSchedule;
 use App\Models\ProgramSubmission;
 use App\Services\DataProgramSyncService;
 use App\Services\ProgramReconciliationService;
@@ -37,6 +38,24 @@ if (! app()->environment('local') || env('ENABLE_AUTO_AI_SCHEDULE', false)) {
         ->withoutOverlapping()
         ->runInBackground();
 }
+
+// Detak scheduler: Master → Jadwal Otomatis memperingatkan bila detak ini berhenti (schedule:work / cron schedule:run mati).
+Schedule::call(fn () => AutomationSchedule::recordSchedulerHeartbeat())
+    ->name('scheduler-heartbeat')
+    ->everyMinute();
+
+// Cocokkan otomatis Data Program ↔ Form Program setiap menit (tanpa WhatsApp).
+Schedule::command('program:auto-match')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// WhatsApp ke telemarketing untuk baris yang BISA DI POTONG; jamnya diatur di Master → Jadwal Otomatis (dicek tiap menit).
+Schedule::command('program:notify-telemarketing')
+    ->everyMinute()
+    ->when(fn () => AutomationSchedule::isDueNow(AutomationSchedule::TELEMARKETING_WA))
+    ->withoutOverlapping()
+    ->runInBackground();
 
 Artisan::command('program:refresh-completeness', function () {
     $this->info('Memperbarui status kelengkapan dokumen Non-PKP...');

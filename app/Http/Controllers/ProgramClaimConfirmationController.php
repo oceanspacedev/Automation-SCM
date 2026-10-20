@@ -25,7 +25,7 @@ class ProgramClaimConfirmationController extends Controller
     public function confirm(Request $request, int|string $id): View
     {
         if (! $request->hasValidSignature()) {
-            abort(403, 'Tautan konfirmasi tidak valid atau sudah kedaluwarsa (berlaku 7 hari). Silakan minta kirim ulang notifikasi ke WhatsApp Anda.');
+            abort(403, 'Tautan konfirmasi tidak valid atau sudah kedaluwarsa (berlaku '.WhatsAppService::CONFIRM_LINK_DAYS.' hari). Silakan minta kirim ulang notifikasi ke WhatsApp Anda.');
         }
 
         $submission = ProgramSubmission::findOrFail($id);
@@ -129,7 +129,7 @@ class ProgramClaimConfirmationController extends Controller
     public function confirmDataProgram(Request $request, int|string $id): View
     {
         if (! $request->hasValidSignature()) {
-            abort(403, 'Tautan konfirmasi tidak valid atau sudah kedaluwarsa (berlaku 7 hari). Silakan minta kirim ulang notifikasi ke WhatsApp Anda.');
+            abort(403, 'Tautan konfirmasi tidak valid atau sudah kedaluwarsa (berlaku '.WhatsAppService::CONFIRM_LINK_DAYS.' hari). Silakan minta kirim ulang notifikasi ke WhatsApp Anda.');
         }
 
         $dp = DataProgram::findOrFail($id);

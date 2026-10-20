@@ -111,7 +111,7 @@
         </form>
 
         <p class="text-xs text-gray-400 text-center mt-4">
-            Tautan konfirmasi berlaku 7 hari.
+            Tautan konfirmasi berlaku {{ \App\Services\WhatsAppService::CONFIRM_LINK_DAYS }} hari.
         </p>
     </div>
 </body>

@@ -965,7 +965,7 @@
                     @click.stop="sendWaToTelemarketing(row)"
                     :disabled="sendingWaId === row.id"
                     class="h-7 px-2 inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium transition cursor-pointer shadow-2xs disabled:opacity-50"
-                    title="Kirim ke WhatsApp Telemarketing"
+                    :title="row.telemarketing_notified_at ? `WA telemarketing terkirim ${formatDateTime(row.telemarketing_notified_at)}. Klik untuk kirim ulang.` : 'Kirim ke WhatsApp Telemarketing'"
                   >
                     <RefreshCwIcon v-if="sendingWaId === row.id" class="w-3 h-3 animate-spin text-emerald-600" />
                     <WhatsAppIcon v-else class="w-3.5 h-3.5 text-[#25D366]" />
@@ -1265,6 +1265,9 @@
                   Cek dokumen <span class="text-gray-900">{{ testResult?.details?.cek_dokumen || testRow?.cek_dokumen || '-' }}</span>
                   <span class="mx-1.5 text-gray-300">·</span>
                   <span class="text-gray-900">{{ testResult?.details?.is_pkp ? 'PKP' : 'Non-PKP' }}</span><template v-if="testRow?.wajib_pajak && testRow.wajib_pajak !== '-'"> ({{ testRow.wajib_pajak }})</template>
+                </p>
+                <p v-if="testRow?.telemarketing_notified_at" class="pl-4 text-gray-500">
+                  WA telemarketing terkirim <span class="text-gray-900">{{ formatDateTime(testRow.telemarketing_notified_at) }}</span>
                 </p>
               </div>
 
@@ -1743,6 +1746,14 @@ const hasActiveFilters = computed(() => {
 });
 
 // Formatting functions (Consistent with Form Program)
+const formatDateTime = (value) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : `${date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })} ${date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`;
+};
+
 const formatRupiah = (val) => {
   if (val === null || val === undefined || val === '') return '-';
   const num = Number(val);
@@ -2043,6 +2054,7 @@ const handleConfirmSendTelemarketing = async ({ phone, telemarketing_name, targe
     });
     alert(res.data.message || `Notifikasi klaim "${target.dealer_name || target.kode_bt}" berhasil dikirim ke WhatsApp Telemarketing!`);
     telemarketingModal.isOpen = false;
+    target.telemarketing_notified_at = res.data.telemarketing_notified_at || new Date().toISOString();
     if (telemarketing_name) {
       target.telemarketing = telemarketing_name;
     }

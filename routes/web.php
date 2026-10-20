@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\ArContactController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AutomationScheduleController;
 use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DataProgramController;
@@ -37,6 +38,13 @@ Route::match(['get', 'post'], '/dp/confirm/{id}', [ProgramClaimConfirmationContr
 // brand (Realme, Oppo, ...) lewat header X-Brand atau parameter ?brand=, default Realme
 Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class])->group(function () {
     // Master Brand (Realme, Oppo, ...)
+    // Master Jadwal Otomatis (cron); butuh login karena "jalankan sekarang" bisa mengirim WhatsApp
+    Route::middleware('auth')->group(function () {
+        Route::get('/automation-schedules', [AutomationScheduleController::class, 'index']);
+        Route::put('/automation-schedules/{key}', [AutomationScheduleController::class, 'update']);
+        Route::post('/automation-schedules/{key}/run', [AutomationScheduleController::class, 'run']);
+    });
+
     Route::get('/brands', [BrandController::class, 'index']);
     Route::post('/brands', [BrandController::class, 'store']);
     Route::put('/brands/{id}', [BrandController::class, 'update']);
