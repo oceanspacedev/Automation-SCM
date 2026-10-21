@@ -401,6 +401,7 @@
                 <span class="text-xs">{{ label }}</span>
               </label>
             </div>
+            <p class="mt-1 text-[11px] text-gray-500">Master Program juga membuka menu Brand, Region, dan AR. Master User juga membuka Jadwal Otomatis.</p>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
@@ -502,8 +503,8 @@ import {
 
 const { user: currentUser } = useAuth();
 
-// Permission List Mapping (Clean & Simple)
-const permissionList = {
+// Daftar hak akses & bawaan per peran; diganti dengan daftar dari server (User::AVAILABLE_PERMISSIONS) saat data dimuat
+const permissionList = ref({
   drafts: 'Draft',
   invoices: 'Invoice',
   form_program: 'Form Program',
@@ -511,15 +512,19 @@ const permissionList = {
   riwayat_program: 'Riwayat Program',
   email_logs: 'Riwayat Email',
   dashboard: 'Dashboard',
+  master_program: 'Master Program',
+  master_dealer: 'Master Dealer',
+  master_customer: 'Master Badan Usaha',
   master_user: 'Master User',
-};
+});
 
-const roleDefaults = {
-  admin: ['drafts', 'invoices', 'form_program', 'data_program', 'riwayat_program', 'email_logs', 'dashboard', 'master_user'],
-  scm: ['drafts', 'invoices', 'form_program', 'data_program', 'riwayat_program', 'email_logs', 'dashboard', 'master_user'],
+const ALL_MODULES = ['drafts', 'invoices', 'form_program', 'data_program', 'riwayat_program', 'email_logs', 'dashboard', 'master_program', 'master_dealer', 'master_customer', 'master_user'];
+const roleDefaults = ref({
+  admin: ALL_MODULES,
+  scm: ALL_MODULES,
   ar: ['drafts', 'invoices', 'riwayat_program', 'dashboard'],
   telemarketing: ['form_program', 'riwayat_program'],
-};
+});
 
 // State
 const users = ref([]);
@@ -576,7 +581,7 @@ const pendingCount = computed(() => {
 });
 
 const areAllPermissionsChecked = computed(() => {
-  const allKeys = Object.keys(permissionList);
+  const allKeys = Object.keys(permissionList.value);
   return allKeys.every((k) => userForm.value.permissions.includes(k));
 });
 
@@ -584,12 +589,12 @@ const toggleAllPermissions = () => {
   if (areAllPermissionsChecked.value) {
     userForm.value.permissions = [];
   } else {
-    userForm.value.permissions = Object.keys(permissionList);
+    userForm.value.permissions = Object.keys(permissionList.value);
   }
 };
 
 const handleRoleChange = () => {
-  const defaults = roleDefaults[userForm.value.role];
+  const defaults = roleDefaults.value[userForm.value.role];
   if (defaults) {
     userForm.value.permissions = [...defaults];
   }
@@ -602,6 +607,8 @@ const fetchUsers = async () => {
     const res = await axios.get('/api/users');
     if (res.data?.success) {
       users.value = res.data.data || [];
+      if (res.data.available_permissions) permissionList.value = res.data.available_permissions;
+      if (res.data.default_permissions) roleDefaults.value = { ...roleDefaults.value, ...res.data.default_permissions };
     }
   } catch (err) {
     console.error('Gagal memuat master user:', err);
@@ -624,7 +631,7 @@ const openCreateModal = () => {
     email: '',
     whatsapp: '',
     role: 'scm',
-    permissions: [...roleDefaults.scm],
+    permissions: [...roleDefaults.value.scm],
     password: '',
     is_active: true,
   };
@@ -639,8 +646,8 @@ const openEditModal = (user) => {
   let perms = [];
   if (Array.isArray(user.permissions) && user.permissions.length > 0) {
     perms = [...user.permissions];
-  } else if (roleDefaults[user.role]) {
-    perms = [...roleDefaults[user.role]];
+  } else if (roleDefaults.value[user.role]) {
+    perms = [...roleDefaults.value[user.role]];
   }
 
   userForm.value = {
@@ -735,12 +742,12 @@ const getUserPermissions = (user) => {
   if (Array.isArray(user.permissions) && user.permissions.length > 0) {
     return user.permissions;
   }
-  return roleDefaults[user.role] || [];
+  return roleDefaults.value[user.role] || [];
 };
 
 const formatPermissionsSummary = (user) => {
   const perms = getUserPermissions(user);
-  const total = Object.keys(permissionList).length;
+  const total = Object.keys(permissionList.value).length;
   if (perms.length >= total) {
     return 'Semua Modul';
   }
@@ -752,6 +759,6 @@ const formatPermissionsSummary = (user) => {
 
 const formatPermissionsDetail = (user) => {
   const perms = getUserPermissions(user);
-  return perms.map((p) => permissionList[p] || p).join(', ');
+  return perms.map((p) => permissionList.value[p] || p).join(', ');
 };
 </script>
