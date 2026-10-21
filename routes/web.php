@@ -6,6 +6,7 @@ use App\Http\Controllers\AutomationScheduleController;
 use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DataProgramController;
+use App\Http\Controllers\DataResetController;
 use App\Http\Controllers\DealerController;
 use App\Http\Controllers\DraftController;
 use App\Http\Controllers\DraftImportController;
@@ -43,6 +44,11 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         Route::get('/automation-schedules', [AutomationScheduleController::class, 'index']);
         Route::put('/automation-schedules/{key}', [AutomationScheduleController::class, 'update']);
         Route::post('/automation-schedules/{key}/run', [AutomationScheduleController::class, 'run']);
+
+        // Reset data transaksi (Draft, Invoice, Data Program, Form Program); khusus Admin, dengan password reset
+        Route::get('/data-reset', [DataResetController::class, 'index']);
+        Route::post('/data-reset', [DataResetController::class, 'destroy'])->middleware('throttle:5,1');
+        Route::put('/data-reset/password', [DataResetController::class, 'updatePassword'])->middleware('throttle:5,1');
     });
 
     Route::get('/brands', [BrandController::class, 'index']);

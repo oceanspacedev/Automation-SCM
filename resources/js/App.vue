@@ -540,6 +540,8 @@ const masterColumns = computed(() => [
     canAccess('master_customer') && { label: 'Badan Usaha', to: '/badan-usaha' },
     canAccess('master_user') && { label: 'User', to: '/users' },
     canAccess('master_user') && { label: 'Jadwal Otomatis', to: '/jadwal-otomatis' },
+    // Reset data transaksi khusus Admin
+    user.value?.role === 'admin' && { label: 'Reset Data', to: '/reset-data' },
   ],
 ].map((column) => column.filter(Boolean)).filter((column) => column.length > 0));
 

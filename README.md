@@ -230,10 +230,18 @@ sequenceDiagram
 | **Dealer** | Toko dari file Master Customer CV TOP: kode BT, nama, alias, ID Realme/Nama GS, Jenis NPWP, NPWP, region, telemarketing (+ nomor WA), sales, status. | Import (file CV TOP; satu file untuk semua area) & export dengan format yang sama |
 | **Badan Usaha** | Badan usaha Bill To invoice (CV TOP SELULAR, PT RISM, PT MSI, ...): kode, nama, NPWP, alamat. Dulu bernama Master Customer; link lama `/customers` diarahkan ke `/badan-usaha`. | Export |
 | **User** | Akun pengguna, peran, akses per menu, persetujuan (ACC). | — |
+| **Reset Data** | Khusus Admin. Hapus data transaksi yang dipilih (Draft, Invoice, Data Program, Form Program) untuk area dan brand tertentu atau semuanya. Data master tidak ikut terhapus. | — |
 
 **Import Master Dealer:** area tiap toko diambil dari kolom **Big Area** (atau **Reffnote** bila Big Area kosong). Toko tanpa keduanya dilewati dan bisa diunduh sebagai daftar *dealer belum diimport*. Pilih **Tambah & perbarui** (aman) atau **Ganti semua** (hapus semua dealer lama di kedua area).
 
 > File export Dealer hanya berisi area yang sedang dibuka. Jangan mengimport file satu area dengan pilihan **Ganti semua**, karena dealer area lain akan terhapus.
+
+**Reset Data:** pilih area (semua / Jawa Barat / Jawa Tengah), brand (semua atau satu brand), dan data yang mau dihapus, klik **Reset data**, lalu masukkan **password reset**. Password ini diatur Admin di halaman yang sama (**Atur/Ubah password reset**; mengubahnya butuh password lama) dan disimpan sebagai hash di tabel `app_settings`. Selama belum diatur, reset tidak bisa dipakai. Salah password dibatasi 5 kali per menit. Penghapusan tidak bisa dibatalkan dan dicatat di `storage/logs/laravel.log` beserta email admin-nya.
+
+- **Draft:** invoice dari draft itu ikut terhapus.
+- **Invoice:** riwayat email & WA-nya ikut terhapus; draft-nya kembali berstatus siap sehingga bisa di-generate lagi.
+- **Data Program / Form Program:** riwayat pencocokannya ikut terhapus. Baris yang masih ada di Google Spreadsheet akan masuk lagi saat sinkron berikutnya, jadi kosongkan juga spreadsheet-nya bila datanya memang tidak dipakai lagi.
+- File yang sudah diunggah (dokumen Form Program, PDF invoice) tidak dihapus.
 
 ---
 
@@ -436,6 +444,7 @@ vendor/bin/pint --dirty
 | `ar_contacts` | Master AR per region per area. |
 | `brands` | Master Brand (Realme, Oppo, ...); kode URL-nya dipakai di kolom `brand` tabel data. |
 | `master_programs` | Master Program per brand (kode unik per brand, dipakai semua area). |
+| `app_settings` | Pengaturan yang diubah dari aplikasi, mis. hash password Reset Data. |
 | `customers` | Master Badan Usaha (Bill To invoice). |
 | `automation_schedules` | Master Jadwal Otomatis: kapan tugas otomatis (WA ke telemarketing) berjalan dan hasil jalan terakhirnya. |
 | `email_accounts` | Akun pengirim email invoice. |
