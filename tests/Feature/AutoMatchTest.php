@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\DataProgram;
 use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
+use App\Models\User;
 use App\Services\AutoMatchService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -20,6 +21,9 @@ class AutoMatchTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // API selain login, form publik & webhook butuh login
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
 
         config([
             'services.wag.token' => 'fake_token',

@@ -26,6 +26,7 @@ class DataResetController extends Controller
         return response()->json([
             'success' => true,
             'datasets' => DataResetService::DATASETS,
+            'master_datasets' => DataResetService::MASTER_DATASETS,
             'counts' => $reset->counts($area, $brand),
             'password_set' => $this->resetPasswordHash() !== null,
         ]);

@@ -10,6 +10,7 @@ use App\Models\MasterProgram;
 use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
 use App\Models\Region;
+use App\Models\User;
 use App\Services\AreaContext;
 use App\Services\DataProgramSyncService;
 use App\Services\ProgramReconciliationService;
@@ -23,6 +24,14 @@ use Tests\TestCase;
 class AreaSeparationTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // API selain login, form publik & webhook butuh login
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+    }
 
     public function test_data_program_list_only_shows_rows_of_selected_area(): void
     {

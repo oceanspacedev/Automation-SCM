@@ -29,7 +29,7 @@
         </button>
         <button
           type="button"
-          @click="downloadExport('/api/dealers/export', { search: searchQuery, region: filterRegion })"
+          @click="downloadExport('/api/dealers/export', { search: searchQuery, region: filterRegion, agreement: filterAgreement })"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
           title="Export dealer area ini sesuai pencarian & filter (format sama dengan file import CV TOP)"
         >
@@ -48,8 +48,72 @@
     <DealerImportModal
       :is-open="isImportModalOpen"
       @close="isImportModalOpen = false"
-      @imported="fetchDealers(1); fetchMasterRegions()"
+      @started="applyImportStatus"
     />
+
+    <!-- Import yang berjalan di background: status, progres, lalu hasilnya -->
+    <div
+      v-if="isImportStatusVisible"
+      class="rounded-xl border px-4 py-3 text-xs flex items-start justify-between gap-3"
+      :class="{
+        'border-gray-200 bg-white': isImportActive,
+        'border-emerald-200 bg-emerald-50/60': importStatus.state === 'done',
+        'border-red-200 bg-red-50/60': importStatus.state === 'failed',
+      }"
+    >
+      <div class="min-w-0 space-y-1.5">
+        <template v-if="isImportActive">
+          <p class="font-medium text-gray-900 flex items-center gap-2">
+            <span class="w-3.5 h-3.5 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin shrink-0"></span>
+            <template v-if="importStatus.state === 'queued'">Import {{ importStatus.file_name }} menunggu diproses...</template>
+            <template v-else-if="importStatus.type === 'agreements'">Mengecek agreement {{ importStatus.file_name }} dengan AI...</template>
+            <template v-else>Mengimport {{ importStatus.file_name }}...</template>
+          </p>
+          <div v-if="importStatus.progress" class="flex items-center gap-2 text-gray-600">
+            <div class="h-1.5 w-40 rounded-full bg-gray-200 overflow-hidden">
+              <div class="h-full bg-gray-900 transition-all" :style="{ width: `${importProgressPercent}%` }"></div>
+            </div>
+            <span class="tabular-nums">{{ importStatus.progress.done }} / {{ importStatus.progress.total }} toko</span>
+          </div>
+          <p v-if="isImportWaitingLong" class="text-amber-700">
+            Belum mulai juga? Pastikan queue worker atau scheduler berjalan (lokal: <code>composer run dev</code>).
+          </p>
+          <p v-else class="text-gray-500">Halaman boleh ditinggal; hasilnya muncul di sini setelah selesai.</p>
+        </template>
+
+        <template v-else-if="importStatus.state === 'done' && importStatus.type === 'agreements'">
+          <p class="font-medium text-emerald-800">Agreement dari {{ importStatus.file_name }} selesai diimport.</p>
+          <p class="text-gray-700">
+            {{ importStatus.result.filled }} toko diisi, {{ importStatus.result.replaced }} diganti, {{ importStatus.result.same }} sudah sama,
+            {{ importStatus.result.removed }} dihapus karena tidak ada agreement yang memenuhi (nama toko, atau TTD dengan cap toko).
+            {{ importStatus.result.kept }} toko tetap memakai agreement dari Form Program; {{ importStatus.result.not_found }} kode BT tidak ada di Master Dealer.
+          </p>
+          <p v-if="importStatus.result.unchecked" class="text-amber-700">
+            {{ importStatus.result.unchecked }} toko belum bisa dicek AI. Import ulang file yang sama nanti; dokumen yang sudah dicek tidak dicek lagi.
+          </p>
+        </template>
+
+        <template v-else-if="importStatus.state === 'done'">
+          <p class="font-medium text-emerald-800">
+            {{ importStatus.result.imported }} dealer dari {{ importStatus.file_name }} berhasil diimport<template v-if="importAreaSummary"> ({{ importAreaSummary }})</template>.
+          </p>
+          <p v-if="importStatus.result.regions_created?.length" class="text-gray-700">Region baru di Master Region: {{ importStatus.result.regions_created.join(', ') }}</p>
+          <p v-if="importStatus.result.skipped?.length" class="text-amber-700">
+            {{ importStatus.result.skipped.length }} baris dilewati (Big Area / Reffnote kosong atau tidak dikenal).
+            <a href="/api/dealers/import/skipped" class="underline text-gray-800 hover:text-gray-950">Unduh daftar baris</a>,
+            lengkapi, lalu import lagi dengan "Tambah & perbarui".
+          </p>
+        </template>
+
+        <template v-else>
+          <p class="font-medium text-red-700">Import {{ importStatus.file_name }} gagal.</p>
+          <p class="text-gray-700">{{ importStatus.message }}</p>
+        </template>
+      </div>
+      <button v-if="!isImportActive" type="button" @click="dismissImportStatus" class="text-gray-400 hover:text-gray-600 cursor-pointer shrink-0" title="Tutup">
+        <XIcon class="w-4 h-4" />
+      </button>
+    </div>
 
     <!-- Table Card (Matching Form Program Plain Ordinary Table Style) -->
     <div class="rounded-xl border border-gray-200 bg-white shadow-xs overflow-hidden">
@@ -59,10 +123,10 @@
           <span>Total: {{ totalRows }} data</span>
         </div>
 
-        <!-- Filter & pencarian; di layar kecil cari di atas, region di bawahnya -->
+        <!-- Filter & pencarian; di layar kecil cari di atas, region & agreement berdampingan di bawahnya -->
         <div class="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-nowrap">
           <!-- Region Filter -->
-          <div class="relative min-w-[140px] col-span-2">
+          <div class="relative min-w-[140px]">
             <select
               v-model="filterRegion"
               @change="fetchDealers(1)"
@@ -70,6 +134,20 @@
             >
               <option value="all">Semua Region</option>
               <option v-for="r in availableRegions" :key="r" :value="r">{{ r }}</option>
+            </select>
+            <ChevronDownIcon class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          </div>
+
+          <!-- Agreement Filter -->
+          <div class="relative min-w-[140px]">
+            <select
+              v-model="filterAgreement"
+              @change="fetchDealers(1)"
+              class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 pr-8 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-900 cursor-pointer appearance-none shadow-2xs"
+            >
+              <option value="all">Semua Agreement</option>
+              <option value="yes">Ada agreement</option>
+              <option value="no">Belum ada agreement</option>
             </select>
             <ChevronDownIcon class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           </div>
@@ -117,6 +195,11 @@
               </button>
             </div>
             <p class="text-gray-500 break-words">ID Realme {{ d.id_realme || '-' }}<template v-if="d.gs_name"> · {{ d.gs_name }}</template></p>
+            <p class="text-gray-500">
+              Agreement
+              <a v-if="d.agreement_url" :href="d.agreement_url" target="_blank" rel="noopener" class="text-gray-900 underline">Lihat</a>
+              <template v-else>belum ada</template>
+            </p>
             <div class="flex items-end justify-between gap-3">
               <p class="min-w-0 text-gray-500 break-words">
                 Telemarketing {{ d.telemarketing || '-' }}<template v-if="d.telemarketing_phone"> · {{ d.telemarketing_phone }}</template>
@@ -155,18 +238,19 @@
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Region</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Telemarketing</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Sales</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Agreement</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
               <th scope="col" class="py-2.5 px-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <tr v-if="isLoading">
-              <td colspan="10" class="py-8 text-center text-gray-500">
+              <td colspan="11" class="py-8 text-center text-gray-500">
                 Memuat data...
               </td>
             </tr>
             <tr v-else-if="dealers.length === 0">
-              <td colspan="10" class="py-8 text-center text-gray-500">
+              <td colspan="11" class="py-8 text-center text-gray-500">
                 Tidak ada data dealer yang ditemukan.
               </td>
             </tr>
@@ -217,6 +301,15 @@
               <!-- 7. Sales -->
               <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
                 {{ d.sales_person || '-' }}
+              </td>
+
+              <!-- Agreement toko (dipakai otomatis di Form Program Realme) -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
+                <template v-if="d.agreement_url">
+                  <a :href="d.agreement_url" target="_blank" rel="noopener" class="text-gray-900 underline">Lihat</a>
+                  <div v-if="d.agreement_updated_at" class="text-[11px] text-gray-500">{{ formatDate(d.agreement_updated_at) }}</div>
+                </template>
+                <span v-else class="text-gray-400">-</span>
               </td>
 
               <!-- 8. Status -->
@@ -394,6 +487,17 @@
                 class="w-full h-9 px-3 rounded-lg border border-gray-300 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-900"
               />
             </div>
+            <div class="sm:col-span-2">
+              <label for="dealer-agreement-url" class="block font-medium text-gray-900 mb-1">Link Agreement</label>
+              <input
+                id="dealer-agreement-url"
+                type="url"
+                v-model="formData.agreement_url"
+                placeholder="https://drive.google.com/..."
+                class="w-full h-9 px-3 rounded-lg border border-gray-300 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-900"
+              />
+              <p class="mt-1 text-[11px] text-gray-500">Satu agreement bertanda tangan per toko, dipakai otomatis di Form Program Realme.</p>
+            </div>
           </div>
 
           <div class="pt-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -543,7 +647,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import AreaTabs from '@/components/AreaTabs.vue';
 import DealerImportModal from '@/components/DealerImportModal.vue';
@@ -584,6 +688,7 @@ const fetchMasterRegions = async () => {
 
 const searchQuery = ref('');
 const filterRegion = ref('all');
+const filterAgreement = ref('all');
 let searchTimeout = null;
 
 const isModalOpen = ref(false);
@@ -611,8 +716,14 @@ const formData = reactive({
   whatsapp: '',
   email: '',
   pic_name: '',
+  agreement_url: '',
   is_active: true,
 });
+
+const formatDate = (value) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+};
 
 async function fetchDealers(page = 1) {
   isLoading.value = true;
@@ -624,6 +735,7 @@ async function fetchDealers(page = 1) {
       per_page: perPage.value,
       search: searchQuery.value.trim() || undefined,
       region: filterRegion.value !== 'all' ? filterRegion.value : undefined,
+      agreement: filterAgreement.value !== 'all' ? filterAgreement.value : undefined,
     };
     const res = await axios.get('/api/dealers', { params });
     if (res.data?.success) {
@@ -670,6 +782,7 @@ function openCreateModal() {
     whatsapp: '',
     email: '',
     pic_name: '',
+    agreement_url: '',
     is_active: true,
   });
   isModalOpen.value = true;
@@ -696,6 +809,7 @@ function openEditModal(d) {
     whatsapp: d.whatsapp || '',
     email: d.email || '',
     pic_name: d.pic_name || '',
+    agreement_url: d.agreement_url || '',
     is_active: Boolean(d.is_active),
   });
   isModalOpen.value = true;
@@ -749,8 +863,68 @@ async function executeDelete() {
   }
 }
 
+// Import di background: status dicek berkala selama masih menunggu / berjalan
+const DISMISSED_IMPORT_KEY = 'dealer-import-dismissed';
+const importStatus = ref(null);
+const dismissedImportAt = ref(readDismissedImport());
+let importPollTimer = null;
+
+const isImportActive = computed(() => ['queued', 'running'].includes(importStatus.value?.state));
+const isImportStatusVisible = computed(() => importStatus.value && (isImportActive.value || importStatus.value.queued_at !== dismissedImportAt.value));
+const importProgressPercent = computed(() => {
+  const progress = importStatus.value?.progress;
+  return progress?.total ? Math.round((progress.done / progress.total) * 100) : 0;
+});
+const isImportWaitingLong = computed(() => importStatus.value?.state === 'queued' && Date.now() - new Date(importStatus.value.queued_at).getTime() > 2 * 60 * 1000);
+const importAreaSummary = computed(() =>
+  Object.entries(importStatus.value?.result?.per_area || {}).map(([area, count]) => `${area}: ${count}`).join(' · ')
+);
+
+function readDismissedImport() {
+  try {
+    return localStorage.getItem(DISMISSED_IMPORT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function dismissImportStatus() {
+  dismissedImportAt.value = importStatus.value?.queued_at || null;
+  try {
+    localStorage.setItem(DISMISSED_IMPORT_KEY, dismissedImportAt.value || '');
+  } catch {
+    // Tanpa penyimpanan browser, status tetap tertutup sampai halaman dimuat ulang
+  }
+}
+
+function applyImportStatus(status) {
+  const wasActive = isImportActive.value;
+  importStatus.value = status || null;
+
+  clearTimeout(importPollTimer);
+  if (isImportActive.value) {
+    importPollTimer = setTimeout(fetchImportStatus, 3000);
+  } else if (wasActive) {
+    // Baru selesai: tampilkan data terbaru
+    fetchDealers(1);
+    fetchMasterRegions();
+  }
+}
+
+async function fetchImportStatus() {
+  try {
+    const res = await axios.get('/api/dealers/import/status');
+    applyImportStatus(res.data.status);
+  } catch {
+    if (isImportActive.value) importPollTimer = setTimeout(fetchImportStatus, 10000);
+  }
+}
+
 onMounted(() => {
   fetchMasterRegions();
   fetchDealers(1);
+  fetchImportStatus();
 });
+
+onUnmounted(() => clearTimeout(importPollTimer));
 </script>

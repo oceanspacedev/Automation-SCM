@@ -18,6 +18,14 @@ class DataProgramTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // API selain login, form publik & webhook butuh login
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+    }
+
     public function test_can_get_paginated_data_program(): void
     {
         DataProgram::create([

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\MasterProgram;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -12,6 +13,14 @@ use Tests\TestCase;
 class MasterProgramTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // API selain login, form publik & webhook butuh login
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+    }
 
     public function test_can_list_master_programs(): void
     {

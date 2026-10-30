@@ -3,16 +3,21 @@
 namespace Tests\Feature;
 
 use App\Models\AppSetting;
+use App\Models\ArContact;
 use App\Models\Brand;
+use App\Models\Customer;
 use App\Models\DataProgram;
 use App\Models\Dealer;
 use App\Models\Draft;
 use App\Models\EmailLog;
 use App\Models\Invoice;
+use App\Models\MasterProgram;
 use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
+use App\Models\Region;
 use App\Models\User;
 use App\Models\WhatsAppLog;
+use App\Services\DataResetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -140,6 +145,51 @@ class DataResetTest extends TestCase
 
         $this->assertSame('ready', $draft->fresh()->status);
         $this->assertSame(0, Invoice::withoutGlobalScopes()->count());
+    }
+
+    public function test_resetting_master_data_follows_each_lists_own_scope_and_keeps_transactions_brands_and_users(): void
+    {
+        Brand::factory()->create(['slug' => 'xiaomi', 'name' => 'Xiaomi']);
+        $admin = $this->admin();
+        $draft = $this->invoicedDraft('jabar', '2608000001');
+        Dealer::create(['area' => 'jabar', 'kode_bt' => 'BT01111', 'dealer_name' => 'TOKO JABAR', 'is_active' => true]);
+        $jatengDealer = Dealer::create(['area' => 'jateng', 'kode_bt' => 'BT02222', 'dealer_name' => 'TOKO JATENG', 'is_active' => true]);
+        Region::factory()->create(['area' => 'jabar']);
+        Region::factory()->create(['area' => 'jateng']);
+        ArContact::factory()->create(['area' => 'jabar']);
+        ArContact::factory()->create(['area' => 'jateng']);
+        MasterProgram::create(['brand' => 'realme', 'name' => 'PROGRAM TES RESET JUNI 2026']);
+        $xiaomiProgram = MasterProgram::create(['brand' => 'xiaomi', 'name' => 'PROGRAM SO XIAOMI JUNI 2026']);
+        Customer::create(['code' => 'TESRESET', 'name' => 'BADAN USAHA TES RESET']);
+
+        // Sebagian master sudah terisi dari migrasi, jadi jumlahnya dihitung dari database
+        $expected = [
+            'dealers' => 1,
+            'regions' => Region::withoutGlobalScopes()->where('area', 'jabar')->count(),
+            'ar_contacts' => ArContact::withoutGlobalScopes()->where('area', 'jabar')->count(),
+            'master_programs' => MasterProgram::withoutGlobalScopes()->where('brand', 'realme')->count(),
+            'customers' => Customer::count(),
+        ];
+        $jatengRegions = Region::withoutGlobalScopes()->where('area', 'jateng')->pluck('id')->all();
+        $jatengArContacts = ArContact::withoutGlobalScopes()->where('area', 'jateng')->pluck('id')->all();
+
+        // Dealer, region & AR per area; program per brand; badan usaha selalu semua
+        $response = $this->actingAs($admin)->getJson('/api/data-reset?area=jabar&brand=realme')->assertOk();
+        $response->assertJsonPath('master_datasets', DataResetService::MASTER_DATASETS);
+        $this->assertSame($expected, array_intersect_key($response->json('counts'), $expected));
+
+        $this->postJson('/api/data-reset', ['datasets' => DataResetService::MASTER_DATASETS, 'area' => 'jabar', 'brand' => 'realme', 'password' => self::PASSWORD])
+            ->assertOk()
+            ->assertJsonPath('deleted', $expected + ['history' => 0]);
+
+        $this->assertSame([$jatengDealer->id], Dealer::withoutGlobalScopes()->pluck('id')->all());
+        $this->assertSame($jatengRegions, Region::withoutGlobalScopes()->pluck('id')->all());
+        $this->assertSame($jatengArContacts, ArContact::withoutGlobalScopes()->pluck('id')->all());
+        $this->assertSame([$xiaomiProgram->id], MasterProgram::withoutGlobalScopes()->pluck('id')->all());
+        $this->assertSame(0, Customer::count());
+        $this->assertModelExists($draft);
+        $this->assertModelExists($admin);
+        $this->assertSame(2, Brand::count());
     }
 
     public function test_resetting_program_data_of_a_brand_removes_its_matching_history_only(): void

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Mail\InvoiceMail;
 use App\Models\Draft;
 use App\Models\Invoice;
+use App\Models\User;
 use App\Services\DraftImportService;
 use App\Services\InvoiceGenerator;
 use App\Services\WhatsAppService;
@@ -19,6 +20,14 @@ use Tests\TestCase;
 class InvoiceNotificationTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // API selain login, form publik & webhook butuh login
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+    }
 
     public function test_import_draft_with_whatsapp_column(): void
     {

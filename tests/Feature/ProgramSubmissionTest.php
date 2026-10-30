@@ -8,12 +8,15 @@ use App\Models\ProgramSubmission;
 use App\Models\User;
 use App\Services\DocumentAnalysisService;
 use App\Services\ProgramSubmissionService;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
+use Mockery;
 use Tests\TestCase;
 
 class ProgramSubmissionTest extends TestCase
@@ -1418,6 +1421,9 @@ class ProgramSubmissionTest extends TestCase
     public function test_can_submit_public_program_form(): void
     {
         Storage::fake('public');
+        // Dokumen masuk SeaweedFS / S3 (dipalsukan, tidak menyentuh storage asli)
+        config(['filesystems.disks.s3.key' => 'test-key', 'filesystems.disks.s3.bucket' => 'scm']);
+        Storage::fake('s3');
 
         $cnFile = UploadedFile::fake()->create('credit_note_toko_jaya.pdf', 50, 'application/pdf');
         $agrFile = UploadedFile::fake()->create('agreement_toko_jaya.pdf', 50, 'application/pdf');
@@ -1446,16 +1452,34 @@ class ProgramSubmissionTest extends TestCase
 
         $submission = ProgramSubmission::where('id_real', 'IDME00789')->first();
         $this->assertNotNull($submission);
-        $this->assertTrue(
-            str_contains($submission->credit_note_url, 'storage.completeselular.com') ||
-            str_contains($submission->credit_note_url, 'storage/program_documents')
-        );
-        $this->assertTrue(
-            str_contains($submission->agreement_url, 'storage.completeselular.com') ||
-            str_contains($submission->agreement_url, 'storage/program_documents')
-        );
-        $this->assertStringContainsString('Toko Jaya Selular', $submission->credit_note_url);
-        $this->assertStringContainsString('PROGRAM DSA FEBRUARI 2026', $submission->credit_note_url);
+        $this->assertCount(2, Storage::disk('s3')->files('Toko Jaya Selular/PROGRAM DSA FEBRUARI 2026'));
+        $this->assertStringContainsString('Toko Jaya Selular/PROGRAM DSA FEBRUARI 2026/CN_', $submission->credit_note_url);
+        $this->assertStringContainsString('Toko Jaya Selular/PROGRAM DSA FEBRUARI 2026/AGR_', $submission->agreement_url);
+    }
+
+    public function test_public_form_documents_fall_back_to_local_storage_when_the_s3_upload_fails(): void
+    {
+        Storage::fake('public');
+        config(['filesystems.disks.s3.key' => 'test-key', 'filesystems.disks.s3.bucket' => 'scm']);
+        // Disk S3 tidak melempar error: unggahan yang gagal mengembalikan false
+        $failingS3 = Mockery::mock(FilesystemAdapter::class);
+        $failingS3->shouldReceive('putFileAs')->andReturn(false);
+        Storage::set('s3', $failingS3);
+
+        $this->postJson('/api/program-submissions/submit-form', [
+            'program_name' => 'PROGRAM DSA FEBRUARI 2026',
+            'region' => 'BIG BANDUNG',
+            'id_real' => 'IDME00790',
+            'dealer_name' => 'Toko Jaya Selular',
+            'sales_name' => 'SANDY ARJAYAN',
+            'credit_note_file' => UploadedFile::fake()->create('credit_note_toko_jaya.pdf', 50, 'application/pdf'),
+            'agreement_file' => UploadedFile::fake()->create('agreement_toko_jaya.pdf', 50, 'application/pdf'),
+        ])->assertOk();
+
+        $submission = ProgramSubmission::where('id_real', 'IDME00790')->firstOrFail();
+        $this->assertStringContainsString('/storage/program_documents/', $submission->credit_note_url);
+        Storage::disk('public')->assertExists(Str::after($submission->credit_note_url, '/storage/'));
+        Storage::disk('public')->assertExists(Str::after($submission->agreement_url, '/storage/'));
     }
 
     public function test_cannot_submit_public_program_form_with_swapped_or_invalid_documents(): void
@@ -1639,6 +1663,8 @@ class ProgramSubmissionTest extends TestCase
 
     public function test_get_and_save_spreadsheet_config(): void
     {
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+
         $getRes = $this->getJson('/api/program-submissions/config');
         $getRes->assertOk()
             ->assertJsonStructure(['webapp_url', 'spreadsheet_url']);
@@ -1658,6 +1684,8 @@ class ProgramSubmissionTest extends TestCase
 
     public function test_push_single_submission_to_spreadsheet(): void
     {
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+
         Http::fake([
             'script.google.com/macros/s/*' => Http::response([
                 'success' => true,

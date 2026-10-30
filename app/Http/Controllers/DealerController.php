@@ -2,12 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Area;
+use App\Jobs\ImportDealerFile;
 use App\Models\Dealer;
 use App\Services\AreaContext;
 use App\Services\DealerImportService;
 use App\Services\SpreadsheetExport;
-use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -19,53 +18,47 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class DealerController extends Controller
 {
     /**
-     * Import Master Dealer from the CV TOP master file. The file holds every area: each store's area
-     * comes from its Big Area (or Reffnote), so one import fills both Jawa Barat and Jawa Tengah.
+     * Start importing a file in the background (see ImportDealerFile): the CV TOP master customer file (every area;
+     * each store's area comes from its Big Area or Reffnote), or a Data Program file for the stores' agreements.
      */
-    public function import(Request $request, DealerImportService $importer): JsonResponse
+    public function import(Request $request): JsonResponse
     {
         $request->validate([
-            'file' => ['required', 'file', 'extensions:xlsx,xls,csv', 'max:20480'],
+            'file' => ['required', 'file', 'extensions:xlsx,xls,csv', 'max:51200'],
             'replace_existing' => ['nullable', 'boolean'],
         ], [
-            'file.required' => 'Pilih file Excel Master Dealer terlebih dahulu.',
+            'file.required' => 'Pilih file Excel terlebih dahulu.',
             'file.extensions' => 'File harus berformat .xlsx, .xls, atau .csv.',
-            'file.max' => 'Ukuran file maksimal 20 MB.',
+            'file.max' => 'Ukuran file maksimal 50 MB.',
         ]);
 
-        set_time_limit(300);
-
-        try {
-            $result = $importer->import($request->file('file')->getRealPath(), $request->boolean('replace_existing'));
-        } catch (Exception $e) {
+        if (! ImportDealerFile::start($request->file('file'), $request->boolean('replace_existing'), (string) $request->user()?->email)) {
             return response()->json([
                 'success' => false,
-                'message' => 'File tidak bisa diimport: '.$e->getMessage(),
-            ], 422);
-        }
-
-        if ($result['skipped']) {
-            $importer->writeSkippedRows($result['skipped'], $result['header'], $importer->skippedRowsPath());
+                'message' => 'Masih ada import yang berjalan. Tunggu sampai selesai, lalu coba lagi.',
+                'status' => ImportDealerFile::status(),
+            ], 409);
         }
 
         return response()->json([
             'success' => true,
-            'message' => "{$result['imported']} dealer berhasil diimport.",
-            'data' => [
-                'imported' => $result['imported'],
-                'per_area' => collect($result['per_area'])->mapWithKeys(fn (int $count, string $area) => [Area::from($area)->label() => $count])->all(),
-                'regions_created' => $result['regions_created'],
-                'duplicates' => $result['duplicates'],
-                'normalized_kode_bt' => $result['normalized_kode_bt'],
-                'kept_original_kode_bt' => $result['kept_original_kode_bt'],
-                'skipped' => array_map(fn (array $row) => Arr::only($row, ['row', 'kode_bt', 'dealer_name', 'reason']), $result['skipped']),
-            ],
-        ]);
+            'message' => 'Import berjalan di background.',
+            'status' => ImportDealerFile::status(),
+        ], 202);
+    }
+
+    /**
+     * Progress and result of the latest import.
+     */
+    public function importStatus(): JsonResponse
+    {
+        return response()->json(['success' => true, 'status' => ImportDealerFile::status()]);
     }
 
     /**
      * Export the dealers of the selected area (with the list's search & filters) in the CV TOP master file layout,
-     * so the file can be edited and imported again.
+     * so the file can be edited and imported again. The store's agreement is a last "Agreement" column (a short
+     * "Link AGR" that opens the document), which the import ignores.
      */
     public function export(Request $request, SpreadsheetExport $export, AreaContext $areaContext): StreamedResponse
     {
@@ -87,12 +80,13 @@ class DealerController extends Controller
             $dealer->telemarketing_phone,
             $dealer->region,
             $dealer->sales_person,
+            $dealer->agreement_url ? SpreadsheetExport::link($dealer->agreement_url, 'Link AGR') : null,
         ]);
 
         return $export->download(
             'master_dealer_'.$area->value.'_'.now()->format('Ymd_His').'.xlsx',
             'Master Dealer '.$area->label(),
-            ['ID Customer', 'Nama Customer', 'Alias', 'Alamat', 'ID GS', 'Nama GS', 'Status GS', 'NPWP/NIK', 'NAMA NPWP/NIK', 'Reffnote', 'Jenis NPWP', 'Telemarketing', 'No. WA Telemarketing', 'Big Area', 'SALES AREA'],
+            ['ID Customer', 'Nama Customer', 'Alias', 'Alamat', 'ID GS', 'Nama GS', 'Status GS', 'NPWP/NIK', 'NAMA NPWP/NIK', 'Reffnote', 'Jenis NPWP', 'Telemarketing', 'No. WA Telemarketing', 'Big Area', 'SALES AREA', 'Agreement'],
             $rows
         );
     }
@@ -124,6 +118,12 @@ class DealerController extends Controller
             if ($region !== 'all') {
                 $query->where('region', $region);
             }
+        }
+
+        if ($request->input('agreement') === 'yes') {
+            $query->whereNotNull('agreement_url')->where('agreement_url', '!=', '');
+        } elseif ($request->input('agreement') === 'no') {
+            $query->where(fn (Builder $q) => $q->whereNull('agreement_url')->orWhere('agreement_url', ''));
         }
 
         if ($request->has('is_active') && $request->input('is_active') !== 'all' && $request->input('is_active') !== null) {
@@ -238,6 +238,7 @@ class DealerController extends Controller
                 'is_pkp' => $dealer->isPkp(),
                 'telemarketing' => $dealer->telemarketing,
                 'sales_person' => $dealer->sales_person,
+                'has_agreement' => filled($dealer->agreement_url),
             ],
         ]);
     }
@@ -275,11 +276,16 @@ class DealerController extends Controller
             });
         }
 
-        // Toko tanpa ID Realme (ID GS) memakai kode BT sebagai ID-nya
+        // Toko tanpa ID Realme (ID GS) memakai kode BT sebagai ID-nya; link agreement tidak dikirim ke form publik
         $suggestions = $query->orderBy('dealer_name')
             ->limit($limit)
-            ->get(['id', 'id_realme', 'dealer_name', 'region', 'kode_bt', 'whatsapp', 'npwp_type'])
-            ->map(fn (Dealer $dealer) => [...$dealer->toArray(), 'id_realme' => $dealer->id_realme ?: $dealer->kode_bt, 'is_pkp' => $dealer->isPkp()]);
+            ->get(['id', 'id_realme', 'dealer_name', 'region', 'kode_bt', 'whatsapp', 'npwp_type', 'agreement_url'])
+            ->map(fn (Dealer $dealer) => [
+                ...Arr::except($dealer->toArray(), ['agreement_url']),
+                'id_realme' => $dealer->id_realme ?: $dealer->kode_bt,
+                'is_pkp' => $dealer->isPkp(),
+                'has_agreement' => filled($dealer->agreement_url),
+            ]);
 
         return response()->json([
             'success' => true,
@@ -343,11 +349,21 @@ class DealerController extends Controller
             'whatsapp' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'string', 'email', 'max:255'],
             'pic_name' => ['nullable', 'string', 'max:150'],
+            'agreement_url' => ['nullable', 'url', 'max:1000'],
             'is_active' => ['boolean'],
         ], [
             'kode_bt.required' => 'Kode BT wajib diisi.',
             'kode_bt.unique' => 'Kode BT sudah terdaftar di Master Dealer.',
+            'agreement_url.url' => 'Link agreement harus berupa URL, misalnya https://drive.google.com/...',
         ]);
+
+        // Catat kapan agreement toko diganti
+        if (array_key_exists('agreement_url', $validated)) {
+            $validated['agreement_url'] = $validated['agreement_url'] ? trim($validated['agreement_url']) : null;
+            if ($validated['agreement_url'] !== $dealer?->agreement_url) {
+                $validated['agreement_updated_at'] = $validated['agreement_url'] ? now() : null;
+            }
+        }
 
         $validated['dealer_name'] = trim($validated['dealer_name']);
         foreach (['id_realme', 'region', 'npwp_type'] as $field) {

@@ -307,7 +307,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { Send as SendIcon, CheckCircle as CheckCircleIcon, AlertCircle as AlertCircleIcon } from '@lucide/vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -384,4 +384,7 @@ const formatDateTime = (val) => {
 onMounted(() => {
   fetchInvoice();
 });
+
+// Pindah langsung ke invoice lain (komponen yang sama dipakai ulang): muat data invoice itu
+watch(() => props.id, fetchInvoice);
 </script>

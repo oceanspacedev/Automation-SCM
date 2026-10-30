@@ -19,6 +19,7 @@ use App\Services\WhatsAppService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -1089,15 +1090,48 @@ class ProgramSubmissionController extends Controller
     }
 
     /**
+     * Store an uploaded program document in SeaweedFS / S3 under "<dealer>/<program>", or on the public disk when S3 is
+     * not configured or the upload fails. The S3 disk does not throw: a failed upload returns false, which must not
+     * become a link to the bucket root.
+     */
+    private function storeProgramDocument(UploadedFile $file, string $prefix, string $s3Folder, bool $useS3): string
+    {
+        $filename = $prefix.'_'.time().'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
+
+        if ($useS3) {
+            try {
+                $path = Storage::disk('s3')->putFileAs($s3Folder, $file, $filename);
+
+                if ($path !== false) {
+                    return Storage::disk('s3')->url($path);
+                }
+
+                Log::warning("Upload {$prefix} to S3 failed, fallback to local.");
+            } catch (\Throwable $e) {
+                Log::warning("Upload {$prefix} to S3 failed, fallback to local: ".$e->getMessage());
+            }
+        }
+
+        return url('storage/'.$file->store('program_documents', 'public'));
+    }
+
+    /**
      * PKP status of the selected store from its Jenis NPWP in Master Dealer (null when the store or its type is unknown).
      * The form sends the store's kode BT when it was picked from the list, since an ID Realme can be shared by several stores.
      */
     private function masterDealerPkpStatus(Request $request): ?bool
     {
-        $dealer = Dealer::findByIdReal($request->input('kode_bt'))
-            ?? Dealer::findByIdReal($request->input('id_real'), $request->input('dealer_name'));
+        return $this->masterDealer($request)?->isPkp();
+    }
 
-        return $dealer?->isPkp();
+    /**
+     * The selected store in Master Dealer: by the kode BT the form sends when it was picked from the list,
+     * else by its ID REALME and name.
+     */
+    private function masterDealer(Request $request): ?Dealer
+    {
+        return Dealer::findByIdReal($request->input('kode_bt'))
+            ?? Dealer::findByIdReal($request->input('id_real'), $request->input('dealer_name'));
     }
 
     /**
@@ -1150,6 +1184,11 @@ class ProgramSubmissionController extends Controller
             }
         }
 
+        // Agreement toko (satu per toko, berlaku untuk semua program Realme) dari Master Dealer: tidak perlu diunggah ulang
+        $masterDealer = $this->masterDealer($request);
+        $usesMasterAgreement = app(BrandContext::class)->resolve() === Brand::DEFAULT_SLUG;
+        $masterAgreement = $usesMasterAgreement ? $masterDealer?->agreement_url : null;
+
         $request->validate([
             'program_name' => ['required', 'string', 'max:255'],
             'region' => ['required', 'string', 'max:100'],
@@ -1168,7 +1207,7 @@ class ProgramSubmissionController extends Controller
             'sales_name' => ['required', 'string', 'max:255'],
             'whatsapp' => ['nullable', 'string', 'max:30'],
             'credit_note_file' => ['required_without:credit_note_url', 'nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:15360'],
-            'agreement_file' => ['required_without:agreement_url', 'nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:15360'],
+            'agreement_file' => [$masterAgreement ? 'nullable' : 'required_without:agreement_url', 'nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:15360'],
             'tax_invoice_file' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:15360'],
         ], [
             'program_name.required' => 'Nama Program wajib dipilih atau diisi.',
@@ -1316,62 +1355,15 @@ class ProgramSubmissionController extends Controller
 
         $useS3 = ! empty(config('filesystems.disks.s3.key')) && ! empty(config('filesystems.disks.s3.bucket'));
 
-        $cnUrl = $request->input('credit_note_url');
-        if ($request->hasFile('credit_note_file')) {
-            $file = $request->file('credit_note_file');
-            $filename = 'CN_'.time().'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
-            if ($useS3) {
-                try {
-                    $path = Storage::disk('s3')->putFileAs($s3Folder, $file, $filename);
-                    $cnUrl = Storage::disk('s3')->url($path);
-                } catch (\Throwable $e) {
-                    Log::warning('Upload CN to S3 failed, fallback to local: '.$e->getMessage());
-                    $path = $file->store('program_documents', 'public');
-                    $cnUrl = url('storage/'.$path);
-                }
-            } else {
-                $path = $file->store('program_documents', 'public');
-                $cnUrl = url('storage/'.$path);
-            }
-        }
-
-        $agrUrl = $request->input('agreement_url');
-        if ($request->hasFile('agreement_file')) {
-            $file = $request->file('agreement_file');
-            $filename = 'AGR_'.time().'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
-            if ($useS3) {
-                try {
-                    $path = Storage::disk('s3')->putFileAs($s3Folder, $file, $filename);
-                    $agrUrl = Storage::disk('s3')->url($path);
-                } catch (\Throwable $e) {
-                    Log::warning('Upload AGR to S3 failed, fallback to local: '.$e->getMessage());
-                    $path = $file->store('program_documents', 'public');
-                    $agrUrl = url('storage/'.$path);
-                }
-            } else {
-                $path = $file->store('program_documents', 'public');
-                $agrUrl = url('storage/'.$path);
-            }
-        }
-
-        $taxUrl = $request->input('tax_invoice_url');
-        if ($request->hasFile('tax_invoice_file')) {
-            $file = $request->file('tax_invoice_file');
-            $filename = 'FAKTUR_'.time().'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
-            if ($useS3) {
-                try {
-                    $path = Storage::disk('s3')->putFileAs($s3Folder, $file, $filename);
-                    $taxUrl = Storage::disk('s3')->url($path);
-                } catch (\Throwable $e) {
-                    Log::warning('Upload Faktur to S3 failed, fallback to local: '.$e->getMessage());
-                    $path = $file->store('program_documents', 'public');
-                    $taxUrl = url('storage/'.$path);
-                }
-            } else {
-                $path = $file->store('program_documents', 'public');
-                $taxUrl = url('storage/'.$path);
-            }
-        }
+        $cnUrl = $request->hasFile('credit_note_file')
+            ? $this->storeProgramDocument($request->file('credit_note_file'), 'CN', $s3Folder, $useS3)
+            : $request->input('credit_note_url');
+        $agrUrl = $request->hasFile('agreement_file')
+            ? $this->storeProgramDocument($request->file('agreement_file'), 'AGR', $s3Folder, $useS3)
+            : ($request->input('agreement_url') ?: $masterAgreement);
+        $taxUrl = $request->hasFile('tax_invoice_file')
+            ? $this->storeProgramDocument($request->file('tax_invoice_file'), 'FAKTUR', $s3Folder, $useS3)
+            : $request->input('tax_invoice_url');
 
         $timestamp = date('d/m/Y H:i:s');
         $hashString = "{$timestamp}|{$formData['region']}|{$formData['id_real']}|{$formData['dealer_name']}|{$formData['program_name']}|".uniqid();
@@ -1413,6 +1405,11 @@ class ProgramSubmissionController extends Controller
                 'user_agent' => $request->userAgent(),
             ],
         ]);
+
+        // Agreement yang baru diunggah menjadi agreement toko di Master Dealer (menggantikan yang lama)
+        if ($usesMasterAgreement && $request->hasFile('agreement_file')) {
+            $masterDealer?->rememberAgreement($agrUrl);
+        }
 
         // Otomatis push data pengajuan ke Google Spreadsheet
         $sheetResult = null;

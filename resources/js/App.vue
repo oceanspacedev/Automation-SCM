@@ -618,7 +618,8 @@ const progressPercentage = computed(() => {
 });
 
 const checkAiStatus = async () => {
-  if (isStandalonePage.value) return;
+  // Status AI hanya untuk pengguna yang sudah login (API-nya butuh login)
+  if (isStandalonePage.value || !user.value) return;
   try {
     const res = await axios.get('/api/program-submissions/ai-status');
     const data = res.data;

@@ -10,7 +10,7 @@
     <div>
       <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Reset Data</h1>
       <p class="text-xs text-gray-500 mt-0.5">
-        Hapus data transaksi untuk mulai dari awal. Data master (brand, program, region, AR, dealer, badan usaha, user, jadwal) tidak ikut terhapus.
+        Hapus data transaksi atau data master untuk mulai dari awal. Brand, user, dan jadwal tidak ikut terhapus.
       </p>
     </div>
 
@@ -48,12 +48,12 @@
           </select>
         </div>
 
-        <!-- Data yang direset -->
-        <div :class="rowClass">
-          <p :class="rowLabelClass">Data</p>
+        <!-- Data yang direset: transaksi lalu master -->
+        <div v-for="group in datasetGroups" :key="group.label" :class="rowClass">
+          <p :class="rowLabelClass">{{ group.label }}</p>
           <div class="space-y-2.5 min-w-0">
             <label
-              v-for="(label, key) in datasets"
+              v-for="key in group.keys"
               :key="key"
               class="flex items-start gap-2.5 text-xs"
               :class="isIncludedByDrafts(key) ? 'cursor-default' : 'cursor-pointer'"
@@ -66,7 +66,7 @@
                 class="mt-0.5 w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-900 cursor-pointer disabled:cursor-default"
               />
               <span class="min-w-0">
-                <span class="font-medium text-gray-900">{{ label }}</span>
+                <span class="font-medium text-gray-900">{{ datasets[key] }}</span>
                 <span class="text-gray-500 tabular-nums"> · {{ isLoading ? '…' : formatNumber(counts[key]) }} data</span>
                 <span class="block text-[11px] text-gray-500 mt-0.5">{{ isIncludedByDrafts(key) ? 'Ikut terhapus karena Draft dipilih.' : DATASET_NOTES[key] }}</span>
               </span>
@@ -228,13 +228,33 @@ const DATASET_NOTES = {
   invoices: 'Beserta riwayat email & WA-nya. Draft-nya kembali bisa di-generate.',
   data_programs: 'Beserta riwayat pencocokan. Baris yang masih ada di Google Spreadsheet akan masuk lagi saat sinkron.',
   program_submissions: 'Beserta riwayat pencocokan. File dokumen yang sudah diunggah tidak dihapus.',
+  dealers: 'Toko di area yang dipilih (brand tidak berpengaruh), termasuk link agreement-nya. Isi lagi lewat Import Excel CV TOP.',
+  regions: 'Region di area yang dipilih (brand tidak berpengaruh).',
+  ar_contacts: 'Nomor WA AR per region di area yang dipilih (brand tidak berpengaruh).',
+  master_programs: 'Daftar program brand yang dipilih, untuk semua area.',
+  customers: 'Badan usaha Bill To invoice. Selalu semua, tidak tergantung area & brand.',
 };
 
 const areaOptions = [{ value: 'all', label: 'Semua area' }, ...AREAS.map((a) => ({ value: a.value, label: a.label }))];
 
 const { brands, loadBrands } = useBrands();
 
-const datasets = ref({ drafts: 'Draft', invoices: 'Invoice', data_programs: 'Data Program', program_submissions: 'Form Program' });
+const datasets = ref({
+  drafts: 'Draft',
+  invoices: 'Invoice',
+  data_programs: 'Data Program',
+  program_submissions: 'Form Program',
+  dealers: 'Dealer',
+  regions: 'Region',
+  ar_contacts: 'AR',
+  master_programs: 'Program',
+  customers: 'Badan Usaha',
+});
+const masterDatasets = ref(['dealers', 'regions', 'ar_contacts', 'master_programs', 'customers']);
+const datasetGroups = computed(() => [
+  { label: 'Transaksi', keys: Object.keys(datasets.value).filter((key) => !masterDatasets.value.includes(key)) },
+  { label: 'Master', keys: masterDatasets.value.filter((key) => key in datasets.value) },
+]);
 const counts = ref({});
 const scope = reactive({ area: 'all', brand: 'all' });
 const selected = ref([]);
@@ -288,6 +308,7 @@ async function fetchCounts() {
   try {
     const res = await axios.get('/api/data-reset', { params: { area: scope.area, brand: scope.brand } });
     datasets.value = res.data.datasets || datasets.value;
+    masterDatasets.value = res.data.master_datasets || masterDatasets.value;
     counts.value = res.data.counts || {};
     passwordSet.value = res.data.password_set !== false;
   } catch (err) {

@@ -8,6 +8,7 @@ use App\Models\Region;
 use Exception;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
@@ -83,6 +84,18 @@ class DealerImportService
      */
     public function import(string $path, bool $replaceExisting = true): array
     {
+        // Baris header dicek dulu, supaya file lain (mis. Draft Program puluhan MB) ditolak tanpa memuat seluruh isinya
+        $reader = IOFactory::createReaderForFile($path);
+        $reader->setReadDataOnly(true);
+        $reader->setReadFilter(new class implements IReadFilter
+        {
+            public function readCell(string $columnAddress, int $row, string $worksheetName = ''): bool
+            {
+                return $row === 1;
+            }
+        });
+        $this->mapColumns(array_map(fn ($cell) => trim((string) $cell), $reader->load($path)->getActiveSheet()->toArray(null, false, false, false)[0] ?? []));
+
         $rows = IOFactory::load($path)->getActiveSheet()->toArray(null, true, true, false);
         $header = array_map(fn ($cell) => trim((string) $cell), array_shift($rows) ?? []);
         $columns = $this->mapColumns($header);
@@ -163,7 +176,10 @@ class DealerImportService
         $regionsCreated = [];
 
         DB::transaction(function () use ($dealers, $replaceExisting, &$regionsCreated) {
+            // Agreement toko tidak ada di file CV TOP: saat "Ganti semua", simpan dulu lalu pasang lagi ke kode BT yang sama
+            $agreements = collect();
             if ($replaceExisting) {
+                $agreements = Dealer::withoutGlobalScopes()->whereNotNull('agreement_url')->get(['kode_bt', 'agreement_url', 'agreement_updated_at']);
                 Dealer::withoutGlobalScopes()->delete();
             }
 
@@ -174,6 +190,13 @@ class DealerImportService
                     ['kode_bt'],
                     [...array_diff(array_keys($chunk[0]), ['kode_bt']), 'updated_at']
                 );
+            }
+
+            foreach ($agreements as $agreement) {
+                Dealer::withoutGlobalScopes()->where('kode_bt', $agreement->kode_bt)->update([
+                    'agreement_url' => $agreement->agreement_url,
+                    'agreement_updated_at' => $agreement->agreement_updated_at,
+                ]);
             }
 
             foreach (collect($dealers)->filter(fn (array $dealer) => $dealer['region'] !== null)->map(fn (array $dealer) => [$dealer['area'], $dealer['region']])->unique() as [$area, $region]) {

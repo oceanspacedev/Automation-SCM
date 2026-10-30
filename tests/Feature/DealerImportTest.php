@@ -2,15 +2,20 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\ImportDealerFile;
 use App\Models\DataProgram;
 use App\Models\Dealer;
 use App\Models\Draft;
 use App\Models\MasterProgram;
 use App\Models\Region;
+use App\Models\User;
 use App\Services\DataProgramSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
@@ -18,6 +23,16 @@ use Tests\TestCase;
 class DealerImportTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // API selain login, form publik & webhook butuh login
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+        // File yang diunggah disimpan sementara di disk local sampai import di background selesai
+        Storage::fake('local');
+    }
 
     private const HEADER = ['ID Customer', 'Nama Customer', 'Alias', 'Alamat', 'ID GS', 'Nama GS', 'Status GS', 'NPWP/NIK', 'NAMA NPWP/NIK', 'Reffnote', 'Status DL', 'Nama Customer', 'Jenis NPWP', 'Telemarketing', 'No. WA Telemarketing', 'Big Area', 'SALES AREA'];
 
@@ -92,12 +107,20 @@ class DealerImportTest extends TestCase
             $this->row('BT05000', 'TOKO TANPA AREA', '-', '-'),
         ]);
 
+        // Import berjalan di antrean (sync saat tes), jadi statusnya sudah selesai begitu respons kembali
         $this->post('/api/dealers/import', ['file' => new UploadedFile($file, 'Master Customer CV TOP.xlsx', null, null, true)], ['Accept' => 'application/json'])
+            ->assertAccepted()
+            ->assertJsonPath('status.state', 'done')
+            ->assertJsonPath('status.type', 'dealers')
+            ->assertJsonPath('status.file_name', 'Master Customer CV TOP.xlsx');
+
+        $this->getJson('/api/dealers/import/status')
             ->assertOk()
-            ->assertJsonPath('data.imported', 2)
-            ->assertJsonPath('data.per_area', ['Jawa Barat' => 1, 'Jawa Tengah' => 1])
-            ->assertJsonPath('data.skipped.0.kode_bt', 'BT05000')
-            ->assertJsonPath('data.skipped.0.reason', 'Big Area & Reffnote kosong / tidak dikenal');
+            ->assertJsonPath('status.result.imported', 2)
+            ->assertJsonPath('status.result.per_area', ['Jawa Barat' => 1, 'Jawa Tengah' => 1])
+            ->assertJsonPath('status.result.skipped.0.kode_bt', 'BT05000')
+            ->assertJsonPath('status.result.skipped.0.reason', 'Big Area & Reffnote kosong / tidak dikenal');
+        $this->assertSame([], Storage::disk('local')->allFiles('dealer-import'));
 
         $this->assertDatabaseHas('dealers', ['kode_bt' => 'BT99999']);
         $this->assertDatabaseHas('dealers', ['kode_bt' => 'BT03000', 'area' => 'jateng']);
@@ -107,9 +130,11 @@ class DealerImportTest extends TestCase
 
     public function test_exported_dealers_of_an_area_can_be_imported_again_unchanged(): void
     {
+        $agreement = 'https://drive.google.com/open?id=1PhOk1VkVCQiFAmjqM9OmApTdbgF3SCmH';
         Dealer::create([
             'area' => 'jabar', 'kode_bt' => 'BT02657', 'dealer_name' => 'AWEI CELL', 'id_realme' => 'DLAA0001', 'npwp' => '3277030808650024',
             'npwp_type' => 'PRIBADI', 'telemarketing' => 'AKHMAD ZULFIKAR', 'telemarketing_phone' => '087778888837', 'region' => 'BIG BANDUNG', 'is_active' => false,
+            'agreement_url' => $agreement,
         ]);
         Dealer::create(['area' => 'jateng', 'kode_bt' => 'BT03000', 'dealer_name' => 'TOKO SOLO', 'region' => 'BIG SOLO']);
 
@@ -119,14 +144,20 @@ class DealerImportTest extends TestCase
         $this->assertCount(2, $rows);
         $this->assertSame(['BT02657', 'AWEI CELL', 'DLAA0001', 'Disabled', '3277030808650024', '087778888837', 'BIG BANDUNG'], [$rows[1][0], $rows[1][1], $rows[1][4], $rows[1][6], $rows[1][7], $rows[1][12], $rows[1][13]]);
 
-        // File export langsung bisa diimport ulang tanpa mengubah data
+        // Agreement di kolom terakhir: teks pendek "Link AGR" yang membuka dokumennya
         $file = $this->saveDownloadedSpreadsheet($this->get('/api/dealers/export?area=jabar'));
-        $this->post('/api/dealers/import', ['file' => new UploadedFile($file, 'export.xlsx', null, null, true)], ['Accept' => 'application/json'])
-            ->assertOk()
-            ->assertJsonPath('data.imported', 1)
-            ->assertJsonPath('data.skipped', []);
+        $agreementCell = IOFactory::load($file)->getActiveSheet()->getCell('P2');
+        $this->assertSame('Agreement', $rows[0][15]);
+        $this->assertSame('Link AGR', $agreementCell->getValue());
+        $this->assertSame($agreement, $agreementCell->getHyperlink()->getUrl());
 
-        $this->assertDatabaseHas('dealers', ['kode_bt' => 'BT02657', 'area' => 'jabar', 'npwp' => '3277030808650024', 'telemarketing_phone' => '087778888837', 'is_active' => false]);
+        // File export langsung bisa diimport ulang tanpa mengubah data (agreement toko tetap)
+        $this->post('/api/dealers/import', ['file' => new UploadedFile($file, 'export.xlsx', null, null, true)], ['Accept' => 'application/json'])
+            ->assertAccepted()
+            ->assertJsonPath('status.result.imported', 1)
+            ->assertJsonPath('status.result.skipped', []);
+
+        $this->assertDatabaseHas('dealers', ['kode_bt' => 'BT02657', 'area' => 'jabar', 'npwp' => '3277030808650024', 'telemarketing_phone' => '087778888837', 'is_active' => false, 'agreement_url' => $agreement]);
         $this->assertDatabaseHas('dealers', ['kode_bt' => 'BT03000', 'area' => 'jateng']);
     }
 
@@ -141,9 +172,33 @@ class DealerImportTest extends TestCase
         $path = tempnam(sys_get_temp_dir(), 'dealers').'.xlsx';
         (new Xlsx($spreadsheet))->save($path);
 
+        // File lain baru ketahuan saat diproses di background: statusnya gagal dengan alasannya
         $this->post('/api/dealers/import', ['file' => new UploadedFile($path, 'lain.xlsx', null, null, true)], ['Accept' => 'application/json'])
-            ->assertStatus(422)
-            ->assertJsonPath('message', 'File tidak bisa diimport: Kolom "ID CUSTOMER" tidak ditemukan di baris header file.');
+            ->assertAccepted()
+            ->assertJsonPath('status.state', 'failed')
+            ->assertJsonPath('status.message', 'Kolom "ID CUSTOMER" tidak ditemukan di baris header file.');
+        $this->assertSame([], Storage::disk('local')->allFiles('dealer-import'));
+    }
+
+    public function test_only_one_dealer_import_runs_at_a_time(): void
+    {
+        Queue::fake();
+        $file = fn () => new UploadedFile($this->makeMasterFile([$this->row('BT02657', 'AWEI CELL', 'BIG BANDUNG')]), 'Master Customer CV TOP.xlsx', null, null, true);
+
+        $this->post('/api/dealers/import', ['file' => $file()], ['Accept' => 'application/json'])
+            ->assertAccepted()
+            ->assertJsonPath('status.state', 'queued');
+        Queue::assertPushed(ImportDealerFile::class);
+
+        $this->post('/api/dealers/import', ['file' => $file()], ['Accept' => 'application/json'])
+            ->assertStatus(409)
+            ->assertJsonPath('status.state', 'queued');
+        Queue::assertPushed(ImportDealerFile::class, 1);
+
+        // Import yang statusnya tidak berubah lebih dari sejam dianggap berhenti, jadi import baru boleh mulai
+        $this->travel(71)->minutes();
+        $this->post('/api/dealers/import', ['file' => $file()], ['Accept' => 'application/json'])->assertAccepted();
+        Queue::assertPushed(ImportDealerFile::class, 2);
     }
 
     public function test_dealer_kode_bt_is_required_unique_and_normalized(): void

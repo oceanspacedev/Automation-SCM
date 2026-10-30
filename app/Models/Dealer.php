@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Toko/dealer dari master CV TOP, dikenali dari kode BT ("ID Customer").
  * ID Realme ("ID GS") bisa kosong atau dipakai beberapa toko.
+ * Agreement toko (satu dokumen bertanda tangan, berlaku untuk semua program Realme) disimpan di agreement_url.
  */
 class Dealer extends Model
 {
@@ -18,7 +19,22 @@ class Dealer extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'agreement_updated_at' => 'datetime',
     ];
+
+    /**
+     * Keep the store's agreement from a document link (e.g. a newly uploaded one in the Form Program).
+     */
+    public function rememberAgreement(?string $url): void
+    {
+        $url = trim((string) $url);
+
+        if (! preg_match('#^https?://#i', $url) || $url === $this->agreement_url) {
+            return;
+        }
+
+        $this->forceFill(['agreement_url' => $url, 'agreement_updated_at' => now()])->save();
+    }
 
     /**
      * Normalize a kode BT: uppercase, trimmed, and "BTO…" (letter O) written as "BT0…" (zero),

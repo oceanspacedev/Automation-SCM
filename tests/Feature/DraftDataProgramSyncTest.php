@@ -6,6 +6,7 @@ use App\Models\DataProgram;
 use App\Models\Dealer;
 use App\Models\Draft;
 use App\Models\MasterProgram;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -13,6 +14,14 @@ use Tests\TestCase;
 class DraftDataProgramSyncTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // API selain login, form publik & webhook butuh login
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+    }
 
     public function test_draft_program_code_is_resolved_from_master_program_and_sent_to_data_program(): void
     {

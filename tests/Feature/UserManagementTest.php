@@ -10,6 +10,14 @@ class UserManagementTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // API selain login, form publik & webhook butuh login
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+    }
+
     public function test_can_list_users_with_stats(): void
     {
         User::factory()->create(['role' => 'admin', 'is_active' => true]);
@@ -19,14 +27,15 @@ class UserManagementTest extends TestCase
 
         $response = $this->getJson('/api/users');
 
+        // Termasuk Admin yang login di setUp
         $response->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('stats.total', 4)
-            ->assertJsonPath('stats.admin', 1)
+            ->assertJsonPath('stats.total', 5)
+            ->assertJsonPath('stats.admin', 2)
             ->assertJsonPath('stats.scm', 1)
             ->assertJsonPath('stats.ar', 1)
             ->assertJsonPath('stats.telemarketing', 1)
-            ->assertJsonPath('stats.active', 3)
+            ->assertJsonPath('stats.active', 4)
             ->assertJsonPath('stats.inactive', 1);
     }
 

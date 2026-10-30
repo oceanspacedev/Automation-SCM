@@ -76,7 +76,8 @@ class UserRegistrationTest extends TestCase
         ]);
 
         // Admin ACCs the user
-        $approveResponse = $this->patchJson("/api/users/{$user->id}/approve");
+        $approveResponse = $this->actingAs(User::factory()->create(['role' => 'admin']))
+            ->patchJson("/api/users/{$user->id}/approve");
 
         $approveResponse->assertOk()
             ->assertJsonPath('success', true)

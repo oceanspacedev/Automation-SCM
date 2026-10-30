@@ -50,6 +50,12 @@ Schedule::command('program:auto-match')
     ->withoutOverlapping()
     ->runInBackground();
 
+// Jalankan antrean (mis. import Master Dealer dari web) di server yang hanya memasang cron scheduler, tanpa queue worker sendiri.
+Schedule::command('queue:work --stop-when-empty --tries=1 --timeout=3600')
+    ->everyMinute()
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // WhatsApp ke telemarketing untuk baris yang BISA DI POTONG; jamnya diatur di Master → Jadwal Otomatis (dicek tiap menit).
 Schedule::command('program:notify-telemarketing')
     ->everyMinute()

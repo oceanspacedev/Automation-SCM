@@ -524,12 +524,22 @@
         >
           <div class="space-y-2">
             <label class="block text-sm sm:text-base font-medium text-gray-900">
-              AGREEMENT <span class="text-rose-500">*</span>
+              AGREEMENT <span v-if="!usesMasterAgreement" class="text-rose-500">*</span>
             </label>
             <p class="text-xs text-gray-500">
-              Upload 1 file yang didukung: PDF, drawing, atau image. Maks 10 GB.
+              {{ usesMasterAgreement
+                ? 'Agreement toko ini sudah ada di data master, jadi tidak perlu diunggah. Unggah file hanya kalau agreement-nya mau diganti.'
+                : 'Upload 1 file yang didukung: PDF, drawing, atau image. Maks 10 GB.' }}
             </p>
           </div>
+
+          <!-- Agreement dari data master (Master Dealer); link-nya tidak ditampilkan di form publik -->
+          <p
+            v-if="usesMasterAgreement && !filePreviews.agreement"
+            class="px-3 py-2.5 rounded-lg border border-emerald-200 bg-emerald-50 text-xs text-emerald-800"
+          >
+            Memakai agreement {{ form.dealer_name || 'toko ini' }} dari data master.
+          </p>
 
           <!-- File Upload Trigger & Preview -->
           <div class="space-y-2">
@@ -580,7 +590,7 @@
               class="h-9 px-4 inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
             >
               <UploadCloudIcon class="w-4 h-4 text-gray-500" />
-              <span>Tambahkan file</span>
+              <span>{{ usesMasterAgreement ? 'Ganti agreement' : 'Tambahkan file' }}</span>
             </button>
           </div>
 
@@ -804,7 +814,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import axios from 'axios';
 import { useArea } from '@/composables/useArea';
-import { useBrands } from '@/composables/useBrands';
+import { DEFAULT_BRAND, useBrands } from '@/composables/useBrands';
 import {
   UploadCloud as UploadCloudIcon,
   FileText as FileTextIcon,
@@ -877,9 +887,15 @@ const form = reactive({
 // Jenis NPWP toko dari Master Dealer: menentukan wajib/tidaknya Faktur Pajak (null bila toko/jenisnya tidak dikenali)
 const dealerTaxStatus = ref(null);
 
+// Toko yang dipilih sudah punya agreement di Master Dealer (satu per toko, dipakai di form Realme)
+const dealerHasAgreement = ref(false);
+const usesMasterAgreement = computed(() => brand.value.slug === DEFAULT_BRAND && dealerHasAgreement.value);
+
 function applyMasterDealerTax(dealer) {
   form.kode_bt = dealer?.kode_bt || '';
   form.is_pkp = dealer?.is_pkp === true;
+  dealerHasAgreement.value = dealer?.has_agreement === true;
+  if (usesMasterAgreement.value) validationErrors.agreement = '';
   dealerTaxStatus.value = typeof dealer?.is_pkp === 'boolean'
     ? { npwpType: dealer.npwp_type, isPkp: dealer.is_pkp }
     : null;
@@ -1425,7 +1441,7 @@ function validateAllFields() {
     validationErrors.credit_note = '';
   }
 
-  if (!files.agreement) {
+  if (!files.agreement && !usesMasterAgreement.value) {
     validationErrors.agreement = 'Dokumen Agreement wajib diunggah.';
     isValid = false;
   } else {

@@ -7,6 +7,7 @@ use App\Models\ArContact;
 use App\Models\DataProgram;
 use App\Models\ProgramSubmission;
 use App\Models\Region;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
@@ -15,6 +16,14 @@ use Tests\TestCase;
 class ArContactTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // API selain login, form publik & webhook butuh login
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+    }
 
     public function test_master_ar_has_one_ar_per_region_in_each_area(): void
     {

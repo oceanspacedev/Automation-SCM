@@ -123,7 +123,7 @@ Formulir publik tanpa login:
 2. Sales mencari toko di **ID REALME** dengan kode BT, ID Realme (ID GS), atau nama toko dari Master Dealer. Region dan nama dealer terisi otomatis.
 3. Isi Nama Sales, lalu unggah dokumen:
    - **Credit Note (CN)**: wajib.
-   - **Agreement**: wajib diunggah, tetapi tidak dianalisis AI (data Agreement mengikuti data master).
+   - **Agreement**: satu agreement bertanda tangan per toko, berlaku untuk semua program. Di form **Realme**, kalau toko sudah punya agreement di **Master Dealer**, kolom ini terisi otomatis dan tidak perlu diunggah (link-nya tidak ditampilkan di form publik). Agreement yang diunggah sales menggantikan agreement toko di Master Dealer. Toko yang belum punya agreement wajib mengunggah. Agreement tidak dianalisis AI.
    - **Faktur Pajak**: **wajib untuk toko PKP**, tidak wajib untuk Non-PKP. Status PKP diambil dari **Jenis NPWP di Master Dealer** dan ditampilkan di formulir.
 4. Saat **Kirim**, dokumen dianalisis AI. AI membaca nama dealer, program, DPP, PPN, PPh, dan Net Pay di CN, lalu memeriksa kelengkapan dan dokumen yang tertukar.
    - Kalau ada masalah (dokumen kurang, nama dealer/program berbeda, file tertukar), hasilnya ditampilkan di kartu **Hasil Pemeriksaan Dokumen** dan formulir belum terkirim.
@@ -227,16 +227,21 @@ sequenceDiagram
 | **Program** | Kode program (mis. PROGRAM 345), nama, periode. Satu daftar per brand untuk semua area (tab brand di atas halaman). Nama program di draft otomatis mengisi kodenya. | Import & export Excel (kolom PROGRAM, NAMA PROGRAM, PERIODE) |
 | **Region** | Region per area (dipakai di Form Program & Master Dealer). | Export |
 | **AR** | AR per region: nama & nomor WhatsApp penerima WA "dealer setuju dipotong". | Export |
-| **Dealer** | Toko dari file Master Customer CV TOP: kode BT, nama, alias, ID Realme/Nama GS, Jenis NPWP, NPWP, region, telemarketing (+ nomor WA), sales, status. | Import (file CV TOP; satu file untuk semua area) & export dengan format yang sama |
+| **Dealer** | Toko dari file Master Customer CV TOP: kode BT, nama, alias, ID Realme/Nama GS, Jenis NPWP, NPWP, region, telemarketing (+ nomor WA), sales, status. Kolom **Agreement** (link dokumen agreement toko) diisi dari Form Program atau diedit manual, dan tetap ada walau dealer diimport ulang. Daftar bisa difilter **Ada / Belum ada agreement** (ikut ke Export). Di file export, agreement ada di kolom terakhir **Agreement** sebagai teks pendek **Link AGR** yang bisa diklik (kolom ini diabaikan saat import). | Import (file CV TOP; satu file untuk semua area) & export dengan format yang sama |
 | **Badan Usaha** | Badan usaha Bill To invoice (CV TOP SELULAR, PT RISM, PT MSI, ...): kode, nama, NPWP, alamat. Dulu bernama Master Customer; link lama `/customers` diarahkan ke `/badan-usaha`. | Export |
 | **User** | Akun pengguna, peran, akses per menu, persetujuan (ACC). | — |
-| **Reset Data** | Khusus Admin. Hapus data transaksi yang dipilih (Draft, Invoice, Data Program, Form Program) untuk area dan brand tertentu atau semuanya. Data master tidak ikut terhapus. | — |
+| **Reset Data** | Khusus Admin. Hapus data transaksi (Draft, Invoice, Data Program, Form Program) dan/atau data master (Dealer, Region, AR, Program, Badan Usaha) yang dipilih, untuk area dan brand tertentu atau semuanya. Brand, user, dan jadwal tidak pernah ikut terhapus. | — |
 
-**Import Master Dealer:** area tiap toko diambil dari kolom **Big Area** (atau **Reffnote** bila Big Area kosong). Toko tanpa keduanya dilewati dan bisa diunduh sebagai daftar *dealer belum diimport*. Pilih **Tambah & perbarui** (aman) atau **Ganti semua** (hapus semua dealer lama di kedua area).
+**Import Master Dealer:** tombol **Import Excel** menerima dua jenis file dan mengenalinya otomatis. Import berjalan **di background**: jendela langsung tertutup, lalu status, progres, dan hasilnya tampil di atas daftar Master Dealer (halaman boleh ditinggal). Hanya satu import yang bisa berjalan pada satu waktu.
+
+- **Master Customer CV TOP** (data toko): area tiap toko diambil dari kolom **Big Area** (atau **Reffnote** bila Big Area kosong). Toko tanpa keduanya dilewati dan bisa diunduh sebagai daftar *dealer belum diimport*. Pilih **Tambah & perbarui** (aman) atau **Ganti semua** (hapus semua dealer lama di kedua area). File lain ditolak dari baris header-nya, tanpa memuat seluruh file.
+- **Draft Program** (agreement toko): file dengan sheet berkolom **Kode BT** & **AGREMENT** (mis. RAW JABAR). Sama dengan `dealers:fill-agreements "<file>"`: tiap agreement dicek AI, jadi bisa butuh beberapa menit; progresnya tampil per toko. Import data toko CV TOP dulu bila Master Dealer masih kosong.
+
+Import di background dijalankan antrean (queue). Lokal: `composer run dev` sudah menjalankannya. Server: cukup cron scheduler, karena scheduler menjalankan `queue:work --stop-when-empty` setiap menit (import mulai paling lambat sekitar satu menit setelah diunggah).
 
 > File export Dealer hanya berisi area yang sedang dibuka. Jangan mengimport file satu area dengan pilihan **Ganti semua**, karena dealer area lain akan terhapus.
 
-**Reset Data:** pilih area (semua / Jawa Barat / Jawa Tengah), brand (semua atau satu brand), dan data yang mau dihapus, klik **Reset data**, lalu masukkan **password reset**. Password ini diatur Admin di halaman yang sama (**Atur/Ubah password reset**; mengubahnya butuh password lama) dan disimpan sebagai hash di tabel `app_settings`. Selama belum diatur, reset tidak bisa dipakai. Salah password dibatasi 5 kali per menit. Penghapusan tidak bisa dibatalkan dan dicatat di `storage/logs/laravel.log` beserta email admin-nya.
+**Reset Data:** pilih area (semua / Jawa Barat / Jawa Tengah), brand (semua atau satu brand), dan data yang mau dihapus, klik **Reset data**, lalu masukkan **password reset**. Untuk data master, pilihan area/brand berlaku sesuai datanya: Dealer, Region, dan AR per **area**; Program per **brand** (semua area); Badan Usaha selalu **semua**. Reset Dealer ikut menghapus link agreement toko; isi lagi lewat Import Excel CV TOP lalu `dealers:fill-agreements`. Password ini diatur Admin di halaman yang sama (**Atur/Ubah password reset**; mengubahnya butuh password lama) dan disimpan sebagai hash di tabel `app_settings`. Selama belum diatur, reset tidak bisa dipakai. Salah password dibatasi 5 kali per menit. Penghapusan tidak bisa dibatalkan dan dicatat di `storage/logs/laravel.log` beserta email admin-nya.
 
 - **Draft:** invoice dari draft itu ikut terhapus.
 - **Invoice:** riwayat email & WA-nya ikut terhapus; draft-nya kembali berstatus siap sehingga bisa di-generate lagi.
@@ -375,10 +380,12 @@ Jangan pernah commit nilai rahasia (`*_KEY`, `*_SECRET`, `*_TOKEN`, password) ke
 | `php artisan data-program:sync [--limit=0]` | Sinkron Data Program dari Google Spreadsheet. |
 | `php artisan program:auto-analyze-ai --year=2026 --limit=15` | Analisis AI pengajuan Form Program yang belum dianalisis. |
 | `php artisan program:refresh-completeness` | Perbarui status kelengkapan pengajuan Non-PKP. |
+| `php artisan dealers:fill-agreements` | Isi agreement Master Dealer dari agreement terbaru yang pernah dikirim toko lewat Form Program Realme. Toko yang sudah punya agreement tidak diubah. Jalankan sekali setelah fitur agreement dipasang (aman dijalankan ulang). |
+| `php artisan dealers:fill-agreements "<file Data Program>.xlsx" [--sheet="RAW JABAR"] [--parallel=8]` | Isi agreement Master Dealer dari kolom **AGREMENT** file Data Program (mis. *DRAFT TEMPLATE PROGRAM JABAR*), dicocokkan lewat **Kode BT**. Isi tiap dokumen dicek AI (AI router yang sama dengan cek CN/Faktur; file Word dibaca dari teks & gambarnya). Yang dipakai: link **terbaru** toko itu yang berupa agreement dan **nama tokonya terisi**. Agreement dengan nama toko kosong hanya dipakai bila ada **tanda tangan dan cap yang namanya sesuai toko itu** di Master Dealer (tanda tangan saja tidak cukup). Credit Note, invoice, faktur, dan agreement yang tidak memenuhi dilewati, lalu link yang lebih lama dicoba. Bila tidak ada yang memenuhi, agreement dari file dihapus dari toko itu. Agreement yang tidak ada di file (mis. dari Form Program) tidak diubah. Hasil cek AI disimpan per file, jadi menjalankan ulang hanya mengecek dokumen baru atau yang gagal dicek. |
 | `php artisan program:auto-match [--limit=200]` | Cocokkan Data Program dengan Form Program (tanpa WA). |
 | `php artisan program:notify-telemarketing [--limit=200]` | WA ke telemarketing untuk baris yang BISA DI POTONG dan belum pernah dikirimi. |
 
-Di luar lingkungan `local`, `data-program:sync` dan `program:auto-analyze-ai` dijadwalkan **setiap menit**. `program:auto-match` juga jalan **setiap menit**, di semua lingkungan. `program:notify-telemarketing` mengikuti **Master → Jadwal Otomatis**: aktif/nonaktif, pada jam tertentu (WIB, bawaan 09:00 dan 14:00) atau setiap 5 menit sampai 6 jam, di hari yang dipilih. Di halaman itu juga ada tombol **Jalankan sekarang** dan hasil jalan terakhir.
+Di luar lingkungan `local`, `data-program:sync` dan `program:auto-analyze-ai` dijadwalkan **setiap menit**. `program:auto-match` juga jalan **setiap menit**, di semua lingkungan, begitu pula `queue:work --stop-when-empty` yang menjalankan antrean (mis. import Master Dealer dari web) lalu berhenti. `program:notify-telemarketing` mengikuti **Master → Jadwal Otomatis**: aktif/nonaktif, pada jam tertentu (WIB, bawaan 09:00 dan 14:00) atau setiap 5 menit sampai 6 jam, di hari yang dipilih. Di halaman itu juga ada tombol **Jalankan sekarang** dan hasil jalan terakhir.
 
 Semua jadwal di atas hanya jalan bila **scheduler Laravel** berjalan. `php artisan serve` dan `queue:work` saja tidak cukup.
 
@@ -397,11 +404,11 @@ Scheduler mencatat detak setiap menit. Bila detak terakhir lebih dari 2 menit la
 
 1. `composer install --no-dev --optimize-autoloader`
 2. `npm ci && npm run build`
-3. `php artisan migrate --force`
+3. `php artisan migrate --force`, lalu sekali saja `php artisan dealers:fill-agreements` untuk mengisi agreement Master Dealer dari pengajuan yang sudah ada
 4. `php artisan storage:link` (sekali saja)
 5. `php artisan config:cache && php artisan route:cache && php artisan view:cache`
 6. Pastikan `storage/` dan `bootstrap/cache/` bisa ditulis web server.
-7. Pasang cron scheduler (lihat di atas) bila memakai sinkron spreadsheet / analisis AI otomatis.
+7. Pasang cron scheduler (lihat di atas). Wajib untuk import Master Dealer dari web (dijalankan antrean lewat scheduler), sinkron spreadsheet, dan analisis AI otomatis.
 
 > **Peringatan sinkron spreadsheet.** Sinkron penuh `data-program:sync` menganggap Google Spreadsheet sebagai sumber utama dan **menghapus baris Data Program yang tidak ada di sheet**, termasuk baris yang dibuat dari invoice di web. Kalau data sudah dikelola penuh di web, jangan nyalakan scheduler sinkron (atau matikan jadwalnya di `routes/console.php`).
 

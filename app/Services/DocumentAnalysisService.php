@@ -248,6 +248,161 @@ class DocumentAnalysisService
     }
 
     /**
+     * Read an agreement document with the AI router: is it an agreement, is the dealer's name filled in, is it signed?
+     * A Word file (.docx) is sent as its text and embedded images (scanned pages, signatures, stamps).
+     * Answers are remembered per file, so a file is read once. A file that can't be downloaded (e.g. not shared) counts
+     * as no agreement; null when the AI can't read it (try again later).
+     *
+     * @return array{is_agreement: bool, name_filled: bool, has_signature: bool, has_stamp: bool, dealer_name: ?string, stamp_name: ?string, note: string}|null
+     */
+    public function inspectAgreement(string $url): ?array
+    {
+        $fileId = preg_match('/(?:id=|\/d\/)([a-zA-Z0-9_-]{20,})/', $url, $matches) ? $matches[1] : sha1(trim($url));
+        $cacheKey = "agreement_inspection:{$fileId}";
+        // Hasil lama tanpa nama di cap dibaca ulang
+        if (is_array($cached = Cache::get($cacheKey)) && array_key_exists('stamp_name', $cached)) {
+            return $cached;
+        }
+
+        $config = $this->getConfig();
+        if (empty($config['api_key'])) {
+            return null;
+        }
+
+        $dataUri = $this->fetchDocumentAsDataUri($url);
+        if ($dataUri === null) {
+            // Tidak disimpan: file bisa saja dibagikan belakangan
+            return ['is_agreement' => false, 'name_filled' => false, 'has_signature' => false, 'has_stamp' => false, 'dealer_name' => null, 'stamp_name' => null, 'note' => 'File tidak bisa diunduh (mungkin tidak dibagikan).'];
+        }
+
+        $payload = [
+            'messages' => [
+                ['role' => 'system', 'content' => $this->agreementPrompt()],
+                ['role' => 'user', 'content' => $this->agreementDocumentParts($dataUri)],
+            ],
+            'stream' => false,
+            'temperature' => 0.1,
+        ];
+
+        foreach ($this->inspectionModels($config['model'] ?: 'ag/gemini-3.7-flash-low') as $model) {
+            try {
+                $response = Http::withoutVerifying()
+                    ->withToken($config['api_key'])
+                    ->timeout(120)
+                    ->post("{$config['base_url']}/chat/completions", [...$payload, 'model' => $model]);
+                $parsed = $response->successful() ? $this->parseJsonResponse((string) $response->json('choices.0.message.content')) : null;
+            } catch (\Throwable $e) {
+                Log::warning("Agreement check with {$model} failed: ".$e->getMessage());
+
+                continue;
+            }
+
+            if ($parsed === null) {
+                Log::warning("Agreement check with {$model} returned HTTP {$response->status()}.");
+
+                continue;
+            }
+
+            $inspection = [
+                'is_agreement' => (bool) ($parsed['is_agreement'] ?? false),
+                'name_filled' => (bool) ($parsed['name_filled'] ?? false),
+                'has_signature' => (bool) ($parsed['has_signature'] ?? false),
+                'has_stamp' => (bool) ($parsed['has_stamp'] ?? false),
+                'dealer_name' => filled($parsed['dealer_name'] ?? null) ? (string) $parsed['dealer_name'] : null,
+                'stamp_name' => filled($parsed['stamp_name'] ?? null) ? (string) $parsed['stamp_name'] : null,
+                'note' => (string) ($parsed['note'] ?? ''),
+            ];
+            Cache::forever($cacheKey, $inspection);
+
+            return $inspection;
+        }
+
+        return null;
+    }
+
+    /**
+     * An agreement is accepted for Master Dealer when the dealer's name is filled in. One with a blank name is accepted
+     * only when it is signed and stamped with the store's own name; a signature alone doesn't show which store signed.
+     *
+     * @param  array{is_agreement: bool, name_filled: bool, has_signature: bool, has_stamp: bool, stamp_name?: ?string}  $inspection
+     */
+    public function isAcceptableAgreement(array $inspection, ?string $storeName): bool
+    {
+        if (! $inspection['is_agreement']) {
+            return false;
+        }
+
+        if ($inspection['name_filled']) {
+            return true;
+        }
+
+        // Nama di cap harus lebih dari kata umum (mis. "CELL" saja), karena pencocokan nama juga menerima potongan nama
+        $stampName = (string) ($inspection['stamp_name'] ?? '');
+        $distinctiveStampName = preg_replace('/[^a-z0-9]/', '', preg_replace('/\b(?:pt|cv|ud|toko|cell|cellular|selular|store|phone|ponsel)\b/', '', strtolower($stampName)));
+
+        return $inspection['has_signature'] && $inspection['has_stamp'] && filled($storeName) && strlen($distinctiveStampName) >= 3
+            && $this->isDealerNameMatching($storeName, $stampName);
+    }
+
+    /**
+     * The document as message parts for the AI: one image/PDF, or the text and images of a Word file.
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected function agreementDocumentParts(string $dataUri): array
+    {
+        $bytes = base64_decode(substr($dataUri, strpos($dataUri, ',') + 1));
+        if (! str_starts_with($bytes, "PK\x03\x04")) {
+            return [['type' => 'image_url', 'image_url' => ['url' => $dataUri]]];
+        }
+
+        $path = tempnam(sys_get_temp_dir(), 'agr');
+        file_put_contents($path, $bytes);
+        $zip = new \ZipArchive;
+        if ($zip->open($path) !== true || $zip->locateName('word/document.xml') === false) {
+            $zip->close();
+            @unlink($path);
+
+            return [['type' => 'image_url', 'image_url' => ['url' => $dataUri]]];
+        }
+
+        $text = trim(preg_replace('/[ \t]+/', ' ', strip_tags(str_replace('</w:p>', "\n", (string) $zip->getFromName('word/document.xml')))));
+        $images = [];
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $name = (string) $zip->getNameIndex($i);
+            // Gambar sangat kecil (garis, titik) dilewati
+            if (preg_match('#^word/media/.+\.(jpe?g|png)$#i', $name, $match) && $zip->statIndex($i)['size'] > 1024) {
+                $images[$name] = 'data:image/'.(strtolower($match[1]) === 'png' ? 'png' : 'jpeg').';base64,'.base64_encode($zip->getFromIndex($i));
+            }
+        }
+        $zip->close();
+        @unlink($path);
+        uksort($images, 'strnatcmp');
+
+        return [
+            ['type' => 'text', 'text' => "Dokumen berupa file Word. TEKS DOKUMEN:\n".($text !== '' ? mb_substr($text, 0, 6000) : '(tidak ada teks, isi dokumen berupa gambar)')],
+            ...array_map(fn (string $image) => ['type' => 'image_url', 'image_url' => ['url' => $image]], array_values($images)),
+        ];
+    }
+
+    protected function agreementPrompt(): string
+    {
+        return <<<'PROMPT'
+Kamu memeriksa dokumen AGREEMENT dealer Realme (surat perjanjian/kesepakatan program antara CV TOP SELULAR dan toko/dealer).
+Nilai dokumen yang dilampirkan dan jawab HANYA dengan JSON berikut, tanpa teks lain:
+{
+  "is_agreement": boolean,   // dokumen ini memang agreement/perjanjian/kesepakatan program dealer (bukan Credit Note, faktur, invoice, nota, foto toko, atau dokumen lain)
+  "dealer_name": string|null, // nama toko/dealer/pemilik yang tertulis sebagai pihak dealer di dokumen
+  "name_filled": boolean,    // nama pihak dealer tertulis jelas (bukan kosong, titik-titik, atau template)
+  "has_signature": boolean,  // ada tanda tangan pihak dealer (basah, scan, atau tanda tangan digital)
+  "has_stamp": boolean,      // ada cap/stempel toko
+  "stamp_name": string|null, // nama toko yang terbaca di cap/stempel (null bila tidak ada cap atau namanya tidak terbaca)
+  "note": string             // catatan singkat (maks. 15 kata), mis. apa yang kurang
+}
+PROMPT;
+    }
+
+    /**
      * Convert an UploadedFile, local storage path, data URI, or URL to a base64 data URI string.
      */
     public function fileOrUrlToDataUri(mixed $fileOrUrl): ?string

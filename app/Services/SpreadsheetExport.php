@@ -7,6 +7,7 @@ use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\Font;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -16,7 +17,18 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class SpreadsheetExport
 {
     /**
+     * A cell showing a short label that opens the link, so long URLs don't clutter the sheet.
+     *
+     * @return array{label: string, url: string}
+     */
+    public static function link(string $url, string $label): array
+    {
+        return ['label' => $label, 'url' => $url];
+    }
+
+    /**
      * Text is written as text so codes and numbers like kode BT, NPWP and "0812…" keep their leading zeros.
+     * A value made with link() is written as a clickable label.
      *
      * @param  array<int, string>  $headers
      * @param  iterable<int, array<int, mixed>>  $rows
@@ -39,7 +51,11 @@ class SpreadsheetExport
         foreach ($rows as $row) {
             foreach (array_values($row) as $index => $value) {
                 $cell = $sheet->getCell([$index + 1, $rowNumber]);
-                if (is_int($value) || is_float($value)) {
+                if (is_array($value) && isset($value['url'], $value['label'])) {
+                    $cell->setValueExplicit($value['label'], DataType::TYPE_STRING);
+                    $cell->getHyperlink()->setUrl($value['url']);
+                    $cell->getStyle()->getFont()->setUnderline(Font::UNDERLINE_SINGLE)->getColor()->setARGB('FF2563EB');
+                } elseif (is_int($value) || is_float($value)) {
                     $cell->setValue($value);
                 } elseif ($value !== null && $value !== '') {
                     $cell->setValueExplicit((string) $value, DataType::TYPE_STRING);

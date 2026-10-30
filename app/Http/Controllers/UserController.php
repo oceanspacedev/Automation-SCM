@@ -16,6 +16,8 @@ class UserController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorizeUserManagement($request);
+
         $query = User::query();
 
         // Filter pencarian nama / email / nomor WA
@@ -73,6 +75,8 @@ class UserController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $this->authorizeUserManagement($request, newRole: (string) $request->input('role'));
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
@@ -112,6 +116,7 @@ class UserController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $user = User::findOrFail($id);
+        $this->authorizeUserManagement($request, $user, (string) $request->input('role'));
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -168,9 +173,10 @@ class UserController extends Controller
     /**
      * Hapus akun user.
      */
-    public function destroy(int $id): JsonResponse
+    public function destroy(Request $request, int $id): JsonResponse
     {
         $user = User::findOrFail($id);
+        $this->authorizeUserManagement($request, $user);
 
         // Jangan izinkan hapus diri sendiri
         if (Auth::id() === $user->id) {
@@ -205,9 +211,10 @@ class UserController extends Controller
     /**
      * Toggle status aktif / nonaktif cepat.
      */
-    public function toggleStatus(int $id): JsonResponse
+    public function toggleStatus(Request $request, int $id): JsonResponse
     {
         $user = User::findOrFail($id);
+        $this->authorizeUserManagement($request, $user);
 
         if (Auth::id() === $user->id && $user->is_active) {
             return response()->json([
@@ -243,9 +250,10 @@ class UserController extends Controller
     /**
      * Setujui (ACC) akun user yang mendaftar.
      */
-    public function approve(int $id): JsonResponse
+    public function approve(Request $request, int $id): JsonResponse
     {
         $user = User::findOrFail($id);
+        $this->authorizeUserManagement($request, $user);
         $user->is_active = true;
         $user->save();
 
@@ -254,6 +262,18 @@ class UserController extends Controller
             'message' => "Akun {$user->name} berhasil disetujui (ACC) dan sekarang sudah aktif.",
             'data' => $user,
         ]);
+    }
+
+    /**
+     * Managing accounts needs the Master User access, and only an Admin may create, change or remove an Admin account;
+     * otherwise anyone with Master User access could make themselves Admin.
+     */
+    private function authorizeUserManagement(Request $request, ?User $target = null, ?string $newRole = null): void
+    {
+        $actor = $request->user();
+
+        abort_unless($actor?->isAdmin() || $actor?->hasPermission('master_user'), 403, 'Anda tidak punya akses ke Master User.');
+        abort_if(($target?->role === 'admin' || $newRole === 'admin') && ! $actor->isAdmin(), 403, 'Hanya Admin yang bisa membuat atau mengubah akun Admin.');
     }
 
     /**

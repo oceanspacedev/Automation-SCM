@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Draft;
 use App\Models\Invoice;
+use App\Models\User;
 use App\Services\InvoiceGenerator;
 use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,6 +19,9 @@ class InvoiceGeneratorTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // API selain login, form publik & webhook butuh login
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
         $this->generator = app(InvoiceGenerator::class);
     }
 

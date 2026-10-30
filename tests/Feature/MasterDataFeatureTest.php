@@ -4,12 +4,21 @@ namespace Tests\Feature;
 
 use App\Models\Customer;
 use App\Models\Dealer;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class MasterDataFeatureTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // API selain login, form publik & webhook butuh login
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+    }
 
     public function test_can_lookup_dealer_by_id_realme(): void
     {

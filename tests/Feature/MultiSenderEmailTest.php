@@ -7,6 +7,7 @@ use App\Models\Draft;
 use App\Models\EmailAccount;
 use App\Models\GoogleToken;
 use App\Models\Invoice;
+use App\Models\User;
 use Database\Seeders\EmailAccountSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -20,6 +21,9 @@ class MultiSenderEmailTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // API selain login, form publik & webhook butuh login
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
         $this->seed(EmailAccountSeeder::class);
     }
 

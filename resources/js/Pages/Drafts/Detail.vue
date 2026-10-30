@@ -324,7 +324,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { CheckCircle as CheckCircleIcon, AlertCircle as AlertCircleIcon } from '@lucide/vue';
@@ -415,4 +415,7 @@ const formatCurrency = (val) => {
 onMounted(() => {
   fetchDetail();
 });
+
+// Pindah langsung ke draft lain (komponen yang sama dipakai ulang): muat data draft itu
+watch(() => props.id, fetchDetail);
 </script>

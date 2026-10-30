@@ -9,6 +9,7 @@ use App\Models\Draft;
 use App\Models\MasterProgram;
 use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
+use App\Models\User;
 use App\Services\DataProgramSyncService;
 use App\Services\ProgramReconciliationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,6 +21,14 @@ use Tests\TestCase;
 class BrandTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // API selain login, form publik & webhook butuh login
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+    }
 
     public function test_new_brand_gets_a_url_slug_that_stays_when_renamed(): void
     {

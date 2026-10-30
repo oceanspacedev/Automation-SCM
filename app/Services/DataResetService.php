@@ -3,12 +3,17 @@
 namespace App\Services;
 
 use App\Area;
+use App\Models\ArContact;
+use App\Models\Customer;
 use App\Models\DataProgram;
+use App\Models\Dealer;
 use App\Models\Draft;
 use App\Models\EmailLog;
 use App\Models\Invoice;
+use App\Models\MasterProgram;
 use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
+use App\Models\Region;
 use App\Models\WhatsAppLog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -16,8 +21,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Empties transaction data (Draft, Invoice, Data Program, Form Program) of an area and brand, with its history.
- * Master data (dealers, programs, regions, users, ...) and uploaded files are never touched.
+ * Empties transaction data (Draft, Invoice, Data Program, Form Program) of an area and brand, with its history, and
+ * master data (Dealer, Region, AR, Program, Badan Usaha). Brands, users, schedules and uploaded files are never touched.
  */
 class DataResetService
 {
@@ -31,7 +36,19 @@ class DataResetService
         'invoices' => 'Invoice',
         'data_programs' => 'Data Program',
         'program_submissions' => 'Form Program',
+        'dealers' => 'Dealer',
+        'regions' => 'Region',
+        'ar_contacts' => 'AR',
+        'master_programs' => 'Program',
+        'customers' => 'Badan Usaha',
     ];
+
+    /**
+     * The datasets that are master data.
+     *
+     * @var list<string>
+     */
+    public const MASTER_DATASETS = ['dealers', 'regions', 'ar_contacts', 'master_programs', 'customers'];
 
     /**
      * @var array<string, class-string<Model>>
@@ -41,6 +58,29 @@ class DataResetService
         'invoices' => Invoice::class,
         'data_programs' => DataProgram::class,
         'program_submissions' => ProgramSubmission::class,
+        'dealers' => Dealer::class,
+        'regions' => Region::class,
+        'ar_contacts' => ArContact::class,
+        'master_programs' => MasterProgram::class,
+        'customers' => Customer::class,
+    ];
+
+    /**
+     * Which of the chosen area and brand narrow each dataset: dealers, regions and AR belong to an area, programs to a
+     * brand (for every area), and Badan Usaha to neither.
+     *
+     * @var array<string, list<string>>
+     */
+    private const SCOPED_BY = [
+        'drafts' => ['area', 'brand'],
+        'invoices' => ['area', 'brand'],
+        'data_programs' => ['area', 'brand'],
+        'program_submissions' => ['area', 'brand'],
+        'dealers' => ['area'],
+        'regions' => ['area'],
+        'ar_contacts' => ['area'],
+        'master_programs' => ['brand'],
+        'customers' => [],
     ];
 
     /**
@@ -117,6 +157,10 @@ class DataResetService
                 $deleted[$dataset] = $purge($dataset);
             }
 
+            foreach (array_intersect(self::MASTER_DATASETS, $datasets) as $dataset) {
+                $deleted[$dataset] = $purge($dataset);
+            }
+
             return $deleted;
         });
     }
@@ -126,7 +170,11 @@ class DataResetService
      */
     private function query(string $dataset, ?Area $area, ?string $brand): Builder
     {
-        return $this->scoped((self::MODELS[$dataset])::query(), $area, $brand);
+        return $this->scoped(
+            (self::MODELS[$dataset])::query(),
+            in_array('area', self::SCOPED_BY[$dataset], true) ? $area : null,
+            in_array('brand', self::SCOPED_BY[$dataset], true) ? $brand : null,
+        );
     }
 
     /**
