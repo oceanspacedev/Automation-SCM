@@ -509,7 +509,7 @@ const permissionList = ref({
   invoices: 'Invoice',
   form_program: 'Form Program',
   data_program: 'Data Program',
-  riwayat_program: 'Riwayat Program',
+  riwayat_program: 'Riwayat Program & Approval',
   email_logs: 'Riwayat Email',
   dashboard: 'Dashboard',
   master_program: 'Master Program',

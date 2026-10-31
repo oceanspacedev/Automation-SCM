@@ -8,12 +8,14 @@ use App\Models\Brand;
 use App\Models\DataProgram;
 use App\Models\Dealer;
 use App\Models\MasterProgram;
+use App\Models\ProgramApprovalLog;
 use App\Models\ProgramSubmission;
 use App\Models\Region;
 use App\Services\AreaContext;
 use App\Services\BrandContext;
 use App\Services\DataProgramSyncService;
 use App\Services\DocumentAnalysisService;
+use App\Services\ProgramReconciliationService;
 use App\Services\ProgramSubmissionService;
 use App\Services\WhatsAppService;
 use Exception;
@@ -944,6 +946,9 @@ class ProgramSubmissionController extends Controller
         $phone = $request->input('phone');
 
         $result = $this->waService->sendProgramClaimNotificationToAr($submission, $phone);
+        $dataProgram = app(ProgramReconciliationService::class)->dataProgramForSubmission($submission);
+        ProgramApprovalLog::record($dataProgram, ProgramApprovalLog::AR_NOTIFIED, $result['success'],
+            actor: $request->user()?->email, recipient: ProgramApprovalLog::arRecipient($dataProgram, $phone), note: $result['message'], submission: $submission);
 
         if (! $result['success']) {
             return response()->json([
@@ -968,6 +973,9 @@ class ProgramSubmissionController extends Controller
         $phone = $request->input('phone');
 
         $result = $this->waService->sendProgramClaimNotificationToTelemarketing($submission, $phone);
+        $dataProgram = app(ProgramReconciliationService::class)->dataProgramForSubmission($submission);
+        ProgramApprovalLog::record($dataProgram, ProgramApprovalLog::TELEMARKETING_NOTIFIED, $result['success'],
+            actor: $request->user()?->email, recipient: $phone ?: null, note: $result['message'], submission: $submission);
 
         if (! $result['success']) {
             return response()->json([
@@ -975,6 +983,9 @@ class ProgramSubmissionController extends Controller
                 'message' => $result['message'],
             ], 422);
         }
+
+        // Baris Data Program-nya juga tercatat sudah dikirimi, supaya cron tidak mengirim ulang dan riwayat approval sesuai
+        $dataProgram?->forceFill(['telemarketing_notified_at' => now()])->save();
 
         return response()->json([
             'success' => true,
@@ -1039,15 +1050,23 @@ class ProgramSubmissionController extends Controller
             ->pluck('name')
             ->all();
 
-        $sales = Cache::remember(Brand::settingKey('program_submissions_sales_list_v2', $area, $brand->slug), 300, function () use ($area) {
-            return ProgramSubmission::withoutGlobalScope('area')
+        // Sales dari Master Dealer (Sales Area toko aktif), ditambah nama sales yang pernah dipakai di pengajuan
+        $sales = Cache::remember(Brand::settingKey('program_submissions_sales_list_v3', $area, $brand->slug), 300, function () use ($area) {
+            return Dealer::withoutGlobalScope('area')
                 ->where('area', $area->value)
-                ->whereNotNull('sales_name')
-                ->where('sales_name', '!=', '')
+                ->where('is_active', true)
+                ->whereNotNull('sales_person')
                 ->distinct()
-                ->orderBy('sales_name')
-                ->pluck('sales_name')
-                ->filter(fn ($s) => trim((string) $s) !== '' && trim((string) $s) !== '-')
+                ->pluck('sales_person')
+                ->merge(ProgramSubmission::withoutGlobalScope('area')
+                    ->where('area', $area->value)
+                    ->whereNotNull('sales_name')
+                    ->distinct()
+                    ->pluck('sales_name'))
+                ->map(fn ($s) => strtoupper(trim((string) $s)))
+                ->filter(fn (string $s) => $s !== '' && $s !== '-')
+                ->unique()
+                ->sort()
                 ->values()
                 ->all();
         });

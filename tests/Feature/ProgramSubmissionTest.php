@@ -1359,6 +1359,31 @@ class ProgramSubmissionTest extends TestCase
         $this->assertContains('JEJE ROHIMAN', $response->json('sales'));
     }
 
+    public function test_public_form_sales_list_comes_from_master_dealer_and_past_submissions(): void
+    {
+        Dealer::create(['area' => 'jabar', 'kode_bt' => 'BT01001', 'dealer_name' => 'TOKO A', 'sales_person' => ' dodi permana ', 'is_active' => true]);
+        Dealer::create(['area' => 'jabar', 'kode_bt' => 'BT01002', 'dealer_name' => 'TOKO B', 'sales_person' => 'JEJE ROHIMAN', 'is_active' => true]);
+        Dealer::create(['area' => 'jabar', 'kode_bt' => 'BT01003', 'dealer_name' => 'TOKO TUTUP', 'sales_person' => 'SALES LAMA', 'is_active' => false]);
+        Dealer::create(['area' => 'jateng', 'kode_bt' => 'BT01004', 'dealer_name' => 'TOKO SOLO', 'sales_person' => 'ZULI PURNOMO', 'is_active' => true]);
+
+        foreach (['JEJE ROHIMAN', 'HASAN NURDIN'] as $index => $salesName) {
+            ProgramSubmission::create([
+                'submission_timestamp' => '10/10/2026 12:35:41',
+                'region' => 'BIG BANDUNG',
+                'id_real' => 'IDME00'.$index,
+                'dealer_name' => 'Dealer Bandung',
+                'program_name' => 'PROGRAM DSA FEBRUARI 2026',
+                'sales_name' => $salesName,
+                'row_hash' => 'hash_test_sales_'.$index,
+            ]);
+        }
+
+        // Sales toko aktif di area ini, digabung dengan sales dari pengajuan, tanpa nama ganda
+        $this->getJson('/api/program-submissions/form-options')
+            ->assertOk()
+            ->assertJsonPath('sales', ['DODI PERMANA', 'HASAN NURDIN', 'JEJE ROHIMAN']);
+    }
+
     public function test_can_pre_validate_documents_and_detect_swap(): void
     {
         Storage::fake('public');

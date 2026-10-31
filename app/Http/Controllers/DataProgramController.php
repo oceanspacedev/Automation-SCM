@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\DataProgram;
+use App\Models\ProgramApprovalLog;
 use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
 use App\Services\DataProgramSyncService;
@@ -859,6 +860,8 @@ class DataProgramController extends Controller
         }
 
         $result = $this->waService->sendDataProgramClaimNotificationToTelemarketing($dp, $phone);
+        ProgramApprovalLog::record($dp, ProgramApprovalLog::TELEMARKETING_NOTIFIED, $result['success'],
+            actor: $request->user()?->email, recipient: trim(($dp->telemarketing ?: '').' '.($phone ?: '')) ?: null, note: $result['message']);
 
         if (! $result['success']) {
             return response()->json([
@@ -887,6 +890,8 @@ class DataProgramController extends Controller
         $phone = $request->input('phone');
 
         $result = $this->waService->sendDataProgramClaimNotificationToAr($dp, $phone);
+        ProgramApprovalLog::record($dp, ProgramApprovalLog::AR_NOTIFIED, $result['success'],
+            actor: $request->user()?->email, recipient: ProgramApprovalLog::arRecipient($dp, $phone), note: $result['message']);
 
         if (! $result['success']) {
             return response()->json([

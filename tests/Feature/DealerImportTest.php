@@ -237,6 +237,28 @@ class DealerImportTest extends TestCase
             ->assertJsonPath('data.dealer_name', 'BARITO CELL');
     }
 
+    public function test_dealer_suggestions_report_the_total_and_load_the_next_page_with_an_offset(): void
+    {
+        foreach (['TOKO C', 'TOKO A', 'TOKO B'] as $index => $name) {
+            Dealer::create(['area' => 'jabar', 'kode_bt' => 'BT0100'.$index, 'dealer_name' => $name, 'sales_person' => 'DODI PERMANA', 'is_active' => true]);
+        }
+        Dealer::create(['area' => 'jabar', 'kode_bt' => 'BT01009', 'dealer_name' => 'TOKO TUTUP', 'is_active' => false]);
+
+        // Jumlah toko yang ditampilkan form adalah semua toko aktif, bukan hanya halaman pertama
+        $this->getJson('/api/dealers/suggestions?limit=2', ['X-Area' => 'jabar'])
+            ->assertOk()
+            ->assertJsonPath('total', 3)
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.dealer_name', 'TOKO A')
+            ->assertJsonPath('data.0.sales_person', 'DODI PERMANA');
+
+        $this->getJson('/api/dealers/suggestions?limit=2&offset=2', ['X-Area' => 'jabar'])
+            ->assertOk()
+            ->assertJsonPath('total', 3)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.dealer_name', 'TOKO C');
+    }
+
     public function test_data_program_takes_sales_and_telemarketing_from_master_dealer(): void
     {
         Http::fake();

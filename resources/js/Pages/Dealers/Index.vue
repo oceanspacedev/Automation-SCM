@@ -67,17 +67,26 @@
             <span class="w-3.5 h-3.5 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin shrink-0"></span>
             <template v-if="importStatus.state === 'queued'">Import {{ importStatus.file_name }} menunggu diproses...</template>
             <template v-else-if="importStatus.type === 'agreements'">Mengecek agreement {{ importStatus.file_name }} dengan AI...</template>
-            <template v-else>Mengimport {{ importStatus.file_name }}...</template>
+            <template v-else-if="importStatus.type === 'dealers'">Mengimport data toko dari {{ importStatus.file_name }}...</template>
+            <template v-else>Membaca {{ importStatus.file_name }}...</template>
           </p>
-          <div v-if="importStatus.progress" class="flex items-center gap-2 text-gray-600">
+          <div v-if="importStatus.progress" class="flex flex-wrap items-center gap-x-3 gap-y-1 text-gray-600">
             <div class="h-1.5 w-40 rounded-full bg-gray-200 overflow-hidden">
               <div class="h-full bg-gray-900 transition-all" :style="{ width: `${importProgressPercent}%` }"></div>
             </div>
-            <span class="tabular-nums">{{ importStatus.progress.done }} / {{ importStatus.progress.total }} toko</span>
+            <span class="tabular-nums">
+              {{ formatCount(importStatus.progress.checked) }} dokumen dianalisis ·
+              {{ formatCount(importStatus.progress.done) }} / {{ formatCount(importStatus.progress.total) }} toko selesai
+            </span>
           </div>
-          <p v-if="isImportWaitingLong" class="text-amber-700">
-            Belum mulai juga? Pastikan queue worker atau scheduler berjalan (lokal: <code>composer run dev</code>).
-          </p>
+          <p v-else-if="importStatus.type === 'agreements'" class="text-gray-600">Menyiapkan daftar link agreement per toko...</p>
+          <div v-if="isImportWaitingLong" class="text-amber-700 space-y-0.5">
+            <p>Belum mulai juga? Antrean import belum dijalankan.</p>
+            <p>
+              Lokal: jalankan <code>composer run dev</code>. Server: pastikan cron <code>php artisan schedule:run</code> aktif setiap menit,
+              atau jalankan <code>php artisan queue:work --stop-when-empty --tries=1 --timeout=3600</code> di folder aplikasi.
+            </p>
+          </div>
           <p v-else class="text-gray-500">Halaman boleh ditinggal; hasilnya muncul di sini setelah selesai.</p>
         </template>
 
@@ -85,7 +94,7 @@
           <p class="font-medium text-emerald-800">Agreement dari {{ importStatus.file_name }} selesai diimport.</p>
           <p class="text-gray-700">
             {{ importStatus.result.filled }} toko diisi, {{ importStatus.result.replaced }} diganti, {{ importStatus.result.same }} sudah sama,
-            {{ importStatus.result.removed }} dihapus karena tidak ada agreement yang memenuhi (nama toko, atau TTD dengan cap toko).
+            {{ importStatus.result.removed }} dihapus dan {{ importStatus.result.none }} tetap kosong karena tidak ada agreement yang memenuhi (nama toko, atau TTD dengan cap toko).
             {{ importStatus.result.kept }} toko tetap memakai agreement dari Form Program; {{ importStatus.result.not_found }} kode BT tidak ada di Master Dealer.
           </p>
           <p v-if="importStatus.result.unchecked" class="text-amber-700">
@@ -876,6 +885,7 @@ const importProgressPercent = computed(() => {
   return progress?.total ? Math.round((progress.done / progress.total) * 100) : 0;
 });
 const isImportWaitingLong = computed(() => importStatus.value?.state === 'queued' && Date.now() - new Date(importStatus.value.queued_at).getTime() > 2 * 60 * 1000);
+const formatCount = (value) => Number(value || 0).toLocaleString('id-ID');
 const importAreaSummary = computed(() =>
   Object.entries(importStatus.value?.result?.per_area || {}).map(([area, count]) => `${area}: ${count}`).join(' · ')
 );

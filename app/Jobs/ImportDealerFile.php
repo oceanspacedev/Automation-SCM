@@ -93,7 +93,7 @@ class ImportDealerFile implements ShouldQueue
 
             if ($sheet !== null) {
                 $this->report(['type' => 'agreements', 'sheet' => $sheet]);
-                $counts = $agreements->import($path, $sheet, onProgress: fn (int $done, int $total) => $this->report(['progress' => ['done' => $done, 'total' => $total]]));
+                $counts = $agreements->import($path, $sheet, onProgress: fn (int $done, int $total, int $checked) => $this->report(['progress' => compact('done', 'total', 'checked')]));
                 $this->report(['state' => 'done', 'result' => $counts]);
 
                 return;

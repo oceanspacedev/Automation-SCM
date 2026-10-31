@@ -39,6 +39,14 @@ class DataProgram extends Model
     }
 
     /**
+     * Recorded steps of the approval flow (WhatsApp to telemarketing, the dealer's answer, WhatsApp to AR, the cut).
+     */
+    public function approvalLogs(): HasMany
+    {
+        return $this->hasMany(ProgramApprovalLog::class, 'data_program_id')->withoutGlobalScopes(['area', 'brand'])->orderBy('id');
+    }
+
+    /**
      * Draft origin if created or synced from Draft.
      */
     public function draft(): BelongsTo

@@ -38,7 +38,7 @@ class DealerAgreementImportService
     }
 
     /**
-     * @param  (Closure(int $done, int $total): void)|null  $onProgress  called as stores are checked
+     * @param  (Closure(int $done, int $total, int $checked): void)|null  $onProgress  called as documents are checked: stores decided, stores in total, documents checked
      * @return array{filled: int, replaced: int, same: int, removed: int, none: int, kept: int, unchecked: int, not_found: int}
      *
      * @throws Exception when the sheet or its Kode BT & AGREMENT columns are missing
@@ -142,18 +142,25 @@ class DealerAgreementImportService
      *
      * @param  array<string, list<string>>  $candidates  kode BT => links, newest first
      * @param  array<string, string>  $storeNames  kode BT => store name in Master Dealer
-     * @param  (Closure(int $done, int $total): void)|null  $onProgress
+     * @param  (Closure(int $done, int $total, int $checked): void)|null  $onProgress
      * @return array<string, string|false|null> kode BT => accepted link, null when no link is acceptable, false when the AI could not read one
      */
     private function newestAcceptableAgreements(array $candidates, array $storeNames, int $parallel, ?Closure $onProgress): array
     {
         $total = count($candidates);
         $accepted = [];
+        $checked = 0;
 
         for ($round = 0; $candidates !== []; $round++) {
             $urls = array_map(fn (array $links) => $links[$round] ?? null, $candidates);
 
-            $inspections = [];
+            // Link toko ini sudah habis dicoba: tidak ada agreement yang memenuhi
+            foreach (array_keys(array_filter($urls, fn (?string $url) => $url === null)) as $kodeBt) {
+                $accepted[$kodeBt] = null;
+                unset($candidates[$kodeBt]);
+            }
+
+            // Toko diputuskan per kelompok dokumen, supaya progresnya bergerak sepanjang putaran
             foreach (array_chunk(array_values(array_unique(array_filter($urls))), $parallel) as $chunk) {
                 // Satu closure per baris: closure dikirim ke proses lain lewat kodenya, dan dua closure di satu baris tertukar.
                 // Hasilnya dikirim balik sebagai base64, karena teks berisi "..." (mis. nama di cap) rusak di perjalanan.
@@ -162,29 +169,31 @@ class DealerAgreementImportService
                     $tasks[] = static fn () => base64_encode(json_encode(app(DocumentAnalysisService::class)->inspectAgreement($url)));
                 }
                 $results = Concurrency::run($tasks, 300);
+                $inspections = [];
                 foreach ($chunk as $index => $url) {
                     $inspections[$url] = json_decode(base64_decode($results[$index]), true);
                 }
-            }
+                $checked += count($chunk);
 
-            foreach ($urls as $kodeBt => $url) {
-                $inspection = $url === null ? null : $inspections[$url];
+                foreach (array_intersect($urls, $chunk) as $kodeBt => $url) {
+                    $inspection = $inspections[$url];
 
-                if ($url !== null && $inspection !== null && ! $this->analysis->isAcceptableAgreement($inspection, $storeNames[$kodeBt])) {
-                    continue; // coba link yang lebih lama di putaran berikutnya
+                    if ($inspection !== null && ! $this->analysis->isAcceptableAgreement($inspection, $storeNames[$kodeBt])) {
+                        continue; // coba link yang lebih lama di putaran berikutnya
+                    }
+
+                    $accepted[$kodeBt] = $inspection === null ? false : $url;
+                    unset($candidates[$kodeBt]);
                 }
 
-                $accepted[$kodeBt] = match (true) {
-                    $url === null => null,
-                    $inspection === null => false,
-                    default => $url,
-                };
-                unset($candidates[$kodeBt]);
+                if ($onProgress) {
+                    $onProgress(count($accepted), $total, $checked);
+                }
             }
+        }
 
-            if ($onProgress) {
-                $onProgress(count($accepted), $total);
-            }
+        if ($onProgress) {
+            $onProgress(count($accepted), $total, $checked);
         }
 
         return $accepted;

@@ -73,7 +73,7 @@
                         type="button"
                         :class="[
                           navigationMenuTriggerStyle(),
-                          (isActive('/dashboard') || isActive('/riwayat-program') || isActive('/email-logs')) && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
+                          (isActive('/dashboard') || isActive('/riwayat-program') || isActive('/riwayat-approval') || isActive('/email-logs')) && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
                           'gap-1.5 dark:text-slate-200 dark:hover:bg-slate-800'
                         ]"
                       >
@@ -96,6 +96,19 @@
                         ]"
                       >
                         Riwayat Program
+                      </router-link>
+
+                      <!-- Alur approval ke telemarketing & AR; ikut hak akses Riwayat Program -->
+                      <router-link
+                        v-if="canAccess('riwayat_program')"
+                        to="/riwayat-approval"
+                        @click="isRiwayatOpen = false"
+                        :class="[
+                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                          isActive('/riwayat-approval') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                        ]"
+                      >
+                        Riwayat Approval
                       </router-link>
 
                       <router-link
@@ -561,6 +574,7 @@ const mobileNavGroups = computed(() => {
       title: 'Riwayat',
       links: [
         canAccess('riwayat_program') && { label: 'Riwayat Program', to: '/riwayat-program' },
+        canAccess('riwayat_program') && { label: 'Riwayat Approval', to: '/riwayat-approval' },
         canAccess('email_logs') && { label: 'Riwayat Email', to: '/email-logs' },
         canAccess('dashboard') && { label: 'Dashboard', to: '/dashboard' },
       ],

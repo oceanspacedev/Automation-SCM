@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\DataProgram;
+use App\Models\ProgramApprovalLog;
 use App\Models\ProgramSubmission;
 use App\Services\DataProgramSyncService;
 use App\Services\ProgramReconciliationService;
@@ -69,6 +70,9 @@ class ProgramClaimConfirmationController extends Controller
                     $matchingDp->update(['status_potong_ar' => 'DEALER SETUJU (PROSES AR)']);
                     $this->pushDpToSpreadsheet($matchingDp);
                 }
+                ProgramApprovalLog::record($matchingDp, ProgramApprovalLog::APPROVED, actor: $this->linkActor($role), submission: $submission);
+                ProgramApprovalLog::record($matchingDp, ProgramApprovalLog::AR_NOTIFIED, (bool) ($arNotification['success'] ?? false),
+                    actor: ProgramApprovalLog::AUTOMATIC, recipient: ProgramApprovalLog::arRecipient($matchingDp), note: $arNotification['message'] ?? null, submission: $submission);
             } elseif ($action === 'potong') {
                 $todayDate = date('n/j/Y');
                 $submission->update([
@@ -96,6 +100,7 @@ class ProgramClaimConfirmationController extends Controller
                     $matchingDp->update($updateData);
                     $this->pushDpToSpreadsheet($matchingDp);
                 }
+                ProgramApprovalLog::record($matchingDp, ProgramApprovalLog::CUT, actor: $this->linkActor($role), submission: $submission);
             } elseif ($action === 'tunda') {
                 $submission->update([
                     'status_potong_ar' => 'PENDING DEALER',
@@ -106,6 +111,7 @@ class ProgramClaimConfirmationController extends Controller
                     $matchingDp->update(['status_potong_ar' => 'PENDING DEALER']);
                     $this->pushDpToSpreadsheet($matchingDp);
                 }
+                ProgramApprovalLog::record($matchingDp, ProgramApprovalLog::POSTPONED, actor: $this->linkActor($role), submission: $submission);
             }
 
             return view('program_submissions.confirmed', [
@@ -150,6 +156,7 @@ class ProgramClaimConfirmationController extends Controller
                 $dp->update([
                     'status_potong_ar' => 'DEALER SETUJU (PROSES AR)',
                 ]);
+                ProgramApprovalLog::record($dp, ProgramApprovalLog::APPROVED, actor: $this->linkActor($role));
 
                 // Estafet Otomatis: Kirim notifikasi WA ke Tim AR
                 try {
@@ -166,6 +173,8 @@ class ProgramClaimConfirmationController extends Controller
                         'message' => $e->getMessage(),
                     ];
                 }
+                ProgramApprovalLog::record($dp, ProgramApprovalLog::AR_NOTIFIED, (bool) ($arNotification['success'] ?? false),
+                    actor: ProgramApprovalLog::AUTOMATIC, recipient: ProgramApprovalLog::arRecipient($dp), note: $arNotification['message'] ?? null);
 
                 // Kirim perubahan status_potong_ar ke Google Spreadsheet
                 $this->pushDpToSpreadsheet($dp);
@@ -184,6 +193,7 @@ class ProgramClaimConfirmationController extends Controller
                     'tgl_potong_tf' => $todayDate,
                     'no_pembayaran' => trim($validated['no_pembayaran']),
                 ]);
+                ProgramApprovalLog::record($dp, ProgramApprovalLog::CUT, actor: $this->linkActor($role), note: "No. Pembayaran: {$dp->no_pembayaran}");
 
                 // Kirim status SUDAH POTONG ke Google Spreadsheet
                 $this->pushDpToSpreadsheet($dp);
@@ -191,6 +201,7 @@ class ProgramClaimConfirmationController extends Controller
                 $dp->update([
                     'status_potong_ar' => 'PENDING DEALER',
                 ]);
+                ProgramApprovalLog::record($dp, ProgramApprovalLog::POSTPONED, actor: $this->linkActor($role));
 
                 // Kirim status PENDING DEALER ke Google Spreadsheet
                 $this->pushDpToSpreadsheet($dp);
@@ -209,6 +220,14 @@ class ProgramClaimConfirmationController extends Controller
             'dp' => $dp,
             'role' => $role,
         ]);
+    }
+
+    /**
+     * Who acted through a confirmation link, for the approval history (the link itself has no login).
+     */
+    protected function linkActor(?string $role): string
+    {
+        return ProgramApprovalLog::LINK_ACTORS[$role] ?? 'Link WA';
     }
 
     /**

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\DataProgram;
+use App\Models\ProgramApprovalLog;
 use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
 use Illuminate\Support\Facades\Log;
@@ -131,6 +132,8 @@ class AutoMatchService
             }
 
             $result = $this->whatsApp->sendDataProgramClaimNotificationToTelemarketing($dataProgram, $dataProgram->telemarketing_phone);
+            ProgramApprovalLog::record($dataProgram, ProgramApprovalLog::TELEMARKETING_NOTIFIED, $result['success'], actor: ProgramApprovalLog::AUTOMATIC,
+                recipient: trim(($dataProgram->telemarketing ?: '').' '.($dataProgram->telemarketing_phone ?: '')) ?: null, note: $result['message']);
 
             if ($result['success']) {
                 $dataProgram->forceFill(['telemarketing_notified_at' => now()])->saveQuietly();

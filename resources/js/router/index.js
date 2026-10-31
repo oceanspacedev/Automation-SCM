@@ -11,6 +11,7 @@ import ProgramSubmissionsIndex from '../Pages/ProgramSubmissions/Index.vue';
 import ProgramPublicForm from '../Pages/ProgramSubmissions/PublicForm.vue';
 import DataProgramIndex from '../Pages/DataProgram/Index.vue';
 import ProgramHistoryIndex from '../Pages/ProgramHistory/Index.vue';
+import ApprovalHistoryIndex from '../Pages/ApprovalHistory/Index.vue';
 import TestProgramIndex from '../Pages/TestProgram/Index.vue';
 import UsersIndex from '../Pages/Users/Index.vue';
 import CustomersIndex from '../Pages/Customers/Index.vue';
@@ -73,6 +74,7 @@ const routes = [
   { path: '/test-program', redirect: to => ({ path: `/form-program/${DEFAULT_BRAND}/${DEFAULT_AREA}`, query: to.query }) },
   { path: `/test-program/:area(${AREA_ROUTE_PATTERN})`, redirect: to => ({ path: `/form-program/${DEFAULT_BRAND}/${to.params.area}`, query: to.query }) },
   ...brandAreaRoutes('/riwayat-program', 'program-history.index', ProgramHistoryIndex),
+  ...brandAreaRoutes('/riwayat-approval', 'approval-history.index', ApprovalHistoryIndex),
   // Master Program per brand (satu daftar untuk semua area); link lama /programs dan /programs/jabar diarahkan ke Realme
   { path: '/programs', redirect: `/programs/${DEFAULT_BRAND}` },
   { path: `/programs/:area(${AREA_ROUTE_PATTERN})`, redirect: `/programs/${DEFAULT_BRAND}` },

@@ -251,6 +251,7 @@ class DealerController extends Controller
         $q = trim((string) $request->input('query'));
         $region = trim((string) $request->input('region'));
         $limit = min((int) $request->input('limit', 50), 100);
+        $offset = max((int) $request->input('offset', 0), 0);
 
         $query = Dealer::where('is_active', true)
             ->whereNotNull('dealer_name')
@@ -276,10 +277,15 @@ class DealerController extends Controller
             });
         }
 
+        // Jumlah semua toko yang cocok; daftar dikirim per halaman (offset) supaya form bisa memuat lanjutannya
+        $total = (clone $query)->count();
+
         // Toko tanpa ID Realme (ID GS) memakai kode BT sebagai ID-nya; link agreement tidak dikirim ke form publik
         $suggestions = $query->orderBy('dealer_name')
+            ->orderBy('id')
+            ->offset($offset)
             ->limit($limit)
-            ->get(['id', 'id_realme', 'dealer_name', 'region', 'kode_bt', 'whatsapp', 'npwp_type', 'agreement_url'])
+            ->get(['id', 'id_realme', 'dealer_name', 'region', 'kode_bt', 'whatsapp', 'npwp_type', 'sales_person', 'agreement_url'])
             ->map(fn (Dealer $dealer) => [
                 ...Arr::except($dealer->toArray(), ['agreement_url']),
                 'id_realme' => $dealer->id_realme ?: $dealer->kode_bt,
@@ -290,6 +296,7 @@ class DealerController extends Controller
         return response()->json([
             'success' => true,
             'data' => $suggestions,
+            'total' => $total,
         ]);
     }
 

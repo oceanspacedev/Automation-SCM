@@ -37,7 +37,7 @@ Dibangun dengan **Laravel 13 (PHP 8.3+)**, **Vue 3** (SPA) dan **Tailwind CSS v4
 | **Invoice** | Daftar invoice resmi: lihat, cetak/unduh PDF, kirim lewat email (Gmail API / SMTP) dan WhatsApp. |
 | **Form Program** | Formulir publik untuk sales (mis. `/form/realme/jabar`) mengirim dokumen klaim (Credit Note, Agreement, Faktur Pajak). Dokumen dicek AI. |
 | **Data Program** | Daftar klaim (56 kolom) per area. Baris otomatis dibuat saat invoice terbit, lalu dicocokkan dengan Form Program. |
-| **Riwayat** | Riwayat Program (log pencocokan), Riwayat Email, dan Dashboard ringkasan. |
+| **Riwayat** | Riwayat Program (log pencocokan), Riwayat Approval (alur persetujuan telemarketing & AR), Riwayat Email, dan Dashboard ringkasan. |
 | **Master** | Brand, Program, Region, AR, Dealer, Badan Usaha (Bill To), User. Bisa import & export Excel. |
 | **Profil** | Ubah foto, nama, email, WhatsApp, dan password akun sendiri. |
 
@@ -119,8 +119,8 @@ Formulir publik tanpa login:
 | Realme Jawa Tengah | `/form/realme/jateng` |
 | Brand lain | `/form/<kode-brand>/jabar` · `/form/<kode-brand>/jateng` (kode brand terlihat di Master Brand) |
 
-1. Sales memilih **Nama Program** (dari Master Program brand tersebut).
-2. Sales mencari toko di **ID REALME** dengan kode BT, ID Realme (ID GS), atau nama toko dari Master Dealer. Region dan nama dealer terisi otomatis.
+1. Sales memilih toko di **ID REALME** (pertanyaan pertama), dicari dengan kode BT, ID Realme (ID GS), atau nama toko. Toko hanya bisa dipilih dari Master Dealer (tidak bisa diketik manual); toko yang belum ada harus ditambahkan admin dulu. Nama dealer, region, nomor WA, status PKP, dan agreement toko terisi otomatis.
+2. Sales memilih **Nama Program** (dari Master Program brand tersebut).
 3. Isi Nama Sales, lalu unggah dokumen:
    - **Credit Note (CN)**: wajib.
    - **Agreement**: satu agreement bertanda tangan per toko, berlaku untuk semua program. Di form **Realme**, kalau toko sudah punya agreement di **Master Dealer**, kolom ini terisi otomatis dan tidak perlu diunggah (link-nya tidak ditampilkan di form publik). Agreement yang diunggah sales menggantikan agreement toko di Master Dealer. Toko yang belum punya agreement wajib mengunggah. Agreement tidak dianalisis AI.
@@ -175,6 +175,7 @@ sequenceDiagram
 - **Manual:** tombol **WA** / **Kirim ke WA Telemarketing** muncul di Data Program untuk baris **BISA DI POTONG**. Nomor tujuan diambil dari telemarketing toko di Master Dealer (bisa dipilih ulang saat mengirim). Baris yang sudah dikirim manual tidak dikirim ulang oleh cron.
 - **AR tujuan** dicari dari **Master AR** berdasarkan region dealer (Region, lalu Big Region). Kalau region belum punya AR aktif, WA dikirim ke nomor AR default (`AR_DEFAULT_PHONE`).
 - Link konfirmasi ditandatangani (*signed URL*) dan kedaluwarsa 30 hari setelah dikirim.
+- Setiap langkah dicatat di **Riwayat → Riwayat Approval**: WA ke telemarketing (otomatis atau oleh siapa), dealer setuju / tunda (lewat link telemarketing), WA ke AR (berhasil atau gagal), dan sudah dipotong (lewat link AR, dengan No. Pembayaran), beserta waktunya.
 
 ### 7. Akun & Hak Akses
 
@@ -217,6 +218,7 @@ sequenceDiagram
 
 ### Riwayat
 - **Riwayat Program**: log pencocokan (Sesuai, Dokumen Kurang, Selisih, Belum Ada Form) dengan nominal dan dokumen.
+- **Riwayat Approval** (per brand & area, ikut hak akses Riwayat Program): tiap baris Data Program yang sudah **BISA DI POTONG** tampil dengan alur 5 langkah: *Bisa dipotong → WA ke telemarketing → Disetujui dealer → WA ke AR → Sudah dipotong*. Langkah selesai berwarna hijau, posisi sekarang kuning, WA yang gagal merah, dan "Ditunda dealer" oranye. Filter per tahap (Belum dikirim ke telemarketing, Menunggu persetujuan dealer, Ditunda dealer, Disetujui · proses AR, Sudah dipotong) beserta jumlahnya, dan pencarian dealer / kode BT / program / telemarketing. **Detail** menampilkan waktu, pelaku, tujuan WA, dan catatan tiap langkah. Tahap diambil dari status Data Program, jadi baris lama ikut tampil; hanya waktu & pelaku langkah sebelum fitur ini dipasang yang tidak tercatat.
 - **Riwayat Email**: log pengiriman invoice.
 - **Dashboard**: ringkasan jumlah draft, invoice per tipe, dan total Net Pay.
 
@@ -410,6 +412,15 @@ Scheduler mencatat detak setiap menit. Bila detak terakhir lebih dari 2 menit la
 6. Pastikan `storage/` dan `bootstrap/cache/` bisa ditulis web server.
 7. Pasang cron scheduler (lihat di atas). Wajib untuk import Master Dealer dari web (dijalankan antrean lewat scheduler), sinkron spreadsheet, dan analisis AI otomatis.
 
+**Agar import Master Dealer di background jalan di server:**
+
+- `.env`: `QUEUE_CONNECTION=database` (bukan `sync`, yang membuat import kembali berjalan di dalam request dan bisa timeout) dan `CACHE_STORE=database` (atau `file`/`redis`, asal sama untuk web dan antrean; tempat status import disimpan). Jangan isi `DB_QUEUE_RETRY_AFTER` di bawah `3700`.
+- Batas unggah minimal 50 MB (file Draft Program ±20 MB): PHP `upload_max_filesize = 50M`, `post_max_size = 50M`; Nginx `client_max_body_size 50m;`.
+- PHP CLI boleh menjalankan proses lain (`proc_open` tidak ada di `disable_functions`): scheduler dan cek AI agreement menjalankan beberapa proses `php artisan` sekaligus.
+- `storage/` bisa ditulis: file unggahan disimpan sementara di `storage/app/private/dealer-import` sampai import selesai.
+- Opsional: queue worker tetap (mis. Supervisor `php artisan queue:work --tries=1 --timeout=3600`) supaya import mulai seketika, bukan menunggu menit berikutnya. Setelah deploy kode baru, jalankan `php artisan queue:restart`.
+- AI router harus aktif (sama dengan cek CN/Faktur). Import agreement pertama di server mengecek semua dokumen (±800 toko, link lama ikut dicek bila perlu), jadi bisa 15–30 menit dan memakai kuota AI; import berikutnya hanya mengecek dokumen baru.
+
 > **Peringatan sinkron spreadsheet.** Sinkron penuh `data-program:sync` menganggap Google Spreadsheet sebagai sumber utama dan **menghapus baris Data Program yang tidak ada di sheet**, termasuk baris yang dibuat dari invoice di web. Kalau data sudah dikelola penuh di web, jangan nyalakan scheduler sinkron (atau matikan jadwalnya di `routes/console.php`).
 
 ---
@@ -446,6 +457,7 @@ vendor/bin/pint --dirty
 | `data_programs` | Klaim 56 kolom per area (dari invoice atau spreadsheet), status potong & dokumen. |
 | `program_submissions` | Pengajuan Form Program per area, link dokumen, hasil analisis AI. |
 | `program_reconciliation_logs` | Log setiap pencocokan Data Program ↔ Form Program. |
+| `program_approval_logs` | Langkah alur approval per baris Data Program: WA ke telemarketing, setuju / tunda, WA ke AR, sudah dipotong (waktu, pelaku, tujuan WA, catatan). Ikut terhapus bila baris Data Program-nya dihapus. |
 | `dealers` | Master Dealer per area (kode BT unik). |
 | `regions` | Master Region per area. |
 | `ar_contacts` | Master AR per region per area. |

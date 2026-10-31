@@ -1,12 +1,12 @@
 <template>
-  <div class="min-h-screen bg-[#faf5ee] py-6 sm:py-10 px-3 sm:px-6 font-sans text-gray-900 selection:bg-orange-100 selection:text-orange-900">
+  <div class="min-h-screen bg-[#f0f4f9] py-6 sm:py-10 px-3 sm:px-6 font-sans text-gray-900 selection:bg-blue-100 selection:text-blue-900">
     <div class="max-w-2xl mx-auto space-y-4">
       
       <!-- ================= SUCCESS SCREEN (GOOGLE FORM STYLE) ================= -->
       <div v-if="isSubmitted" class="space-y-4 animate-in fade-in duration-200">
         <!-- Header Card -->
         <div class="bg-white rounded-xl shadow-xs border border-gray-200 overflow-hidden">
-          <div class="h-2.5 bg-[#ea580c]"></div>
+          <div class="h-2.5 bg-[#1a73e8]"></div>
           <div class="p-6 sm:p-8 space-y-4">
             <h1 class="text-2xl sm:text-3xl font-normal text-gray-950 tracking-tight">
               PROGRAM {{ brandLabel }} {{ area.short }}
@@ -34,7 +34,7 @@
         <!-- HEADER CARD (GOOGLE FORM STYLE) -->
         <div class="bg-white rounded-xl shadow-xs border border-gray-200 overflow-hidden">
           <!-- Top Orange Bar -->
-          <div class="h-2.5 bg-[#ea580c]"></div>
+          <div class="h-2.5 bg-[#1a73e8]"></div>
           
           <div class="p-6 sm:p-8">
             <h1 class="text-2xl sm:text-3xl font-normal text-gray-950 tracking-tight">
@@ -43,133 +43,25 @@
           </div>
         </div>
 
-        <!-- CARD 1: NAMA PROGRAM -->
-        <div
-          class="bg-white rounded-xl shadow-xs border p-6 space-y-4 transition"
-          :class="validationErrors.program_name ? 'border-rose-300 ring-1 ring-rose-100' : 'border-gray-200'"
-        >
-          <div class="space-y-1">
-            <label class="block text-sm sm:text-base font-medium text-gray-900">
-              NAMA PROGRAM <span class="text-rose-500">*</span>
-            </label>
-            <p class="text-xs text-gray-500">Pilih salah satu program {{ brand.name }} yang diajukan.</p>
-          </div>
-
-          <div class="space-y-2.5 pt-1">
-            <!-- Dua kolom di layar lebar (urut dari atas ke bawah), satu kolom di HP -->
-            <div class="sm:columns-2 sm:gap-x-4">
-            <label
-              v-for="prog in defaultProgramsList"
-              :key="prog"
-              class="flex items-start gap-3 p-2 mb-1 rounded-lg hover:bg-gray-50 cursor-pointer transition group break-inside-avoid"
-            >
-              <input
-                type="radio"
-                name="program_name_radio"
-                :value="prog"
-                v-model="form.program_name"
-                class="w-4 h-4 mt-0.5 shrink-0 text-orange-600 focus:ring-orange-500 border-gray-300 cursor-pointer"
-                @change="handleProgramChange(prog)"
-              />
-              <span
-                class="text-xs sm:text-sm text-gray-800 leading-snug transition"
-                :class="form.program_name === prog ? 'font-semibold text-gray-950' : 'font-normal'"
-              >
-                {{ prog }}
-              </span>
-            </label>
-            </div>
-          </div>
-
-          <div v-if="validationErrors.program_name" class="flex items-center gap-1.5 text-xs text-rose-600 pt-1">
-            <AlertCircleIcon class="w-4 h-4 shrink-0" />
-            <span>{{ validationErrors.program_name }}</span>
-          </div>
-        </div>
-
-        <!-- CARD 2: REGION -->
-        <div
-          class="bg-white rounded-xl shadow-xs border p-6 space-y-4 transition"
-          :class="validationErrors.region ? 'border-rose-300 ring-1 ring-rose-100' : 'border-gray-200'"
-        >
-          <div class="space-y-1">
-            <div class="flex items-center justify-between gap-2 flex-wrap">
-              <label class="block text-sm sm:text-base font-medium text-gray-900">
-                REGION <span class="text-rose-500">*</span>
-              </label>
-              <span
-                v-if="isAutoFilledRegion"
-                class="text-xs text-gray-500 flex items-center gap-1 font-normal"
-              >
-                <CheckIcon class="w-3.5 h-3.5 text-gray-400" /> Terisi otomatis dari Master Dealer
-              </span>
-            </div>
-            <p class="text-xs text-gray-500">Pilih wilayah cabang operasional toko.</p>
-          </div>
-
-          <div class="space-y-2.5 pt-1">
-            <label
-              v-for="reg in regionOptions"
-              :key="reg"
-              class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition group"
-            >
-              <input
-                type="radio"
-                name="region_radio"
-                :value="reg"
-                v-model="form.region"
-                class="w-4 h-4 text-orange-600 focus:ring-orange-500 border-gray-300 cursor-pointer"
-                @change="validationErrors.region = ''; isAutoFilledRegion = false"
-              />
-              <span
-                class="text-xs sm:text-sm text-gray-800 transition"
-                :class="form.region === reg ? 'font-semibold text-gray-950' : 'font-normal'"
-              >
-                {{ reg }}
-              </span>
-            </label>
-          </div>
-
-          <div v-if="validationErrors.region" class="flex items-center gap-1.5 text-xs text-rose-600 pt-1">
-            <AlertCircleIcon class="w-4 h-4 shrink-0" />
-            <span>{{ validationErrors.region }}</span>
-          </div>
-        </div>
-
-        <!-- CARD 3: ID REALME -->
+        <!-- CARD 1: ID REALME (diisi pertama: toko yang dipilih mengisi nama dealer, region, WA & agreement) -->
         <div
           class="bg-white rounded-xl shadow-xs border p-6 space-y-3 transition relative"
           :class="validationErrors.id_real ? 'border-rose-300 ring-1 ring-rose-100' : 'border-gray-200'"
         >
-          <div class="flex items-center justify-between gap-2 flex-wrap">
-            <label class="block text-sm sm:text-base font-medium text-gray-900">
-              ID REALME <span class="text-rose-500">*</span>
-            </label>
-            <div class="flex items-center gap-3">
-              <span v-if="isLookupLoading" class="inline-flex items-center gap-1.5 text-xs text-gray-500 font-normal">
-                <Loader2Icon class="w-3.5 h-3.5 animate-spin text-orange-500" /> Memeriksa...
-              </span>
-              <!-- Toggle Mode Input: Dropdown Pilihan vs Ketik Langsung -->
-              <button
-                type="button"
-                @click="isManualIdInputMode = !isManualIdInputMode"
-                class="text-xs text-gray-500 hover:text-gray-900 underline cursor-pointer"
-              >
-                {{ isManualIdInputMode ? 'Pilih dari Daftar' : 'Ketik Manual' }}
-              </button>
-            </div>
-          </div>
+          <label class="block text-sm sm:text-base font-medium text-gray-900">
+            ID REALME <span class="text-rose-500">*</span>
+          </label>
 
           <p class="text-xs text-gray-500">
-            {{ isManualIdInputMode ? 'Ketik ID Realme toko secara manual di bawah ini.' : 'Pilih dari Master Dealer, cari pakai kode BT, ID Realme, atau nama toko.' }}
+            Pilih toko dari Master Dealer, cari pakai kode BT, ID Realme, atau nama toko. Nama dealer dan region terisi otomatis.
           </p>
 
-          <!-- MODE 1: Searchable Dropdown -->
-          <div v-if="!isManualIdInputMode" class="pt-1 relative w-full sm:max-w-md" ref="dealerDropdownRef">
+          <!-- Toko hanya bisa dipilih dari Master Dealer (tidak bisa diketik manual) -->
+          <div class="pt-1 relative w-full sm:max-w-md" ref="dealerDropdownRef">
             <button
               type="button"
               @click="toggleDealerDropdown"
-              :class="[pickerTriggerClass, validationErrors.id_real ? 'border-rose-500' : isDealerDropdownOpen ? 'border-orange-500' : 'border-gray-300 hover:border-gray-400']"
+              :class="[pickerTriggerClass, validationErrors.id_real ? 'border-rose-500' : isDealerDropdownOpen ? 'border-[#1a73e8]' : 'border-gray-300 hover:border-gray-400']"
             >
               <span v-if="form.id_real" class="flex items-baseline gap-2 min-w-0 flex-1">
                 <span class="text-gray-900 truncate">{{ form.dealer_name || form.id_real }}</span>
@@ -225,7 +117,7 @@
               <div class="flex items-center justify-between gap-2 px-3.5 py-2 text-xs text-gray-500">
                 <span class="truncate">
                   {{ filterDealersByRegion && form.region ? form.region : 'Semua wilayah' }}
-                  · {{ dealerSuggestions.length }} toko
+                  · {{ dealerTotal.toLocaleString('id-ID') }} toko
                 </span>
                 <button
                   v-if="form.region"
@@ -237,14 +129,14 @@
                 </button>
               </div>
 
-              <!-- List of Dealers -->
-              <div :class="pickerListClass">
+              <!-- List of Dealers (toko berikutnya dimuat saat digulir ke bawah) -->
+              <div :class="pickerListClass" @scroll.passive="handleDealerListScroll">
                 <button
                   v-for="item in dealerSuggestions"
                   :key="item.id"
                   type="button"
                   @click="selectDealerSuggestion(item)"
-                  :class="[pickerOptionClass, form.id_real === item.id_realme && 'bg-orange-50/60']"
+                  :class="[pickerOptionClass, form.id_real === item.id_realme && 'bg-[#e8f0fe]']"
                 >
                   <span class="min-w-0 flex-1">
                     <span class="block text-gray-900 truncate">
@@ -255,37 +147,19 @@
                       {{ [item.kode_bt, item.id_realme !== item.kode_bt ? item.id_realme : null, !(filterDealersByRegion && form.region) ? item.region : null].filter(Boolean).join(' · ') }}
                     </span>
                   </span>
-                  <CheckIcon v-if="form.id_real === item.id_realme" class="w-4 h-4 text-orange-600 shrink-0" />
+                  <CheckIcon v-if="form.id_real === item.id_realme" class="w-4 h-4 text-[#1a73e8] shrink-0" />
                 </button>
 
-                <p v-if="dealerSuggestions.length === 0" class="px-3.5 py-6 text-center text-xs sm:text-sm text-gray-500">
+                <p v-if="isLoadingDealers" class="px-3.5 py-3 text-center text-xs text-gray-400">Memuat toko...</p>
+                <p v-else-if="dealerSuggestions.length === 0" class="px-3.5 py-6 text-center text-xs sm:text-sm text-gray-500">
                   Toko tidak ditemukan.
                 </p>
               </div>
 
-              <!-- Manual entry -->
-              <button
-                type="button"
-                @click="switchToManualIdInput"
-                class="w-full px-3.5 py-2.5 border-t border-gray-100 text-left text-xs sm:text-sm text-gray-500 hover:bg-gray-50 cursor-pointer"
-              >
-                Toko tidak ada di daftar? <span class="text-gray-900 underline">Ketik ID manual</span>
-              </button>
+              <p class="px-3.5 py-2.5 border-t border-gray-100 text-xs sm:text-sm text-gray-500">
+                Toko tidak ada di daftar? Minta admin menambahkannya ke Master Dealer.
+              </p>
             </div>
-          </div>
-
-          <!-- MODE 2: Manual Direct Input -->
-          <div v-else class="pt-1 relative">
-            <input
-              type="text"
-              v-model="form.id_real"
-              @input="handleIdRealInput"
-              @blur="handleIdRealBlur"
-              placeholder="Jawaban Anda"
-              autocomplete="off"
-              class="w-full text-xs sm:text-sm border-b pb-1.5 focus:outline-none transition bg-transparent placeholder:text-gray-400 text-gray-900 font-normal"
-              :class="validationErrors.id_real ? 'border-rose-500' : 'border-gray-300 focus:border-orange-500'"
-            />
           </div>
 
           <div v-if="validationErrors.id_real" class="flex items-center gap-1.5 text-xs text-rose-600 pt-1">
@@ -294,7 +168,7 @@
           </div>
         </div>
 
-        <!-- CARD 4: NAMA DEALER -->
+        <!-- CARD 2: NAMA DEALER -->
         <div
           class="bg-white rounded-xl shadow-xs border p-6 space-y-3 transition"
           :class="validationErrors.dealer_name ? 'border-rose-300 ring-1 ring-rose-100' : 'border-gray-200'"
@@ -305,9 +179,9 @@
             </label>
             <span
               v-if="isAutoFilledFromMaster"
-              class="text-xs text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1 font-medium border border-emerald-100"
+              class="text-xs text-gray-500 flex items-center gap-1 font-normal"
             >
-              <CheckIcon class="w-3.5 h-3.5 text-emerald-600" /> Terisi otomatis dari Master
+              <CheckIcon class="w-3.5 h-3.5 text-gray-400" /> Terisi otomatis dari Master Dealer
             </span>
             <span
               v-else-if="isAutoFilledDealer"
@@ -325,7 +199,7 @@
               @blur="validateField('dealer_name')"
               placeholder="Jawaban Anda"
               class="w-full text-xs sm:text-sm border-b pb-1.5 focus:outline-none transition bg-transparent placeholder:text-gray-400 text-gray-900 font-normal"
-              :class="validationErrors.dealer_name ? 'border-rose-500' : 'border-gray-300 focus:border-orange-500'"
+              :class="validationErrors.dealer_name ? 'border-rose-500' : 'border-gray-300 focus:border-[#1a73e8]'"
             />
           </div>
 
@@ -335,21 +209,119 @@
           </div>
         </div>
 
+        <!-- CARD 3: REGION (terisi otomatis dari toko) -->
+        <div
+          class="bg-white rounded-xl shadow-xs border p-6 space-y-4 transition"
+          :class="validationErrors.region ? 'border-rose-300 ring-1 ring-rose-100' : 'border-gray-200'"
+        >
+          <div class="space-y-1">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <label class="block text-sm sm:text-base font-medium text-gray-900">
+                REGION <span class="text-rose-500">*</span>
+              </label>
+              <span
+                v-if="isAutoFilledRegion"
+                class="text-xs text-gray-500 flex items-center gap-1 font-normal"
+              >
+                <CheckIcon class="w-3.5 h-3.5 text-gray-400" /> Terisi otomatis dari Master Dealer
+              </span>
+            </div>
+            <p class="text-xs text-gray-500">Pilih wilayah cabang operasional toko.</p>
+          </div>
+
+          <div class="space-y-2.5 pt-1">
+            <label
+              v-for="reg in regionOptions"
+              :key="reg"
+              class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition group"
+            >
+              <input
+                type="radio"
+                name="region_radio"
+                :value="reg"
+                v-model="form.region"
+                class="w-4 h-4 accent-[#1a73e8] border-gray-300 cursor-pointer"
+                @change="validationErrors.region = ''; isAutoFilledRegion = false"
+              />
+              <span
+                class="text-xs sm:text-sm text-gray-800 transition"
+                :class="form.region === reg ? 'font-semibold text-gray-950' : 'font-normal'"
+              >
+                {{ reg }}
+              </span>
+            </label>
+          </div>
+
+          <div v-if="validationErrors.region" class="flex items-center gap-1.5 text-xs text-rose-600 pt-1">
+            <AlertCircleIcon class="w-4 h-4 shrink-0" />
+            <span>{{ validationErrors.region }}</span>
+          </div>
+        </div>
+
+        <!-- CARD 4: NAMA PROGRAM -->
+        <div
+          class="bg-white rounded-xl shadow-xs border p-6 space-y-4 transition"
+          :class="validationErrors.program_name ? 'border-rose-300 ring-1 ring-rose-100' : 'border-gray-200'"
+        >
+          <div class="space-y-1">
+            <label class="block text-sm sm:text-base font-medium text-gray-900">
+              NAMA PROGRAM <span class="text-rose-500">*</span>
+            </label>
+            <p class="text-xs text-gray-500">Pilih salah satu program {{ brand.name }} yang diajukan.</p>
+          </div>
+
+          <div class="space-y-2.5 pt-1">
+            <!-- Dua kolom di layar lebar (urut dari atas ke bawah), satu kolom di HP -->
+            <div class="sm:columns-2 sm:gap-x-4">
+            <label
+              v-for="prog in defaultProgramsList"
+              :key="prog"
+              class="flex items-start gap-3 p-2 mb-1 rounded-lg hover:bg-gray-50 cursor-pointer transition group break-inside-avoid"
+            >
+              <input
+                type="radio"
+                name="program_name_radio"
+                :value="prog"
+                v-model="form.program_name"
+                class="w-4 h-4 mt-0.5 shrink-0 accent-[#1a73e8] border-gray-300 cursor-pointer"
+                @change="handleProgramChange(prog)"
+              />
+              <span
+                class="text-xs sm:text-sm text-gray-800 leading-snug transition"
+                :class="form.program_name === prog ? 'font-semibold text-gray-950' : 'font-normal'"
+              >
+                {{ prog }}
+              </span>
+            </label>
+            </div>
+          </div>
+
+          <div v-if="validationErrors.program_name" class="flex items-center gap-1.5 text-xs text-rose-600 pt-1">
+            <AlertCircleIcon class="w-4 h-4 shrink-0" />
+            <span>{{ validationErrors.program_name }}</span>
+          </div>
+        </div>
+
         <!-- CARD 5: NAMA SALES (DM) -->
         <div
           class="bg-white rounded-xl shadow-xs border p-6 space-y-3 transition relative"
           :class="validationErrors.sales_name ? 'border-rose-300 ring-1 ring-rose-100' : 'border-gray-200'"
         >
-          <label class="block text-sm sm:text-base font-medium text-gray-900">
-            NAMA SALES (DM) <span class="text-rose-500">*</span>
-          </label>
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <label class="block text-sm sm:text-base font-medium text-gray-900">
+              NAMA SALES (DM) <span class="text-rose-500">*</span>
+            </label>
+            <span v-if="isAutoFilledSales" class="text-xs text-gray-500 flex items-center gap-1 font-normal">
+              <CheckIcon class="w-3.5 h-3.5 text-gray-400" /> Terisi otomatis dari Master Dealer
+            </span>
+          </div>
 
           <!-- Pemilih sales: gaya sama dengan pemilih toko -->
           <div class="pt-1 relative w-full sm:max-w-md" ref="salesDropdownRef">
             <button
               type="button"
               @click="isSalesDropdownOpen = !isSalesDropdownOpen"
-              :class="[pickerTriggerClass, validationErrors.sales_name ? 'border-rose-500' : isSalesDropdownOpen ? 'border-orange-500' : 'border-gray-300 hover:border-gray-400']"
+              :class="[pickerTriggerClass, validationErrors.sales_name ? 'border-rose-500' : isSalesDropdownOpen ? 'border-[#1a73e8]' : 'border-gray-300 hover:border-gray-400']"
             >
               <span class="truncate flex-1" :class="form.sales_name ? 'text-gray-900' : 'text-gray-400'">
                 {{ form.sales_name || 'Pilih sales' }}
@@ -374,10 +346,10 @@
                   :key="sales"
                   type="button"
                   @click="selectSales(sales)"
-                  :class="[pickerOptionClass, form.sales_name === sales && 'bg-orange-50/60']"
+                  :class="[pickerOptionClass, form.sales_name === sales && 'bg-[#e8f0fe]']"
                 >
                   <span class="min-w-0 flex-1 truncate text-gray-900">{{ sales }}</span>
-                  <CheckIcon v-if="form.sales_name === sales" class="w-4 h-4 text-orange-600 shrink-0" />
+                  <CheckIcon v-if="form.sales_name === sales" class="w-4 h-4 text-[#1a73e8] shrink-0" />
                 </button>
 
                 <p v-if="filteredSalesList.length === 0" class="px-3.5 py-6 text-center text-xs sm:text-sm text-gray-500">
@@ -391,7 +363,7 @@
                   type="text"
                   v-model="form.sales_custom"
                   placeholder="Atau ketik sales baru"
-                  class="flex-1 min-w-0 h-8 px-2.5 text-xs sm:text-sm text-gray-900 placeholder:text-gray-400 border border-gray-300 rounded-md focus:outline-none focus:border-orange-500"
+                  class="flex-1 min-w-0 h-8 px-2.5 text-xs sm:text-sm text-gray-900 placeholder:text-gray-400 border border-gray-300 rounded-md focus:outline-none focus:border-[#1a73e8]"
                 />
                 <button
                   type="button"
@@ -426,7 +398,7 @@
               type="tel"
               v-model="form.whatsapp"
               placeholder="Contoh: 081224290502"
-              class="w-full text-xs sm:text-sm border-b pb-1.5 focus:outline-none border-gray-300 focus:border-orange-500 transition bg-transparent placeholder:text-gray-400"
+              class="w-full text-xs sm:text-sm border-b pb-1.5 focus:outline-none border-gray-300 focus:border-[#1a73e8] transition bg-transparent placeholder:text-gray-400"
             />
           </div>
         </div>
@@ -732,7 +704,7 @@
           <button
             type="submit"
             :disabled="isSubmitting"
-            class="h-10 px-8 rounded-lg bg-[#d9381e] hover:bg-[#c23315] text-white text-sm font-semibold shadow-xs transition cursor-pointer flex items-center gap-2 active:scale-98 disabled:opacity-50"
+            class="h-10 px-8 rounded-lg bg-[#1a73e8] hover:bg-[#1765cc] text-white text-sm font-semibold shadow-xs transition cursor-pointer flex items-center gap-2 active:scale-98 disabled:opacity-50"
           >
             <RefreshCwIcon v-if="isSubmitting" class="w-4 h-4 animate-spin" />
             <span>{{ isSubmitting ? submitProgressText : 'Kirim' }}</span>
@@ -742,7 +714,7 @@
             type="button"
             @click="handleClearForm"
             :disabled="isSubmitting"
-            class="text-xs font-medium text-[#d9381e] hover:text-[#b32b14] hover:underline cursor-pointer transition disabled:opacity-50"
+            class="text-xs font-medium text-[#1a73e8] hover:text-[#1765cc] hover:underline cursor-pointer transition disabled:opacity-50"
           >
             Kosongkan formulir
           </button>
@@ -826,7 +798,6 @@ import {
   AlertCircle as AlertCircleIcon,
   AlertTriangle as AlertTriangleIcon,
   CheckCircle2 as CheckCircle2Icon,
-  Loader2 as Loader2Icon,
 } from 'lucide-vue-next';
 
 // ================= FORM STATE =================
@@ -868,6 +839,7 @@ const regionOptions = ref(area.value.value === 'jabar' ? [
 ] : []);
 
 const salesList = ref([]);
+const isAutoFilledSales = ref(false);
 const salesSearchQuery = ref('');
 const isSalesDropdownOpen = ref(false);
 const salesDropdownRef = ref(null);
@@ -919,11 +891,12 @@ const isScanningDoc = reactive({
   tax_invoice: false,
 });
 
+// Urut sesuai formulir: toko dulu, lalu program
 const validationErrors = reactive({
-  program_name: '',
-  region: '',
   id_real: '',
   dealer_name: '',
+  region: '',
+  program_name: '',
   sales_name: '',
   credit_note: '',
   agreement: '',
@@ -932,15 +905,13 @@ const validationErrors = reactive({
 // Master Dealer Lookup State
 const dealerDropdownRef = ref(null);
 const isDealerDropdownOpen = ref(false);
-const isManualIdInputMode = ref(false);
 const dealerSearchQuery = ref('');
-const isLookupLoading = ref(false);
 const isAutoFilledFromMaster = ref(false);
 const isAutoFilledRegion = ref(false);
 const filterDealersByRegion = ref(true);
 const dealerSuggestions = ref([]);
-const showDealerSuggestions = ref(false);
-let lookupTimeout = null;
+const dealerTotal = ref(0);
+const isLoadingDealers = ref(false);
 let suggestionsTimeout = null;
 
 // AI Inspection State
@@ -1150,6 +1121,7 @@ function handleProgramChange(prog) {
 
 function selectSales(sales) {
   form.sales_name = sales;
+  isAutoFilledSales.value = false;
   validationErrors.sales_name = '';
   isSalesDropdownOpen.value = false;
   salesSearchQuery.value = '';
@@ -1158,9 +1130,23 @@ function selectSales(sales) {
 function applyCustomSales() {
   if (form.sales_custom.trim()) {
     form.sales_name = form.sales_custom.trim();
+    isAutoFilledSales.value = false;
     validationErrors.sales_name = '';
     isSalesDropdownOpen.value = false;
   }
+}
+
+// Sales toko dari Master Dealer mengisi Nama Sales, kecuali sales sudah dipilih sendiri
+function applyStoreSales(dealer) {
+  const storeSales = String(dealer?.sales_person || '').trim().toUpperCase();
+  if (!storeSales || (form.sales_name && !isAutoFilledSales.value)) return;
+
+  if (!salesList.value.includes(storeSales)) {
+    salesList.value = [...salesList.value, storeSales].sort();
+  }
+  form.sales_name = storeSales;
+  isAutoFilledSales.value = true;
+  validationErrors.sales_name = '';
 }
 
 // ================= MASTER DEALER LOOKUP & DROPDOWN =================
@@ -1172,19 +1158,43 @@ async function toggleDealerDropdown() {
   }
 }
 
-async function fetchDealerOptions(query = '') {
+// Toko dimuat per halaman: halaman pertama saat daftar dibuka / dicari, berikutnya saat daftar digulir ke bawah
+const DEALER_PAGE_SIZE = 50;
+let dealerRequestId = 0;
+
+async function fetchDealerOptions(query = '', append = false) {
+  const requestId = ++dealerRequestId;
+  isLoadingDealers.value = true;
   try {
     const params = {
       query: query || undefined,
       region: (filterDealersByRegion.value && form.region) ? form.region : undefined,
-      limit: 60,
+      limit: DEALER_PAGE_SIZE,
+      offset: append ? dealerSuggestions.value.length : 0,
     };
     const res = await axios.get('/api/dealers/suggestions', { params });
-    if (res.data?.success && res.data.data) {
+    // Hasil pencarian lama yang datang terlambat diabaikan
+    if (requestId !== dealerRequestId || !res.data?.success || !res.data.data) return;
+    if (append) {
+      // Toko yang sudah ada di daftar tidak ditambahkan dua kali (mis. data berubah di antara dua halaman)
+      const loadedIds = new Set(dealerSuggestions.value.map((dealer) => dealer.id));
+      dealerSuggestions.value = [...dealerSuggestions.value, ...res.data.data.filter((dealer) => !loadedIds.has(dealer.id))];
+    } else {
       dealerSuggestions.value = res.data.data;
     }
+    dealerTotal.value = res.data.total ?? dealerSuggestions.value.length;
   } catch (e) {
     // Ignore error
+  } finally {
+    if (requestId === dealerRequestId) isLoadingDealers.value = false;
+  }
+}
+
+function handleDealerListScroll(event) {
+  const list = event.target;
+  const nearBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 48;
+  if (nearBottom && !isLoadingDealers.value && dealerSuggestions.value.length < dealerTotal.value) {
+    fetchDealerOptions(dealerSearchQuery.value.trim(), true);
   }
 }
 
@@ -1205,11 +1215,6 @@ function toggleRegionFilter() {
   fetchDealerOptions(dealerSearchQuery.value.trim());
 }
 
-function switchToManualIdInput() {
-  isDealerDropdownOpen.value = false;
-  isManualIdInputMode.value = true;
-}
-
 function clearSelectedDealer() {
   form.id_real = '';
   form.dealer_name = '';
@@ -1217,78 +1222,13 @@ function clearSelectedDealer() {
   isAutoFilledFromMaster.value = false;
   isAutoFilledDealer.value = false;
   isAutoFilledRegion.value = false;
+  // Sales yang terisi dari toko ikut dikosongkan; yang dipilih sendiri tetap
+  if (isAutoFilledSales.value) {
+    form.sales_name = '';
+    isAutoFilledSales.value = false;
+  }
   validationErrors.id_real = '';
   validationErrors.dealer_name = '';
-}
-
-async function handleIdRealInput() {
-  validationErrors.id_real = '';
-  applyMasterDealerTax(null);
-  const query = form.id_real ? form.id_real.trim() : '';
-
-  if (suggestionsTimeout) clearTimeout(suggestionsTimeout);
-  if (lookupTimeout) clearTimeout(lookupTimeout);
-
-  if (query.length >= 2) {
-    suggestionsTimeout = setTimeout(async () => {
-      try {
-        const res = await axios.get('/api/dealers/suggestions', { params: { query } });
-        if (res.data?.success && res.data.data) {
-          dealerSuggestions.value = res.data.data;
-          showDealerSuggestions.value = res.data.data.length > 0;
-        }
-      } catch (e) {
-        dealerSuggestions.value = [];
-        showDealerSuggestions.value = false;
-      }
-    }, 200);
-  } else {
-    dealerSuggestions.value = [];
-    showDealerSuggestions.value = false;
-  }
-
-  // Debounced auto lookup if query length >= 4
-  if (query.length >= 4) {
-    lookupTimeout = setTimeout(() => {
-      lookupDealerByIdRealme(query);
-    }, 500);
-  }
-}
-
-async function lookupDealerByIdRealme(idReal) {
-  const targetId = idReal || form.id_real?.trim();
-  if (!targetId || targetId === '-') return;
-
-  isLookupLoading.value = true;
-  try {
-    const res = await axios.get('/api/dealers/lookup', { params: { id_realme: targetId } });
-    if (res.data?.success && res.data.found && res.data.data) {
-      const dealer = res.data.data;
-      form.dealer_name = dealer.dealer_name;
-      applyMasterDealerTax(dealer);
-      if (dealer.region) {
-        const regUpper = dealer.region.trim().toUpperCase();
-        if (!regionOptions.value.includes(regUpper)) {
-          regionOptions.value.push(regUpper);
-        }
-        form.region = regUpper;
-        isAutoFilledRegion.value = true;
-        validationErrors.region = '';
-      }
-      if (dealer.whatsapp && !form.whatsapp) {
-        form.whatsapp = dealer.whatsapp;
-      }
-      isAutoFilledFromMaster.value = true;
-      isAutoFilledDealer.value = false;
-      validationErrors.dealer_name = '';
-      aiAnalysis.dealerMismatch = false;
-      showDealerSuggestions.value = false;
-    }
-  } catch (e) {
-    // Ignore error
-  } finally {
-    isLookupLoading.value = false;
-  }
 }
 
 function selectDealerSuggestion(dealer) {
@@ -1307,23 +1247,13 @@ function selectDealerSuggestion(dealer) {
   if (dealer.whatsapp && !form.whatsapp) {
     form.whatsapp = dealer.whatsapp;
   }
+  applyStoreSales(dealer);
   isAutoFilledFromMaster.value = true;
   isAutoFilledDealer.value = false;
   isDealerDropdownOpen.value = false;
-  showDealerSuggestions.value = false;
   validationErrors.id_real = '';
   validationErrors.dealer_name = '';
   aiAnalysis.dealerMismatch = false;
-}
-
-function handleIdRealBlur() {
-  validateField('id_real');
-  setTimeout(() => {
-    showDealerSuggestions.value = false;
-  }, 250);
-  if (form.id_real && form.id_real.trim() && !form.dealer_name) {
-    lookupDealerByIdRealme(form.id_real.trim());
-  }
 }
 
 function openFilePicker(slot) {
@@ -1643,6 +1573,7 @@ function handleClearForm() {
 
     Object.keys(validationErrors).forEach(k => validationErrors[k] = '');
     isAutoFilledDealer.value = false;
+    isAutoFilledSales.value = false;
     aiAnalysis.hasScanned = false;
     aiAnalysis.docValidation = null;
     aiAnalysis.hasSwapped = false;

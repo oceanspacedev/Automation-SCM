@@ -6,6 +6,7 @@ use App\Models\Brand;
 use App\Models\Dealer;
 use App\Models\ProgramSubmission;
 use App\Models\User;
+use App\Services\DealerAgreementImportService;
 use App\Services\DealerImportService;
 use App\Services\DocumentAnalysisService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -267,11 +268,39 @@ class DealerAgreementTest extends TestCase
             ->assertJsonPath('status.state', 'done')
             ->assertJsonPath('status.type', 'agreements')
             ->assertJsonPath('status.sheet', 'RAW JABAR')
-            ->assertJsonPath('status.progress', ['done' => 1, 'total' => 1])
+            ->assertJsonPath('status.progress', ['done' => 1, 'total' => 1, 'checked' => 1])
             ->assertJsonPath('status.result.filled', 1);
 
         $this->assertSame('https://drive.google.com/open?id=lengkap_toko_a_000000', $dealer->fresh()->agreement_url);
         $this->assertSame([], Storage::disk('local')->allFiles('dealer-import'));
+    }
+
+    public function test_agreement_import_progress_moves_after_every_batch_of_documents(): void
+    {
+        $this->dealer();
+        $this->dealer(['kode_bt' => 'BT08888']);
+        $this->dealer(['kode_bt' => 'BT09999']);
+        $this->fakeDriveAndAi([
+            'lengkap_toko_a_000000' => $this->inspection(),
+            'credit_note_toko_b_00' => $this->inspection(isAgreement: false),
+            'lengkap_toko_b_000000' => $this->inspection(),
+            'lengkap_toko_c_000000' => $this->inspection(),
+        ]);
+        $link = fn (string $id) => "https://drive.google.com/open?id={$id}";
+        $path = $this->dataProgramFile([
+            ['BT07777', $link('lengkap_toko_a_000000')],
+            ['BT08888', $link('lengkap_toko_b_000000')],
+            ['BT08888', $link('credit_note_toko_b_00')],
+            ['BT09999', $link('lengkap_toko_c_000000')],
+        ]);
+
+        // Satu dokumen per kelompok: [toko selesai, total toko, dokumen dianalisis] naik setiap dokumen
+        $progress = [];
+        app(DealerAgreementImportService::class)->import($path, 'RAW JABAR', 1, function (int $done, int $total, int $checked) use (&$progress) {
+            $progress[] = [$done, $total, $checked];
+        });
+
+        $this->assertSame([[1, 3, 1], [1, 3, 2], [2, 3, 3], [3, 3, 4], [3, 3, 4]], $progress);
     }
 
     public function test_a_word_agreement_is_sent_to_the_ai_as_its_text_and_images(): void

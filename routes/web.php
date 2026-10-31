@@ -14,6 +14,7 @@ use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\MasterProgramController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ProgramApprovalController;
 use App\Http\Controllers\ProgramClaimConfirmationController;
 use App\Http\Controllers\ProgramSubmissionController;
 use App\Http\Controllers\RegionController;
@@ -206,6 +207,8 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         Route::post('/data-program/{id}/send-wa-ar', [DataProgramController::class, 'sendWaToAr']);
         Route::get('/data-program/reconcile-stats', [DataProgramController::class, 'reconcileStats']);
         Route::get('/data-program/reconciliation-logs', [DataProgramController::class, 'reconciliationLogs']);
+        Route::get('/data-program/approval-history', [ProgramApprovalController::class, 'index']);
+        Route::get('/data-program/{id}/approval-history', [ProgramApprovalController::class, 'show']);
         Route::put('/data-program/bulk', [DataProgramController::class, 'bulkUpdate']);
         Route::put('/data-program/{id}', [DataProgramController::class, 'update']);
     });
