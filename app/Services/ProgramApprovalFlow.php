@@ -125,7 +125,8 @@ class ProgramApprovalFlow
                 failed: $telemarketing === null && $row->telemarketing_notified_at === null && ! $answered && $telemarketingFailed?->success === false,
                 person: $telemarketingName, role: 'Telemarketing'),
             $this->step('approval', $stage === 'postponed' ? 'Ditunda dealer' : 'Persetujuan dealer', in_array($stage, ['approved', 'cut'], true),
-                log: $answer, postponed: $stage === 'postponed', person: $telemarketingName, role: 'Telemarketing'),
+                log: $answer, postponed: $stage === 'postponed', person: $telemarketingName, role: 'Telemarketing',
+                note: $row->telemarketing_reminder_count > 0 ? "{$row->telemarketing_reminder_count} pengingat terkirim ke telemarketing" : null),
             // WA ke AR terkirim otomatis saat dealer setuju; baris lama tanpa catatan dianggap sudah terkirim
             $this->step('ar', 'WA ke AR', $ar !== null || $stage === 'cut' || ($stage === 'approved' && $arAttempt === null),
                 log: $ar ?? ($arAttempt?->success === false ? $arAttempt : null),

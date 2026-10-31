@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Carbon\CarbonInterface;
 use Database\Factories\AutomationScheduleFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -37,7 +38,27 @@ class AutomationSchedule extends Model
      */
     public const INTERVAL_CHOICES = [5, 10, 15, 30, 60, 120, 180, 360];
 
+    /**
+     * Days between reminders to telemarketing while the dealer has not approved a row (0: no reminders).
+     *
+     * @var list<int>
+     */
+    public const REMINDER_DAY_CHOICES = [0, 1, 2, 3, 5, 7];
+
+    /**
+     * How many reminders a row can get at most.
+     *
+     * @var list<int>
+     */
+    public const REMINDER_MAX_CHOICES = [1, 2, 3, 5];
+
+    public const DEFAULT_REMINDER_EVERY_DAYS = 3;
+
+    public const DEFAULT_REMINDER_MAX = 3;
+
     protected $guarded = ['id'];
+
+    protected $appends = ['reminder_every_days', 'reminder_max'];
 
     protected function casts(): array
     {
@@ -117,6 +138,22 @@ class AutomationSchedule extends Model
         $interval = max(1, (int) $this->interval_minutes);
 
         return ($now->hour * 60 + $now->minute) % $interval === 0;
+    }
+
+    /**
+     * Days after the last WhatsApp before the telemarketing is reminded of a row the dealer has not approved (0: never).
+     */
+    protected function reminderEveryDays(): Attribute
+    {
+        return Attribute::get(fn (): int => (int) ($this->options['reminder_every_days'] ?? self::DEFAULT_REMINDER_EVERY_DAYS));
+    }
+
+    /**
+     * How many reminders a row gets at most.
+     */
+    protected function reminderMax(): Attribute
+    {
+        return Attribute::get(fn (): int => (int) ($this->options['reminder_max'] ?? self::DEFAULT_REMINDER_MAX));
     }
 
     /**

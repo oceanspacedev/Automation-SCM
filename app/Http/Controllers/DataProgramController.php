@@ -735,8 +735,9 @@ class DataProgramController extends Controller
             'program_2' => 'nullable|string',
             'cn' => 'nullable|string',
             'agrement' => 'nullable|string',
-            'cek_fp' => 'nullable|string|max:100',
-            'cek_evidance' => 'nullable|string|max:100',
+            // Berisi link dokumen seperti CN & Agreement; link faktur dari Form Program bisa lebih dari 100 karakter
+            'cek_fp' => 'nullable|string',
+            'cek_evidance' => 'nullable|string',
             'noted' => 'nullable|string',
             'norek' => 'nullable|string|max:100',
             'namrek' => 'nullable|string|max:255',

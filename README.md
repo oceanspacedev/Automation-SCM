@@ -172,6 +172,7 @@ sequenceDiagram
 ```
 
 - **Otomatis:** cron `program:auto-match` jalan **setiap menit** dan mencocokkan baris Data Program yang belum bisa dipotong dengan Form Program-nya, tanpa mengirim WA. Baris tanpa pengajuan, atau yang tidak berubah sejak dicek, dilewati. WA ke telemarketing toko dikirim terpisah oleh cron `program:notify-telemarketing` pada jam yang diatur di **Master → Jadwal Otomatis** (bawaan 09:00 dan 14:00 WIB): semua baris **BISA DI POTONG** yang belum dikirimi, sekali per baris. Waktu kirimnya tampil di tombol WA dan di **Lihat**.
+- **Pengingat:** selama dealer belum setuju (belum dijawab, atau ditunda), cron yang sama mengirim ulang WA berjudul *PENGINGAT KE-n* ke telemarketing dengan link konfirmasi baru. Bawaannya **3 hari setelah WA terakhir, paling banyak 3 kali**; bisa diubah atau dimatikan di **Master → Jadwal Otomatis → Pengingat** (1–7 hari, 1–5 kali). Baris yang baru ditunda menunggu jarak yang sama sejak ditunda. Hanya WA yang benar-benar terkirim (tercatat di **Riwayat Approval**) yang diingatkan, jadi baris lama yang cuma ditandai terkirim saat WA otomatis dipasang tidak ikut. Setiap pengingat tercatat di Riwayat Approval.
 - **Manual:** tombol **WA** / **Kirim ke WA Telemarketing** muncul di Data Program untuk baris **BISA DI POTONG**. Nomor tujuan diambil dari telemarketing toko di Master Dealer (bisa dipilih ulang saat mengirim). Baris yang sudah dikirim manual tidak dikirim ulang oleh cron.
 - **AR tujuan** dicari dari **Master AR** berdasarkan region dealer (Region, lalu Big Region). Kalau region belum punya AR aktif, WA dikirim ke nomor AR default (`AR_DEFAULT_PHONE`).
 - Link konfirmasi ditandatangani (*signed URL*) dan kedaluwarsa 30 hari setelah dikirim.
@@ -385,7 +386,7 @@ Jangan pernah commit nilai rahasia (`*_KEY`, `*_SECRET`, `*_TOKEN`, password) ke
 | `php artisan dealers:fill-agreements` | Isi agreement Master Dealer dari agreement terbaru yang pernah dikirim toko lewat Form Program Realme. Toko yang sudah punya agreement tidak diubah. Jalankan sekali setelah fitur agreement dipasang (aman dijalankan ulang). |
 | `php artisan dealers:fill-agreements "<file Data Program>.xlsx" [--sheet="RAW JABAR"] [--parallel=8]` | Isi agreement Master Dealer dari kolom **AGREMENT** file Data Program (mis. *DRAFT TEMPLATE PROGRAM JABAR*), dicocokkan lewat **Kode BT**. Isi tiap dokumen dicek AI (AI router yang sama dengan cek CN/Faktur; file Word dibaca dari teks & gambarnya). Yang dipakai: link **terbaru** toko itu yang berupa agreement dan **nama tokonya terisi**. Agreement dengan nama toko kosong hanya dipakai bila ada **tanda tangan dan cap yang namanya sesuai toko itu** di Master Dealer (tanda tangan saja tidak cukup). Credit Note, invoice, faktur, dan agreement yang tidak memenuhi dilewati, lalu link yang lebih lama dicoba. Bila tidak ada yang memenuhi, agreement dari file dihapus dari toko itu. Agreement yang tidak ada di file (mis. dari Form Program) tidak diubah. Hasil cek AI disimpan per file, jadi menjalankan ulang hanya mengecek dokumen baru atau yang gagal dicek. |
 | `php artisan program:auto-match [--limit=200]` | Cocokkan Data Program dengan Form Program (tanpa WA). |
-| `php artisan program:notify-telemarketing [--limit=200]` | WA ke telemarketing untuk baris yang BISA DI POTONG dan belum pernah dikirimi. |
+| `php artisan program:notify-telemarketing [--limit=200]` | WA ke telemarketing untuk baris yang BISA DI POTONG dan belum pernah dikirimi, lalu pengingat untuk baris yang belum disetujui dealer (sesuai pengaturan **Pengingat** di Master Jadwal Otomatis). |
 
 Di luar lingkungan `local`, `data-program:sync` dan `program:auto-analyze-ai` dijadwalkan **setiap menit**. `program:auto-match` juga jalan **setiap menit**, di semua lingkungan, begitu pula `queue:work --stop-when-empty` yang menjalankan antrean (mis. import Master Dealer dari web) lalu berhenti. `program:notify-telemarketing` mengikuti **Master → Jadwal Otomatis**: aktif/nonaktif, pada jam tertentu (WIB, bawaan 09:00 dan 14:00) atau setiap 5 menit sampai 6 jam, di hari yang dipilih. Di halaman itu juga ada tombol **Jalankan sekarang** dan hasil jalan terakhir.
 
@@ -457,7 +458,7 @@ vendor/bin/pint --dirty
 | `data_programs` | Klaim 56 kolom per area (dari invoice atau spreadsheet), status potong & dokumen. |
 | `program_submissions` | Pengajuan Form Program per area, link dokumen, hasil analisis AI. |
 | `program_reconciliation_logs` | Log setiap pencocokan Data Program ↔ Form Program. |
-| `program_approval_logs` | Langkah alur approval per baris Data Program: WA ke telemarketing, setuju / tunda, WA ke AR, sudah dipotong (waktu, pelaku, tujuan WA, catatan). Ikut terhapus bila baris Data Program-nya dihapus. |
+| `program_approval_logs` | Langkah alur approval per baris Data Program: WA ke telemarketing, pengingat, setuju / tunda, WA ke AR, sudah dipotong (waktu, pelaku, tujuan WA, catatan). Ikut terhapus bila baris Data Program-nya dihapus. |
 | `dealers` | Master Dealer per area (kode BT unik). |
 | `regions` | Master Region per area. |
 | `ar_contacts` | Master AR per region per area. |
@@ -465,7 +466,7 @@ vendor/bin/pint --dirty
 | `master_programs` | Master Program per brand (kode unik per brand, dipakai semua area). |
 | `app_settings` | Pengaturan yang diubah dari aplikasi, mis. hash password Reset Data. |
 | `customers` | Master Badan Usaha (Bill To invoice). |
-| `automation_schedules` | Master Jadwal Otomatis: kapan tugas otomatis (WA ke telemarketing) berjalan dan hasil jalan terakhirnya. |
+| `automation_schedules` | Master Jadwal Otomatis: kapan tugas otomatis (WA ke telemarketing) berjalan, pengaturan pengingatnya (`options`), dan hasil jalan terakhirnya. |
 | `email_accounts` | Akun pengirim email invoice. |
 | `email_logs`, `whatsapp_logs` | Log pengiriman invoice. |
 

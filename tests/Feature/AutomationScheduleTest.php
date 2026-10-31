@@ -107,6 +107,30 @@ class AutomationScheduleTest extends TestCase
             ->assertJsonPath('data.interval_minutes', null);
     }
 
+    public function test_admin_sets_how_often_the_telemarketing_is_reminded(): void
+    {
+        $admin = User::factory()->create();
+
+        // Bawaan: setiap 3 hari, paling banyak 3 kali
+        $this->actingAs($admin)->getJson('/api/automation-schedules')
+            ->assertOk()
+            ->assertJsonPath('data.0.reminder_every_days', 3)
+            ->assertJsonPath('data.0.reminder_max', 3);
+
+        $this->actingAs($admin)
+            ->putJson('/api/automation-schedules/telemarketing_wa', ['is_active' => true, 'mode' => 'times', 'times' => ['09:00'], 'reminder_every_days' => 4])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['reminder_every_days']);
+
+        $this->actingAs($admin)
+            ->putJson('/api/automation-schedules/telemarketing_wa', ['is_active' => true, 'mode' => 'times', 'times' => ['09:00'], 'reminder_every_days' => 7, 'reminder_max' => 2])
+            ->assertOk()
+            ->assertJsonPath('data.reminder_every_days', 7)
+            ->assertJsonPath('data.reminder_max', 2);
+
+        $this->assertSame(7, AutomationSchedule::forKey(AutomationSchedule::TELEMARKETING_WA)->reminder_every_days);
+    }
+
     public function test_run_now_whatsapps_the_telemarketing_and_records_the_result(): void
     {
         config([

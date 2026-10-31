@@ -12,8 +12,8 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * One step of the approval flow of a Data Program row: WhatsApp to telemarketing, the dealer's approval or
- * postponement (through the telemarketing's link), WhatsApp to AR, and the cut by AR.
+ * One step of the approval flow of a Data Program row: WhatsApp to telemarketing (and reminders while the dealer has
+ * not approved), the dealer's approval or postponement (through the telemarketing's link), WhatsApp to AR, and the cut by AR.
  */
 class ProgramApprovalLog extends Model
 {
@@ -21,6 +21,8 @@ class ProgramApprovalLog extends Model
     use BelongsToArea, BelongsToBrand, HasFactory;
 
     public const TELEMARKETING_NOTIFIED = 'telemarketing_notified';
+
+    public const TELEMARKETING_REMINDED = 'telemarketing_reminded';
 
     public const APPROVED = 'approved';
 

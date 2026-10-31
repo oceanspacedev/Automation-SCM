@@ -146,6 +146,33 @@
             <p class="text-[11px] text-gray-500">{{ forms[item.key].days.length ? 'Hanya di hari yang dipilih.' : 'Tidak ada yang dipilih: jalan setiap hari.' }}</p>
           </div>
         </div>
+
+        <!-- Pengingat WA selama dealer belum menyetujui -->
+        <div v-if="item.key === 'telemarketing_wa'" :class="rowClass">
+          <p :class="rowLabelClass">Pengingat</p>
+          <div class="space-y-2 min-w-0">
+            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+              <select
+                :id="`reminder-days-${item.key}`"
+                v-model.number="forms[item.key].reminder_every_days"
+                aria-label="Jarak pengingat"
+                :class="[selectClass, 'w-full sm:w-52 px-3']"
+              >
+                <option v-for="days in reminderDayChoices" :key="days" :value="days">{{ days ? `Setiap ${days} hari` : 'Tanpa pengingat' }}</option>
+              </select>
+              <select
+                v-if="forms[item.key].reminder_every_days"
+                :id="`reminder-max-${item.key}`"
+                v-model.number="forms[item.key].reminder_max"
+                aria-label="Jumlah pengingat"
+                :class="[selectClass, 'w-full sm:w-40 px-3']"
+              >
+                <option v-for="count in reminderMaxChoices" :key="count" :value="count">Maksimal {{ count }} kali</option>
+              </select>
+            </div>
+            <p class="text-[11px] text-gray-500 leading-relaxed">{{ reminderHint(forms[item.key]) }}</p>
+          </div>
+        </div>
       </div>
 
       <!-- Ringkasan & aksi -->
@@ -207,7 +234,7 @@ const weekDays = [
 const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
 const RUN_CONFIRMATIONS = {
-  telemarketing_wa: 'Kirim WhatsApp sekarang ke telemarketing untuk semua baris BISA DI POTONG yang belum dikirimi?',
+  telemarketing_wa: 'Kirim WhatsApp sekarang ke telemarketing untuk semua baris BISA DI POTONG yang belum dikirimi, beserta pengingat yang sudah waktunya?',
 };
 
 // Pilihan jam 00–23 dan menit kelipatan 5 (format 24 jam)
@@ -216,6 +243,8 @@ const minutes = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '
 
 const schedules = ref([]);
 const intervalChoices = ref([5, 10, 15, 30, 60, 120, 180, 360]);
+const reminderDayChoices = ref([0, 1, 2, 3, 5, 7]);
+const reminderMaxChoices = ref([1, 2, 3, 5]);
 const isLoading = ref(false);
 // Dianggap hidup sampai server bilang sebaliknya, supaya peringatan tidak berkedip saat memuat
 const schedulerAlive = ref(true);
@@ -242,9 +271,15 @@ function fillForm(item) {
     interval_minutes: item.interval_minutes || 15,
     times: [...(item.times || [])].sort(),
     days: [...(item.days || [])].map(Number),
+    reminder_every_days: item.reminder_every_days ?? 0,
+    reminder_max: item.reminder_max || 3,
   };
   newTimes[item.key] = { hour: '08', minute: '00' };
 }
+
+const reminderHint = (form) => (form.reminder_every_days
+  ? `Bila dealer belum setuju (belum dijawab atau ditunda), WA dikirim ulang ${form.reminder_every_days} hari setelah WA terakhir, paling banyak ${form.reminder_max} kali, pada jadwal di atas.`
+  : 'WA ke telemarketing hanya dikirim sekali per baris.');
 
 async function fetchSchedules() {
   isLoading.value = true;
@@ -252,6 +287,8 @@ async function fetchSchedules() {
     const res = await axios.get('/api/automation-schedules');
     schedules.value = res.data.data || [];
     if (res.data.interval_choices) intervalChoices.value = res.data.interval_choices;
+    if (res.data.reminder_day_choices) reminderDayChoices.value = res.data.reminder_day_choices;
+    if (res.data.reminder_max_choices) reminderMaxChoices.value = res.data.reminder_max_choices;
     applySchedulerStatus(res.data);
     schedules.value.forEach(fillForm);
   } finally {

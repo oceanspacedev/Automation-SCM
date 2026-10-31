@@ -187,6 +187,19 @@
                     class="w-full h-8.5 px-3 rounded-lg border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-white transition"
                   />
                 </div>
+
+                <!-- Nomor tujuan WA klaim ke telemarketing (otomatis & tombol WA) -->
+                <div>
+                  <label class="block font-medium text-gray-700 mb-1">No. WA Telemarketing</label>
+                  <input
+                    v-model="form.telemarketing_phone"
+                    type="tel"
+                    inputmode="tel"
+                    maxlength="50"
+                    placeholder="Contoh: 081234567890"
+                    class="w-full h-8.5 px-3 rounded-lg border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-white transition"
+                  />
+                </div>
               </div>
             </div>
 
@@ -773,6 +786,7 @@ const form = reactive({
   status_dl: '',
   sales_person: '',
   telemarketing: '',
+  telemarketing_phone: '',
 
   // Finansial & Pajak
   wajib_pajak: '',
@@ -847,6 +861,7 @@ watch(
       form.status_dl = dp.status_dl ?? '';
       form.sales_person = dp.sales_person ?? '';
       form.telemarketing = dp.telemarketing ?? '';
+      form.telemarketing_phone = dp.telemarketing_phone ?? '';
 
       form.wajib_pajak = dp.wajib_pajak ?? '';
       form.trf_pph = dp.trf_pph ?? '';

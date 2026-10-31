@@ -2,11 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\AutomationSchedule;
 use App\Models\DataProgram;
+use App\Models\ProgramApprovalLog;
 use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
 use App\Models\User;
 use App\Services\AutoMatchService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -120,6 +123,70 @@ class AutoMatchTest extends TestCase
         $this->postJson("/api/data-program/{$dataProgram->id}/send-wa-telemarketing")->assertOk();
         $this->assertNotNull($dataProgram->fresh()->telemarketing_notified_at);
 
+        $this->artisan('program:notify-telemarketing')->assertSuccessful();
+
+        Http::assertSentCount(1);
+    }
+
+    public function test_whatsapp_cron_reminds_the_telemarketing_every_few_days_up_to_the_maximum(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-20 09:00'));
+        $dataProgram = $this->dataProgram(['status_potong_purchase' => 'BISA DI POTONG']);
+        // Baris lama yang hanya ditandai terkirim saat WA otomatis dipasang (tanpa WA sungguhan) tidak diingatkan
+        $this->dataProgram(['row_hash' => 'dp_marked_only', 'kode_bt' => 'BT08888', 'dealer_name' => 'TOKO LAMA',
+            'status_potong_purchase' => 'BISA DI POTONG', 'telemarketing_notified_at' => now()->subMonth()]);
+
+        $this->artisan('program:notify-telemarketing')->assertSuccessful();
+        Http::assertSentCount(1);
+
+        // Bawaan: 3 hari setelah WA terakhir, paling banyak 3 kali, sekali di hari itu
+        $sentCountAt = ['2026-10-22 09:00' => 1, '2026-10-23 09:00' => 2, '2026-10-23 14:00' => 2, '2026-10-26 09:00' => 3, '2026-10-29 09:00' => 4, '2026-11-01 09:00' => 4];
+        foreach ($sentCountAt as $time => $sentCount) {
+            $this->travelTo(Carbon::parse($time));
+            $this->artisan('program:notify-telemarketing')->assertSuccessful();
+            Http::assertSentCount($sentCount);
+        }
+
+        $this->assertSame(3, $dataProgram->fresh()->telemarketing_reminder_count);
+        $this->assertSame(3, ProgramApprovalLog::where('data_program_id', $dataProgram->id)->where('event', ProgramApprovalLog::TELEMARKETING_REMINDED)->count());
+        Http::assertSent(fn (Request $request) => str_contains($request['message']['text'], 'PENGINGAT KE-3: KLAIM BELUM DISETUJUI DEALER')
+            && str_contains($request['message']['text'], 'BT07777'));
+    }
+
+    public function test_reminders_stop_once_the_dealer_approves_and_wait_again_after_a_postponement(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-20 09:00'));
+        $approved = $this->dataProgram(['status_potong_purchase' => 'BISA DI POTONG']);
+        $postponed = $this->dataProgram(['row_hash' => 'dp_postponed', 'kode_bt' => 'BT07778', 'dealer_name' => 'TOKO TUNDA', 'status_potong_purchase' => 'BISA DI POTONG']);
+        $this->artisan('program:notify-telemarketing')->assertSuccessful();
+
+        $approved->update(['status_potong_ar' => 'DEALER SETUJU (PROSES AR)']);
+        $this->travelTo(Carbon::parse('2026-10-22 10:00'));
+        $postponed->update(['status_potong_ar' => 'PENDING DEALER']);
+        ProgramApprovalLog::record($postponed, ProgramApprovalLog::POSTPONED, actor: ProgramApprovalLog::LINK_ACTORS['telemarketing']);
+
+        // Sehari setelah ditunda belum diingatkan; tiga hari setelah ditunda diingatkan untuk menawarkan kembali
+        $this->travelTo(Carbon::parse('2026-10-23 09:00'));
+        $this->artisan('program:notify-telemarketing')->assertSuccessful();
+        Http::assertSentCount(2);
+
+        $this->travelTo(Carbon::parse('2026-10-25 09:00'));
+        $this->artisan('program:notify-telemarketing')->assertSuccessful();
+        Http::assertSentCount(3);
+        Http::assertSent(fn (Request $request) => str_contains($request['message']['text'], 'PENGINGAT KE-1')
+            && str_contains($request['message']['text'], 'TOKO TUNDA')
+            && str_contains($request['message']['text'], 'DITUNDA dealer'));
+        $this->assertSame(0, $approved->fresh()->telemarketing_reminder_count);
+    }
+
+    public function test_reminders_can_be_switched_off(): void
+    {
+        AutomationSchedule::forKey(AutomationSchedule::TELEMARKETING_WA)->update(['options' => ['reminder_every_days' => 0]]);
+        $this->travelTo(Carbon::parse('2026-10-20 09:00'));
+        $this->dataProgram(['status_potong_purchase' => 'BISA DI POTONG']);
+
+        $this->artisan('program:notify-telemarketing')->assertSuccessful();
+        $this->travelTo(Carbon::parse('2026-10-30 09:00'));
         $this->artisan('program:notify-telemarketing')->assertSuccessful();
 
         Http::assertSentCount(1);

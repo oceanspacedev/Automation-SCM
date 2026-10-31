@@ -382,6 +382,31 @@ class DataProgramTest extends TestCase
         $this->assertTrue((int) $dp->lama_pending > 30);
     }
 
+    public function test_a_row_with_a_long_faktur_link_can_be_edited_and_gets_a_telemarketing_number(): void
+    {
+        // Link faktur dari Form Program disimpan di "<dealer>/<program>/<nama file>", bisa lebih dari 255 karakter
+        $fakturLink = 'https://s3.example.com/scm-documents/CV._CENTRA_JAYA_ABADI/PROGRAM_PEAKSEASON_SEPTEMBER_2026/faktur_1793400000_'
+            .str_repeat('RX00282-DBDA3137-CV_TOP_SELULAR_', 6).'FAKTUR_PAJAK.pdf';
+        $dp = DataProgram::create([
+            'row_hash' => 'draft_44',
+            'dealer_name' => 'CV. CENTRA JAYA ABADI',
+            'kode_bt' => 'BT06707',
+            'program_name' => 'PROGRAM PEAKSEASON SEPTEMBER 2026',
+            'cek_fp' => $fakturLink,
+        ]);
+
+        $this->putJson("/api/data-program/{$dp->id}", [
+            'cek_fp' => $fakturLink,
+            'telemarketing' => 'REZA',
+            'telemarketing_phone' => '081200000002',
+            'push_to_sheet' => false,
+        ])->assertOk();
+
+        $dp->refresh();
+        $this->assertSame($fakturLink, $dp->cek_fp);
+        $this->assertSame('081200000002', $dp->telemarketing_phone);
+    }
+
     public function test_bulk_update_fills_one_column_of_several_rows_and_pushes_them_in_one_request(): void
     {
         Http::fake(['script.google.com/macros/s/*' => Http::response(['success' => true, 'updated_count' => 2])]);

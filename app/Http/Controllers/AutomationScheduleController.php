@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AutomationSchedule;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Validation\Rule;
 
@@ -25,6 +26,8 @@ class AutomationScheduleController extends Controller
             'success' => true,
             'data' => AutomationSchedule::query()->orderBy('id')->get(),
             'interval_choices' => AutomationSchedule::INTERVAL_CHOICES,
+            'reminder_day_choices' => AutomationSchedule::REMINDER_DAY_CHOICES,
+            'reminder_max_choices' => AutomationSchedule::REMINDER_MAX_CHOICES,
             'scheduler_alive' => AutomationSchedule::schedulerIsAlive(),
             'scheduler_last_seen' => AutomationSchedule::schedulerLastSeen()?->toIso8601String(),
         ]);
@@ -42,11 +45,15 @@ class AutomationScheduleController extends Controller
             'times.*' => ['string', 'date_format:H:i', 'distinct'],
             'days' => ['array'],
             'days.*' => ['integer', 'between:1,7', 'distinct'],
+            'reminder_every_days' => ['sometimes', 'integer', Rule::in(AutomationSchedule::REMINDER_DAY_CHOICES)],
+            'reminder_max' => ['sometimes', 'integer', Rule::in(AutomationSchedule::REMINDER_MAX_CHOICES)],
         ], [
             'times.required_if' => 'Isi minimal satu jam jalan.',
             'times.*.date_format' => 'Jam harus berformat JJ:MM, misalnya 08:00.',
             'times.*.distinct' => 'Jam :input diisi lebih dari sekali.',
             'interval_minutes.in' => 'Pilih interval yang tersedia.',
+            'reminder_every_days.in' => 'Pilih jarak pengingat yang tersedia.',
+            'reminder_max.in' => 'Pilih jumlah pengingat yang tersedia.',
         ]);
 
         $times = collect($validated['times'] ?? [])->unique()->sort()->values()->all();
@@ -59,6 +66,7 @@ class AutomationScheduleController extends Controller
             'times' => $validated['mode'] === AutomationSchedule::MODE_TIMES ? $times : [],
             // Ketujuh hari dipilih sama dengan setiap hari
             'days' => count($days) === 7 ? [] : $days,
+            'options' => [...($schedule->options ?? []), ...Arr::only($validated, ['reminder_every_days', 'reminder_max'])],
         ]);
 
         return response()->json([

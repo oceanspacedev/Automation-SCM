@@ -11,7 +11,8 @@ use Illuminate\Support\Str;
 
 /**
  * Pencocokan otomatis Data Program ↔ Form Program (cron tiap menit), dan WhatsApp ke telemarketing
- * untuk setiap baris yang BISA DI POTONG, sekali per baris (cron pada jam di Master Jadwal Otomatis).
+ * untuk setiap baris yang BISA DI POTONG, sekali per baris, plus pengingat selama dealer belum menyetujui
+ * (cron pada jam di Master Jadwal Otomatis).
  */
 class AutoMatchService
 {
@@ -30,6 +31,13 @@ class AutoMatchService
      * @var list<string>
      */
     private const AR_STATUSES_BEFORE_TELEMARKETING = ['', '-', 'BELUM POTONG'];
+
+    /**
+     * AR statuses while the dealer has not approved yet: no answer, or postponed.
+     *
+     * @var list<string>
+     */
+    private const AR_STATUSES_AWAITING_DEALER = [...self::AR_STATUSES_BEFORE_TELEMARKETING, 'PENDING DEALER'];
 
     public function __construct(
         protected ProgramReconciliationService $reconciler,
@@ -142,6 +150,64 @@ class AutoMatchService
                 // Dicoba lagi pada jadwal berikutnya
                 Log::warning("WA telemarketing Data Program #{$dataProgram->id} gagal: {$result['message']}");
                 $summary['notify_failed']++;
+            }
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Remind the telemarketing of rows the dealer has not approved yet (no answer, or postponed): $everyDays days after
+     * the last WhatsApp and after the last postponement, at most $max times per row.
+     * Only rows whose WhatsApp really went out (recorded in Riwayat Approval) are reminded, not old rows that were only
+     * marked as notified when the WhatsApp job was introduced.
+     *
+     * @return array{reminded: int, remind_failed: int}
+     */
+    public function remindTelemarketing(int $everyDays, int $max, int $limit = 200, float $sleepSeconds = 0.0): array
+    {
+        $summary = ['reminded' => 0, 'remind_failed' => 0];
+
+        if ($everyDays < 1 || $max < 1) {
+            return $summary;
+        }
+
+        $lastDueDate = today()->subDays($everyDays);
+
+        $rows = DataProgram::query()
+            ->where('status_potong_purchase', 'BISA DI POTONG')
+            ->where(fn ($q) => $q->whereNull('status_potong_ar')
+                ->orWhereIn('status_potong_ar', self::AR_STATUSES_AWAITING_DEALER))
+            ->where('telemarketing_reminder_count', '<', $max)
+            ->whereDate('telemarketing_notified_at', '<=', $lastDueDate)
+            ->whereHas('approvalLogs', fn ($q) => $q
+                ->whereIn('event', [ProgramApprovalLog::TELEMARKETING_NOTIFIED, ProgramApprovalLog::TELEMARKETING_REMINDED])
+                ->where('success', true))
+            ->whereDoesntHave('approvalLogs', fn ($q) => $q
+                ->where('event', ProgramApprovalLog::POSTPONED)
+                ->whereDate('created_at', '>', $lastDueDate))
+            ->orderBy('telemarketing_notified_at')
+            ->limit($limit)
+            ->get();
+
+        foreach ($rows as $index => $dataProgram) {
+            if ($index > 0 && $sleepSeconds > 0) {
+                usleep((int) ($sleepSeconds * 1_000_000));
+            }
+
+            $reminderNumber = $dataProgram->telemarketing_reminder_count + 1;
+            $result = $this->whatsApp->sendDataProgramClaimNotificationToTelemarketing($dataProgram, $dataProgram->telemarketing_phone, $reminderNumber);
+            ProgramApprovalLog::record($dataProgram, ProgramApprovalLog::TELEMARKETING_REMINDED, $result['success'], actor: ProgramApprovalLog::AUTOMATIC,
+                recipient: trim(($dataProgram->telemarketing ?: '').' '.($dataProgram->telemarketing_phone ?: '')) ?: null,
+                note: "Pengingat ke-{$reminderNumber}. {$result['message']}");
+
+            if ($result['success']) {
+                $dataProgram->forceFill(['telemarketing_notified_at' => now(), 'telemarketing_reminder_count' => $reminderNumber])->saveQuietly();
+                $summary['reminded']++;
+            } else {
+                // Dicoba lagi pada jadwal berikutnya
+                Log::warning("Pengingat WA telemarketing Data Program #{$dataProgram->id} gagal: {$result['message']}");
+                $summary['remind_failed']++;
             }
         }
 

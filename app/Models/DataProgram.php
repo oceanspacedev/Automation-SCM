@@ -25,6 +25,7 @@ class DataProgram extends Model
             'net_pay' => 'float',
             'selisih' => 'float',
             'telemarketing_notified_at' => 'datetime',
+            'telemarketing_reminder_count' => 'integer',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

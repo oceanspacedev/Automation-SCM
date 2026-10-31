@@ -649,10 +649,11 @@ class WhatsAppService
 
     /**
      * Send DataProgram claim notification to Telemarketing with 1-click confirmation link.
+     * With a reminder number, the message is that reminder for a row the dealer has not approved yet.
      *
      * @return array{success: bool, message: string, provider_id: ?string}
      */
-    public function sendDataProgramClaimNotificationToTelemarketing(DataProgram $dp, ?string $overridePhone = null): array
+    public function sendDataProgramClaimNotificationToTelemarketing(DataProgram $dp, ?string $overridePhone = null, ?int $reminderNumber = null): array
     {
         $phone = $overridePhone ?: (config('services.wag.telemarketing_phone') ?: config('services.wag.ar_phone', '081224290502'));
         $cleanPhone = $this->formatPhone($phone);
@@ -687,7 +688,7 @@ class WhatsAppService
             ['id' => $dp->id, 'role' => 'telemarketing']
         );
 
-        $messageText = $this->buildDataProgramClaimTelemarketingMessage($dp, $confirmUrl);
+        $messageText = $this->buildDataProgramClaimTelemarketingMessage($dp, $confirmUrl, $reminderNumber);
         $uuid = Str::uuid()->toString();
 
         $payload = [
@@ -703,7 +704,7 @@ class WhatsAppService
             'purpose' => 'transactional',
             'mode' => 'async',
             'route_key' => 'default',
-            'client_reference' => "DP-CLAIM-TM-{$dp->id}",
+            'client_reference' => "DP-CLAIM-TM-{$dp->id}".($reminderNumber ? "-R{$reminderNumber}" : ''),
         ];
 
         try {
@@ -858,9 +859,10 @@ class WhatsAppService
     }
 
     /**
-     * Build formatted Indonesian WhatsApp message for Telemarketing DataProgram claim offer.
+     * Build formatted Indonesian WhatsApp message for Telemarketing DataProgram claim offer
+     * (or, with a reminder number, the reminder while the dealer has not approved it).
      */
-    public function buildDataProgramClaimTelemarketingMessage(DataProgram $dp, string $confirmUrl): string
+    public function buildDataProgramClaimTelemarketingMessage(DataProgram $dp, string $confirmUrl, ?int $reminderNumber = null): string
     {
         $dealerName = $dp->dealer_name ?: '-';
         $kodeBt = $dp->kode_bt ?: '-';
@@ -870,10 +872,18 @@ class WhatsAppService
         $cekDokumen = $dp->cek_dokumen ?: 'LENGKAP';
         $netPayFormatted = 'Rp '.number_format((float) ($dp->net_pay ?? 0), 0, ',', '.');
 
+        $intro = match (true) {
+            $reminderNumber === null => 'Halo Tim Telemarketing / Sales, dokumen klaim program berikut telah LENGKAP dan SIAP DITAWARKAN POTONG ke dealer saat order:',
+            $dp->status_potong_ar === 'PENDING DEALER' => 'Halo Tim Telemarketing / Sales, klaim program berikut sebelumnya DITUNDA dealer dan sampai sekarang belum disetujui. Mohon tawarkan kembali potongannya:',
+            default => 'Halo Tim Telemarketing / Sales, klaim program berikut sudah BISA DIPOTONG tetapi belum ada konfirmasi dari dealer:',
+        };
+
         $lines = [
-            '*PEMBERITAHUAN KLAIM BISA DIPOTONG (DATA PROGRAM)*',
+            $reminderNumber === null
+                ? '*PEMBERITAHUAN KLAIM BISA DIPOTONG (DATA PROGRAM)*'
+                : "*PENGINGAT KE-{$reminderNumber}: KLAIM BELUM DISETUJUI DEALER (DATA PROGRAM)*",
             '',
-            'Halo Tim Telemarketing / Sales, dokumen klaim program berikut telah LENGKAP dan SIAP DITAWARKAN POTONG ke dealer saat order:',
+            $intro,
             '',
             "*Kode BT / ID Real:* {$kodeBt}",
             "*Dealer:* {$dealerName}",
