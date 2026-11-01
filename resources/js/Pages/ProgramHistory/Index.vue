@@ -78,7 +78,7 @@
               v-model="autoRefresh"
               class="rounded border-gray-300 text-gray-900 focus:ring-0 w-3.5 h-3.5 cursor-pointer"
             />
-            <span class="text-xs text-gray-600">Auto-Refresh (30s)</span>
+            <span class="text-xs text-gray-600">Auto-Refresh ({{ AUTO_REFRESH_SECONDS }}s)</span>
           </label>
           <span v-if="lastUpdatedText" class="text-xs text-gray-400 hidden sm:inline">
             &bull; Update: {{ lastUpdatedText }}
@@ -644,6 +644,7 @@ import {
 } from 'lucide-vue-next';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
+import { useAutoRefresh, createRequestTracker, AUTO_REFRESH_SECONDS } from '@/composables/useAutoRefresh';
 
 const logs = ref([]);
 const loading = ref(false);
@@ -678,7 +679,6 @@ const pagination = reactive({
 });
 
 let debounceTimer = null;
-let autoRefreshTimer = null;
 
 const debounceFetch = () => {
   clearTimeout(debounceTimer);
@@ -695,8 +695,11 @@ const resetFilters = () => {
   fetchLogs(1);
 };
 
-const fetchLogs = async (page = 1) => {
-  loading.value = true;
+const startLogsRequest = createRequestTracker();
+
+const fetchLogs = async (page = 1, { silent = false } = {}) => {
+  const isLatest = startLogsRequest();
+  if (!silent) loading.value = true;
   try {
     const params = {
       page,
@@ -708,6 +711,7 @@ const fetchLogs = async (page = 1) => {
     if (filters.triggered_by) params.triggered_by = filters.triggered_by;
 
     const response = await axios.get('/api/data-program/reconciliation-logs', { params });
+    if (!isLatest()) return;
     const data = response.data;
 
     logs.value = data.data || [];
@@ -721,10 +725,12 @@ const fetchLogs = async (page = 1) => {
     const now = new Date();
     lastUpdatedText.value = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   } catch (err) {
-    statusError.value = true;
-    statusMessage.value = 'Gagal memuat riwayat: ' + (err.response?.data?.message || err.message);
+    if (!silent) {
+      statusError.value = true;
+      statusMessage.value = 'Gagal memuat riwayat: ' + (err.response?.data?.message || err.message);
+    }
   } finally {
-    loading.value = false;
+    if (!silent && isLatest()) loading.value = false;
   }
 };
 
@@ -819,17 +825,14 @@ const isValidUrl = (url) => {
 
 onMounted(() => {
   fetchLogs(1);
+});
 
-  autoRefreshTimer = setInterval(() => {
-    if (autoRefresh.value && !loading.value && !showDetailModal.value) {
-      fetchLogs(pagination.current_page);
-    }
-  }, 30000);
+useAutoRefresh(() => fetchLogs(pagination.current_page, { silent: true }), {
+  isPaused: () => !autoRefresh.value || loading.value || isReconciling.value || showDetailModal.value,
 });
 
 onUnmounted(() => {
   if (debounceTimer) clearTimeout(debounceTimer);
-  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
 });
 </script>
 

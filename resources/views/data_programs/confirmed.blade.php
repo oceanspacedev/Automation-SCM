@@ -51,8 +51,41 @@
             @elseif($action === 'potong')
                 <h1 class="text-sm font-semibold text-gray-950">Pemotongan Selesai Diproses</h1>
                 <p class="text-xs text-gray-500 mt-1 leading-relaxed">
-                    Status klaim telah diperbarui menjadi SUDAH POTONG di database dan Google Spreadsheet.
+                    Status klaim telah diperbarui menjadi SUDAH POTONG di database dan Google Spreadsheet, lalu diteruskan ke Tim Pajak untuk cek PPh.
                 </p>
+
+                @if(isset($taxNotification))
+                    @if($taxNotification['success'] ?? false)
+                        <div class="mt-3 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs">
+                            <p class="font-medium text-emerald-900">WhatsApp terkirim ke Tim Pajak</p>
+                            <p class="text-emerald-700 mt-0.5">{{ $taxNotification['message'] }}</p>
+                        </div>
+                    @else
+                        <div class="mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs">
+                            <p class="font-medium text-amber-900">WhatsApp ke Tim Pajak gagal terkirim</p>
+                            <p class="text-amber-800 mt-0.5">{{ $taxNotification['message'] ?? 'Status potong tetap tersimpan.' }} Bisa dikirim ulang dari menu Riwayat Approval.</p>
+                        </div>
+                    @endif
+                @endif
+            @elseif($action === 'cek_pajak')
+                <h1 class="text-sm font-semibold text-gray-950">Cek Pajak Tersimpan</h1>
+                <p class="text-xs text-gray-500 mt-1 leading-relaxed">
+                    Cek Pajak, Selisih, dan Note PPh sudah disimpan di database dan dikirim ke Google Spreadsheet, lalu hasilnya diteruskan ke Tim SCM.
+                </p>
+
+                @if(isset($scmNotification))
+                    @if($scmNotification['success'] ?? false)
+                        <div class="mt-3 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs">
+                            <p class="font-medium text-emerald-900">Hasil terkirim ke WhatsApp Tim SCM</p>
+                            <p class="text-emerald-700 mt-0.5">{{ $scmNotification['message'] }}</p>
+                        </div>
+                    @else
+                        <div class="mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs">
+                            <p class="font-medium text-amber-900">WhatsApp ke Tim SCM gagal terkirim</p>
+                            <p class="text-amber-800 mt-0.5">{{ $scmNotification['message'] ?? 'Cek pajak tetap tersimpan.' }} Bisa dikirim ulang dari menu Riwayat Approval.</p>
+                        </div>
+                    @endif
+                @endif
             @else
                 <h1 class="text-sm font-semibold text-gray-950">Klaim Ditunda</h1>
                 <p class="text-xs text-gray-500 mt-1 leading-relaxed">
@@ -89,11 +122,27 @@
                         <td class="py-1 font-medium text-gray-900 text-right">{{ $dp->no_pembayaran }}</td>
                     </tr>
                     @endif
+                    @if($action === 'cek_pajak')
+                    <tr>
+                        <td class="py-1 text-gray-500 align-top">Cek Pajak</td>
+                        <td class="py-1 font-medium text-gray-900 text-right">{{ $dp->cek_pajak_tarif ?: '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="py-1 text-gray-500 align-top">Selisih</td>
+                        <td class="py-1 text-gray-900 text-right">Rp {{ number_format((float) $dp->selisih, 0, ',', '.') }}</td>
+                    </tr>
+                    <tr>
+                        <td class="py-1 text-gray-500 align-top">Note PPh</td>
+                        <td class="py-1 text-gray-900 text-right break-words">{{ $dp->note_pph ?: '-' }}</td>
+                    </tr>
+                    @endif
                     <tr>
                         <td class="py-1 text-gray-500 align-top">Status</td>
                         <td class="py-1 text-right">
                             @if($action === 'setuju')
                                 <span class="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">DEALER SETUJU (PROSES AR)</span>
+                            @elseif($action === 'cek_pajak')
+                                <span class="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">SUDAH DICEK PAJAK</span>
                             @elseif($action === 'potong')
                                 <span class="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">SUDAH POTONG</span>
                             @else

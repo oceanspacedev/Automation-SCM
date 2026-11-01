@@ -462,6 +462,8 @@
                     (tes)
                   </span>
                 </div>
+                <!-- Email toko dari form publik -->
+                <div v-if="row.email" class="text-[11px] text-gray-500" title="Email toko">{{ row.email }}</div>
               </TableCell>
 
               <!-- Dokumen Credit Note -->

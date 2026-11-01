@@ -338,6 +338,7 @@ import {
 } from 'lucide-vue-next';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
+import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
 
 const logs = ref([]);
 const loading = ref(false);
@@ -411,8 +412,11 @@ const onPerPageChange = (newPerPage) => {
   fetchLogs(1);
 };
 
-const fetchLogs = async (page = 1) => {
-  loading.value = true;
+const startLogsRequest = createRequestTracker();
+
+const fetchLogs = async (page = 1, { silent = false } = {}) => {
+  const isLatest = startLogsRequest();
+  if (!silent) loading.value = true;
   try {
     const res = await axios.get('/api/email-logs', {
       params: {
@@ -421,18 +425,24 @@ const fetchLogs = async (page = 1) => {
         ...filters
       }
     });
+    if (!isLatest()) return;
     logs.value = res.data.data || [];
     pagination.current_page = res.data.current_page || 1;
     pagination.last_page = res.data.last_page || 1;
     pagination.per_page = res.data.per_page || 10;
     pagination.total = res.data.total || 0;
-    selectedIds.value = [];
+    // Muat ulang otomatis tidak melepas centang
+    if (!silent) selectedIds.value = [];
   } catch (err) {
     console.error('Error fetching email logs', err);
   } finally {
-    loading.value = false;
+    if (!silent && isLatest()) loading.value = false;
   }
 };
+
+useAutoRefresh(() => fetchLogs(pagination.current_page, { silent: true }), {
+  isPaused: () => loading.value,
+});
 
 const resetFilters = () => {
   filters.status = '';

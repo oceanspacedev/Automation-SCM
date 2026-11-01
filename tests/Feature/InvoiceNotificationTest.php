@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Mail\InvoiceMail;
+use App\Models\Dealer;
 use App\Models\Draft;
 use App\Models\Invoice;
 use App\Models\User;
@@ -13,6 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
@@ -212,6 +214,109 @@ class InvoiceNotificationTest extends TestCase
             'recipient_phone' => '6281234567890',
             'status' => 'sent',
             'provider_message_id' => 'prov-456',
+        ]);
+    }
+
+    public function test_batch_send_emails_each_dealer_and_whatsapps_one_pdf_per_region_to_telemarketing(): void
+    {
+        $this->fakeInvoiceChannels();
+        Dealer::create(['kode_bt' => 'BT07238', 'dealer_name' => '6003 MOBILE', 'telemarketing' => 'Tele Bandung', 'telemarketing_phone' => '081111111111']);
+        Dealer::create(['kode_bt' => 'BT07184', 'dealer_name' => '888 CELL', 'telemarketing' => 'Tele Cirebon', 'telemarketing_phone' => '082222222222']);
+        Dealer::create(['kode_bt' => 'BT06910', 'dealer_name' => 'A1 CELL', 'telemarketing' => 'Tele Cirebon', 'telemarketing_phone' => '0822-2222-2222']);
+
+        $invoices = [
+            $this->regionInvoice('BANDUNG', 'BT07238', '6003 MOBILE', 'CN-REG-001', 'mobile6003@example.com'),
+            $this->regionInvoice('CIREBON', 'BT07184', '888 CELL', 'CN-REG-002', 'cell888@example.com'),
+            $this->regionInvoice('CIREBON', 'BT06910', 'A1 CELL', 'CN-REG-003', 'a1cell@example.com'),
+        ];
+
+        $this->postJson('/api/invoices/send-batch', ['ids' => array_map(fn (Invoice $invoice) => $invoice->id, $invoices)])
+            ->assertOk()
+            ->assertJson(['success' => true, 'sent' => 3, 'failed' => 0]);
+
+        foreach (['mobile6003@example.com', 'cell888@example.com', 'a1cell@example.com'] as $email) {
+            Mail::assertSent(InvoiceMail::class, fn (InvoiceMail $mail) => $mail->hasTo($email));
+        }
+
+        Http::assertSentCount(2);
+        Http::assertSent(fn ($request) => $request['recipient']['value'] === '6282222222222'
+            && $request['message']['attachment']['filename'] === 'Invoice Region CIREBON.pdf'
+            && str_contains($request['message']['text'], 'CN-REG-002')
+            && str_contains($request['message']['text'], 'CN-REG-003')
+            && ! str_contains($request['message']['text'], 'CN-REG-001')
+            && str_contains($request['message']['text'], '/form/realme/jabar'));
+        Http::assertSent(fn ($request) => $request['recipient']['value'] === '6281111111111'
+            && $request['message']['attachment']['filename'] === 'Invoice Region BANDUNG.pdf');
+
+        $cirebonPdf = collect(Storage::disk('public')->files('invoices/regions'))->first(fn (string $path) => str_contains($path, 'cirebon'));
+        $this->assertSame(2, preg_match_all('#/Type\s*/Page[^s]#', Storage::disk('public')->get($cirebonPdf)));
+
+        foreach ($invoices as $invoice) {
+            $invoice->refresh();
+            $this->assertSame('sent', $invoice->status);
+            $this->assertNotNull($invoice->email_sent_at);
+            $this->assertNotNull($invoice->whatsapp_sent_at);
+        }
+        $this->assertDatabaseHas('whatsapp_logs', ['invoice_id' => $invoices[2]->id, 'recipient_phone' => '6282222222222', 'status' => 'sent']);
+    }
+
+    public function test_batch_send_reports_an_invoice_whose_store_has_no_telemarketing_number(): void
+    {
+        $this->fakeInvoiceChannels();
+        Dealer::create(['kode_bt' => 'BT07238', 'dealer_name' => '6003 MOBILE']);
+        $invoice = $this->regionInvoice('BANDUNG', 'BT07238', '6003 MOBILE', 'CN-REG-009', 'mobile6003@example.com');
+
+        $this->postJson('/api/invoices/send-batch', ['ids' => [$invoice->id]])
+            ->assertOk()
+            ->assertJson(['success' => true, 'sent' => 1])
+            ->assertJsonPath('message', fn (string $message) => str_contains($message, 'Nomor WA telemarketing belum ada di Master Dealer untuk invoice: CN-REG-009'));
+
+        Mail::assertSent(InvoiceMail::class, fn (InvoiceMail $mail) => $mail->hasTo('mobile6003@example.com'));
+        Http::assertNothingSent();
+        $this->assertNull($invoice->refresh()->whatsapp_sent_at);
+    }
+
+    /**
+     * Fake the mailer, the public disk and the WhatsApp gateway (no other outgoing request allowed).
+     */
+    private function fakeInvoiceChannels(): void
+    {
+        Mail::fake();
+        Storage::fake('public');
+        config(['services.wag.token' => 'test-token', 'services.wag.public_url' => 'https://cdn.example.com']);
+        Http::preventStrayRequests();
+        Http::fake(['*/api/v1/messages' => Http::response(['data' => ['id' => 'waghub-msg-1', 'provider_message_id' => 'prov-1']], 201)]);
+    }
+
+    /**
+     * A generated invoice from a draft row with its region, kode BT and dealer email (as in the draft file).
+     */
+    private function regionInvoice(string $region, string $kodeBt, string $dealerName, string $invoiceNumber, string $email): Invoice
+    {
+        $amounts = ['support_amount' => 1000000, 'dpp' => 900901, 'dpp_lain' => 0, 'ppn' => 0, 'pph' => 22523, 'netpay' => 878378];
+
+        $draft = Draft::create([
+            ...$amounts,
+            'region' => $region,
+            'kode_bt' => $kodeBt,
+            'dealer_name' => $dealerName,
+            'customer_name' => $dealerName,
+            'cn_number' => $invoiceNumber,
+            'invoice_type' => 'NPS FL',
+            'status' => 'invoiced',
+            'email' => $email,
+        ]);
+
+        return Invoice::create([
+            ...$amounts,
+            'invoice_number' => $invoiceNumber,
+            'draft_id' => $draft->id,
+            'invoice_type' => 'NPS FL',
+            'dealer_name' => $dealerName,
+            'customer_name' => $dealerName,
+            'program_name' => 'PROGRAM SEPTEMBER 2026',
+            'email' => $email,
+            'status' => 'generated',
         ]);
     }
 }

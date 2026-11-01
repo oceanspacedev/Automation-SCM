@@ -139,10 +139,13 @@ class DataProgramSyncService
             return 0.0;
         }
 
-        // Handle negative numbers like (200.000)
+        // Handle negative numbers like (200.000) or -200.000
         $isNegative = str_starts_with($clean, '(') && str_ends_with($clean, ')');
         if ($isNegative) {
             $clean = trim($clean, '()');
+        } elseif (str_starts_with($clean, '-')) {
+            $isNegative = true;
+            $clean = ltrim($clean, '-');
         }
 
         // Format 200.000 or 1.234.567 or 180.180,50
@@ -542,6 +545,124 @@ class DataProgramSyncService
             $dp->bank ?? '',
             $dp->big_region ?? '',
         ];
+    }
+
+    /**
+     * A Data Program row in the shape the spreadsheet's Apps Script "update_rows" action expects.
+     *
+     * @return array<string, mixed>
+     */
+    public function spreadsheetRow(DataProgram $dp): array
+    {
+        $rowIndex = str_starts_with((string) $dp->row_hash, 'row_') ? (int) str_replace('row_', '', (string) $dp->row_hash) : 0;
+
+        return [
+            'row_index' => $rowIndex > 0 ? $rowIndex : null,
+            'kode_bt' => $dp->kode_bt,
+            'dealer_name' => $dp->dealer_name,
+            'program' => $dp->program,
+            'program_name' => $dp->program_name,
+            'periode' => $dp->periode,
+            'region' => $dp->region,
+            'no_po' => $dp->no_po,
+            'id_gs' => $dp->id_gs,
+            'kode_supplier' => $dp->kode_supplier,
+            'status_dl' => $dp->status_dl,
+            'sales_person' => $dp->sales_person,
+            'telemarketing' => $dp->telemarketing,
+            'wajib_pajak' => $dp->wajib_pajak,
+            'trf_pph' => $dp->trf_pph,
+            'incentive' => $dp->incentive,
+            'dpp' => $dp->dpp,
+            'dpp_lain' => $dp->dpp_lain,
+            'ppn' => $dp->ppn,
+            'nilai_pph' => $dp->nilai_pph,
+            'net_pay' => $dp->net_pay,
+            'cek_pajak_tarif' => $dp->cek_pajak_tarif,
+            'selisih' => $dp->selisih,
+            'note_pph' => $dp->note_pph,
+            'no_faktur_pajak' => $dp->no_faktur_pajak,
+            'ket_faktur_pajak' => $dp->ket_faktur_pajak,
+            'no_po_sj' => $dp->no_po_sj,
+            'no_transaksi' => $dp->no_transaksi,
+            'tgl_input' => $dp->tgl_input,
+            'tgl_share_cn' => $dp->tgl_share_cn,
+            'lama_pending' => $dp->lama_pending,
+            'status_potong_purchase' => $dp->status_potong_purchase,
+            'status_potong_ar' => $dp->status_potong_ar,
+            'tgl_potong_tf' => $dp->tgl_potong_tf,
+            'no_uid' => $dp->no_uid,
+            'no_pembayaran' => $dp->no_pembayaran,
+            'tgl_input_bank_pph' => $dp->tgl_input_bank_pph,
+            'tf_status' => $dp->tf_status,
+            'tgl_proses' => $dp->tgl_proses,
+            'tgl_sj' => $dp->tgl_sj,
+            'no_sj' => $dp->no_sj,
+            'info_bank' => $dp->info_bank,
+            'pending_potongan' => $dp->pending_potongan,
+            'npwp' => $dp->npwp,
+            'nama_npwp' => $dp->nama_npwp,
+            'program_2' => $dp->program_2,
+            'cek_dokumen' => $dp->cek_dokumen,
+            'keterangan' => $dp->keterangan,
+            'cn' => $dp->cn,
+            'agrement' => $dp->agrement,
+            'cek_fp' => $dp->cek_fp,
+            'cek_evidance' => $dp->cek_evidance,
+            'noted' => $dp->noted,
+            'norek' => $dp->norek,
+            'namrek' => $dp->namrek,
+            'bank' => $dp->bank,
+            'big_region' => $dp->big_region,
+            'values' => $this->convertDataProgramToRowArray($dp),
+        ];
+    }
+
+    /**
+     * Fill a Master Program's code into the Data Program rows and drafts of that program name that have no code yet
+     * (or still have the program's previous code), then send the changed rows to their area's spreadsheet like an edit
+     * in Data Program does.
+     *
+     * @return int how many Data Program rows got the code
+     */
+    public function fillProgramCode(MasterProgram $program, ?string $previousCode = null): int
+    {
+        $code = trim((string) $program->code);
+        $name = trim((string) $program->name);
+
+        if ($code === '' || $name === '') {
+            return 0;
+        }
+
+        $replaceable = array_values(array_unique(['', '-', ...($previousCode && $previousCode !== $code ? [$previousCode] : [])]));
+        $withoutCode = fn (string $column) => fn ($query) => $query->whereNull($column)->orWhereIn($column, $replaceable);
+
+        // Draft ikut diisi, supaya sinkron ulang draft ke Data Program tidak mengosongkan kodenya lagi
+        Draft::withoutGlobalScopes()
+            ->where('brand', $program->brand)
+            ->where('program_name', $name)
+            ->where($withoutCode('program_code'))
+            ->update(['program_code' => $code]);
+
+        $rows = DataProgram::withoutGlobalScopes()
+            ->where('brand', $program->brand)
+            ->where('program_name', $name)
+            ->where($withoutCode('program'))
+            ->get();
+
+        foreach ($rows as $row) {
+            $row->forceFill(['program' => $code])->save();
+        }
+
+        foreach ($rows->groupBy('area') as $area => $areaRows) {
+            try {
+                $this->pushUpdatesToSpreadsheet($areaRows->map(fn (DataProgram $row) => $this->spreadsheetRow($row))->values()->all(), null, Area::from($area), $program->brand);
+            } catch (\Throwable $e) {
+                Log::warning("Push kode program {$code} ke spreadsheet gagal: {$e->getMessage()}");
+            }
+        }
+
+        return $rows->count();
     }
 
     /**

@@ -2,10 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Models\DataProgram;
+use App\Models\Draft;
 use App\Models\MasterProgram;
 use App\Models\User;
+use App\Services\DataProgramSyncService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
@@ -200,6 +206,41 @@ class MasterProgramTest extends TestCase
             'name' => 'PROGRAM DSA SEPTEMBER 2026',
             'period' => 'Periode 1-30 September 2026',
         ])->assertCreated()->assertJsonPath('data.code', 'PROGRAM 344');
+    }
+
+    public function test_a_saved_program_fills_its_code_into_data_program_rows_and_drafts_without_one(): void
+    {
+        Cache::put(DataProgramSyncService::CACHE_KEY_SPREADSHEET_URL, 'https://script.google.com/macros/s/test_token/exec');
+        Http::fake(['https://script.google.com/macros/s/*' => Http::response(['success' => true, 'updated_count' => 1], 200)]);
+        MasterProgram::create(['code' => 'PROGRAM 345', 'name' => 'PROGRAM DSA JANUARI 2026']);
+
+        $draft = Draft::create(['area' => 'jabar', 'dealer_name' => 'A1 CELL', 'program_name' => 'PROGRAM SEPTEMBER 2028', 'support_amount' => 1, 'status' => 'ready']);
+        $fromDraft = DataProgram::create(['row_hash' => "draft_{$draft->id}", 'draft_id' => $draft->id, 'dealer_name' => 'A1 CELL', 'kode_bt' => 'BT06910', 'program_name' => 'PROGRAM SEPTEMBER 2028']);
+        $fromSheet = DataProgram::create(['row_hash' => 'row_12', 'dealer_name' => 'TOKO B', 'program' => '-', 'program_name' => 'PROGRAM SEPTEMBER 2028']);
+        $ownCode = DataProgram::create(['row_hash' => 'row_13', 'dealer_name' => 'TOKO C', 'program' => 'PROGRAM 300', 'program_name' => 'PROGRAM SEPTEMBER 2028']);
+
+        // Program baru di Master Program: kolom Program yang masih kosong langsung terisi kodenya, juga di spreadsheet
+        $this->postJson('/api/programs', ['name' => 'PROGRAM SEPTEMBER 2028'])
+            ->assertCreated()
+            ->assertJsonPath('data.code', 'PROGRAM 346')
+            ->assertJsonPath('data_program_filled', 2);
+
+        $this->assertSame('PROGRAM 346', $fromDraft->fresh()->program);
+        $this->assertSame('PROGRAM 346', $fromSheet->fresh()->program);
+        $this->assertSame('PROGRAM 300', $ownCode->fresh()->program);
+        $this->assertSame('PROGRAM 346', $draft->fresh()->program_code);
+        Http::assertSent(fn (Request $request) => str_contains($request->url(), 'script.google.com')
+            && collect($request['rows'] ?? [])->pluck('program')->unique()->values()->all() === ['PROGRAM 346']);
+
+        // Kode diganti: baris yang masih memakai kode lama ikut berganti, kode yang diisi sendiri tetap
+        $program = MasterProgram::where('name', 'PROGRAM SEPTEMBER 2028')->firstOrFail();
+        $this->putJson("/api/programs/{$program->id}", ['name' => 'PROGRAM SEPTEMBER 2028', 'code' => '347'])
+            ->assertOk()
+            ->assertJsonPath('data_program_filled', 2);
+
+        $this->assertSame('PROGRAM 347', $fromDraft->fresh()->program);
+        $this->assertSame('PROGRAM 347', $draft->fresh()->program_code);
+        $this->assertSame('PROGRAM 300', $ownCode->fresh()->program);
     }
 
     public function test_program_code_must_be_unique_after_normalization(): void

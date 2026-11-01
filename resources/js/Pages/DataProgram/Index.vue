@@ -174,7 +174,7 @@
               v-model="autoRefresh"
               class="rounded border-gray-300 text-gray-900 focus:ring-0 w-3.5 h-3.5 cursor-pointer"
             />
-            <span class="text-xs text-gray-600">Auto-Refresh (30s)</span>
+            <span class="text-xs text-gray-600">Auto-Refresh ({{ AUTO_REFRESH_SECONDS }}s)</span>
           </label>
           <span v-if="lastUpdatedText" class="text-xs text-gray-400 hidden sm:inline">
             &bull; Update: {{ lastUpdatedText }}
@@ -1442,7 +1442,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import axios from 'axios';
 import AreaTabs from '@/components/AreaTabs.vue';
 import WhatsAppIcon from '@/components/WhatsAppIcon.vue';
@@ -1450,6 +1450,7 @@ import TelemarketingSelectModal from '@/components/TelemarketingSelectModal.vue'
 import { useArea } from '@/composables/useArea';
 import EditDataProgramModal from '@/components/EditDataProgramModal.vue';
 import { useSpreadsheetGrid } from '@/composables/useSpreadsheetGrid';
+import { useAutoRefresh, createRequestTracker, AUTO_REFRESH_SECONDS } from '@/composables/useAutoRefresh';
 import {
   Search as SearchIcon,
   RefreshCw as RefreshCwIcon,
@@ -1538,8 +1539,7 @@ const isSyncing = ref(false);
 const isExporting = ref(false);
 const syncMessage = ref('');
 const syncError = ref(false);
-const autoRefresh = ref(false);
-let autoRefreshTimer = null;
+const autoRefresh = ref(true);
 const lastUpdatedText = ref('');
 
 // Modal Edit Data Program
@@ -1598,6 +1598,7 @@ const saveCells = async (field, changes) => {
 };
 
 const {
+  activeCell,
   cellEditor,
   cellEditorInput,
   selectionBox,
@@ -1783,8 +1784,11 @@ const updateLastTimestamp = () => {
   lastUpdatedText.value = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 };
 
-const fetchData = async (page = 1) => {
-  isLoading.value = true;
+const startDataRequest = createRequestTracker();
+
+const fetchData = async (page = 1, { silent = false } = {}) => {
+  const isLatest = startDataRequest();
+  if (!silent) isLoading.value = true;
   try {
     const params = {
       page,
@@ -1797,6 +1801,7 @@ const fetchData = async (page = 1) => {
     };
 
     const res = await axios.get('/api/data-program', { params });
+    if (!isLatest()) return;
     items.value = res.data.items || [];
     Object.assign(pagination, res.data.pagination);
     if (res.data.filter_options) {
@@ -1809,7 +1814,7 @@ const fetchData = async (page = 1) => {
   } catch (err) {
     console.error('Error fetching Data Program:', err);
   } finally {
-    isLoading.value = false;
+    if (!silent && isLatest()) isLoading.value = false;
   }
 };
 
@@ -1829,15 +1834,13 @@ const onPageInputBlur = (e) => {
   }
 };
 
-watch(autoRefresh, (enabled) => {
-  if (enabled) {
-    autoRefreshTimer = setInterval(() => {
-      fetchData(pagination.current_page);
-    }, 30000);
-  } else if (autoRefreshTimer) {
-    clearInterval(autoRefreshTimer);
-    autoRefreshTimer = null;
-  }
+// Auto-Refresh: berhenti selama sel tabel dipilih/diisi, modal terbuka, atau proses (sinkron, cocokkan, kirim WA) berjalan
+useAutoRefresh(() => fetchData(pagination.current_page, { silent: true }), {
+  isPaused: () => !autoRefresh.value || isLoading.value || isSyncing.value || isReconciling.value
+    || reconcilingRowId.value !== null || isSendingTelemarketing.value || sendingWaId.value !== null
+    || activeCell.value !== null || cellEditor.open || fillBox.value !== null
+    || editModal.isOpen || urlModal.isOpen || telemarketingModal.isOpen
+    || showReconcileModal.value || showHistoryModal.value || showTestModal.value,
 });
 
 const triggerSync = async () => {
@@ -2082,7 +2085,6 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
-  if (autoRefreshTimer) clearInterval(autoRefreshTimer);
   document.removeEventListener('click', handleClickOutsideSpreadsheetDropdown);
   document.removeEventListener('click', handleClickOutsideReconcileDropdown);
   document.removeEventListener('click', handleClickOutsideProgramDropdown);

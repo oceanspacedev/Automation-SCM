@@ -204,6 +204,7 @@
               </button>
             </div>
             <p class="text-gray-500 break-words">ID Realme {{ d.id_realme || '-' }}<template v-if="d.gs_name"> · {{ d.gs_name }}</template></p>
+            <p class="text-gray-500 break-words">Email <template v-if="d.email">{{ emailParts(d.email)[0] }}<wbr>{{ emailParts(d.email)[1] }}</template><template v-else>belum ada</template></p>
             <p class="text-gray-500">
               Agreement
               <a v-if="d.agreement_url" :href="d.agreement_url" target="_blank" rel="noopener" class="text-gray-900 underline">Lihat</a>
@@ -245,6 +246,7 @@
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">ID Realme / Nama GS</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Jenis NPWP</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Region</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Email</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Telemarketing</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Sales</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Agreement</th>
@@ -254,12 +256,12 @@
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <tr v-if="isLoading">
-              <td colspan="11" class="py-8 text-center text-gray-500">
+              <td colspan="12" class="py-8 text-center text-gray-500">
                 Memuat data...
               </td>
             </tr>
             <tr v-else-if="dealers.length === 0">
-              <td colspan="11" class="py-8 text-center text-gray-500">
+              <td colspan="12" class="py-8 text-center text-gray-500">
                 Tidak ada data dealer yang ditemukan.
               </td>
             </tr>
@@ -280,7 +282,7 @@
               </td>
 
               <!-- 3. Nama Dealer -->
-              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-normal min-w-[180px] max-w-[260px] break-words leading-snug" :title="d.dealer_name">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-normal min-w-[170px] max-w-[260px] break-words leading-snug" :title="d.dealer_name">
                 <div class="text-gray-900">{{ d.dealer_name || '-' }}</div>
                 <div v-if="d.alias && d.alias !== d.dealer_name" class="text-[11px] text-gray-500">{{ d.alias }}</div>
               </td>
@@ -301,14 +303,20 @@
                 {{ d.region || '-' }}
               </td>
 
-              <!-- 6. Telemarketing -->
+              <!-- Email toko (bisa terisi dari Form Program): selalu utuh satu baris; kolom lain yang turun baris -->
               <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
+                <span v-if="d.email" class="text-gray-900">{{ d.email }}</span>
+                <span v-else class="text-gray-400">-</span>
+              </td>
+
+              <!-- 6. Telemarketing: nama panjang boleh turun baris supaya tabel muat di layar -->
+              <td class="py-2.5 px-3 border-r border-gray-100 min-w-[130px] leading-snug">
                 <div>{{ d.telemarketing || '-' }}</div>
-                <div v-if="d.telemarketing_phone" class="text-[11px] text-gray-500">{{ d.telemarketing_phone }}</div>
+                <div v-if="d.telemarketing_phone" class="text-[11px] text-gray-500 whitespace-nowrap">{{ d.telemarketing_phone }}</div>
               </td>
 
               <!-- 7. Sales -->
-              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap">
+              <td class="py-2.5 px-3 border-r border-gray-100 min-w-[110px] leading-snug">
                 {{ d.sales_person || '-' }}
               </td>
 
@@ -660,6 +668,7 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import AreaTabs from '@/components/AreaTabs.vue';
 import DealerImportModal from '@/components/DealerImportModal.vue';
+import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
 import { downloadExport } from '@/lib/download';
 import {
   ChevronRightIcon,
@@ -734,8 +743,17 @@ const formatDate = (value) => {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
-async function fetchDealers(page = 1) {
-  isLoading.value = true;
+// Email dipecah di depan "@" supaya bila kolom sempit turun baris di situ, bukan di tengah kata
+const emailParts = (email) => {
+  const at = email.indexOf('@');
+  return at > 0 ? [email.slice(0, at), email.slice(at)] : [email, ''];
+};
+
+const startDealersRequest = createRequestTracker();
+
+async function fetchDealers(page = 1, { silent = false } = {}) {
+  const isLatest = startDealersRequest();
+  if (!silent) isLoading.value = true;
   currentPage.value = page;
 
   try {
@@ -747,6 +765,7 @@ async function fetchDealers(page = 1) {
       agreement: filterAgreement.value !== 'all' ? filterAgreement.value : undefined,
     };
     const res = await axios.get('/api/dealers', { params });
+    if (!isLatest()) return;
     if (res.data?.success) {
       dealers.value = res.data.data.data || [];
       totalRows.value = res.data.data.total || 0;
@@ -757,11 +776,17 @@ async function fetchDealers(page = 1) {
       }
     }
   } catch (e) {
-    alert('Gagal memuat data dealer: ' + (e.response?.data?.message || e.message));
+    if (!silent) alert('Gagal memuat data dealer: ' + (e.response?.data?.message || e.message));
   } finally {
-    isLoading.value = false;
+    if (!silent && isLatest()) isLoading.value = false;
   }
 }
+
+// Berhenti selama modal terbuka atau import berjalan (selesai import, daftar dimuat ulang sendiri)
+useAutoRefresh(() => fetchDealers(currentPage.value, { silent: true }), {
+  isPaused: () => isLoading.value || isModalOpen.value || isImportModalOpen.value || dealerToDelete.value !== null
+    || isSaving.value || isDeleting.value || isImportActive.value,
+});
 
 function handleSearchInput() {
   if (searchTimeout) clearTimeout(searchTimeout);

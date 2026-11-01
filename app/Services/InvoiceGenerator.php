@@ -137,13 +137,7 @@ class InvoiceGenerator
      */
     public function renderAndSavePdf(Invoice $invoice): string
     {
-        $viewName = match ($invoice->invoice_type) {
-            'DSA' => 'invoices.dsa',
-            'REGULAR', 'REGULER' => 'invoices.regular',
-            default => 'invoices.nps-fl',
-        };
-
-        $pdf = Pdf::loadView($viewName, ['invoice' => $invoice])
+        $pdf = Pdf::loadView($this->viewName($invoice), ['invoice' => $invoice])
             ->setPaper('a4', 'portrait')
             ->setOptions([
                 'isHtml5ParserEnabled' => true,
@@ -155,5 +149,52 @@ class InvoiceGenerator
         Storage::disk('public')->put($filename, $pdf->output());
 
         return $filename;
+    }
+
+    /**
+     * One PDF holding several invoices, each starting on a new page (e.g. all invoices of a region for its
+     * telemarketing). Each invoice uses its own layout; the layouts share their styles.
+     *
+     * @param  iterable<Invoice>  $invoices
+     */
+    public function renderCombinedPdf(iterable $invoices): string
+    {
+        $styles = [];
+        $pages = [];
+
+        foreach ($invoices as $invoice) {
+            $html = view($this->viewName($invoice), ['invoice' => $invoice])->render();
+
+            if (preg_match('#<style[^>]*>(.*?)</style>#is', $html, $style)) {
+                $styles[md5($style[1])] = $style[1];
+            }
+            $pages[] = preg_match('#<body[^>]*>(.*)</body>#is', $html, $body) ? $body[1] : $html;
+        }
+
+        $html = '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><style>'.implode("\n", $styles)
+            .' .invoice-page + .invoice-page { page-break-before: always; }</style></head><body>'
+            .implode('', array_map(fn (string $page) => '<div class="invoice-page">'.$page.'</div>', $pages))
+            .'</body></html>';
+
+        return Pdf::loadHTML($html)
+            ->setPaper('a4', 'portrait')
+            ->setOptions([
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => true,
+                'defaultFont' => 'sans-serif',
+            ])
+            ->output();
+    }
+
+    /**
+     * The Blade layout of an invoice by its type.
+     */
+    private function viewName(Invoice $invoice): string
+    {
+        return match ($invoice->invoice_type) {
+            'DSA' => 'invoices.dsa',
+            'REGULAR', 'REGULER' => 'invoices.regular',
+            default => 'invoices.nps-fl',
+        };
     }
 }

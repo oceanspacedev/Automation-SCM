@@ -403,6 +403,38 @@
           </div>
         </div>
 
+        <!-- CARD 6B: EMAIL TOKO (wajib bila toko belum punya email di Master Dealer, lalu tersimpan ke sana) -->
+        <div
+          class="bg-white rounded-xl shadow-xs border p-6 space-y-3 transition"
+          :class="validationErrors.email ? 'border-rose-300 ring-1 ring-rose-100' : 'border-gray-200'"
+        >
+          <div>
+            <label for="store-email" class="block text-sm sm:text-base font-medium text-gray-900">
+              EMAIL TOKO <span v-if="emailRequired" class="text-rose-500">*</span>
+            </label>
+            <p class="text-xs text-gray-500 mt-0.5">{{ emailHint }}</p>
+          </div>
+
+          <div class="pt-1">
+            <input
+              id="store-email"
+              type="email"
+              inputmode="email"
+              autocomplete="email"
+              v-model="form.email"
+              @input="validationErrors.email = ''"
+              placeholder="Contoh: toko@gmail.com"
+              class="w-full text-xs sm:text-sm border-b pb-1.5 focus:outline-none transition bg-transparent placeholder:text-gray-400"
+              :class="validationErrors.email ? 'border-rose-400 focus:border-rose-500' : 'border-gray-300 focus:border-[#1a73e8]'"
+            />
+          </div>
+
+          <div v-if="validationErrors.email" class="flex items-center gap-1.5 text-xs text-rose-600 pt-1">
+            <AlertCircleIcon class="w-4 h-4 shrink-0" />
+            <span>{{ validationErrors.email }}</span>
+          </div>
+        </div>
+
         <!-- ================= DOKUMEN UPLOAD CARDS ================= -->
 
         <!-- CARD 7: DOKUMEN CREDIT NOTE/INVOICE * -->
@@ -853,6 +885,7 @@ const form = reactive({
   sales_name: '',
   sales_custom: '',
   whatsapp: '',
+  email: '',
   is_pkp: false,
 });
 
@@ -863,10 +896,21 @@ const dealerTaxStatus = ref(null);
 const dealerHasAgreement = ref(false);
 const usesMasterAgreement = computed(() => brand.value.slug === DEFAULT_BRAND && dealerHasAgreement.value);
 
+// Email toko di Master Dealer: hanya tahu ada/tidaknya (emailnya tidak dikirim ke form publik).
+// Wajib diisi selama toko belum punya email; email yang diisi lalu tersimpan ke Master Dealer.
+const dealerHasEmail = ref(null);
+const emailRequired = computed(() => dealerHasEmail.value !== true);
+const emailHint = computed(() => {
+  if (dealerHasEmail.value === true) return 'Email toko ini sudah tercatat di Master Dealer, jadi boleh dikosongkan.';
+  if (dealerHasEmail.value === false) return 'Toko ini belum punya email di Master Dealer, jadi wajib diisi. Email ini otomatis disimpan ke Master Dealer.';
+  return 'Wajib diisi bila toko belum punya email di Master Dealer; email ini otomatis disimpan ke sana.';
+});
+
 function applyMasterDealerTax(dealer) {
   form.kode_bt = dealer?.kode_bt || '';
   form.is_pkp = dealer?.is_pkp === true;
   dealerHasAgreement.value = dealer?.has_agreement === true;
+  dealerHasEmail.value = typeof dealer?.has_email === 'boolean' ? dealer.has_email : null;
   if (usesMasterAgreement.value) validationErrors.agreement = '';
   dealerTaxStatus.value = typeof dealer?.is_pkp === 'boolean'
     ? { npwpType: dealer.npwp_type, isPkp: dealer.is_pkp }
@@ -898,6 +942,7 @@ const validationErrors = reactive({
   region: '',
   program_name: '',
   sales_name: '',
+  email: '',
   credit_note: '',
   agreement: '',
 });
@@ -1364,6 +1409,18 @@ function validateAllFields() {
     validationErrors.sales_name = '';
   }
 
+  // Email wajib bila toko belum punya email di Master Dealer; bila diisi harus berformat email
+  const emailVal = form.email.trim();
+  if (!emailVal && emailRequired.value) {
+    validationErrors.email = 'Pertanyaan ini wajib diisi';
+    isValid = false;
+  } else if (emailVal && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
+    validationErrors.email = 'Format email tidak valid, contoh: toko@gmail.com';
+    isValid = false;
+  } else {
+    validationErrors.email = '';
+  }
+
   if (!files.credit_note) {
     validationErrors.credit_note = 'Dokumen Credit Note/Invoice wajib diunggah.';
     isValid = false;
@@ -1518,6 +1575,7 @@ async function handleSubmit() {
   formData.append('dealer_name', form.dealer_name.trim());
   formData.append('sales_name', form.sales_name.trim());
   if (form.whatsapp) formData.append('whatsapp', form.whatsapp.trim());
+  if (form.email.trim()) formData.append('email', form.email.trim());
   formData.append('is_pkp', form.is_pkp ? '1' : '0');
 
   if (files.credit_note) formData.append('credit_note_file', files.credit_note);
@@ -1562,6 +1620,7 @@ function handleClearForm() {
     form.sales_name = '';
     form.sales_custom = '';
     form.whatsapp = '';
+    form.email = '';
 
     files.credit_note = null;
     files.agreement = null;

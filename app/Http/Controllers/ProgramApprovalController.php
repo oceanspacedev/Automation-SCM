@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AppSetting;
 use App\Models\ArContact;
 use App\Models\DataProgram;
 use App\Models\ProgramApprovalLog;
@@ -28,6 +29,9 @@ class ProgramApprovalController extends Controller
         ProgramApprovalLog::POSTPONED => 'Dealer menunda',
         ProgramApprovalLog::AR_NOTIFIED => 'WA ke AR',
         ProgramApprovalLog::CUT => 'Sudah dipotong AR',
+        ProgramApprovalLog::TAX_NOTIFIED => 'WA ke Tim Pajak',
+        ProgramApprovalLog::TAX_CHECKED => 'Dicek Tim Pajak',
+        ProgramApprovalLog::SCM_NOTIFIED => 'WA hasil ke Tim SCM',
     ];
 
     public function __construct(private ProgramApprovalFlow $flow) {}
@@ -56,10 +60,11 @@ class ProgramApprovalController extends Controller
             ->orderByDesc('id')
             ->paginate((int) $request->input('per_page', 25));
         $arName = $this->arNameResolver();
+        $teamNames = $this->teamNamesResolver();
 
         return response()->json([
             'success' => true,
-            'data' => $rows->getCollection()->map(fn (DataProgram $row) => $this->present($row, $arName($row)))->all(),
+            'data' => $rows->getCollection()->map(fn (DataProgram $row) => $this->present($row, $arName($row), $teamNames($row)))->all(),
             'pagination' => [
                 'current_page' => $rows->currentPage(),
                 'last_page' => $rows->lastPage(),
@@ -81,7 +86,7 @@ class ProgramApprovalController extends Controller
 
         return response()->json([
             'success' => true,
-            'data' => $this->present($row, ($this->arNameResolver())($row)) + [
+            'data' => $this->present($row, ($this->arNameResolver())($row), ($this->teamNamesResolver())($row)) + [
                 'timeline' => $row->approvalLogs->map(fn (ProgramApprovalLog $log) => [
                     'id' => $log->id,
                     'event' => $log->event,
@@ -115,9 +120,29 @@ class ProgramApprovalController extends Controller
     }
 
     /**
+     * The tax and SCM teams of a row's area in Master AR, read once per area.
+     *
+     * @return Closure(DataProgram): array{tax: ?string, scm: ?string}
+     */
+    private function teamNamesResolver(): Closure
+    {
+        $names = [];
+
+        return function (DataProgram $row) use (&$names): array {
+            $area = $row->areaEnum();
+
+            return $names[$area->value] ??= [
+                'tax' => AppSetting::teamContact($area, AppSetting::TAX_TEAM)['name'],
+                'scm' => AppSetting::teamContact($area, AppSetting::SCM_TEAM)['name'],
+            ];
+        };
+    }
+
+    /**
+     * @param  array{tax: ?string, scm: ?string}  $teamNames
      * @return array<string, mixed>
      */
-    private function present(DataProgram $row, ?string $arName): array
+    private function present(DataProgram $row, ?string $arName, array $teamNames): array
     {
         $stage = $this->flow->stage($row);
 
@@ -136,7 +161,7 @@ class ProgramApprovalController extends Controller
             'status_potong_ar' => $row->status_potong_ar,
             'stage' => $stage,
             'stage_label' => ProgramApprovalFlow::STAGES[$stage],
-            'steps' => $this->flow->steps($row, $row->approvalLogs, $arName),
+            'steps' => $this->flow->steps($row, $row->approvalLogs, $arName, $teamNames['tax'], $teamNames['scm']),
         ];
     }
 }

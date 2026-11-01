@@ -13,11 +13,14 @@ use App\Services\CustomerLookupService;
 use App\Services\DataProgramSyncService;
 use App\Services\GoogleMailService;
 use App\Services\InvoiceGenerator;
+use App\Services\InvoiceRegionSender;
 use App\Services\WhatsAppService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Exception;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
@@ -502,9 +505,9 @@ class InvoiceController extends Controller
     }
 
     /**
-     * Send multiple selected invoices via email and WhatsApp.
+     * Send the selected invoices: email to each dealer, WhatsApp to telemarketing as one PDF per region.
      */
-    public function sendBatch(Request $request): JsonResponse
+    public function sendBatch(Request $request, InvoiceRegionSender $regionSender): JsonResponse
     {
         $ids = $request->input('ids', []);
         if (empty($ids) || ! is_array($ids)) {
@@ -514,14 +517,7 @@ class InvoiceController extends Controller
             ], 422);
         }
 
-        $invoices = Invoice::with('draft')
-            ->whereIn('id', $ids)
-            ->where(function ($q) {
-                $q->whereNull('email_sent_at')
-                    ->orWhereNull('whatsapp_sent_at');
-            })
-            ->where('status', '!=', 'sent')
-            ->get();
+        $invoices = $this->unsentInvoices()->whereIn('id', $ids)->get();
 
         if ($invoices->isEmpty()) {
             return response()->json([
@@ -530,210 +526,140 @@ class InvoiceController extends Controller
             ], 422);
         }
 
-        $sender = $this->resolveSender($request->input('sender_id'));
-        $successCount = 0;
-        $failedCount = 0;
-
-        foreach ($invoices as $invoice) {
-            $email = $invoice->email ?? $invoice->draft?->email;
-            $rawWhatsapp = $invoice->whatsapp ?? $invoice->draft?->whatsapp;
-            $whatsapp = $this->whatsAppService->formatPhone($rawWhatsapp);
-
-            $hasEmail = ! empty($email) && filter_var($email, FILTER_VALIDATE_EMAIL);
-            $hasWhatsapp = ! empty($whatsapp);
-
-            if (! $hasEmail && ! $hasWhatsapp) {
-                $failedCount++;
-
-                continue;
-            }
-
-            $sentAny = false;
-            $updates = [];
-
-            if ($hasEmail && ! $invoice->email_sent_at) {
-                try {
-                    if ($this->googleMailService->isConnected()) {
-                        $this->googleMailService->sendInvoiceMail(
-                            invoice: $invoice,
-                            sender: $sender,
-                            to: $email
-                        );
-                    } else {
-                        Mail::to($email)->send(new InvoiceMail(
-                            invoice: $invoice,
-                            senderEmail: $sender->email,
-                            senderName: $sender->name
-                        ));
-                    }
-
-                    $updates['email_sent_at'] = now();
-                    $updates['email'] = $email;
-
-                    EmailLog::create([
-                        'invoice_id' => $invoice->id,
-                        'invoice_number' => $invoice->invoice_number,
-                        'sender_email' => $sender->email,
-                        'sender_name' => $sender->name,
-                        'recipient_email' => $email,
-                        'status' => 'sent',
-                    ]);
-
-                    $sentAny = true;
-                } catch (Exception $e) {
-                    EmailLog::create([
-                        'invoice_id' => $invoice->id,
-                        'invoice_number' => $invoice->invoice_number,
-                        'sender_email' => $sender->email,
-                        'sender_name' => $sender->name,
-                        'recipient_email' => $email,
-                        'status' => 'failed',
-                        'error_message' => $e->getMessage(),
-                    ]);
-                }
-            }
-
-            if ($hasWhatsapp && ! $invoice->whatsapp_sent_at) {
-                $waResult = $this->whatsAppService->sendInvoiceMessage($invoice, $whatsapp);
-                if ($waResult['success']) {
-                    $updates['whatsapp_sent_at'] = now();
-                    $updates['whatsapp'] = $whatsapp;
-                    $sentAny = true;
-                }
-            }
-
-            if ($sentAny) {
-                $updates['status'] = 'sent';
-                $invoice->update($updates);
-                $successCount++;
-            } else {
-                $failedCount++;
-            }
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => "Pengiriman selesai: {$successCount} invoice berhasil dikirim".($failedCount > 0 ? ", {$failedCount} gagal." : '.'),
-            'sent' => $successCount,
-            'failed' => $failedCount,
-        ]);
+        return $this->sendInvoices($invoices, $this->resolveSender($request->input('sender_id')), $regionSender);
     }
 
     /**
-     * Batch send all unsent invoices that have an email or WhatsApp number.
+     * Send every unsent invoice: email to each dealer, WhatsApp to telemarketing as one PDF per region.
      */
-    public function quickSendAll(Request $request): JsonResponse
+    public function quickSendAll(Request $request, InvoiceRegionSender $regionSender): JsonResponse
     {
-        $invoices = Invoice::with('draft')
-            ->where(function ($q) {
-                $q->whereNull('email_sent_at')
-                    ->orWhereNull('whatsapp_sent_at');
-            })
-            ->where('status', '!=', 'sent')
-            ->where(function ($q) {
-                $q->where(function ($sub) {
-                    $sub->whereNotNull('email')->where('email', '!=', '');
-                })->orWhere(function ($sub) {
-                    $sub->whereNotNull('whatsapp')->where('whatsapp', '!=', '');
-                })->orWhereHas('draft', fn ($sq) => $sq->where(function ($sub2) {
-                    $sub2->whereNotNull('email')->where('email', '!=', '')
-                        ->orWhereNotNull('whatsapp')->where('whatsapp', '!=', '');
-                }));
-            })
-            ->get();
+        $invoices = $this->unsentInvoices()->get();
 
         if ($invoices->isEmpty()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Tidak ada invoice yang belum dikirim dengan data email atau WhatsApp tersedia.',
+                'message' => 'Tidak ada invoice yang belum dikirim.',
             ], 422);
         }
 
-        $sender = $this->resolveSender($request->input('sender_id'));
-        $successCount = 0;
-        $failedCount = 0;
+        return $this->sendInvoices($invoices, $this->resolveSender($request->input('sender_id')), $regionSender);
+    }
 
-        foreach ($invoices as $invoice) {
-            $email = $invoice->email ?? $invoice->draft?->email;
-            $rawWhatsapp = $invoice->whatsapp ?? $invoice->draft?->whatsapp;
-            $whatsapp = $this->whatsAppService->formatPhone($rawWhatsapp);
+    /**
+     * Invoices not sent yet (no email or no WhatsApp sent so far), in the order they were generated.
+     *
+     * @return Builder<Invoice>
+     */
+    private function unsentInvoices(): Builder
+    {
+        return Invoice::with('draft')
+            ->where(fn (Builder $q) => $q->whereNull('email_sent_at')->orWhereNull('whatsapp_sent_at'))
+            ->where('status', '!=', 'sent')
+            ->orderBy('id');
+    }
 
-            $hasEmail = ! empty($email) && filter_var($email, FILTER_VALIDATE_EMAIL);
-            $hasWhatsapp = ! empty($whatsapp);
+    /**
+     * Email each invoice to its dealer (the draft's Email), and WhatsApp the invoices to telemarketing: the invoices of
+     * one region with the same telemarketing number go together as one PDF, one invoice per page. A channel already
+     * sent for an invoice is skipped.
+     *
+     * @param  Collection<int, Invoice>  $invoices
+     */
+    private function sendInvoices(Collection $invoices, EmailAccount $sender, InvoiceRegionSender $regionSender): JsonResponse
+    {
+        $updates = [];
+        $emailFailed = [];
 
-            if (! $hasEmail && ! $hasWhatsapp) {
+        foreach ($invoices->whereNull('email_sent_at') as $invoice) {
+            $email = $invoice->email ?: $invoice->draft?->email;
+
+            if (! $email || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 continue;
             }
 
-            $sentAny = false;
-            $updates = [];
-
-            if ($hasEmail && ! $invoice->email_sent_at) {
-                try {
-                    if ($this->googleMailService->isConnected()) {
-                        $this->googleMailService->sendInvoiceMail(
-                            invoice: $invoice,
-                            sender: $sender,
-                            to: $email
-                        );
-                    } else {
-                        Mail::to($email)->send(new InvoiceMail(
-                            invoice: $invoice,
-                            senderEmail: $sender->email,
-                            senderName: $sender->name
-                        ));
-                    }
-
-                    $updates['email_sent_at'] = now();
-                    $updates['email'] = $email;
-
-                    EmailLog::create([
-                        'invoice_id' => $invoice->id,
-                        'invoice_number' => $invoice->invoice_number,
-                        'sender_email' => $sender->email,
-                        'sender_name' => $sender->name,
-                        'recipient_email' => $email,
-                        'status' => 'sent',
-                    ]);
-
-                    $sentAny = true;
-                } catch (Exception $e) {
-                    EmailLog::create([
-                        'invoice_id' => $invoice->id,
-                        'invoice_number' => $invoice->invoice_number,
-                        'sender_email' => $sender->email,
-                        'sender_name' => $sender->name,
-                        'recipient_email' => $email,
-                        'status' => 'failed',
-                        'error_message' => $e->getMessage(),
-                    ]);
-                }
-            }
-
-            if ($hasWhatsapp && ! $invoice->whatsapp_sent_at) {
-                $waResult = $this->whatsAppService->sendInvoiceMessage($invoice, $whatsapp);
-                if ($waResult['success']) {
-                    $updates['whatsapp_sent_at'] = now();
-                    $updates['whatsapp'] = $whatsapp;
-                    $sentAny = true;
-                }
-            }
-
-            if ($sentAny) {
-                $updates['status'] = 'sent';
-                $invoice->update($updates);
-                $successCount++;
+            if ($this->emailInvoice($invoice, $sender, $email)) {
+                $updates[$invoice->id] = ['email_sent_at' => now(), 'email' => $email];
             } else {
-                $failedCount++;
+                $emailFailed[] = $invoice->invoice_number;
             }
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => "Proses pengiriman selesai: {$successCount} terkirim, {$failedCount} gagal.",
-            'sent' => $successCount,
-            'failed' => $failedCount,
+        $whatsApp = $regionSender->send($invoices->whereNull('whatsapp_sent_at')->values());
+
+        foreach (array_keys($whatsApp['sent']) as $invoiceId) {
+            $updates[$invoiceId] = [...($updates[$invoiceId] ?? []), 'whatsapp_sent_at' => now()];
+        }
+
+        foreach ($invoices->whereIn('id', array_keys($updates)) as $invoice) {
+            $invoice->update([...$updates[$invoice->id], 'status' => 'sent']);
+        }
+
+        $files = collect($whatsApp['files']);
+        $emailed = count(array_filter($updates, fn (array $update) => isset($update['email_sent_at'])));
+
+        $message = array_filter([
+            'Pengiriman selesai: '.count($updates)." dari {$invoices->count()} invoice terkirim.",
+            $emailed > 0 ? "Email ke dealer: {$emailed} terkirim." : null,
+            $emailFailed ? 'Email gagal: '.$this->invoiceNumberList($emailFailed).'.' : null,
+            $files->where('success', true)->isNotEmpty()
+                ? 'WhatsApp ke telemarketing: '.$files->where('success', true)->map(fn (array $file) => "Region {$file['region']} ({$file['count']} invoice, 1 PDF)")->implode(', ').'.'
+                : null,
+            ...$files->where('success', false)->map(fn (array $file) => "WhatsApp Region {$file['region']} gagal: {$file['message']}")->all(),
+            $whatsApp['without_phone']
+                ? 'Nomor WA telemarketing belum ada di Master Dealer untuk invoice: '.$this->invoiceNumberList($whatsApp['without_phone']).'.'
+                : null,
         ]);
+
+        return response()->json([
+            'success' => $updates !== [],
+            'message' => implode(' ', $message),
+            'sent' => count($updates),
+            'failed' => $invoices->count() - count($updates),
+            'whatsapp_files' => $whatsApp['files'],
+        ], $updates !== [] ? 200 : 422);
+    }
+
+    /**
+     * Email an invoice to its dealer (via Gmail API when connected), recorded in the email history.
+     */
+    private function emailInvoice(Invoice $invoice, EmailAccount $sender, string $email): bool
+    {
+        try {
+            if ($this->googleMailService->isConnected()) {
+                $this->googleMailService->sendInvoiceMail(invoice: $invoice, sender: $sender, to: $email);
+            } else {
+                Mail::to($email)->send(new InvoiceMail(invoice: $invoice, senderEmail: $sender->email, senderName: $sender->name));
+            }
+
+            $error = null;
+        } catch (Exception $e) {
+            $error = $e->getMessage();
+        }
+
+        EmailLog::create([
+            'invoice_id' => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+            'sender_email' => $sender->email,
+            'sender_name' => $sender->name,
+            'recipient_email' => $email,
+            'status' => $error === null ? 'sent' : 'failed',
+            'error_message' => $error,
+        ]);
+
+        return $error === null;
+    }
+
+    /**
+     * A short list of invoice numbers for a message: the first five, then how many more.
+     *
+     * @param  list<string>  $invoiceNumbers
+     */
+    private function invoiceNumberList(array $invoiceNumbers): string
+    {
+        $more = count($invoiceNumbers) - 5;
+
+        return implode(', ', array_slice($invoiceNumbers, 0, 5)).($more > 0 ? " dan {$more} lainnya" : '');
     }
 
     /**

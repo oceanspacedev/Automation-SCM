@@ -134,7 +134,7 @@ class DealerImportTest extends TestCase
         Dealer::create([
             'area' => 'jabar', 'kode_bt' => 'BT02657', 'dealer_name' => 'AWEI CELL', 'id_realme' => 'DLAA0001', 'npwp' => '3277030808650024',
             'npwp_type' => 'PRIBADI', 'telemarketing' => 'AKHMAD ZULFIKAR', 'telemarketing_phone' => '087778888837', 'region' => 'BIG BANDUNG', 'is_active' => false,
-            'agreement_url' => $agreement,
+            'agreement_url' => $agreement, 'email' => 'awei.cell@gmail.com',
         ]);
         Dealer::create(['area' => 'jateng', 'kode_bt' => 'BT03000', 'dealer_name' => 'TOKO SOLO', 'region' => 'BIG SOLO']);
 
@@ -144,10 +144,11 @@ class DealerImportTest extends TestCase
         $this->assertCount(2, $rows);
         $this->assertSame(['BT02657', 'AWEI CELL', 'DLAA0001', 'Disabled', '3277030808650024', '087778888837', 'BIG BANDUNG'], [$rows[1][0], $rows[1][1], $rows[1][4], $rows[1][6], $rows[1][7], $rows[1][12], $rows[1][13]]);
 
-        // Agreement di kolom terakhir: teks pendek "Link AGR" yang membuka dokumennya
+        // Email lalu Agreement di kolom terakhir: agreement berupa teks pendek "Link AGR" yang membuka dokumennya
+        $this->assertSame(['Email', 'awei.cell@gmail.com'], [$rows[0][15], $rows[1][15]]);
         $file = $this->saveDownloadedSpreadsheet($this->get('/api/dealers/export?area=jabar'));
-        $agreementCell = IOFactory::load($file)->getActiveSheet()->getCell('P2');
-        $this->assertSame('Agreement', $rows[0][15]);
+        $agreementCell = IOFactory::load($file)->getActiveSheet()->getCell('Q2');
+        $this->assertSame('Agreement', $rows[0][16]);
         $this->assertSame('Link AGR', $agreementCell->getValue());
         $this->assertSame($agreement, $agreementCell->getHyperlink()->getUrl());
 
@@ -157,7 +158,7 @@ class DealerImportTest extends TestCase
             ->assertJsonPath('status.result.imported', 1)
             ->assertJsonPath('status.result.skipped', []);
 
-        $this->assertDatabaseHas('dealers', ['kode_bt' => 'BT02657', 'area' => 'jabar', 'npwp' => '3277030808650024', 'telemarketing_phone' => '087778888837', 'is_active' => false, 'agreement_url' => $agreement]);
+        $this->assertDatabaseHas('dealers', ['kode_bt' => 'BT02657', 'area' => 'jabar', 'npwp' => '3277030808650024', 'telemarketing_phone' => '087778888837', 'is_active' => false, 'agreement_url' => $agreement, 'email' => 'awei.cell@gmail.com']);
         $this->assertDatabaseHas('dealers', ['kode_bt' => 'BT03000', 'area' => 'jateng']);
     }
 

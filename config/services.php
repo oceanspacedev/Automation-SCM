@@ -44,6 +44,11 @@ return [
         'telemarketing_phone' => env('TELEMARKETING_DEFAULT_PHONE', env('AR_DEFAULT_PHONE', '081224290502')),
     ],
 
+    // Alamat Form Program publik untuk dealer: link upload dokumen di email & WA invoice jadi <url>/form/<brand>/<area>
+    'program_form' => [
+        'url' => env('PROGRAM_FORM_URL', 'https://scm-customer.oceanspace.co.id'),
+    ],
+
     // WA ke telemarketing (program:notify-telemarketing): jamnya diatur di Master Jadwal Otomatis;
     // AUTO_MATCH_SEND_WA=false mematikan WhatsApp ke telemarketing apa pun pengaturan di master
     'auto_match' => [

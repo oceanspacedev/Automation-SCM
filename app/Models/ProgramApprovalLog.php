@@ -13,7 +13,8 @@ use Throwable;
 
 /**
  * One step of the approval flow of a Data Program row: WhatsApp to telemarketing (and reminders while the dealer has
- * not approved), the dealer's approval or postponement (through the telemarketing's link), WhatsApp to AR, and the cut by AR.
+ * not approved), the dealer's approval or postponement (through the telemarketing's link), WhatsApp to AR, the cut by
+ * AR, WhatsApp to the tax team and their tax check (through their link), then the result's WhatsApp to the SCM team.
  */
 class ProgramApprovalLog extends Model
 {
@@ -32,6 +33,12 @@ class ProgramApprovalLog extends Model
 
     public const CUT = 'cut';
 
+    public const TAX_NOTIFIED = 'tax_notified';
+
+    public const TAX_CHECKED = 'tax_checked';
+
+    public const SCM_NOTIFIED = 'scm_notified';
+
     /**
      * Who acted through a WhatsApp confirmation link, by the link's role.
      *
@@ -40,6 +47,7 @@ class ProgramApprovalLog extends Model
     public const LINK_ACTORS = [
         'telemarketing' => 'Telemarketing (link WA)',
         'ar' => 'AR (link WA)',
+        'pajak' => 'Tim Pajak (link WA)',
     ];
 
     public const AUTOMATIC = 'Otomatis';
@@ -72,6 +80,16 @@ class ProgramApprovalLog extends Model
         $contact = ArContact::forRegion($dataProgram->areaEnum(), $dataProgram->region, $dataProgram->big_region);
 
         return $contact ? trim("{$contact->name} {$contact->whatsapp}") : 'AR default';
+    }
+
+    /**
+     * Who a WhatsApp to the tax or SCM team about the row goes to: the given number, else the area's team in Master AR.
+     */
+    public static function teamRecipient(DataProgram $dataProgram, string $team, ?string $phone = null): ?string
+    {
+        $contact = AppSetting::teamContact($dataProgram->areaEnum(), $team);
+
+        return trim(($contact['name'] ?? '').' '.($phone ?: ($contact['whatsapp'] ?? ''))) ?: null;
     }
 
     /**

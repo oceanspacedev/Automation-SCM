@@ -101,6 +101,9 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         // Master AR (per region, per area)
         Route::get('/ar-contacts', [ArContactController::class, 'index']);
         Route::get('/ar-contacts/export', [ArContactController::class, 'export']);
+        // Tim Pajak & Tim SCM per area (/ar-contacts/tax-team, /ar-contacts/scm-team)
+        Route::get('/ar-contacts/{team}-team', [ArContactController::class, 'teamContact'])->whereIn('team', ['tax', 'scm']);
+        Route::put('/ar-contacts/{team}-team', [ArContactController::class, 'updateTeamContact'])->whereIn('team', ['tax', 'scm']);
         Route::post('/ar-contacts', [ArContactController::class, 'store']);
         Route::put('/ar-contacts/{id}', [ArContactController::class, 'update']);
         Route::delete('/ar-contacts/{id}', [ArContactController::class, 'destroy']);
@@ -205,6 +208,8 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         Route::post('/data-program/{id}/reconcile', [DataProgramController::class, 'reconcileRow']);
         Route::post('/data-program/{id}/send-wa-telemarketing', [DataProgramController::class, 'sendWaToTelemarketing']);
         Route::post('/data-program/{id}/send-wa-ar', [DataProgramController::class, 'sendWaToAr']);
+        Route::post('/data-program/{id}/send-wa-tax', [DataProgramController::class, 'sendWaToTax']);
+        Route::post('/data-program/{id}/send-wa-scm', [DataProgramController::class, 'sendWaToScm']);
         Route::get('/data-program/reconcile-stats', [DataProgramController::class, 'reconcileStats']);
         Route::get('/data-program/reconciliation-logs', [DataProgramController::class, 'reconciliationLogs']);
         Route::get('/data-program/approval-history', [ProgramApprovalController::class, 'index']);

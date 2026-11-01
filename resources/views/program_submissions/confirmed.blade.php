@@ -47,6 +47,13 @@
             @elseif($action === 'potong')
                 <h1 class="text-base font-semibold text-gray-900">Konfirmasi Berhasil!</h1>
                 <p class="text-sm text-gray-500 mt-1">Status klaim program dealer telah berhasil diperbarui di sistem SCM.</p>
+
+                @if(isset($taxNotification))
+                    <div class="mt-3 p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700">
+                        <p class="font-medium text-gray-900">{{ ($taxNotification['success'] ?? false) ? 'WhatsApp Terkirim ke Tim Pajak' : 'WhatsApp ke Tim Pajak Gagal Terkirim' }}</p>
+                        <p class="text-xs text-gray-500 mt-0.5">{{ $taxNotification['message'] ?? '' }}{{ ($taxNotification['success'] ?? false) ? '' : ' Bisa dikirim ulang dari menu Riwayat Approval.' }}</p>
+                    </div>
+                @endif
             @else
                 <h1 class="text-base font-semibold text-gray-900">Klaim Ditunda</h1>
                 <p class="text-sm text-gray-500 mt-1">Status dicatat sebagai pending. Anda dapat menawarkannya kembali pada pesanan dealer berikutnya.</p>

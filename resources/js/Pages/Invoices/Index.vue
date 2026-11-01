@@ -55,7 +55,7 @@
           @click="askSendAll"
           :disabled="sendingAll"
           :class="headerButtonClass"
-          title="Kirim semua invoice yang belum terkirim via Email & WhatsApp"
+          title="Kirim semua invoice yang belum terkirim: Email ke dealer, WhatsApp ke telemarketing per region"
         >
           <span class="sm:hidden">{{ sendingAll ? 'Mengirim...' : 'Kirim Semua' }}</span>
           <span class="hidden sm:inline">{{ sendingAll ? 'Mengirim Semua...' : 'Kirim Semua Notifikasi' }}</span>
@@ -216,7 +216,7 @@
                 type="checkbox"
                 :value="inv.id"
                 v-model="selectedIds"
-                :disabled="isAlreadySent(inv) || !hasDestination(inv)"
+                :disabled="isAlreadySent(inv)"
                 class="mt-0.5 rounded border-gray-300 text-gray-900 focus:ring-0 w-4 h-4 cursor-pointer disabled:opacity-30 shrink-0"
               />
               <div class="flex-1 min-w-0 space-y-2">
@@ -355,9 +355,9 @@
                   type="checkbox"
                   :value="inv.id"
                   v-model="selectedIds"
-                  :disabled="isAlreadySent(inv) || !hasDestination(inv)"
+                  :disabled="isAlreadySent(inv)"
                   class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer disabled:opacity-30"
-                  :title="isAlreadySent(inv) ? 'Sudah dikirim' : (!hasDestination(inv) ? 'Tidak ada email atau nomor WhatsApp' : 'Pilih invoice ini')"
+                  :title="isAlreadySent(inv) ? 'Sudah dikirim' : 'Pilih invoice ini'"
                 />
               </td>
 
@@ -549,6 +549,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import AreaTabs from '@/components/AreaTabs.vue';
 import { useArea } from '@/composables/useArea';
 import { useBrands } from '@/composables/useBrands';
+import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
 import SendEmailModal from '@/components/SendEmailModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
@@ -640,12 +641,9 @@ const isAlreadySent = (inv) => {
   return inv.status === 'sent' || (!!inv.email_sent_at && !!inv.whatsapp_sent_at);
 };
 
-const hasDestination = (inv) => {
-  return !!(inv.email || inv.draft?.email || inv.whatsapp || inv.draft?.whatsapp);
-};
-
+// WA dikirim ke telemarketing toko (Master Dealer), jadi invoice tanpa email tetap bisa dipilih
 const selectableInvoices = computed(() => {
-  return invoices.value.filter(inv => hasDestination(inv) && !isAlreadySent(inv));
+  return invoices.value.filter(inv => !isAlreadySent(inv));
 });
 
 const isAllSelected = computed(() => {
@@ -733,7 +731,7 @@ const quickSendInvoice = async (inv) => {
 const askSendBatch = () => {
   if (selectedIds.value.length === 0 || sendingBatch.value) return;
   confirmState.title = 'Kirim Batch Notifikasi (Email & WA)';
-  confirmState.message = `Apakah Anda yakin ingin mengirim ${selectedIds.value.length} invoice terpilih ke alamat Email dan WhatsApp tujuan masing-masing?`;
+  confirmState.message = `Kirim ${selectedIds.value.length} invoice terpilih? Email dikirim ke masing-masing dealer. WhatsApp dikirim ke telemarketing per region: invoice satu region digabung jadi satu PDF (satu invoice per halaman).`;
   confirmState.confirmText = `Ya, Kirim (${selectedIds.value.length}) Invoice`;
   confirmState.showSenderSelect = true;
   confirmState.action = async () => {
@@ -772,7 +770,7 @@ const executeSendBatch = async () => {
 const askSendAll = () => {
   if (sendingAll.value) return;
   confirmState.title = 'Kirim Semua Notifikasi Invoice';
-  confirmState.message = 'Apakah Anda yakin ingin mengirim semua invoice yang belum terkirim via Email dan WhatsApp?';
+  confirmState.message = 'Kirim semua invoice yang belum terkirim? Email dikirim ke masing-masing dealer. WhatsApp dikirim ke telemarketing per region: invoice satu region digabung jadi satu PDF (satu invoice per halaman).';
   confirmState.confirmText = 'Ya, Kirim Semua';
   confirmState.showSenderSelect = true;
   confirmState.action = async () => {
@@ -859,8 +857,11 @@ const debounceFetch = () => {
   }, 300);
 };
 
-const fetchInvoices = async (page = 1) => {
-  loading.value = true;
+const startInvoicesRequest = createRequestTracker();
+
+const fetchInvoices = async (page = 1, { silent = false } = {}) => {
+  const isLatest = startInvoicesRequest();
+  if (!silent) loading.value = true;
   try {
     const params = {
       page,
@@ -868,6 +869,7 @@ const fetchInvoices = async (page = 1) => {
       ...filters,
     };
     const res = await axios.get('/api/invoices', { params });
+    if (!isLatest()) return;
     invoices.value = res.data.data;
     pagination.current_page = res.data.current_page;
     pagination.last_page = res.data.last_page;
@@ -876,9 +878,14 @@ const fetchInvoices = async (page = 1) => {
   } catch (err) {
     console.error('Error fetching invoices', err);
   } finally {
-    loading.value = false;
+    if (!silent && isLatest()) loading.value = false;
   }
 };
+
+// Daftar invoice dimuat ulang otomatis; berhenti selama modal terbuka atau pengiriman berjalan
+useAutoRefresh(() => fetchInvoices(pagination.current_page, { silent: true }), {
+  isPaused: () => loading.value || showEmailModal.value || confirmState.show || sendingAll.value || sendingBatch.value || sendingId.value !== null,
+});
 
 const resetFilters = () => {
   filters.search = '';

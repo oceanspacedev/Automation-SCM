@@ -490,6 +490,7 @@
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { useAuth } from '@/composables/useAuth';
+import { useAutoRefresh } from '@/composables/useAutoRefresh';
 import {
   ChevronRightIcon,
   ChevronDownIcon,
@@ -601,8 +602,8 @@ const handleRoleChange = () => {
 };
 
 // Fetch Data
-const fetchUsers = async () => {
-  isLoading.value = true;
+const fetchUsers = async ({ silent = false } = {}) => {
+  if (!silent) isLoading.value = true;
   try {
     const res = await axios.get('/api/users');
     if (res.data?.success) {
@@ -613,12 +614,17 @@ const fetchUsers = async () => {
   } catch (err) {
     console.error('Gagal memuat master user:', err);
   } finally {
-    isLoading.value = false;
+    if (!silent) isLoading.value = false;
   }
 };
 
 onMounted(() => {
   fetchUsers();
+});
+
+// Pendaftar baru (Menunggu ACC) muncul sendiri; berhenti selama form user terbuka
+useAutoRefresh(() => fetchUsers({ silent: true }), {
+  isPaused: () => isLoading.value || isModalOpen.value || userToDelete.value !== null || isSaving.value || isDeleting.value,
 });
 
 // Modal Actions

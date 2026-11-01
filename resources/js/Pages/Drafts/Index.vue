@@ -662,6 +662,7 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
 import ImportModal from '@/components/ImportModal.vue';
 import CreateDraftModal from '@/components/CreateDraftModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
@@ -822,8 +823,11 @@ const debounceFetch = () => {
   }, 300);
 };
 
-const fetchDrafts = async (page = 1) => {
-  loading.value = true;
+const startDraftsRequest = createRequestTracker();
+
+const fetchDrafts = async (page = 1, { silent = false } = {}) => {
+  const isLatest = startDraftsRequest();
+  if (!silent) loading.value = true;
   try {
     const params = {
       page,
@@ -831,6 +835,7 @@ const fetchDrafts = async (page = 1) => {
       ...filters,
     };
     const res = await axios.get('/api/drafts', { params });
+    if (!isLatest()) return;
     drafts.value = res.data.data;
     pagination.current_page = res.data.current_page;
     pagination.last_page = res.data.last_page;
@@ -839,9 +844,15 @@ const fetchDrafts = async (page = 1) => {
   } catch (err) {
     console.error('Error fetching drafts', err);
   } finally {
-    loading.value = false;
+    if (!silent && isLatest()) loading.value = false;
   }
 };
+
+// Daftar draft dimuat ulang otomatis; berhenti selama modal terbuka atau generate / kirim ulang berjalan
+useAutoRefresh(() => fetchDrafts(pagination.current_page, { silent: true }), {
+  isPaused: () => loading.value || showImportModal.value || showCreateModal.value || confirmState.show || generateModalState.show
+    || generatingId.value !== null || generatingBatch.value || generatingAll.value || pushingId.value !== null || pushingBatch.value,
+});
 
 const resetFilters = () => {
   filters.search = '';

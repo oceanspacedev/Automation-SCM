@@ -108,21 +108,26 @@ import { ref, onMounted } from 'vue';
 import axios from 'axios';
 import { ChevronRight as ChevronRightIcon, RefreshCw as RefreshCwIcon } from 'lucide-vue-next';
 import FilamentBadge from '@/components/ui/FilamentBadge.vue';
+import { useAutoRefresh } from '@/composables/useAutoRefresh';
 
 const metrics = ref({});
 const loading = ref(true);
 
-const fetchMetrics = async () => {
-  loading.value = true;
+const fetchMetrics = async ({ silent = false } = {}) => {
+  if (!silent) loading.value = true;
   try {
     const res = await axios.get('/api/dashboard');
     metrics.value = res.data;
   } catch (err) {
     console.error('Error fetching dashboard metrics', err);
   } finally {
-    loading.value = false;
+    if (!silent) loading.value = false;
   }
 };
+
+useAutoRefresh(() => fetchMetrics({ silent: true }), {
+  isPaused: () => loading.value,
+});
 
 const formatCurrency = (val) => {
   return new Intl.NumberFormat('id-ID').format(val || 0);

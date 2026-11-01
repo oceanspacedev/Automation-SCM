@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AppSetting;
 use App\Models\ArContact;
 use App\Services\AreaContext;
 use App\Services\SpreadsheetExport;
@@ -111,6 +112,43 @@ class ArContactController extends Controller
             'success' => true,
             'message' => 'Status AR berhasil diubah menjadi: '.($arContact->is_active ? 'Aktif' : 'Nonaktif'),
             'data' => $arContact,
+        ]);
+    }
+
+    /**
+     * The selected area's tax team (WhatsApp to check the PPh after AR cuts a claim) or SCM team (WhatsApp with the
+     * result of that check); the route's {team} is "tax" or "scm".
+     */
+    public function teamContact(string $team): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => AppSetting::teamContact($this->areaContext->resolve(), "{$team}_team"),
+        ]);
+    }
+
+    public function updateTeamContact(Request $request, string $team): JsonResponse
+    {
+        $area = $this->areaContext->resolve();
+
+        $request->merge([
+            'name' => trim((string) $request->input('name')),
+            'whatsapp' => trim((string) $request->input('whatsapp')),
+        ]);
+
+        $validated = $request->validate([
+            'name' => ['nullable', 'string', 'max:255'],
+            'whatsapp' => ['nullable', 'string', 'max:30', 'regex:/^\+?[\d\s\-]{8,}$/'],
+        ], [
+            'whatsapp.regex' => 'No WhatsApp hanya boleh berisi angka (boleh diawali +62 atau 08).',
+        ]);
+
+        AppSetting::writeTeamContact($area, "{$team}_team", $validated['name'] ?? null, $validated['whatsapp'] ?? null);
+
+        return response()->json([
+            'success' => true,
+            'message' => ($team === 'scm' ? 'Tim SCM' : 'Tim Pajak').' disimpan.',
+            'data' => AppSetting::teamContact($area, "{$team}_team"),
         ]);
     }
 

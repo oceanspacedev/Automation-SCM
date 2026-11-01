@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AppSetting;
 use App\Models\DataProgram;
 use App\Models\ProgramApprovalLog;
 use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
 use App\Services\DataProgramSyncService;
+use App\Services\ProgramApprovalFlow;
 use App\Services\ProgramReconciliationService;
 use App\Services\WhatsAppService;
 use Carbon\Carbon;
@@ -609,7 +611,7 @@ class DataProgramController extends Controller
         $sheetPushResult = null;
         if ($pushToSheet) {
             try {
-                $sheetPushResult = $this->syncService->pushUpdatesToSpreadsheet([$this->spreadsheetRow($dp)], null, $dp->areaEnum(), $dp->brand);
+                $sheetPushResult = $this->syncService->pushUpdatesToSpreadsheet([$this->syncService->spreadsheetRow($dp)], null, $dp->areaEnum(), $dp->brand);
             } catch (\Throwable $e) {
                 Log::warning("Push single row update to spreadsheet failed: {$e->getMessage()}");
             }
@@ -649,7 +651,7 @@ class DataProgramController extends Controller
         foreach ($dataPrograms->groupBy(fn (DataProgram $dp) => $dp->brand.'|'.$dp->areaEnum()->value) as $areaRows) {
             try {
                 $sheetPushResults[] = $this->syncService->pushUpdatesToSpreadsheet(
-                    $areaRows->map(fn (DataProgram $dp) => $this->spreadsheetRow($dp))->values()->all(),
+                    $areaRows->map(fn (DataProgram $dp) => $this->syncService->spreadsheetRow($dp))->values()->all(),
                     null,
                     $areaRows->first()->areaEnum(),
                     $areaRows->first()->brand
@@ -777,77 +779,6 @@ class DataProgramController extends Controller
     }
 
     /**
-     * A Data Program row in the shape the spreadsheet's Apps Script "update_rows" action expects.
-     *
-     * @return array<string, mixed>
-     */
-    private function spreadsheetRow(DataProgram $dp): array
-    {
-        $rowIndex = str_starts_with((string) $dp->row_hash, 'row_') ? (int) str_replace('row_', '', (string) $dp->row_hash) : 0;
-
-        return [
-            'row_index' => $rowIndex > 0 ? $rowIndex : null,
-            'kode_bt' => $dp->kode_bt,
-            'dealer_name' => $dp->dealer_name,
-            'program' => $dp->program,
-            'program_name' => $dp->program_name,
-            'periode' => $dp->periode,
-            'region' => $dp->region,
-            'no_po' => $dp->no_po,
-            'id_gs' => $dp->id_gs,
-            'kode_supplier' => $dp->kode_supplier,
-            'status_dl' => $dp->status_dl,
-            'sales_person' => $dp->sales_person,
-            'telemarketing' => $dp->telemarketing,
-            'wajib_pajak' => $dp->wajib_pajak,
-            'trf_pph' => $dp->trf_pph,
-            'incentive' => $dp->incentive,
-            'dpp' => $dp->dpp,
-            'dpp_lain' => $dp->dpp_lain,
-            'ppn' => $dp->ppn,
-            'nilai_pph' => $dp->nilai_pph,
-            'net_pay' => $dp->net_pay,
-            'cek_pajak_tarif' => $dp->cek_pajak_tarif,
-            'selisih' => $dp->selisih,
-            'note_pph' => $dp->note_pph,
-            'no_faktur_pajak' => $dp->no_faktur_pajak,
-            'ket_faktur_pajak' => $dp->ket_faktur_pajak,
-            'no_po_sj' => $dp->no_po_sj,
-            'no_transaksi' => $dp->no_transaksi,
-            'tgl_input' => $dp->tgl_input,
-            'tgl_share_cn' => $dp->tgl_share_cn,
-            'lama_pending' => $dp->lama_pending,
-            'status_potong_purchase' => $dp->status_potong_purchase,
-            'status_potong_ar' => $dp->status_potong_ar,
-            'tgl_potong_tf' => $dp->tgl_potong_tf,
-            'no_uid' => $dp->no_uid,
-            'no_pembayaran' => $dp->no_pembayaran,
-            'tgl_input_bank_pph' => $dp->tgl_input_bank_pph,
-            'tf_status' => $dp->tf_status,
-            'tgl_proses' => $dp->tgl_proses,
-            'tgl_sj' => $dp->tgl_sj,
-            'no_sj' => $dp->no_sj,
-            'info_bank' => $dp->info_bank,
-            'pending_potongan' => $dp->pending_potongan,
-            'npwp' => $dp->npwp,
-            'nama_npwp' => $dp->nama_npwp,
-            'program_2' => $dp->program_2,
-            'cek_dokumen' => $dp->cek_dokumen,
-            'keterangan' => $dp->keterangan,
-            'cn' => $dp->cn,
-            'agrement' => $dp->agrement,
-            'cek_fp' => $dp->cek_fp,
-            'cek_evidance' => $dp->cek_evidance,
-            'noted' => $dp->noted,
-            'norek' => $dp->norek,
-            'namrek' => $dp->namrek,
-            'bank' => $dp->bank,
-            'big_region' => $dp->big_region,
-            'values' => $this->syncService->convertDataProgramToRowArray($dp),
-        ];
-    }
-
-    /**
      * Send WhatsApp notification to Telemarketing for DataProgram claim offer.
      */
     public function sendWaToTelemarketing(Request $request, int $id): JsonResponse
@@ -893,6 +824,75 @@ class DataProgramController extends Controller
         $result = $this->waService->sendDataProgramClaimNotificationToAr($dp, $phone);
         ProgramApprovalLog::record($dp, ProgramApprovalLog::AR_NOTIFIED, $result['success'],
             actor: $request->user()?->email, recipient: ProgramApprovalLog::arRecipient($dp, $phone), note: $result['message']);
+
+        if (! $result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+            'provider_id' => $result['provider_id'] ?? null,
+        ]);
+    }
+
+    /**
+     * Ask the tax team (again) to check the PPh of a row AR has cut, e.g. when the automatic WhatsApp failed or the row
+     * was cut before the tax check existed.
+     */
+    public function sendWaToTax(Request $request, int $id, ProgramApprovalFlow $flow): JsonResponse
+    {
+        $dp = DataProgram::findOrFail($id);
+        $phone = $request->input('phone');
+
+        if (! in_array($flow->stage($dp), ['cut', 'tax_checked'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Baris ini belum dipotong AR, jadi belum perlu dicek Tim Pajak.',
+            ], 422);
+        }
+
+        $result = $this->waService->sendDataProgramTaxCheckNotification($dp, $phone);
+        ProgramApprovalLog::record($dp, ProgramApprovalLog::TAX_NOTIFIED, $result['success'],
+            actor: $request->user()?->email, recipient: ProgramApprovalLog::teamRecipient($dp, AppSetting::TAX_TEAM, $phone), note: $result['message']);
+
+        if (! $result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
+
+        $dp->forceFill(['tax_notified_at' => now()])->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+            'provider_id' => $result['provider_id'] ?? null,
+        ]);
+    }
+
+    /**
+     * Send (again) the result of a row's tax check to the SCM team, e.g. when the automatic WhatsApp failed.
+     */
+    public function sendWaToScm(Request $request, int $id, ProgramApprovalFlow $flow): JsonResponse
+    {
+        $dp = DataProgram::findOrFail($id);
+        $phone = $request->input('phone');
+
+        if ($flow->stage($dp) !== 'tax_checked') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Baris ini belum dicek Tim Pajak, jadi belum ada hasil untuk Tim SCM.',
+            ], 422);
+        }
+
+        $result = $this->waService->sendDataProgramScmNotification($dp, $phone);
+        ProgramApprovalLog::record($dp, ProgramApprovalLog::SCM_NOTIFIED, $result['success'],
+            actor: $request->user()?->email, recipient: ProgramApprovalLog::teamRecipient($dp, AppSetting::SCM_TEAM, $phone), note: $result['message']);
 
         if (! $result['success']) {
             return response()->json([

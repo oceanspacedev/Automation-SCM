@@ -26,6 +26,8 @@ class DataProgram extends Model
             'selisih' => 'float',
             'telemarketing_notified_at' => 'datetime',
             'telemarketing_reminder_count' => 'integer',
+            'tax_notified_at' => 'datetime',
+            'tax_checked_at' => 'datetime',
             'created_at' => 'datetime',
             'updated_at' => 'datetime',
         ];

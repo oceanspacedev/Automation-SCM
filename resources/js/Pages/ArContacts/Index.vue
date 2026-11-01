@@ -37,6 +37,49 @@
       </div>
     </div>
 
+    <!-- Tim Pajak & Tim SCM: penerima WA cek pajak setelah AR memotong klaim, lalu hasilnya -->
+    <section class="rounded-xl border border-gray-200 bg-white shadow-xs divide-y divide-gray-100">
+      <div
+        v-for="team in TEAMS"
+        :key="team.key"
+        class="p-4 sm:px-5 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6"
+      >
+        <div class="min-w-0 lg:flex-1">
+          <h2 class="text-sm font-semibold text-gray-950">{{ team.label }}</h2>
+          <p class="text-xs text-gray-500 mt-0.5">{{ team.description }}</p>
+          <p v-if="teamMessages[team.key]" class="mt-1.5 text-xs" :class="teamMessages[team.key].error ? 'text-red-600' : 'text-emerald-700'">
+            {{ teamMessages[team.key].text }}
+          </p>
+          <p v-else-if="!isLoading && !savedTeamWhatsapp[team.key]" class="mt-1.5 text-xs text-amber-700">
+            No WhatsApp {{ team.label }} belum diisi, jadi WhatsApp ke {{ team.label }} belum bisa dikirim.
+          </p>
+        </div>
+        <form @submit.prevent="saveTeam(team.key)" class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 lg:w-[520px] lg:shrink-0">
+          <input
+            type="text"
+            v-model="teamContacts[team.key].name"
+            :aria-label="`Nama ${team.label}`"
+            :placeholder="`Nama, cth: ${team.label}`"
+            class="w-full h-9 px-3 rounded-lg border border-gray-300 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-900"
+          />
+          <input
+            type="tel"
+            v-model="teamContacts[team.key].whatsapp"
+            :aria-label="`No WhatsApp ${team.label}`"
+            placeholder="No WhatsApp, cth: 081234567890"
+            class="w-full h-9 px-3 rounded-lg border border-gray-300 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-900"
+          />
+          <button
+            type="submit"
+            :disabled="savingTeam === team.key"
+            class="h-9 px-4 rounded-lg bg-gray-900 hover:bg-gray-800 text-white text-xs font-medium cursor-pointer disabled:opacity-50 whitespace-nowrap"
+          >
+            {{ savingTeam === team.key ? 'Menyimpan...' : 'Simpan' }}
+          </button>
+        </form>
+      </div>
+    </section>
+
     <p v-if="regionsWithoutAr.length" class="text-xs text-amber-700">
       Belum ada AR untuk {{ regionsWithoutAr.join(', ') }}. WhatsApp dealer region ini masih dikirim ke nomor AR default.
     </p>
@@ -284,6 +327,7 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import AreaTabs from '@/components/AreaTabs.vue';
 import { useArea } from '@/composables/useArea';
+import { useAutoRefresh } from '@/composables/useAutoRefresh';
 import { downloadExport } from '@/lib/download';
 import {
   ChevronRight as ChevronRightIcon,
@@ -314,6 +358,38 @@ const formData = reactive({
   is_active: true,
 });
 
+// Tim Pajak menerima WA cek PPh setelah AR memotong klaim; Tim SCM menerima hasil cek pajaknya
+const TEAMS = [
+  { key: 'tax', label: 'Tim Pajak', description: 'Setelah AR memotong klaim, WhatsApp dikirim ke sini untuk cek PPh, lalu Tim Pajak mengisi Cek Pajak, Selisih, dan Note PPh lewat link.' },
+  { key: 'scm', label: 'Tim SCM', description: 'Setelah Tim Pajak menyimpan cek pajak, hasilnya (Cek Pajak, Selisih, Note PPh) dikirim ke WhatsApp ini.' },
+];
+
+const teamContacts = reactive({ tax: { name: '', whatsapp: '' }, scm: { name: '', whatsapp: '' } });
+const savedTeamWhatsapp = reactive({ tax: '', scm: '' });
+const teamMessages = reactive({ tax: null, scm: null });
+const savingTeam = ref(null);
+
+const fillTeam = (key, data) => {
+  teamContacts[key].name = data?.name || '';
+  teamContacts[key].whatsapp = data?.whatsapp || '';
+  savedTeamWhatsapp[key] = teamContacts[key].whatsapp;
+};
+
+const saveTeam = async (key) => {
+  savingTeam.value = key;
+  teamMessages[key] = null;
+  try {
+    const res = await axios.put(`/api/ar-contacts/${key}-team`, { name: teamContacts[key].name, whatsapp: teamContacts[key].whatsapp });
+    fillTeam(key, res.data?.data);
+    teamMessages[key] = { error: false, text: res.data?.message || 'Tersimpan.' };
+  } catch (err) {
+    const errors = err.response?.data?.errors;
+    teamMessages[key] = { error: true, text: errors ? Object.values(errors).flat()[0] : (err.response?.data?.message || 'Gagal menyimpan.') };
+  } finally {
+    savingTeam.value = null;
+  }
+};
+
 const filteredContacts = computed(() => {
   const q = searchQuery.value.trim().toLowerCase();
   if (!q) return contacts.value;
@@ -336,18 +412,30 @@ const modalRegionOptions = computed(() => {
 const fetchData = async () => {
   isLoading.value = true;
   try {
-    const [contactRes, regionRes] = await Promise.all([
+    const [contactRes, regionRes, taxTeamRes, scmTeamRes] = await Promise.all([
       axios.get('/api/ar-contacts'),
       axios.get('/api/regions/options'),
+      axios.get('/api/ar-contacts/tax-team'),
+      axios.get('/api/ar-contacts/scm-team'),
     ]);
     contacts.value = contactRes.data?.data || [];
     regionNames.value = regionRes.data?.data || [];
+    fillTeam('tax', taxTeamRes.data?.data);
+    fillTeam('scm', scmTeamRes.data?.data);
   } catch (err) {
     console.error('Failed to fetch AR contacts:', err);
   } finally {
     isLoading.value = false;
   }
 };
+
+// Muat ulang otomatis hanya daftar AR; kartu Tim Pajak & Tim SCM tidak ditimpa selagi mungkin sedang diisi
+useAutoRefresh(async () => {
+  const res = await axios.get('/api/ar-contacts');
+  contacts.value = res.data?.data || [];
+}, {
+  isPaused: () => isLoading.value || isModalOpen.value || contactToDelete.value !== null || isSaving.value || isDeleting.value,
+});
 
 const openCreateModal = () => {
   formData.id = null;

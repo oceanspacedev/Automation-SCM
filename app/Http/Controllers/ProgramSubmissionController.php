@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
@@ -98,7 +99,7 @@ class ProgramSubmissionController extends Controller
 
         $cols = [
             'id', 'submission_timestamp', 'region', 'id_real', 'dealer_name',
-            'program_name', 'sales_name', 'whatsapp', 'credit_note_url', 'agreement_url',
+            'program_name', 'sales_name', 'whatsapp', 'email', 'credit_note_url', 'agreement_url',
             'tax_invoice_url', 'incentive', 'dpp', 'dpp_lain', 'ppn', 'nilai_pph',
             'net_pay', 'cek_pajak_tarif_pph', 'selisih', 'note_pph', 'no_faktur',
             'tgl_faktur', 'no_po_sj', 'no_transaksi', 'tgl_input',
@@ -213,7 +214,7 @@ class ProgramSubmissionController extends Controller
 
         $cols = [
             'id', 'submission_timestamp', 'region', 'id_real', 'dealer_name',
-            'program_name', 'sales_name', 'whatsapp', 'credit_note_url', 'agreement_url',
+            'program_name', 'sales_name', 'whatsapp', 'email', 'credit_note_url', 'agreement_url',
             'tax_invoice_url', 'incentive', 'dpp', 'dpp_lain', 'ppn', 'nilai_pph',
             'net_pay', 'cek_pajak_tarif_pph', 'selisih', 'note_pph', 'no_faktur',
             'tgl_faktur', 'no_po_sj', 'no_transaksi', 'tgl_input',
@@ -234,6 +235,7 @@ class ProgramSubmissionController extends Controller
             'Nama Program',
             'Nama Sales',
             'No. WhatsApp',
+            'Email',
             'Link CN',
             'Link Agreement',
             'Link Faktur Pajak',
@@ -283,6 +285,7 @@ class ProgramSubmissionController extends Controller
                     $item->program_name ?? '',
                     $item->sales_name ?? '',
                     $item->whatsapp ?? ($item->effective_whatsapp ?? ''),
+                    $item->email ?? '',
                     $item->credit_note_url ?? '',
                     $item->agreement_url ?? '',
                     $item->tax_invoice_url ?? '',
@@ -1225,6 +1228,8 @@ class ProgramSubmissionController extends Controller
             'dealer_name' => ['required', 'string', 'max:255'],
             'sales_name' => ['required', 'string', 'max:255'],
             'whatsapp' => ['nullable', 'string', 'max:30'],
+            // Wajib selama toko belum punya email di Master Dealer (lalu tersimpan ke sana)
+            'email' => [Rule::requiredIf(blank($masterDealer?->email)), 'nullable', 'string', 'email', 'max:255'],
             'credit_note_file' => ['required_without:credit_note_url', 'nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:15360'],
             'agreement_file' => [$masterAgreement ? 'nullable' : 'required_without:agreement_url', 'nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:15360'],
             'tax_invoice_file' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:15360'],
@@ -1234,6 +1239,8 @@ class ProgramSubmissionController extends Controller
             'id_real.required' => 'ID REALME wajib diisi.',
             'dealer_name.required' => 'Nama Dealer wajib diisi.',
             'sales_name.required' => 'Nama Sales (DM) wajib dipilih atau diisi.',
+            'email.required' => 'Email toko wajib diisi karena toko ini belum punya email di Master Dealer.',
+            'email.email' => 'Format email tidak valid, contoh: toko@gmail.com.',
             'credit_note_file.required_without' => 'Dokumen Credit Note/Invoice wajib diunggah.',
             'agreement_file.required_without' => 'Dokumen Agreement wajib diunggah.',
         ]);
@@ -1398,6 +1405,7 @@ class ProgramSubmissionController extends Controller
             'program_name' => $formData['program_name'],
             'sales_name' => $formData['sales_name'],
             'whatsapp' => $formData['whatsapp'] ?: null,
+            'email' => strtolower(trim((string) $request->input('email'))) ?: null,
             'credit_note_url' => $cnUrl,
             'agreement_url' => $agrUrl,
             'tax_invoice_url' => $taxUrl,
@@ -1429,6 +1437,9 @@ class ProgramSubmissionController extends Controller
         if ($usesMasterAgreement && $request->hasFile('agreement_file')) {
             $masterDealer?->rememberAgreement($agrUrl);
         }
+
+        // Email toko mengisi Master Dealer hanya bila toko itu belum punya email
+        $masterDealer?->rememberEmail($submission->email);
 
         // Otomatis push data pengajuan ke Google Spreadsheet
         $sheetResult = null;

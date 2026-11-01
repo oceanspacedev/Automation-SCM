@@ -1459,6 +1459,7 @@ class ProgramSubmissionTest extends TestCase
             'id_real' => 'IDME00789',
             'dealer_name' => 'Toko Jaya Selular',
             'sales_name' => 'SANDY ARJAYAN',
+            'email' => 'toko@contoh.test',
             'whatsapp' => '081234567890',
             'credit_note_file' => $cnFile,
             'agreement_file' => $agrFile,
@@ -1497,6 +1498,7 @@ class ProgramSubmissionTest extends TestCase
             'id_real' => 'IDME00790',
             'dealer_name' => 'Toko Jaya Selular',
             'sales_name' => 'SANDY ARJAYAN',
+            'email' => 'toko@contoh.test',
             'credit_note_file' => UploadedFile::fake()->create('credit_note_toko_jaya.pdf', 50, 'application/pdf'),
             'agreement_file' => UploadedFile::fake()->create('agreement_toko_jaya.pdf', 50, 'application/pdf'),
         ])->assertOk();
@@ -1555,6 +1557,7 @@ class ProgramSubmissionTest extends TestCase
             'id_real' => 'IDME00789',
             'dealer_name' => 'Toko Jaya Selular',
             'sales_name' => 'SANDY ARJAYAN',
+            'email' => 'toko@contoh.test',
             'whatsapp' => '081234567890',
             'credit_note_file' => $swappedCnFile,
             'agreement_file' => $swappedAgrFile,
@@ -1584,6 +1587,7 @@ class ProgramSubmissionTest extends TestCase
             'id_real' => '-',
             'dealer_name' => 'Toko Jaya',
             'sales_name' => 'SANDY ARJAYAN',
+            'email' => 'toko@contoh.test',
             'credit_note_file' => $cnFile,
             'agreement_file' => $agrFile,
         ]);
@@ -1606,6 +1610,7 @@ class ProgramSubmissionTest extends TestCase
             'id_real' => 'IDME00999',
             'dealer_name' => '-', // User entered '-' to auto-read from CN
             'sales_name' => 'SANDY ARJAYAN',
+            'email' => 'toko@contoh.test',
             'credit_note_file' => $cnFile,
             'agreement_file' => $agrFile,
         ]);
@@ -1633,6 +1638,7 @@ class ProgramSubmissionTest extends TestCase
             'id_real' => 'IDME00998',
             'dealer_name' => 'Ocean Cell',
             'sales_name' => 'SANDY ARJAYAN',
+            'email' => 'toko@contoh.test',
             'credit_note_file' => $cnFile,
             'agreement_file' => $agrFile,
         ]);
@@ -1805,6 +1811,7 @@ class ProgramSubmissionTest extends TestCase
             'id_real' => 'BT2026',
             'dealer_name' => 'NEWCO CELL',
             'sales_name' => 'A HASYIM AKBAR',
+            'email' => 'toko@contoh.test',
             'credit_note_file' => $cnFile,
             'agreement_file' => $agrFile,
         ], ['Accept' => 'application/json']);
@@ -1831,6 +1838,7 @@ class ProgramSubmissionTest extends TestCase
             'id_real' => 'DLKS2217',
             'dealer_name' => 'NEWCOO CELL',
             'sales_name' => 'A HASYIM AKBAR',
+            'email' => 'toko@contoh.test',
             'credit_note_file' => $cnFile,
             'agreement_file' => $agrFile,
         ], ['Accept' => 'application/json']);
@@ -1981,6 +1989,7 @@ class ProgramSubmissionTest extends TestCase
             'id_real' => 'IDME12345',
             'dealer_name' => 'rez',
             'sales_name' => 'AGUS',
+            'email' => 'toko@contoh.test',
             'credit_note_file' => $cnFile,
             'agreement_file' => $agrFile,
         ]);

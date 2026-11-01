@@ -24,20 +24,24 @@
         <div class="pb-3 border-b border-gray-100 flex items-center justify-between">
             <span class="text-xs font-medium text-gray-500">SCM Automation</span>
             <span class="text-xs font-medium px-2.5 py-0.5 rounded-lg border border-gray-200 bg-gray-50 text-gray-700">
-                {{ $role === 'ar' ? 'Tim AR' : 'Telemarketing' }}
+                {{ match ($role) { 'ar' => 'Tim AR', 'pajak' => 'Tim Pajak', default => 'Telemarketing' } }}
             </span>
         </div>
 
         <div class="py-3.5">
             <h1 class="text-sm font-semibold text-gray-950">
-                @if($role === 'ar')
+                @if($role === 'pajak')
+                    Cek Pajak Klaim yang Sudah Dipotong
+                @elseif($role === 'ar')
                     Konfirmasi Pemotongan Piutang (AR)
                 @else
                     Konfirmasi Klaim Program Dealer
                 @endif
             </h1>
             <p class="text-xs text-gray-500 mt-1 leading-relaxed">
-                @if($role === 'ar')
+                @if($role === 'pajak')
+                    Klaim ini sudah dipotong AR. Mohon cek PPh-nya, lalu isi Cek Pajak, Selisih, dan Note PPh.
+                @elseif($role === 'ar')
                     Mohon konfirmasi jika pemotongan saldo telah diproses pada invoice order dealer.
                 @else
                     Apakah dealer setuju untuk memotong saldo insentif klaim ini pada order pembelian mereka?
@@ -45,7 +49,13 @@
             </p>
         </div>
 
-        @if($dp->status_potong_purchase === 'SUDAH POTONG')
+        @if($role === 'pajak')
+            @if($dp->tax_checked_at)
+                <div class="mb-3.5 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800">
+                    Sudah dicek pada {{ $dp->tax_checked_at->format('d/m/Y H:i') }} WIB. Simpan lagi bila ingin mengubah isinya.
+                </div>
+            @endif
+        @elseif($dp->status_potong_purchase === 'SUDAH POTONG')
             <div class="mb-3.5 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-800">
                 Klaim ini sudah selesai dipotong pada tanggal {{ $dp->tgl_potong_tf ?: 'sebelumnya' }}.
             </div>
@@ -97,6 +107,26 @@
                         <td class="py-1 text-gray-500 align-top">Status Dokumen</td>
                         <td class="py-1 text-gray-900 font-medium text-right">{{ $dp->cek_dokumen ?: 'LENGKAP' }}</td>
                     </tr>
+                    @if($role === 'pajak')
+                        <tr>
+                            <td class="py-1 text-gray-500 align-top">Wajib Pajak / Tarif PPh</td>
+                            <td class="py-1 text-gray-800 text-right">{{ $dp->wajib_pajak ?: '-' }} / {{ $dp->trf_pph ?: '-' }}</td>
+                        </tr>
+                        <tr>
+                            <td class="py-1 text-gray-500 align-top">NPWP</td>
+                            <td class="py-1 text-gray-800 text-right break-words">{{ $dp->npwp ?: '-' }}@if($dp->nama_npwp)<br>{{ $dp->nama_npwp }}@endif</td>
+                        </tr>
+                        @foreach(['DPP' => $dp->dpp, 'PPN' => $dp->ppn, 'PPh' => $dp->nilai_pph] as $label => $amount)
+                            <tr>
+                                <td class="py-1 text-gray-500 align-top">{{ $label }}</td>
+                                <td class="py-1 text-gray-800 text-right">Rp {{ number_format((float) ($amount ?? 0), 0, ',', '.') }}</td>
+                            </tr>
+                        @endforeach
+                        <tr>
+                            <td class="py-1 text-gray-500 align-top">Tgl Potong / No. Pembayaran</td>
+                            <td class="py-1 text-gray-800 text-right">{{ $dp->tgl_potong_tf ?: '-' }} / {{ $dp->no_pembayaran ?: '-' }}</td>
+                        </tr>
+                    @endif
                 </tbody>
             </table>
         </div>
@@ -106,7 +136,72 @@
             @csrf
             <input type="hidden" name="role" value="{{ $role }}">
 
-            @if($role === 'ar')
+            @if($role === 'pajak')
+                @php($fieldClass = 'w-full h-9 px-3 text-xs bg-white text-gray-900 placeholder-gray-400 border rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-900 transition')
+                <div class="space-y-3">
+                    <div>
+                        <label for="cek_pajak_tarif" class="block text-xs font-medium text-gray-700 mb-1">Cek Pajak</label>
+                        <input type="text" id="cek_pajak_tarif" name="cek_pajak_tarif" required maxlength="100" autocomplete="off"
+                               value="{{ old('cek_pajak_tarif', $dp->cek_pajak_tarif) }}"
+                               placeholder="PPh sesuai tarif, mis. 15.000"
+                               class="{{ $fieldClass }} {{ $errors->has('cek_pajak_tarif') ? 'border-red-400' : 'border-gray-200 focus:border-gray-900' }}">
+                        @error('cek_pajak_tarif')
+                            <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label for="selisih" class="block text-xs font-medium text-gray-700 mb-1">Selisih</label>
+                        <input type="text" id="selisih" name="selisih" inputmode="decimal" maxlength="30" autocomplete="off"
+                               value="{{ old('selisih', $dp->tax_checked_at || $dp->selisih ? number_format((float) $dp->selisih, 0, ',', '.') : '') }}"
+                               placeholder="PPh − Cek Pajak, mis. 0"
+                               class="{{ $fieldClass }} {{ $errors->has('selisih') ? 'border-red-400' : 'border-gray-200 focus:border-gray-900' }}">
+                        <p class="text-[11px] text-gray-400 mt-1">Terisi otomatis dari PPh dikurangi Cek Pajak bila Cek Pajak berupa angka; boleh diubah.</p>
+                        @error('selisih')
+                            <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label for="note_pph" class="block text-xs font-medium text-gray-700 mb-1">Note PPh</label>
+                        <textarea id="note_pph" name="note_pph" rows="2" maxlength="255"
+                                  placeholder="Mis. OK, kurang potong, salah tarif"
+                                  class="w-full px-3 py-2 text-xs bg-white text-gray-900 placeholder-gray-400 border rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-900 transition {{ $errors->has('note_pph') ? 'border-red-400' : 'border-gray-200 focus:border-gray-900' }}">{{ old('note_pph', $dp->note_pph) }}</textarea>
+                        @error('note_pph')
+                            <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <button type="submit" name="action" value="cek_pajak" id="btn-submit-cek-pajak"
+                            class="w-full h-9 px-4 bg-gray-900 hover:bg-gray-800 text-white rounded-lg text-xs font-medium transition cursor-pointer shadow-2xs">
+                        Simpan Cek Pajak
+                    </button>
+                </div>
+
+                <script>
+                    // Selisih = PPh − Cek Pajak (format Indonesia: titik ribuan, koma desimal), selama belum diubah sendiri
+                    (function () {
+                        const pph = {{ (float) ($dp->nilai_pph ?? 0) }};
+                        const cekPajak = document.getElementById('cek_pajak_tarif');
+                        const selisih = document.getElementById('selisih');
+                        let selisihEdited = selisih.value.trim() !== '';
+
+                        const parseAmount = (text) => {
+                            const clean = text.replace(/Rp|\s/gi, '');
+                            if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(clean)) return Number(clean.replace(/\./g, '').replace(',', '.'));
+                            if (/^\d+([.,]\d+)?$/.test(clean)) return Number(clean.replace(',', '.'));
+                            return NaN;
+                        };
+
+                        selisih.addEventListener('input', () => { selisihEdited = selisih.value.trim() !== ''; });
+                        cekPajak.addEventListener('input', () => {
+                            const amount = parseAmount(cekPajak.value);
+                            if (selisihEdited || Number.isNaN(amount)) return;
+                            selisih.value = Math.round(pph - amount).toLocaleString('id-ID');
+                        });
+                    })();
+                </script>
+            @elseif($role === 'ar')
                 @php($showPaymentForm = $errors->has('no_pembayaran') || old('no_pembayaran'))
 
                 <!-- Step 1: Pilihan aksi -->

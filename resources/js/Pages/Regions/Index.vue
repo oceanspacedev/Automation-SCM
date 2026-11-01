@@ -246,6 +246,7 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import AreaTabs from '@/components/AreaTabs.vue';
 import { useArea } from '@/composables/useArea';
+import { useAutoRefresh } from '@/composables/useAutoRefresh';
 import { downloadExport } from '@/lib/download';
 import {
   ChevronRight as ChevronRightIcon,
@@ -278,17 +279,21 @@ const filteredRegions = computed(() => {
   return q ? regions.value.filter(r => r.name.toLowerCase().includes(q)) : regions.value;
 });
 
-const fetchRegions = async () => {
-  isLoading.value = true;
+const fetchRegions = async ({ silent = false } = {}) => {
+  if (!silent) isLoading.value = true;
   try {
     const res = await axios.get('/api/regions');
     regions.value = res.data?.data || [];
   } catch (err) {
     console.error('Failed to fetch regions:', err);
   } finally {
-    isLoading.value = false;
+    if (!silent) isLoading.value = false;
   }
 };
+
+useAutoRefresh(() => fetchRegions({ silent: true }), {
+  isPaused: () => isLoading.value || isModalOpen.value || regionToDelete.value !== null || isSaving.value || isDeleting.value,
+});
 
 const openCreateModal = () => {
   formData.id = null;

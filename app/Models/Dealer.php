@@ -37,6 +37,20 @@ class Dealer extends Model
     }
 
     /**
+     * Fill in the store's email (e.g. from the Form Program) only while it has none; an email already kept stays.
+     */
+    public function rememberEmail(?string $email): void
+    {
+        $email = strtolower(trim((string) $email));
+
+        if ($email === '' || filled($this->email)) {
+            return;
+        }
+
+        $this->forceFill(['email' => $email])->save();
+    }
+
+    /**
      * Normalize a kode BT: uppercase, trimmed, and "BTO…" (letter O) written as "BT0…" (zero),
      * e.g. "bto5768" → "BT05768".
      */

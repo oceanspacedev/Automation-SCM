@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AppSetting;
 use App\Models\DataProgram;
 use App\Models\ProgramApprovalLog;
 use App\Models\ProgramSubmission;
@@ -42,6 +43,7 @@ class ProgramClaimConfirmationController extends Controller
         if ($request->isMethod('post')) {
             $action = $request->input('action') ?? $request->query('action', 'setuju');
             $arNotification = null;
+            $taxNotification = null;
 
             if ($action === 'setuju') {
                 $submission->update([
@@ -101,6 +103,7 @@ class ProgramClaimConfirmationController extends Controller
                     $this->pushDpToSpreadsheet($matchingDp);
                 }
                 ProgramApprovalLog::record($matchingDp, ProgramApprovalLog::CUT, actor: $this->linkActor($role), submission: $submission);
+                $taxNotification = $matchingDp ? $this->notifyTaxTeam($matchingDp) : null;
             } elseif ($action === 'tunda') {
                 $submission->update([
                     'status_potong_ar' => 'PENDING DEALER',
@@ -119,6 +122,7 @@ class ProgramClaimConfirmationController extends Controller
                 'action' => $action,
                 'role' => $role,
                 'arNotification' => $arNotification,
+                'taxNotification' => $taxNotification,
             ]);
         }
 
@@ -130,7 +134,7 @@ class ProgramClaimConfirmationController extends Controller
     }
 
     /**
-     * Handle AR and Telemarketing confirmation click via secure signed URL for DataProgram.
+     * Handle AR, Telemarketing and Tim Pajak confirmation click via secure signed URL for DataProgram.
      */
     public function confirmDataProgram(Request $request, int|string $id): View
     {
@@ -151,6 +155,13 @@ class ProgramClaimConfirmationController extends Controller
         if ($request->isMethod('post')) {
             $action = $request->input('action') ?? $request->query('action', 'setuju');
             $arNotification = null;
+            $taxNotification = null;
+            $scmNotification = null;
+
+            // Link Tim Pajak hanya untuk mengisi cek pajak, dan cek pajak hanya lewat link Tim Pajak
+            if (($role === 'pajak') !== ($action === 'cek_pajak')) {
+                abort(403, 'Aksi ini tidak tersedia untuk tautan ini.');
+            }
 
             if ($action === 'setuju') {
                 $dp->update([
@@ -197,6 +208,9 @@ class ProgramClaimConfirmationController extends Controller
 
                 // Kirim status SUDAH POTONG ke Google Spreadsheet
                 $this->pushDpToSpreadsheet($dp);
+
+                // Estafet Otomatis: Tim Pajak mengecek PPh klaim yang sudah dipotong
+                $taxNotification = $this->notifyTaxTeam($dp);
             } elseif ($action === 'tunda') {
                 $dp->update([
                     'status_potong_ar' => 'PENDING DEALER',
@@ -205,6 +219,32 @@ class ProgramClaimConfirmationController extends Controller
 
                 // Kirim status PENDING DEALER ke Google Spreadsheet
                 $this->pushDpToSpreadsheet($dp);
+            } elseif ($action === 'cek_pajak') {
+                $validated = $request->validate([
+                    'cek_pajak_tarif' => ['required', 'string', 'max:100'],
+                    'selisih' => ['nullable', 'string', 'max:30', 'regex:/^[\s\-()Rp\d.,]*$/i'],
+                    'note_pph' => ['nullable', 'string', 'max:255'],
+                ], [
+                    'cek_pajak_tarif.required' => 'Cek Pajak wajib diisi.',
+                    'cek_pajak_tarif.max' => 'Cek Pajak maksimal 100 karakter.',
+                    'selisih.regex' => 'Selisih hanya boleh berisi angka, mis. 0 atau -1.500.',
+                    'note_pph.max' => 'Note PPh maksimal 255 karakter.',
+                ]);
+
+                $dp->update([
+                    'cek_pajak_tarif' => trim($validated['cek_pajak_tarif']),
+                    'selisih' => $this->dpSyncService->parseAmount($validated['selisih'] ?? null),
+                    'note_pph' => trim((string) ($validated['note_pph'] ?? '')) ?: null,
+                    'tax_checked_at' => now(),
+                ]);
+                ProgramApprovalLog::record($dp, ProgramApprovalLog::TAX_CHECKED, actor: $this->linkActor($role),
+                    note: "Cek Pajak: {$dp->cek_pajak_tarif} · Selisih: ".number_format((float) $dp->selisih, 0, ',', '.').' · Note PPh: '.($dp->note_pph ?: '-'));
+
+                // Kirim Cek Pajak, Selisih & Note PPh ke Google Spreadsheet
+                $this->pushDpToSpreadsheet($dp, withTaxCheck: true);
+
+                // Estafet Otomatis: hasil cek pajak dikirim ke WA Tim SCM
+                $scmNotification = $this->notifyScm($dp);
             }
 
             return view('data_programs.confirmed', [
@@ -212,6 +252,8 @@ class ProgramClaimConfirmationController extends Controller
                 'action' => $action,
                 'role' => $role,
                 'arNotification' => $arNotification,
+                'taxNotification' => $taxNotification,
+                'scmNotification' => $scmNotification,
             ]);
         }
 
@@ -231,9 +273,59 @@ class ProgramClaimConfirmationController extends Controller
     }
 
     /**
-     * Push status update to Google Spreadsheet master.
+     * After AR cuts a claim, ask the area's tax team to check its PPh; a failed WhatsApp is recorded and can be sent
+     * again from Riwayat Approval.
+     *
+     * @return array{success: bool, message: string}
      */
-    protected function pushDpToSpreadsheet(DataProgram $dp): void
+    protected function notifyTaxTeam(DataProgram $dp): array
+    {
+        try {
+            $result = $this->waService->sendDataProgramTaxCheckNotification($dp);
+        } catch (\Throwable $e) {
+            $result = ['success' => false, 'message' => $e->getMessage()];
+        }
+
+        if ($result['success']) {
+            $dp->forceFill(['tax_notified_at' => now()])->save();
+        } else {
+            Log::warning("Gagal kirim WA cek pajak untuk DataProgram ID {$dp->id}: {$result['message']}");
+        }
+
+        ProgramApprovalLog::record($dp, ProgramApprovalLog::TAX_NOTIFIED, $result['success'],
+            actor: ProgramApprovalLog::AUTOMATIC, recipient: ProgramApprovalLog::teamRecipient($dp, AppSetting::TAX_TEAM), note: $result['message']);
+
+        return $result;
+    }
+
+    /**
+     * After the tax team saves their check, send its result to the area's SCM team; a failed WhatsApp is recorded and
+     * can be sent again from Riwayat Approval.
+     *
+     * @return array{success: bool, message: string}
+     */
+    protected function notifyScm(DataProgram $dp): array
+    {
+        try {
+            $result = $this->waService->sendDataProgramScmNotification($dp);
+        } catch (\Throwable $e) {
+            $result = ['success' => false, 'message' => $e->getMessage()];
+        }
+
+        if (! $result['success']) {
+            Log::warning("Gagal kirim WA hasil cek pajak ke SCM untuk DataProgram ID {$dp->id}: {$result['message']}");
+        }
+
+        ProgramApprovalLog::record($dp, ProgramApprovalLog::SCM_NOTIFIED, $result['success'],
+            actor: ProgramApprovalLog::AUTOMATIC, recipient: ProgramApprovalLog::teamRecipient($dp, AppSetting::SCM_TEAM), note: $result['message']);
+
+        return $result;
+    }
+
+    /**
+     * Push status update to Google Spreadsheet master (with the tax team's Cek Pajak, Selisih & Note PPh when asked).
+     */
+    protected function pushDpToSpreadsheet(DataProgram $dp, bool $withTaxCheck = false): void
     {
         try {
             $rowIndex = (int) str_replace('row_', '', (string) $dp->row_hash);
@@ -256,6 +348,11 @@ class ProgramClaimConfirmationController extends Controller
                 'no_faktur_pajak' => $dp->no_faktur_pajak,
                 'ket_faktur_pajak' => $dp->ket_faktur_pajak,
                 'noted' => $dp->noted,
+                ...($withTaxCheck ? [
+                    'cek_pajak_tarif' => $dp->cek_pajak_tarif,
+                    'selisih' => $dp->selisih,
+                    'note_pph' => $dp->note_pph,
+                ] : []),
             ]], null, $dp->areaEnum(), $dp->brand);
         } catch (\Throwable $e) {
             Log::warning("Gagal push status potong ke spreadsheet untuk DP ID {$dp->id}: {$e->getMessage()}");

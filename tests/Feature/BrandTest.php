@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Area;
+use App\Mail\InvoiceMail;
 use App\Models\Brand;
 use App\Models\DataProgram;
 use App\Models\Draft;
@@ -180,16 +181,19 @@ class BrandTest extends TestCase
             ->assertJsonPath('brand.label', 'Oppo');
     }
 
-    public function test_invoice_email_links_dealers_to_the_upload_form_of_its_brand(): void
+    public function test_invoice_email_links_dealers_to_the_public_form_of_its_brand_and_area(): void
     {
+        config(['services.program_form.url' => 'https://scm-customer.oceanspace.co.id/']);
         Brand::factory()->create(['slug' => 'oppo', 'name' => 'Oppo']);
         $draft = Draft::create(['brand' => 'oppo', 'area' => 'jateng', 'dealer_name' => 'TOKO OPPO', 'support_amount' => 1, 'status' => 'ready']);
         $invoice = $draft->invoice()->create(['brand' => 'oppo', 'area' => 'jateng', 'invoice_number' => 'CN-1', 'dealer_name' => 'TOKO OPPO', 'invoice_type' => 'DSA']);
 
         $this->assertSame('Oppo', $invoice->brandName());
-        $this->assertSame('https://scm.test/form/oppo/jateng', $invoice->documentUploadUrl('https://scm.test'));
+        $this->assertSame('https://scm-customer.oceanspace.co.id/form/oppo/jateng', $invoice->documentUploadUrl());
 
-        $invoice->update(['brand' => 'realme']);
-        $this->assertSame(Brand::DEFAULT_UPLOAD_URL, $invoice->fresh()->documentUploadUrl('https://scm.test'));
+        $invoice->update(['brand' => 'realme', 'area' => 'jabar']);
+        $realmeJabar = $invoice->fresh();
+        $this->assertSame('https://scm-customer.oceanspace.co.id/form/realme/jabar', $realmeJabar->documentUploadUrl());
+        $this->assertStringContainsString('https://scm-customer.oceanspace.co.id/form/realme/jabar', (new InvoiceMail($realmeJabar))->render());
     }
 }

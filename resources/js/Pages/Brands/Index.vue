@@ -227,6 +227,7 @@
 import { ref, reactive, onMounted } from 'vue';
 import axios from 'axios';
 import { loadBrands } from '@/composables/useBrands';
+import { useAutoRefresh } from '@/composables/useAutoRefresh';
 import {
   ChevronRight as ChevronRightIcon,
   X as XIcon,
@@ -255,14 +256,18 @@ const formData = reactive({
 });
 
 // Muat ulang daftar brand halaman ini sekaligus menu (yang memakai daftar brand yang sama)
-const fetchBrands = async () => {
-  isLoading.value = true;
+const fetchBrands = async ({ silent = false } = {}) => {
+  if (!silent) isLoading.value = true;
   try {
     brands.value = await loadBrands(true);
   } finally {
-    isLoading.value = false;
+    if (!silent) isLoading.value = false;
   }
 };
+
+useAutoRefresh(() => fetchBrands({ silent: true }), {
+  isPaused: () => isLoading.value || isModalOpen.value || brandToDelete.value !== null || isSaving.value || isDeleting.value,
+});
 
 const showActionMessage = (message, isError = false) => {
   actionMessage.value = message;

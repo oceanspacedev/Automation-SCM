@@ -55,6 +55,19 @@
       </div>
     </div>
 
+    <!-- Hasil simpan / import (mis. kode program ikut terisi ke Data Program) -->
+    <div
+      v-if="notice"
+      role="status"
+      class="rounded-xl border px-4 py-3 text-xs flex items-start justify-between gap-3"
+      :class="notice.error ? 'border-red-200 bg-red-50/60' : 'border-emerald-200 bg-emerald-50/60'"
+    >
+      <p :class="['min-w-0 break-words', notice.error ? 'text-red-700' : 'text-emerald-800']">{{ notice.text }}</p>
+      <button type="button" @click="notice = null" class="text-gray-400 hover:text-gray-600 cursor-pointer shrink-0" title="Tutup">
+        <XIcon class="w-4 h-4" />
+      </button>
+    </div>
+
     <!-- Table Card (Matching Clean Plain Table Style) -->
     <div class="rounded-xl border border-gray-200 bg-white shadow-xs overflow-hidden">
       <!-- Toolbar -->
@@ -335,6 +348,8 @@
             </label>
           </div>
 
+          <p v-if="formError" class="text-xs text-red-600">{{ formError }}</p>
+
           <!-- Buttons -->
           <div class="pt-3 flex items-center justify-end gap-2 border-t border-gray-100">
             <button
@@ -394,6 +409,7 @@ import axios from 'axios';
 import { downloadExport } from '@/lib/download';
 import BrandTabs from '@/components/BrandTabs.vue';
 import { useBrands } from '@/composables/useBrands';
+import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
 import {
   ChevronRightIcon,
   ChevronLeftIcon,
@@ -415,6 +431,10 @@ const isLoading = ref(false);
 const nextCode = ref('');
 const importInput = ref(null);
 const isImporting = ref(false);
+// Hasil simpan / import yang perlu diketahui (mis. kode program ikut terisi ke Data Program), tampil di atas tabel
+const notice = ref(null);
+// Gagal simpan (mis. nama atau kode sudah dipakai), tampil di dalam form
+const formError = ref('');
 
 const fromRow = computed(() => (totalRows.value === 0 ? 0 : (currentPage.value - 1) * perPage.value + 1));
 const toRow = computed(() => Math.min(currentPage.value * perPage.value, totalRows.value));
@@ -450,8 +470,11 @@ const handleSearchInput = () => {
   }, 300);
 };
 
-const fetchPrograms = async (page = currentPage.value) => {
-  isLoading.value = true;
+const startProgramsRequest = createRequestTracker();
+
+const fetchPrograms = async (page = currentPage.value, { silent = false } = {}) => {
+  const isLatest = startProgramsRequest();
+  if (!silent) isLoading.value = true;
   currentPage.value = page;
 
   try {
@@ -463,6 +486,7 @@ const fetchPrograms = async (page = currentPage.value) => {
     };
 
     const res = await axios.get('/api/programs', { params });
+    if (!isLatest()) return;
     if (res.data?.success) {
       programs.value = res.data.data.data;
       totalRows.value = res.data.data.total;
@@ -473,9 +497,13 @@ const fetchPrograms = async (page = currentPage.value) => {
   } catch (err) {
     console.error('Failed to fetch master programs:', err);
   } finally {
-    isLoading.value = false;
+    if (!silent && isLatest()) isLoading.value = false;
   }
 };
+
+useAutoRefresh(() => fetchPrograms(currentPage.value, { silent: true }), {
+  isPaused: () => isLoading.value || isModalOpen.value || programToDelete.value !== null || isImporting.value || isSaving.value || isDeleting.value,
+});
 
 const openCreateModal = () => {
   isEditMode.value = false;
@@ -486,6 +514,7 @@ const openCreateModal = () => {
   formData.period = '';
   formData.description = '';
   formData.is_active = true;
+  formError.value = '';
   isModalOpen.value = true;
 };
 
@@ -498,6 +527,7 @@ const openEditModal = (p) => {
   formData.period = p.period || '';
   formData.description = p.description || '';
   formData.is_active = p.is_active !== false;
+  formError.value = '';
   isModalOpen.value = true;
 };
 
@@ -505,17 +535,18 @@ const submitForm = async () => {
   if (!formData.name.trim()) return;
 
   isSaving.value = true;
+  notice.value = null;
+  formError.value = '';
   try {
-    if (isEditMode.value) {
-      await axios.put(`/api/programs/${formData.id}`, formData);
-    } else {
-      await axios.post('/api/programs', formData);
-    }
+    const res = isEditMode.value
+      ? await axios.put(`/api/programs/${formData.id}`, formData)
+      : await axios.post('/api/programs', formData);
     isModalOpen.value = false;
     fetchPrograms(currentPage.value);
+    // Kode program ikut diisi ke baris Data Program bernama program sama yang kolom Program-nya masih kosong
+    if (res.data?.data_program_filled > 0) notice.value = { error: false, text: res.data.message };
   } catch (err) {
-    const msg = err.response?.data?.message || 'Gagal menyimpan program.';
-    alert(msg);
+    formError.value = err.response?.data?.message || 'Gagal menyimpan program.';
   } finally {
     isSaving.value = false;
   }
@@ -527,14 +558,15 @@ const handleImportFile = async (event) => {
   if (!file) return;
 
   isImporting.value = true;
+  notice.value = null;
   try {
     const payload = new FormData();
     payload.append('file', file);
     const res = await axios.post('/api/programs/import', payload);
-    alert(res.data?.message || 'Import master program selesai.');
+    notice.value = { error: false, text: res.data?.message || 'Import master program selesai.' };
     fetchPrograms(1);
   } catch (err) {
-    alert(err.response?.data?.message || 'Gagal mengimpor file master program.');
+    notice.value = { error: true, text: err.response?.data?.message || 'Gagal mengimpor file master program.' };
   } finally {
     isImporting.value = false;
   }

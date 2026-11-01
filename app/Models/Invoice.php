@@ -55,9 +55,9 @@ class Invoice extends Model
     /**
      * Link where the dealer uploads this program's documents (CN, Agreement, Faktur Pajak).
      */
-    public function documentUploadUrl(?string $baseUrl = null): string
+    public function documentUploadUrl(): string
     {
-        return Brand::documentUploadUrl($this->brand, $this->areaEnum(), $baseUrl ?? url('/'));
+        return Brand::documentUploadUrl($this->brand, $this->areaEnum());
     }
 
     public function getTerbilangAttribute(): string

@@ -618,6 +618,7 @@ import {
 } from 'lucide-vue-next';
 import { useArea, DEFAULT_AREA } from '@/composables/useArea';
 import { useBrands } from '@/composables/useBrands';
+import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
 
 // ===== AREA (Jabar/Jateng) =====
 const { area } = useArea();
@@ -744,22 +745,19 @@ const pagination = reactive({
   to: 0,
 });
 
-let pollTimer = null;
 onMounted(() => {
   fetchSubmissions();
   loadSheetUrl();
   document.addEventListener('click', handleOutsideClick);
-  // Sinkronkan data baru di latar belakang setiap 30 detik (seperti Form Program)
-  pollTimer = setInterval(() => {
-    if (!isLoading.value) {
-      fetchSubmissions(true);
-    }
-  }, 30000);
 });
 
 onUnmounted(() => {
   document.removeEventListener('click', handleOutsideClick);
-  if (pollTimer) clearInterval(pollTimer);
+});
+
+// Pengajuan baru dari form publik muncul sendiri; berhenti selama modal terbuka
+useAutoRefresh(() => fetchSubmissions(true), {
+  isPaused: () => isLoading.value || isFinancialModalOpen.value || isConfigModalOpen.value,
 });
 
 let searchDebounceTimer = null;
@@ -793,7 +791,10 @@ function goToPage(page) {
   fetchSubmissions();
 }
 
+const startSubmissionsRequest = createRequestTracker();
+
 async function fetchSubmissions(isSilent = false) {
+  const isLatest = startSubmissionsRequest();
   if (!isSilent) isLoading.value = true;
   try {
     const params = {
@@ -810,6 +811,7 @@ async function fetchSubmissions(isSilent = false) {
     }
 
     const res = await axios.get('/api/program-submissions', { params });
+    if (!isLatest()) return;
     if (res.data) {
       const p = res.data.submissions;
       items.value = p.data || [];
@@ -829,7 +831,7 @@ async function fetchSubmissions(isSilent = false) {
   } catch (err) {
     console.error('Gagal mengambil data submissions:', err);
   } finally {
-    if (!isSilent) isLoading.value = false;
+    if (!isSilent && isLatest()) isLoading.value = false;
   }
 }
 

@@ -30,11 +30,6 @@ class Brand extends Model
      */
     public const DATA_TABLES = ['drafts', 'invoices', 'data_programs', 'program_submissions', 'program_reconciliation_logs', 'master_programs'];
 
-    /**
-     * Realme's existing upload link for program documents, already shared with dealers.
-     */
-    public const DEFAULT_UPLOAD_URL = 'https://bit.ly/ProgramRealmeJabar';
-
     protected $guarded = ['id'];
 
     /**
@@ -48,16 +43,14 @@ class Brand extends Model
     }
 
     /**
-     * Link where dealers upload a brand's program documents (CN, Agreement, Faktur Pajak) for an area:
-     * Realme keeps its existing short link, other brands use their own public Form Program.
+     * Link where dealers upload a brand's program documents (CN, Agreement, Faktur Pajak) for an area: the brand's
+     * public Form Program on the public site, e.g. https://scm-customer.oceanspace.co.id/form/realme/jabar.
      */
-    public static function documentUploadUrl(?string $slug, Area $area, string $baseUrl): string
+    public static function documentUploadUrl(?string $slug, Area $area): string
     {
         $slug ??= self::DEFAULT_SLUG;
 
-        return $slug === self::DEFAULT_SLUG
-            ? self::DEFAULT_UPLOAD_URL
-            : rtrim($baseUrl, '/')."/form/{$slug}/{$area->value}";
+        return rtrim((string) config('services.program_form.url'), '/')."/form/{$slug}/{$area->value}";
     }
 
     protected $casts = [

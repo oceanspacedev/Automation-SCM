@@ -13,7 +13,7 @@
       <div>
         <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Riwayat Approval</h1>
         <p class="text-xs text-gray-500 mt-0.5">
-          Alur potong klaim tiap baris Data Program: WA ke telemarketing, persetujuan dealer, WA ke AR, lalu dipotong AR.
+          Alur potong klaim tiap baris Data Program: WA ke telemarketing, persetujuan dealer, WA ke AR, dipotong AR, dicek Tim Pajak, lalu hasilnya ke Tim SCM.
         </p>
       </div>
       <button
@@ -85,8 +85,8 @@
               <button type="button" @click="openDetail(row)" :class="[detailButtonClass, 'lg:hidden']">Detail</button>
             </div>
 
-            <!-- Alur 5 langkah (layar sedang & lebar) -->
-            <ol class="hidden md:grid grid-cols-5 w-full max-w-3xl xl:max-w-4xl lg:flex-1">
+            <!-- Alur langkah (layar sedang & lebar), satu kolom per langkah -->
+            <ol class="hidden md:grid w-full max-w-4xl xl:max-w-5xl lg:flex-1" :style="{ gridTemplateColumns: `repeat(${row.steps.length}, minmax(0, 1fr))` }">
               <li v-for="(step, index) in row.steps" :key="step.key" class="relative flex flex-col items-center text-center px-1.5 min-w-0">
                 <!-- Garis dari langkah sebelumnya: hijau penuh bila sudah lewat, hijau berjalan menuju langkah sekarang -->
                 <span v-if="index > 0" :class="['absolute top-2 right-1/2 w-full h-0.5 rounded-full overflow-hidden', connectorClass(step.state)]">
@@ -94,7 +94,7 @@
                 </span>
                 <StepDot :state="step.state" class="relative z-10 ring-4 ring-white" />
                 <p :class="['mt-1.5 text-[10px] font-medium leading-[14px]', stepLabelClass(step.state)]">{{ step.label }}</p>
-                <!-- Tinggi baris tetap walau kosong, supaya kelima langkah sejajar; nama panjang turun baris, tidak dipotong -->
+                <!-- Tinggi baris tetap walau kosong, supaya semua langkah sejajar; nama panjang turun baris, tidak dipotong -->
                 <p :class="['w-full min-h-[14px] text-[10px] leading-[14px] break-words', step.state === 'waiting' ? 'text-gray-400' : 'text-gray-600']">
                   {{ displayName(step.person) }}
                 </p>
@@ -102,7 +102,7 @@
               </li>
             </ol>
 
-            <!-- Alur 5 langkah (layar kecil) -->
+            <!-- Alur langkah (layar kecil) -->
             <ol class="md:hidden">
               <li v-for="(step, index) in row.steps" :key="step.key" class="relative flex items-start gap-2 pb-2.5 last:pb-0">
                 <span
@@ -183,6 +183,14 @@
             </li>
           </ol>
 
+          <!-- Kirim (ulang) WA ke Tim Pajak (sudah dipotong, belum dicek) atau hasil cek pajak ke Tim SCM, mis. bila WA otomatis gagal -->
+          <div v-if="resendAction || waMessage" class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <button v-if="resendAction" type="button" @click="resendWhatsApp" :disabled="sendingWa" :class="[detailButtonClass, 'inline-flex disabled:opacity-50']">
+              {{ sendingWa ? 'Mengirim...' : resendAction.label }}
+            </button>
+            <span v-if="waMessage" :class="['break-words', waMessage.error ? 'text-rose-700' : 'text-emerald-700']">{{ waMessage.text }}</span>
+          </div>
+
           <div class="space-y-2 border-t border-gray-100">
             <p class="pt-3 font-medium text-gray-900">Semua catatan</p>
             <p v-if="detailLoading" class="text-gray-500">Memuat...</p>
@@ -209,10 +217,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, h } from 'vue';
+import { ref, reactive, computed, onMounted, watch, h } from 'vue';
 import axios from 'axios';
 import AreaTabs from '@/components/AreaTabs.vue';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
+import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
 import {
   ChevronRight as ChevronRightIcon,
   ChevronDown as ChevronDownIcon,
@@ -260,6 +269,16 @@ const loading = ref(false);
 const errorMessage = ref('');
 const detail = ref(null);
 const detailLoading = ref(false);
+const sendingWa = ref(false);
+const waMessage = ref(null);
+
+// WA yang bisa dikirim (ulang) dari Detail: ke Tim Pajak selama belum dicek, lalu hasilnya ke Tim SCM bila belum terkirim
+const resendAction = computed(() => {
+  if (detail.value?.stage === 'cut') return { endpoint: 'send-wa-tax', label: 'Kirim WA ke Tim Pajak' };
+  const scmStep = detail.value?.steps?.find((step) => step.key === 'scm');
+  if (detail.value?.stage === 'tax_checked' && scmStep && scmStep.state !== 'done') return { endpoint: 'send-wa-scm', label: 'Kirim hasil ke WA SCM' };
+  return null;
+});
 const pagination = reactive({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
 let debounceTimer = null;
 
@@ -326,26 +345,38 @@ const stageBadgeClass = (value) => ({
   waiting_approval: 'bg-amber-50 text-amber-700 ring-amber-200',
   postponed: 'bg-orange-50 text-orange-700 ring-orange-200',
   approved: 'bg-sky-50 text-sky-700 ring-sky-200',
-  cut: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  cut: 'bg-violet-50 text-violet-700 ring-violet-200',
+  tax_checked: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
 }[value] || 'bg-gray-50 text-gray-600 ring-gray-200');
 
-async function fetchRows(page = 1) {
-  loading.value = true;
-  errorMessage.value = '';
+const startRowsRequest = createRequestTracker();
+
+async function fetchRows(page = 1, { silent = false } = {}) {
+  const isLatest = startRowsRequest();
+  if (!silent) {
+    loading.value = true;
+    errorMessage.value = '';
+  }
   try {
     const params = { page, per_page: pagination.per_page, stage: stage.value };
     if (search.value.trim()) params.search = search.value.trim();
     const res = await axios.get('/api/data-program/approval-history', { params });
+    if (!isLatest()) return;
     rows.value = res.data.data || [];
     counts.value = res.data.counts || {};
     stages.value = res.data.stages || {};
     Object.assign(pagination, res.data.pagination || {});
   } catch (err) {
-    errorMessage.value = 'Gagal memuat riwayat approval: ' + (err.response?.data?.message || err.message);
+    if (!silent) errorMessage.value = 'Gagal memuat riwayat approval: ' + (err.response?.data?.message || err.message);
   } finally {
-    loading.value = false;
+    if (!silent && isLatest()) loading.value = false;
   }
 }
+
+// Langkah approval baru (dealer setuju, AR potong, cek pajak) muncul sendiri; berhenti selama Detail terbuka
+useAutoRefresh(() => fetchRows(pagination.current_page, { silent: true }), {
+  isPaused: () => loading.value || detail.value !== null || sendingWa.value,
+});
 
 function debounceFetch() {
   clearTimeout(debounceTimer);
@@ -362,6 +393,26 @@ async function openDetail(row) {
     // Detail tetap tampil dari data baris; hanya daftar catatan yang kosong
   } finally {
     detailLoading.value = false;
+  }
+}
+
+// Pesan kirim WA milik baris yang sedang dibuka saja
+watch(() => detail.value?.id, () => { waMessage.value = null; });
+
+async function resendWhatsApp() {
+  const action = resendAction.value;
+  sendingWa.value = true;
+  waMessage.value = null;
+  try {
+    const res = await axios.post(`/api/data-program/${detail.value.id}/${action.endpoint}`);
+    waMessage.value = { error: false, text: res.data.message || 'WA terkirim.' };
+    await openDetail(detail.value);
+    fetchRows(pagination.current_page);
+  } catch (err) {
+    waMessage.value = { error: true, text: err.response?.data?.message || 'Gagal mengirim WA.' };
+    if (detail.value) await openDetail(detail.value);
+  } finally {
+    sendingWa.value = false;
   }
 }
 

@@ -73,6 +73,7 @@ class DealerAgreementTest extends TestCase
             'kode_bt' => 'BT07777',
             'dealer_name' => 'TOKO JAYA SELULAR',
             'sales_name' => 'SANDY ARJAYAN',
+            'email' => 'toko@contoh.test',
             'credit_note_file' => UploadedFile::fake()->create('credit_note.pdf', 50, 'application/pdf'),
         ], $headers + ['X-Area' => 'jabar']);
     }
@@ -364,9 +365,38 @@ class DealerAgreementTest extends TestCase
             ->assertJsonValidationErrors(['agreement_file']);
     }
 
-    public function test_admin_edits_the_agreement_and_a_full_dealer_import_keeps_it(): void
+    public function test_the_form_asks_an_email_until_the_master_dealer_has_one_and_keeps_an_existing_email(): void
     {
-        $dealer = $this->dealer();
+        $withoutEmail = $this->dealer(['agreement_url' => self::MASTER_AGREEMENT]);
+        $withEmail = $this->dealer(['kode_bt' => 'BT08888', 'id_realme' => 'DLBB0002', 'dealer_name' => 'TOKO SUDAH EMAIL',
+            'agreement_url' => self::MASTER_AGREEMENT, 'email' => 'lama@toko.test']);
+        $otherStore = ['id_real' => 'DLBB0002', 'kode_bt' => 'BT08888', 'dealer_name' => 'TOKO SUDAH EMAIL'];
+
+        // Form publik hanya tahu toko sudah punya email, emailnya tidak dikirim
+        $this->getJson('/api/dealers/suggestions?query=TOKO', ['X-Area' => 'jabar'])
+            ->assertJsonPath('data.0.has_email', false)
+            ->assertJsonPath('data.1.has_email', true)
+            ->assertJsonMissingPath('data.1.email');
+
+        // Toko tanpa email di Master Dealer: email wajib diisi dengan format yang benar
+        $this->submitForm(['email' => null])->assertStatus(422)->assertJsonValidationErrors(['email']);
+        $this->submitForm(['email' => 'bukan email'])->assertStatus(422)->assertJsonValidationErrors(['email']);
+
+        $this->submitForm(['email' => 'Jaya.Selular@Gmail.com'])->assertOk();
+        $this->assertSame('jaya.selular@gmail.com', $withoutEmail->fresh()->email);
+        $this->assertSame('jaya.selular@gmail.com', ProgramSubmission::where('id_real', 'DLAA0001')->value('email'));
+
+        // Toko yang sudah punya email boleh mengosongkannya, dan email di Master Dealer tidak ditimpa
+        $this->submitForm($otherStore + ['email' => null])->assertOk();
+        $this->submitForm($otherStore + ['email' => 'baru@toko.test'])->assertOk();
+        $this->assertSame('lama@toko.test', $withEmail->fresh()->email);
+        $this->assertSame('baru@toko.test', ProgramSubmission::where('id_real', 'DLBB0002')->latest('id')->value('email'));
+    }
+
+    public function test_admin_edits_the_agreement_and_a_full_dealer_import_keeps_it_and_the_email(): void
+    {
+        // Email toko (mis. dari Form Program) juga tidak ada di file CV TOP
+        $dealer = $this->dealer(['email' => 'jaya.selular@gmail.com']);
 
         $this->actingAs(User::factory()->create(['role' => 'admin']))
             ->putJson("/api/dealers/{$dealer->id}", ['kode_bt' => 'BT07777', 'dealer_name' => 'TOKO JAYA SELULAR', 'agreement_url' => self::MASTER_AGREEMENT])
@@ -382,6 +412,7 @@ class DealerAgreementTest extends TestCase
         app(DealerImportService::class)->import($path, replaceExisting: true);
 
         $this->assertSame(self::MASTER_AGREEMENT, Dealer::withoutGlobalScopes()->where('kode_bt', 'BT07777')->value('agreement_url'));
+        $this->assertSame('jaya.selular@gmail.com', Dealer::withoutGlobalScopes()->where('kode_bt', 'BT07777')->value('email'));
     }
 
     public function test_the_dealer_list_filters_stores_with_or_without_an_agreement(): void

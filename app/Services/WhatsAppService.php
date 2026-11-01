@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AppSetting;
 use App\Models\ArContact;
 use App\Models\DataProgram;
 use App\Models\Invoice;
@@ -9,6 +10,7 @@ use App\Models\ProgramSubmission;
 use App\Models\WhatsAppLog;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Exception;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -18,7 +20,7 @@ use Illuminate\Support\Str;
 class WhatsAppService
 {
     /**
-     * How many days the confirmation link sent to telemarketing and AR stays valid.
+     * How many days the confirmation link sent to telemarketing, AR and the tax team stays valid.
      */
     public const CONFIRM_LINK_DAYS = 30;
 
@@ -231,7 +233,7 @@ class WhatsAppService
         $lines[] = 'Catatan:';
         $lines[] = '1. Tanda tangan & cap maks. 30 hari sejak tanggal terbit.';
         $lines[] = '2. Untuk Dealer PKP, terbitkan Faktur Pajak sesuai tanggal berjalan jika lewat tgl 5.';
-        $lines[] = '3. Dokumen '.$invoice->brandName().' upload ke: '.$invoice->documentUploadUrl($this->resolveBaseUrl());
+        $lines[] = '3. Dokumen '.$invoice->brandName().' upload ke: '.$invoice->documentUploadUrl();
         $lines[] = '';
         $lines[] = 'Terima kasih atas kerja sama Anda.';
         $lines[] = '';
@@ -312,8 +314,20 @@ class WhatsAppService
                 return null;
             }
 
-            $filename = "Invoice_{$invoice->invoice_number}.pdf";
+            return $this->mirrorPublicly($pdfContent, "Invoice_{$invoice->invoice_number}.pdf");
+        } catch (Exception $e) {
+            Log::warning("Gagal mirror PDF invoice ke host publik: {$e->getMessage()}");
+        }
 
+        return null;
+    }
+
+    /**
+     * Upload a PDF to a temporary public host (local development), so the WhatsApp gateway can fetch it.
+     */
+    public function mirrorPublicly(string $pdfContent, string $filename): ?string
+    {
+        try {
             // 1. Primary: Litterbox (Catbox.moe) - 72h retention, direct raw PDF binary stream
             try {
                 $response = Http::withoutVerifying()
@@ -353,6 +367,142 @@ class WhatsAppService
         }
 
         return null;
+    }
+
+    /**
+     * Send a PDF document with a caption to a WhatsApp number, e.g. the invoices of a region to its telemarketing.
+     *
+     * @return array{success: bool, message: string, provider_id: ?string}
+     */
+    public function sendDocument(string $phone, string $text, string $pdfUrl, string $filename, string $clientReference): array
+    {
+        $cleanPhone = $this->formatPhone($phone);
+
+        if (empty($cleanPhone)) {
+            return [
+                'success' => false,
+                'message' => 'Nomor WhatsApp tidak valid atau belum tersedia.',
+                'provider_id' => null,
+            ];
+        }
+
+        $token = config('services.wag.token');
+
+        if (empty($token)) {
+            return [
+                'success' => false,
+                'message' => 'WAG_TOKEN belum dikonfigurasi pada sistem.',
+                'provider_id' => null,
+            ];
+        }
+
+        $uuid = Str::uuid()->toString();
+
+        $payload = [
+            'idempotency_key' => $uuid,
+            'recipient' => [
+                'type' => 'phone',
+                'value' => $cleanPhone,
+            ],
+            'message' => [
+                'type' => 'document',
+                'text' => mb_substr($text, 0, 950),
+                'attachment' => [
+                    'url' => $pdfUrl,
+                    'filename' => $filename,
+                    'mime_type' => 'application/pdf',
+                ],
+            ],
+            'purpose' => 'transactional',
+            'mode' => 'async',
+            'route_key' => 'default',
+            'client_reference' => $clientReference,
+        ];
+
+        try {
+            $client = Http::withToken($token)
+                ->acceptJson()
+                ->asJson()
+                ->withHeaders([
+                    'Idempotency-Key' => $uuid,
+                ])
+                ->timeout(25)
+                ->retry(2, 500, throw: false);
+
+            if (! config('services.wag.verify_ssl', false)) {
+                $client = $client->withoutVerifying();
+            }
+
+            $response = $client->post(rtrim(config('services.wag.url', 'https://waghub.mekayastudio.com'), '/').'/api/v1/messages', $payload);
+            $data = $response->json();
+
+            if ($response->successful() && ($response->status() === 200 || $response->status() === 201)) {
+                return [
+                    'success' => true,
+                    'message' => "{$filename} berhasil dikirim ke WhatsApp {$cleanPhone}.",
+                    'provider_id' => $data['data']['provider_message_id'] ?? ($data['data']['id'] ?? null),
+                ];
+            }
+
+            $errorMessage = $data['message'] ?? ('HTTP Error '.$response->status());
+            if (! empty($data['errors'])) {
+                $errorMessage .= ' ('.json_encode($data['errors']).')';
+            }
+
+            return [
+                'success' => false,
+                'message' => 'Gagal mengirim pesan WhatsApp: '.$errorMessage,
+                'provider_id' => null,
+            ];
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'Exception pengiriman WhatsApp: '.$e->getMessage(),
+                'provider_id' => null,
+            ];
+        }
+    }
+
+    /**
+     * Build the WhatsApp to a region's telemarketing that comes with one PDF of all its invoices.
+     *
+     * @param  Collection<int, Invoice>  $invoices
+     */
+    public function buildRegionInvoiceMessage(string $region, ?string $telemarketingName, Collection $invoices, string $pdfUrl): string
+    {
+        $rupiah = fn ($amount) => 'Rp '.number_format((float) $amount, 0, '.', ',');
+        $shown = $invoices->take(15)->values();
+
+        $lines = [
+            '*INVOICE PEMBAYARAN - SCM*',
+            "*Region {$region}* · {$invoices->count()} invoice",
+            'Kepada Yth. '.($telemarketingName ?: 'Tim Telemarketing'),
+            '',
+        ];
+
+        foreach ($shown as $index => $invoice) {
+            $lines[] = ($index + 1).". {$invoice->invoice_number} · {$invoice->dealer_name} · {$rupiah($invoice->netpay)}";
+        }
+        if ($invoices->count() > $shown->count()) {
+            $lines[] = '… dan '.($invoices->count() - $shown->count()).' invoice lainnya (lihat PDF).';
+        }
+
+        $first = $invoices->first();
+
+        return implode("\n", [
+            ...$lines,
+            '',
+            '*Total Net Pay: '.$rupiah($invoices->sum(fn (Invoice $invoice) => (float) $invoice->netpay)).'*',
+            'Semua invoice ada di PDF terlampir (satu invoice per halaman), atau via:',
+            $pdfUrl,
+            '',
+            'Catatan:',
+            '1. Tanda tangan & cap maks. 30 hari sejak tanggal terbit.',
+            '2. Untuk Dealer PKP, terbitkan Faktur Pajak sesuai tanggal berjalan jika lewat tgl 5.',
+            '3. Dokumen '.$first->brandName().' upload ke: '.$first->documentUploadUrl(),
+            '',
+            '_Ocean Space - Pesan otomatis sistem SCM Invoice_',
+        ]);
     }
 
     /**
@@ -856,6 +1006,200 @@ class WhatsAppService
                 'provider_id' => null,
             ];
         }
+    }
+
+    /**
+     * Ask the area's tax team (Master AR → Tim Pajak) to check the PPh of a claim AR has cut, with a link to fill in
+     * Cek Pajak, Selisih and Note PPh.
+     *
+     * @return array{success: bool, message: string, provider_id: ?string}
+     */
+    public function sendDataProgramTaxCheckNotification(DataProgram $dp, ?string $overridePhone = null): array
+    {
+        $baseUrl = $this->resolveBaseUrl();
+        if (! empty($baseUrl)) {
+            URL::forceRootUrl($baseUrl);
+        }
+
+        $confirmUrl = URL::temporarySignedRoute(
+            'data-programs.confirm',
+            now()->addDays(self::CONFIRM_LINK_DAYS),
+            ['id' => $dp->id, 'role' => 'pajak']
+        );
+
+        return $this->sendToTeam($dp, AppSetting::TAX_TEAM, 'Tim Pajak', $overridePhone, "DP-TAX-CHECK-{$dp->id}",
+            fn (?string $name) => $this->buildDataProgramTaxCheckMessage($dp, $confirmUrl, $name),
+            "Permintaan cek pajak {$dp->dealer_name}");
+    }
+
+    /**
+     * Send the result of the tax check of a cut claim (Cek Pajak, Selisih, Note PPh) to the area's SCM team
+     * (Master AR → Tim SCM).
+     *
+     * @return array{success: bool, message: string, provider_id: ?string}
+     */
+    public function sendDataProgramScmNotification(DataProgram $dp, ?string $overridePhone = null): array
+    {
+        return $this->sendToTeam($dp, AppSetting::SCM_TEAM, 'Tim SCM', $overridePhone, "DP-SCM-RESULT-{$dp->id}",
+            fn (?string $name) => $this->buildDataProgramScmMessage($dp, $name),
+            "Hasil cek pajak {$dp->dealer_name}");
+    }
+
+    /**
+     * Send a Data Program message to the area's tax or SCM team in Master AR (or the given number).
+     *
+     * @param  \Closure(?string): string  $buildMessage  the message for the team's name
+     * @return array{success: bool, message: string, provider_id: ?string}
+     */
+    protected function sendToTeam(DataProgram $dp, string $team, string $teamLabel, ?string $overridePhone, string $clientReference, \Closure $buildMessage, string $subject): array
+    {
+        $contact = AppSetting::teamContact($dp->areaEnum(), $team);
+        $cleanPhone = $this->formatPhone($overridePhone ?: $contact['whatsapp']);
+
+        if (empty($cleanPhone)) {
+            return [
+                'success' => false,
+                'message' => "Nomor WhatsApp {$teamLabel} belum diisi di Master AR.",
+                'provider_id' => null,
+            ];
+        }
+
+        $token = config('services.wag.token');
+
+        if (empty($token)) {
+            return [
+                'success' => false,
+                'message' => 'WAG_TOKEN belum dikonfigurasi pada sistem.',
+                'provider_id' => null,
+            ];
+        }
+
+        $uuid = Str::uuid()->toString();
+
+        $payload = [
+            'idempotency_key' => $uuid,
+            'recipient' => [
+                'type' => 'phone',
+                'value' => $cleanPhone,
+            ],
+            'message' => [
+                'type' => 'text',
+                'text' => $buildMessage($contact['name']),
+            ],
+            'purpose' => 'transactional',
+            'mode' => 'async',
+            'route_key' => 'default',
+            'client_reference' => $clientReference,
+        ];
+
+        try {
+            $client = Http::withToken($token)
+                ->acceptJson()
+                ->asJson()
+                ->withHeaders([
+                    'Idempotency-Key' => $uuid,
+                ])
+                ->timeout(25)
+                ->retry(2, 500, throw: false);
+
+            if (! config('services.wag.verify_ssl', false)) {
+                $client = $client->withoutVerifying();
+            }
+
+            $response = $client->post(rtrim(config('services.wag.url', 'https://waghub.mekayastudio.com'), '/').'/api/v1/messages', $payload);
+            $data = $response->json();
+
+            if ($response->successful() && ($response->status() === 200 || $response->status() === 201)) {
+                return [
+                    'success' => true,
+                    'message' => "{$subject} berhasil dikirim ke WhatsApp {$teamLabel}".($contact['name'] && ! $overridePhone ? " {$contact['name']}" : '')." ({$cleanPhone}).",
+                    'provider_id' => $data['data']['provider_message_id'] ?? ($data['data']['id'] ?? null),
+                ];
+            }
+
+            $errorMessage = $data['message'] ?? ('HTTP Error '.$response->status());
+            if (! empty($data['errors'])) {
+                $errorMessage .= ' ('.json_encode($data['errors']).')';
+            }
+
+            return [
+                'success' => false,
+                'message' => "Gagal mengirim pesan WhatsApp ke {$teamLabel}: ".$errorMessage,
+                'provider_id' => null,
+            ];
+        } catch (Exception $e) {
+            return [
+                'success' => false,
+                'message' => "Exception pengiriman WhatsApp ke {$teamLabel}: ".$e->getMessage(),
+                'provider_id' => null,
+            ];
+        }
+    }
+
+    /**
+     * Build the WhatsApp asking the tax team to check the PPh of a claim AR has cut.
+     */
+    public function buildDataProgramTaxCheckMessage(DataProgram $dp, string $confirmUrl, ?string $taxTeamName = null): string
+    {
+        $rupiah = fn ($amount) => 'Rp '.number_format((float) ($amount ?? 0), 0, ',', '.');
+        $npwp = trim(($dp->npwp ?: '').' '.($dp->nama_npwp ? "({$dp->nama_npwp})" : ''));
+
+        $lines = [
+            '*CEK PAJAK KLAIM SUDAH DIPOTONG (DATA PROGRAM)*',
+            '',
+            'Halo '.($taxTeamName ?: 'Tim Pajak').', klaim program berikut sudah DIPOTONG oleh AR. Mohon cek PPh-nya, lalu isi Cek Pajak, Selisih, dan Note PPh lewat tautan di bawah:',
+            '',
+            '*Kode BT / ID Real:* '.($dp->kode_bt ?: '-'),
+            '*Dealer:* '.($dp->dealer_name ?: '-'),
+            '*Region:* '.($dp->region ?: ($dp->big_region ?: '-')),
+            '*Program:* '.($dp->program_name ?: ($dp->program ?: '-')),
+            '*Wajib Pajak / Tarif PPh:* '.($dp->wajib_pajak ?: '-').' / '.($dp->trf_pph ?: '-'),
+            '*NPWP:* '.($npwp ?: '-'),
+            '*DPP:* '.$rupiah($dp->dpp),
+            '*PPN:* '.$rupiah($dp->ppn),
+            '*PPh:* '.$rupiah($dp->nilai_pph),
+            '*Net Pay:* '.$rupiah($dp->net_pay),
+            '*Tgl Potong / No. Pembayaran:* '.($dp->tgl_potong_tf ?: '-').' / '.($dp->no_pembayaran ?: '-'),
+            '',
+            '👉 *[ KLIK: ISI CEK PAJAK ]*',
+            $confirmUrl,
+            '',
+            '_(Tautan ini aktif selama '.self::CONFIRM_LINK_DAYS.' hari)_',
+            '_Pesan otomatis dari Sistem SCM_',
+        ];
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Build the WhatsApp telling the SCM team the result of the tax check of a cut claim.
+     */
+    public function buildDataProgramScmMessage(DataProgram $dp, ?string $scmTeamName = null): string
+    {
+        $rupiah = fn ($amount) => 'Rp '.number_format((float) ($amount ?? 0), 0, ',', '.');
+
+        $lines = [
+            '*HASIL CEK PAJAK KLAIM (DATA PROGRAM)*',
+            '',
+            'Halo '.($scmTeamName ?: 'Tim SCM').', Tim Pajak sudah mengecek PPh klaim yang sudah dipotong AR berikut:',
+            '',
+            '*Kode BT / ID Real:* '.($dp->kode_bt ?: '-'),
+            '*Dealer:* '.($dp->dealer_name ?: '-'),
+            '*Region:* '.($dp->region ?: ($dp->big_region ?: '-')),
+            '*Program:* '.($dp->program_name ?: ($dp->program ?: '-')),
+            '*Net Pay:* '.$rupiah($dp->net_pay),
+            '*Tgl Potong / No. Pembayaran:* '.($dp->tgl_potong_tf ?: '-').' / '.($dp->no_pembayaran ?: '-'),
+            '*PPh:* '.$rupiah($dp->nilai_pph),
+            '',
+            '*Cek Pajak:* '.($dp->cek_pajak_tarif ?: '-'),
+            '*Selisih:* '.$rupiah($dp->selisih),
+            '*Note PPh:* '.($dp->note_pph ?: '-'),
+            '*Dicek:* '.($dp->tax_checked_at?->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i')).' WIB',
+            '',
+            '_Pesan otomatis dari Sistem SCM_',
+        ];
+
+        return implode("\n", $lines);
     }
 
     /**

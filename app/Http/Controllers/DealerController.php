@@ -57,8 +57,8 @@ class DealerController extends Controller
 
     /**
      * Export the dealers of the selected area (with the list's search & filters) in the CV TOP master file layout,
-     * so the file can be edited and imported again. The store's agreement is a last "Agreement" column (a short
-     * "Link AGR" that opens the document), which the import ignores.
+     * so the file can be edited and imported again. The store's email and agreement are last "Email" and "Agreement"
+     * columns (the agreement a short "Link AGR" that opens the document), which the import ignores.
      */
     public function export(Request $request, SpreadsheetExport $export, AreaContext $areaContext): StreamedResponse
     {
@@ -80,13 +80,14 @@ class DealerController extends Controller
             $dealer->telemarketing_phone,
             $dealer->region,
             $dealer->sales_person,
+            $dealer->email,
             $dealer->agreement_url ? SpreadsheetExport::link($dealer->agreement_url, 'Link AGR') : null,
         ]);
 
         return $export->download(
             'master_dealer_'.$area->value.'_'.now()->format('Ymd_His').'.xlsx',
             'Master Dealer '.$area->label(),
-            ['ID Customer', 'Nama Customer', 'Alias', 'Alamat', 'ID GS', 'Nama GS', 'Status GS', 'NPWP/NIK', 'NAMA NPWP/NIK', 'Reffnote', 'Jenis NPWP', 'Telemarketing', 'No. WA Telemarketing', 'Big Area', 'SALES AREA', 'Agreement'],
+            ['ID Customer', 'Nama Customer', 'Alias', 'Alamat', 'ID GS', 'Nama GS', 'Status GS', 'NPWP/NIK', 'NAMA NPWP/NIK', 'Reffnote', 'Jenis NPWP', 'Telemarketing', 'No. WA Telemarketing', 'Big Area', 'SALES AREA', 'Email', 'Agreement'],
             $rows
         );
     }
@@ -110,7 +111,8 @@ class DealerController extends Controller
                     ->orWhere('telemarketing', 'like', "%{$search}%")
                     ->orWhere('sales_person', 'like', "%{$search}%")
                     ->orWhere('pic_name', 'like', "%{$search}%")
-                    ->orWhere('whatsapp', 'like', "%{$search}%");
+                    ->orWhere('whatsapp', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
 
@@ -280,17 +282,18 @@ class DealerController extends Controller
         // Jumlah semua toko yang cocok; daftar dikirim per halaman (offset) supaya form bisa memuat lanjutannya
         $total = (clone $query)->count();
 
-        // Toko tanpa ID Realme (ID GS) memakai kode BT sebagai ID-nya; link agreement tidak dikirim ke form publik
+        // Toko tanpa ID Realme (ID GS) memakai kode BT sebagai ID-nya; link agreement & email tidak dikirim ke form publik
         $suggestions = $query->orderBy('dealer_name')
             ->orderBy('id')
             ->offset($offset)
             ->limit($limit)
-            ->get(['id', 'id_realme', 'dealer_name', 'region', 'kode_bt', 'whatsapp', 'npwp_type', 'sales_person', 'agreement_url'])
+            ->get(['id', 'id_realme', 'dealer_name', 'region', 'kode_bt', 'whatsapp', 'npwp_type', 'sales_person', 'agreement_url', 'email'])
             ->map(fn (Dealer $dealer) => [
-                ...Arr::except($dealer->toArray(), ['agreement_url']),
+                ...Arr::except($dealer->toArray(), ['agreement_url', 'email']),
                 'id_realme' => $dealer->id_realme ?: $dealer->kode_bt,
                 'is_pkp' => $dealer->isPkp(),
                 'has_agreement' => filled($dealer->agreement_url),
+                'has_email' => filled($dealer->email),
             ]);
 
         return response()->json([

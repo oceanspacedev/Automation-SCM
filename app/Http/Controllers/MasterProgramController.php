@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\MasterProgram;
 use App\Services\BrandContext;
+use App\Services\DataProgramSyncService;
 use App\Services\SpreadsheetExport;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -21,6 +22,16 @@ class MasterProgramController extends Controller
      */
     protected const IMPORT_OPTIONAL_COLUMNS = [
         'period' => ['PERIODE'],
+    ];
+
+    /**
+     * @var array<string, string>
+     */
+    private const VALIDATION_MESSAGES = [
+        'name.required' => 'Nama Program wajib diisi.',
+        'name.unique' => 'Nama program ini sudah ada di Master Program.',
+        'code.required' => 'Kode program wajib diisi.',
+        'code.unique' => 'Kode program ini sudah dipakai program lain.',
     ];
 
     /**
@@ -126,9 +137,9 @@ class MasterProgramController extends Controller
     }
 
     /**
-     * Store a newly created master program.
+     * Store a newly created master program; Data Program rows of that program name without a code get its code.
      */
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, DataProgramSyncService $syncService): JsonResponse
     {
         $request->merge(['code' => MasterProgram::normalizeCode($request->input('code')) ?? MasterProgram::nextCode()]);
 
@@ -142,7 +153,7 @@ class MasterProgramController extends Controller
             'period' => ['nullable', 'string', 'max:100'],
             'description' => ['nullable', 'string'],
             'is_active' => ['boolean'],
-        ]);
+        ], self::VALIDATION_MESSAGES);
 
         $validated['name'] = trim($validated['name']);
         if (! empty($validated['category'])) {
@@ -154,20 +165,24 @@ class MasterProgramController extends Controller
         $validated['is_active'] = $validated['is_active'] ?? true;
 
         $program = MasterProgram::create($validated);
+        $filled = $syncService->fillProgramCode($program);
 
         return response()->json([
             'success' => true,
-            'message' => 'Master Program berhasil ditambahkan.',
+            'message' => 'Master Program berhasil ditambahkan.'.$this->filledMessage($program, $filled),
             'data' => $program,
+            'data_program_filled' => $filled,
         ], 201);
     }
 
     /**
-     * Update the specified master program.
+     * Update the specified master program; Data Program rows of its name without a code (or with its previous code)
+     * get the new code.
      */
-    public function update(Request $request, int $id): JsonResponse
+    public function update(Request $request, int $id, DataProgramSyncService $syncService): JsonResponse
     {
         $program = MasterProgram::findOrFail($id);
+        $previousCode = $program->code;
 
         $request->merge(['code' => MasterProgram::normalizeCode($request->input('code'))]);
 
@@ -178,7 +193,7 @@ class MasterProgramController extends Controller
             'period' => ['nullable', 'string', 'max:100'],
             'description' => ['nullable', 'string'],
             'is_active' => ['boolean'],
-        ]);
+        ], self::VALIDATION_MESSAGES);
 
         $validated['name'] = trim($validated['name']);
         if (! empty($validated['category'])) {
@@ -189,12 +204,22 @@ class MasterProgramController extends Controller
         }
 
         $program->update($validated);
+        $filled = $syncService->fillProgramCode($program, $previousCode);
 
         return response()->json([
             'success' => true,
-            'message' => 'Master Program berhasil diperbarui.',
+            'message' => 'Master Program berhasil diperbarui.'.$this->filledMessage($program, $filled),
             'data' => $program,
+            'data_program_filled' => $filled,
         ]);
+    }
+
+    /**
+     * Note for the save message when Data Program rows got the program's code.
+     */
+    private function filledMessage(MasterProgram $program, int $filled): string
+    {
+        return $filled > 0 ? " Kolom Program di {$filled} baris Data Program \"{$program->name}\" terisi {$program->code}." : '';
     }
 
     /**
@@ -215,7 +240,7 @@ class MasterProgramController extends Controller
      * Import master programs from an Excel/CSV sheet with columns PROGRAM, NAMA PROGRAM, PERIODE.
      * Rows are matched by program code first, then by program name, and updated in place.
      */
-    public function import(Request $request): JsonResponse
+    public function import(Request $request, DataProgramSyncService $syncService): JsonResponse
     {
         $request->validate([
             'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:10240'],
@@ -230,6 +255,7 @@ class MasterProgramController extends Controller
         $created = 0;
         $updated = 0;
         $skipped = 0;
+        $filled = 0;
 
         foreach (array_slice($rows, $headerIndex + 1) as $row) {
             $code = MasterProgram::normalizeCode((string) ($row[$columns['code']] ?? ''));
@@ -251,6 +277,7 @@ class MasterProgramController extends Controller
             }
 
             $program ??= new MasterProgram(['is_active' => true]);
+            $previousCode = $program->code;
             $program->fill(['code' => $code, 'name' => $name]);
 
             foreach (array_keys(self::IMPORT_OPTIONAL_COLUMNS) as $attribute) {
@@ -262,14 +289,17 @@ class MasterProgramController extends Controller
 
             $program->exists ? $updated++ : $created++;
             $program->save();
+            $filled += $syncService->fillProgramCode($program, $previousCode);
         }
 
         return response()->json([
             'success' => true,
-            'message' => "Import selesai: {$created} program baru, {$updated} diperbarui, {$skipped} baris dilewati.",
+            'message' => "Import selesai: {$created} program baru, {$updated} diperbarui, {$skipped} baris dilewati."
+                .($filled > 0 ? " Kolom Program di {$filled} baris Data Program terisi." : ''),
             'created' => $created,
             'updated' => $updated,
             'skipped' => $skipped,
+            'data_program_filled' => $filled,
         ]);
     }
 

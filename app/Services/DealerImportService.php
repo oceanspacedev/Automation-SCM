@@ -176,10 +176,12 @@ class DealerImportService
         $regionsCreated = [];
 
         DB::transaction(function () use ($dealers, $replaceExisting, &$regionsCreated) {
-            // Agreement toko tidak ada di file CV TOP: saat "Ganti semua", simpan dulu lalu pasang lagi ke kode BT yang sama
-            $agreements = collect();
+            // Agreement & email toko tidak ada di file CV TOP: saat "Ganti semua", simpan dulu lalu pasang lagi ke kode BT yang sama
+            $kept = collect();
             if ($replaceExisting) {
-                $agreements = Dealer::withoutGlobalScopes()->whereNotNull('agreement_url')->get(['kode_bt', 'agreement_url', 'agreement_updated_at']);
+                $kept = Dealer::withoutGlobalScopes()
+                    ->where(fn ($q) => $q->whereNotNull('agreement_url')->orWhereNotNull('email'))
+                    ->get(['kode_bt', 'agreement_url', 'agreement_updated_at', 'email']);
                 Dealer::withoutGlobalScopes()->delete();
             }
 
@@ -192,10 +194,11 @@ class DealerImportService
                 );
             }
 
-            foreach ($agreements as $agreement) {
-                Dealer::withoutGlobalScopes()->where('kode_bt', $agreement->kode_bt)->update([
-                    'agreement_url' => $agreement->agreement_url,
-                    'agreement_updated_at' => $agreement->agreement_updated_at,
+            foreach ($kept as $dealer) {
+                Dealer::withoutGlobalScopes()->where('kode_bt', $dealer->kode_bt)->update([
+                    'agreement_url' => $dealer->agreement_url,
+                    'agreement_updated_at' => $dealer->agreement_updated_at,
+                    'email' => $dealer->email,
                 ]);
             }
 

@@ -415,6 +415,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { downloadExport } from '@/lib/download';
+import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
 import {
   ChevronRightIcon,
   ChevronLeftIcon,
@@ -455,8 +456,11 @@ const formData = reactive({
   is_active: true,
 });
 
-async function fetchCustomers(page = 1) {
-  isLoading.value = true;
+const startCustomersRequest = createRequestTracker();
+
+async function fetchCustomers(page = 1, { silent = false } = {}) {
+  const isLatest = startCustomersRequest();
+  if (!silent) isLoading.value = true;
   currentPage.value = page;
 
   try {
@@ -467,6 +471,7 @@ async function fetchCustomers(page = 1) {
       is_active: filterStatus.value !== 'all' ? filterStatus.value : undefined,
     };
     const res = await axios.get('/api/customers', { params });
+    if (!isLatest()) return;
     if (res.data?.success) {
       customers.value = res.data.data.data || [];
       totalRows.value = res.data.data.total || 0;
@@ -474,11 +479,15 @@ async function fetchCustomers(page = 1) {
       perPage.value = res.data.data.per_page || 20;
     }
   } catch (e) {
-    alert('Gagal memuat data badan usaha: ' + (e.response?.data?.message || e.message));
+    if (!silent) alert('Gagal memuat data badan usaha: ' + (e.response?.data?.message || e.message));
   } finally {
-    isLoading.value = false;
+    if (!silent && isLatest()) isLoading.value = false;
   }
 }
+
+useAutoRefresh(() => fetchCustomers(currentPage.value, { silent: true }), {
+  isPaused: () => isLoading.value || isModalOpen.value || customerToDelete.value !== null || isSaving.value || isDeleting.value,
+});
 
 function handleSearchInput() {
   if (searchTimeout) clearTimeout(searchTimeout);
