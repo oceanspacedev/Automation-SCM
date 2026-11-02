@@ -272,13 +272,32 @@ class WhatsAppService
     }
 
     /**
+     * Whether the WhatsApp gateway can fetch a URL from the internet: not localhost, a private network IP (e.g.
+     * 192.168.x.x when the app is opened over Wi-Fi), or a local domain such as invoice.test.
+     */
+    public function isPublicUrl(string $url): bool
+    {
+        $host = trim(strtolower((string) parse_url($url, PHP_URL_HOST)), '[]');
+
+        if ($host === '' || $host === 'localhost' || preg_match('/\.(localhost|test|local|internal)$/', $host)) {
+            return false;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return (bool) filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+        }
+
+        return true;
+    }
+
+    /**
      * Resolve publicly accessible URL for the invoice PDF document.
      */
     public function resolvePublicPdfUrl(Invoice $invoice): string
     {
         // 1. If base URL is public (e.g. staging IP, domain, tunnel), use it
         $baseUrl = $this->resolveBaseUrl();
-        if (! empty($baseUrl) && ! str_contains($baseUrl, 'localhost') && ! str_contains($baseUrl, '127.0.0.1')) {
+        if ($this->isPublicUrl($baseUrl)) {
             return "{$baseUrl}/invoices/{$invoice->id}/pdf";
         }
 
@@ -323,16 +342,17 @@ class WhatsAppService
     }
 
     /**
-     * Upload a PDF to a temporary public host (local development), so the WhatsApp gateway can fetch it.
+     * Upload a file (an invoice PDF or a ZIP of them) to a temporary public host (local development), so the
+     * WhatsApp gateway can fetch it.
      */
-    public function mirrorPublicly(string $pdfContent, string $filename): ?string
+    public function mirrorPublicly(string $content, string $filename): ?string
     {
         try {
-            // 1. Primary: Litterbox (Catbox.moe) - 72h retention, direct raw PDF binary stream
+            // 1. Primary: Litterbox (Catbox.moe) - 72h retention, direct raw binary stream
             try {
                 $response = Http::withoutVerifying()
                     ->timeout(15)
-                    ->attach('fileToUpload', $pdfContent, $filename)
+                    ->attach('fileToUpload', $content, $filename)
                     ->post('https://litterbox.catbox.moe/resources/internals/api.php', [
                         'reqtype' => 'fileupload',
                         'time' => '72h',
@@ -350,7 +370,7 @@ class WhatsAppService
             try {
                 $response = Http::withoutVerifying()
                     ->timeout(15)
-                    ->attach('file', $pdfContent, $filename)
+                    ->attach('file', $content, $filename)
                     ->post('https://tmpfiles.org/api/v1/upload');
 
                 if ($response->successful() && $rawUrl = $response->json('data.url')) {
@@ -363,18 +383,18 @@ class WhatsAppService
                 Log::warning("tmpfiles fallback mirror gagal: {$e->getMessage()}");
             }
         } catch (Exception $e) {
-            Log::warning("Gagal mirror PDF invoice ke host publik: {$e->getMessage()}");
+            Log::warning("Gagal mirror file invoice ke host publik: {$e->getMessage()}");
         }
 
         return null;
     }
 
     /**
-     * Send a PDF document with a caption to a WhatsApp number, e.g. the invoices of a region to its telemarketing.
+     * Send a document with a caption to a WhatsApp number, e.g. the ZIP of a region's invoices to its telemarketing.
      *
      * @return array{success: bool, message: string, provider_id: ?string}
      */
-    public function sendDocument(string $phone, string $text, string $pdfUrl, string $filename, string $clientReference): array
+    public function sendDocument(string $phone, string $text, string $fileUrl, string $filename, string $mimeType, string $clientReference): array
     {
         $cleanPhone = $this->formatPhone($phone);
 
@@ -408,9 +428,9 @@ class WhatsAppService
                 'type' => 'document',
                 'text' => mb_substr($text, 0, 950),
                 'attachment' => [
-                    'url' => $pdfUrl,
+                    'url' => $fileUrl,
                     'filename' => $filename,
-                    'mime_type' => 'application/pdf',
+                    'mime_type' => $mimeType,
                 ],
             ],
             'purpose' => 'transactional',
@@ -464,11 +484,11 @@ class WhatsAppService
     }
 
     /**
-     * Build the WhatsApp to a region's telemarketing that comes with one PDF of all its invoices.
+     * Build the WhatsApp to a region's telemarketing that comes with one ZIP of its invoice PDFs.
      *
      * @param  Collection<int, Invoice>  $invoices
      */
-    public function buildRegionInvoiceMessage(string $region, ?string $telemarketingName, Collection $invoices, string $pdfUrl): string
+    public function buildRegionInvoiceMessage(string $region, ?string $telemarketingName, Collection $invoices, string $fileUrl): string
     {
         $rupiah = fn ($amount) => 'Rp '.number_format((float) $amount, 0, '.', ',');
         $shown = $invoices->take(15)->values();
@@ -484,7 +504,7 @@ class WhatsAppService
             $lines[] = ($index + 1).". {$invoice->invoice_number} · {$invoice->dealer_name} · {$rupiah($invoice->netpay)}";
         }
         if ($invoices->count() > $shown->count()) {
-            $lines[] = '… dan '.($invoices->count() - $shown->count()).' invoice lainnya (lihat PDF).';
+            $lines[] = '… dan '.($invoices->count() - $shown->count()).' invoice lainnya (lihat ZIP).';
         }
 
         $first = $invoices->first();
@@ -493,8 +513,8 @@ class WhatsAppService
             ...$lines,
             '',
             '*Total Net Pay: '.$rupiah($invoices->sum(fn (Invoice $invoice) => (float) $invoice->netpay)).'*',
-            'Semua invoice ada di PDF terlampir (satu invoice per halaman), atau via:',
-            $pdfUrl,
+            'Semua invoice ada di file ZIP terlampir (satu PDF per invoice), atau via:',
+            $fileUrl,
             '',
             'Catatan:',
             '1. Tanda tangan & cap maks. 30 hari sejak tanggal terbit.',

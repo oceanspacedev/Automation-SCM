@@ -95,7 +95,7 @@ flowchart TD
 ### 2. Pengiriman Invoice
 
 - **Email ke dealer.** Tiap invoice dikirim ke email dealer dari kolom **Email** di file draft. Kalau akun Google Workspace sudah terhubung (badge "Gmail: …" di halaman Invoice, klik untuk menghubungkan), email dikirim lewat **Gmail API** dari akun pengirim yang dipilih (daftar di tabel `email_accounts`). Kalau belum terhubung, email dikirim lewat **SMTP** (`MAIL_*`).
-- **WhatsApp ke telemarketing per region.** Saat **Kirim (n)** atau **Kirim Semua**, invoice dikelompokkan per **Region** (kolom Region di file draft) dan nomor WA telemarketing tokonya di **Master Dealer** (dicari dari Kode BT, lalu Dealer Code). Satu kelompok dikirim sebagai **satu PDF**, satu invoice per halaman, bernama `Invoice Region <REGION>.pdf`. Contoh: 2 invoice region CIREBON terkirim sebagai `Invoice Region CIREBON.pdf` berisi 2 halaman. Pesan WA-nya mendaftar No Invoice, dealer, dan Net Pay tiap invoice beserta totalnya. Dikirim lewat WA Gateway (`WAG_*`).
+- **WhatsApp ke telemarketing per region.** Saat **Kirim (n)** atau **Kirim Semua**, invoice dikelompokkan per **Region** (kolom Region di file draft) dan nomor WA telemarketing tokonya di **Master Dealer** (dicari dari Kode BT, lalu Dealer Code). Satu kelompok dikirim sebagai **satu file ZIP** bernama `Invoice Region <REGION>.zip`, berisi PDF terpisah per invoice (`<No Invoice> - <Dealer>.pdf`, tidak digabung). Contoh: 2 invoice region CIREBON terkirim sebagai `Invoice Region CIREBON.zip` berisi `2004000091 - 888 CELL.pdf` dan `2005020202 - A1 CELL.pdf`. Pesan WA-nya mendaftar No Invoice, dealer, dan Net Pay tiap invoice beserta totalnya. Dikirim lewat WA Gateway (`WAG_*`).
 - Invoice yang tokonya belum punya nomor WA telemarketing di Master Dealer tetap dikirim email-nya, dan nomor invoicenya disebut di hasil pengiriman.
 - **Link upload dokumen** (agreement, CN/invoice, faktur pajak) di email dan WA invoice mengarah ke Form Program publik sesuai brand & area invoice, mis. `https://scm-customer.oceanspace.co.id/form/realme/jabar` dan `https://scm-customer.oceanspace.co.id/form/realme/jateng` (alamat situsnya: `PROGRAM_FORM_URL`).
 - **Cara kirim:** centang beberapa lalu **Kirim (n)**, atau **Kirim Semua**. Tombol **Kirim** per baris membuka form kirim satu invoice: email dan nomor WhatsApp tujuan diisi sendiri. Invoice yang sudah terkirim ditandai **Terkirim** dan tidak ikut terkirim ulang.
@@ -109,6 +109,11 @@ flowchart TD
   - pilih sel, klik dua kali, atau langsung ketik
   - **Enter** menyimpan
   - tarik kotak kecil di pojok sel ke bawah untuk mengisi baris berikutnya (angka bertambah otomatis; tahan **Ctrl** untuk menyalin apa adanya)
+- **Import No PO/SJ** (menu **Spreadsheet**): isi **No PO/SJ** dan **No Transaksi** sekaligus dari file Excel berkolom Kode BT, Nama Program, No PO/SJ, dan No. Trs.
+  - Baris dicocokkan dari **Kode BT + Nama Program** di semua area brand ini. "BTO…" sama dengan "BT0…"; spasi dan tanda baca nama program diabaikan.
+  - Sel kosong tidak menghapus nomor yang sudah ada; nomor yang berbeda diganti isi file.
+  - Hasil import menampilkan jumlah baris yang diperbarui, yang sudah sama, dan daftar baris yang tidak ditemukan.
+  - Baris yang berubah langsung dikirim ke Google Spreadsheet area masing-masing, supaya tidak tertimpa kosong saat sinkron berikutnya.
 - Kolom lain diubah lewat tombol **Edit**.
 - **Integrasi Google Spreadsheet** (opsional, per area): menu **Spreadsheet** untuk sinkron dari sheet atau mengirim perubahan ke sheet lewat Google Apps Script Web App. Baca [peringatan sinkron](#deploy-ke-production) sebelum memakai sinkron otomatis.
 
@@ -228,6 +233,7 @@ sequenceDiagram
 - **Lihat**: hasil uji kecocokan per baris (Data Program vs Form Program), **Uji Ulang**, **Riwayat**, **Kirim ke WA Telemarketing**.
 - **Edit**: ubah semua kolom baris.
 - No PO / No PO/SJ / No SJ: isi langsung di tabel seperti spreadsheet.
+- **Spreadsheet → Import No PO/SJ**: isi No PO/SJ dan No Transaksi dari Excel (dicocokkan dari Kode BT + Nama Program).
 
 ### Riwayat
 - **Riwayat Program**: log pencocokan (Sesuai, Dokumen Kurang, Selisih, Belum Ada Form) dengan nominal dan dokumen.

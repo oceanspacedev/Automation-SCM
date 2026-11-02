@@ -8,6 +8,9 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use RuntimeException;
+use ZipArchive;
 
 class InvoiceGenerator
 {
@@ -137,46 +140,64 @@ class InvoiceGenerator
      */
     public function renderAndSavePdf(Invoice $invoice): string
     {
-        $pdf = Pdf::loadView($this->viewName($invoice), ['invoice' => $invoice])
-            ->setPaper('a4', 'portrait')
-            ->setOptions([
-                'isHtml5ParserEnabled' => true,
-                'isRemoteEnabled' => true,
-                'defaultFont' => 'sans-serif',
-            ]);
-
         $filename = "invoices/{$invoice->invoice_number}.pdf";
-        Storage::disk('public')->put($filename, $pdf->output());
+        Storage::disk('public')->put($filename, $this->renderPdf($invoice));
 
         return $filename;
     }
 
     /**
-     * One PDF holding several invoices, each starting on a new page (e.g. all invoices of a region for its
-     * telemarketing). Each invoice uses its own layout; the layouts share their styles.
+     * One ZIP holding the PDF of each invoice, e.g. all invoices of a region for its telemarketing. Each PDF is
+     * named after its invoice, e.g. "2004000091 - 888 CELL.pdf".
      *
      * @param  iterable<Invoice>  $invoices
      */
-    public function renderCombinedPdf(iterable $invoices): string
+    public function renderZip(iterable $invoices): string
     {
-        $styles = [];
-        $pages = [];
+        $path = tempnam(sys_get_temp_dir(), 'invoices');
+        $zip = new ZipArchive;
 
-        foreach ($invoices as $invoice) {
-            $html = view($this->viewName($invoice), ['invoice' => $invoice])->render();
-
-            if (preg_match('#<style[^>]*>(.*?)</style>#is', $html, $style)) {
-                $styles[md5($style[1])] = $style[1];
+        try {
+            if ($zip->open($path, ZipArchive::OVERWRITE) !== true) {
+                throw new RuntimeException('File ZIP invoice tidak bisa dibuat.');
             }
-            $pages[] = preg_match('#<body[^>]*>(.*)</body>#is', $html, $body) ? $body[1] : $html;
+
+            foreach ($invoices as $invoice) {
+                $zip->addFromString($this->pdfFilename($invoice), $this->storedOrRenderedPdf($invoice));
+            }
+            $zip->close();
+
+            return file_get_contents($path);
+        } finally {
+            @unlink($path);
         }
+    }
 
-        $html = '<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><style>'.implode("\n", $styles)
-            .' .invoice-page + .invoice-page { page-break-before: always; }</style></head><body>'
-            .implode('', array_map(fn (string $page) => '<div class="invoice-page">'.$page.'</div>', $pages))
-            .'</body></html>';
+    /**
+     * The invoice's PDF saved when it was generated, or a fresh render when that file is missing.
+     */
+    private function storedOrRenderedPdf(Invoice $invoice): string
+    {
+        $disk = Storage::disk('public');
 
-        return Pdf::loadHTML($html)
+        return $invoice->pdf_path && $disk->exists($invoice->pdf_path)
+            ? $disk->get($invoice->pdf_path)
+            : $this->renderPdf($invoice);
+    }
+
+    /**
+     * File name of an invoice's PDF inside a ZIP: invoice number and dealer, without characters a file name can't hold.
+     */
+    private function pdfFilename(Invoice $invoice): string
+    {
+        $name = Str::squish(preg_replace('#[\\\\/:*?"<>|]+#', ' ', "{$invoice->invoice_number} - {$invoice->dealer_name}"));
+
+        return "{$name}.pdf";
+    }
+
+    private function renderPdf(Invoice $invoice): string
+    {
+        return Pdf::loadView($this->viewName($invoice), ['invoice' => $invoice])
             ->setPaper('a4', 'portrait')
             ->setOptions([
                 'isHtml5ParserEnabled' => true,

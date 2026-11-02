@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
+use ZipArchive;
 
 class InvoiceNotificationTest extends TestCase
 {
@@ -217,7 +218,7 @@ class InvoiceNotificationTest extends TestCase
         ]);
     }
 
-    public function test_batch_send_emails_each_dealer_and_whatsapps_one_pdf_per_region_to_telemarketing(): void
+    public function test_batch_send_emails_each_dealer_and_whatsapps_one_zip_of_pdfs_per_region_to_telemarketing(): void
     {
         $this->fakeInvoiceChannels();
         Dealer::create(['kode_bt' => 'BT07238', 'dealer_name' => '6003 MOBILE', 'telemarketing' => 'Tele Bandung', 'telemarketing_phone' => '081111111111']);
@@ -240,16 +241,30 @@ class InvoiceNotificationTest extends TestCase
 
         Http::assertSentCount(2);
         Http::assertSent(fn ($request) => $request['recipient']['value'] === '6282222222222'
-            && $request['message']['attachment']['filename'] === 'Invoice Region CIREBON.pdf'
+            && $request['message']['attachment']['filename'] === 'Invoice Region CIREBON.zip'
+            && $request['message']['attachment']['mime_type'] === 'application/zip'
             && str_contains($request['message']['text'], 'CN-REG-002')
             && str_contains($request['message']['text'], 'CN-REG-003')
             && ! str_contains($request['message']['text'], 'CN-REG-001')
             && str_contains($request['message']['text'], '/form/realme/jabar'));
         Http::assertSent(fn ($request) => $request['recipient']['value'] === '6281111111111'
-            && $request['message']['attachment']['filename'] === 'Invoice Region BANDUNG.pdf');
+            && $request['message']['attachment']['filename'] === 'Invoice Region BANDUNG.zip');
 
-        $cirebonPdf = collect(Storage::disk('public')->files('invoices/regions'))->first(fn (string $path) => str_contains($path, 'cirebon'));
-        $this->assertSame(2, preg_match_all('#/Type\s*/Page[^s]#', Storage::disk('public')->get($cirebonPdf)));
+        // The CIREBON ZIP holds a separate one-page PDF per invoice
+        $cirebonZip = collect(Storage::disk('public')->files('invoices/regions'))->first(fn (string $path) => str_contains($path, 'cirebon'));
+        $zipPath = tempnam(sys_get_temp_dir(), 'region_zip');
+        file_put_contents($zipPath, Storage::disk('public')->get($cirebonZip));
+        $zip = new ZipArchive;
+        $this->assertTrue($zip->open($zipPath));
+        $pdfs = collect(range(0, $zip->numFiles - 1))->mapWithKeys(fn (int $index) => [$zip->getNameIndex($index) => $zip->getFromIndex($index)]);
+        $zip->close();
+        unlink($zipPath);
+
+        $this->assertSame(['CN-REG-002 - 888 CELL.pdf', 'CN-REG-003 - A1 CELL.pdf'], $pdfs->keys()->sort()->values()->all());
+        foreach ($pdfs as $pdf) {
+            $this->assertStringStartsWith('%PDF', $pdf);
+            $this->assertSame(1, preg_match_all('#/Type\s*/Page[^s]#', $pdf));
+        }
 
         foreach ($invoices as $invoice) {
             $invoice->refresh();
@@ -258,6 +273,23 @@ class InvoiceNotificationTest extends TestCase
             $this->assertNotNull($invoice->whatsapp_sent_at);
         }
         $this->assertDatabaseHas('whatsapp_logs', ['invoice_id' => $invoices[2]->id, 'recipient_phone' => '6282222222222', 'status' => 'sent']);
+    }
+
+    public function test_region_whatsapp_attachment_uses_a_public_mirror_when_the_app_is_opened_over_wifi(): void
+    {
+        $this->fakeInvoiceChannels();
+        config(['services.wag.public_url' => 'http://127.0.0.1:8000', 'app.url' => 'http://localhost:8000']);
+        Http::fake(['litterbox.catbox.moe/*' => Http::response('https://litter.catbox.moe/abc123.pdf')]);
+        Dealer::create(['kode_bt' => 'BT07238', 'dealer_name' => '6003 MOBILE', 'telemarketing' => 'Tele Bandung', 'telemarketing_phone' => '081111111111']);
+        $invoice = $this->regionInvoice('BANDUNG', 'BT07238', '6003 MOBILE', 'CN-REG-010', 'mobile6003@example.com');
+
+        // Opened from another device on the same Wi-Fi: the request host is the laptop's private IP
+        $this->postJson('http://192.168.30.254:8000/api/invoices/send-batch', ['ids' => [$invoice->id]])
+            ->assertOk()
+            ->assertJson(['success' => true, 'sent' => 1]);
+
+        Http::assertSent(fn ($request) => str_ends_with($request->url(), '/api/v1/messages')
+            && $request['message']['attachment']['url'] === 'https://litter.catbox.moe/abc123.pdf');
     }
 
     public function test_batch_send_reports_an_invoice_whose_store_has_no_telemarketing_number(): void

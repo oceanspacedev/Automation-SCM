@@ -7,6 +7,7 @@ use App\Models\DataProgram;
 use App\Models\ProgramApprovalLog;
 use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
+use App\Services\DataProgramPoImportService;
 use App\Services\DataProgramSyncService;
 use App\Services\ProgramApprovalFlow;
 use App\Services\ProgramReconciliationService;
@@ -17,6 +18,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
+use PhpOffice\PhpSpreadsheet\Exception as SpreadsheetException;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DataProgramController extends Controller
@@ -666,6 +669,35 @@ class DataProgramController extends Controller
             'message' => "{$dataPrograms->count()} baris Data Program diperbarui.",
             'data' => $dataPrograms->values(),
             'sheet_push' => $sheetPushResults,
+        ]);
+    }
+
+    /**
+     * Fill No PO/SJ and No Transaksi from an Excel file (Kode BT, Nama Program, No PO/SJ, No. Trs), matched by
+     * Kode BT + Nama Program, then send the changed rows to Google Spreadsheet.
+     */
+    public function importPo(Request $request, DataProgramPoImportService $importService): JsonResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'extensions:xlsx,xls,csv', 'max:51200'],
+        ], [
+            'file.required' => 'Pilih file Excel terlebih dahulu.',
+            'file.extensions' => 'File harus berformat .xlsx, .xls, atau .csv.',
+            'file.max' => 'Ukuran file maksimal 50 MB.',
+        ]);
+
+        try {
+            $result = $importService->import($request->file('file')->getRealPath());
+        } catch (RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (SpreadsheetException) {
+            return response()->json(['success' => false, 'message' => 'File Excel tidak bisa dibaca.'], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$result['updated']} baris Data Program diperbarui.",
+            'data' => $result,
         ]);
     }
 

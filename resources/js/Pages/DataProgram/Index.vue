@@ -81,6 +81,15 @@
               <DownloadIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
               <span>{{ isExporting ? 'Mengekspor...' : 'Export CSV' }}</span>
             </button>
+
+            <button
+              type="button"
+              @click="openPoImport"
+              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer"
+            >
+              <UploadIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
+              <span>Import No PO/SJ</span>
+            </button>
           </div>
         </div>
 
@@ -1179,6 +1188,13 @@
       @close="editModal.isOpen = false"
       @saved="handleDataProgramSaved"
     />
+
+    <!-- Modal Import No PO/SJ & No Transaksi -->
+    <DataProgramPoImportModal
+      :is-open="showPoImportModal"
+      @close="showPoImportModal = false"
+      @imported="fetchData(pagination.current_page, { silent: true })"
+    />
   </div>
 </template>
 
@@ -1213,10 +1229,12 @@ import {
   Eye as EyeIcon,
   Pencil as PencilIcon,
   Settings as SettingsIcon,
+  Upload as UploadIcon,
 } from 'lucide-vue-next';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 import ReconciliationHistoryModal from '@/components/ReconciliationHistoryModal.vue';
+import DataProgramPoImportModal from '@/components/DataProgramPoImportModal.vue';
 
 // ===== AREA (Jabar/Jateng) =====
 const { area } = useArea();
@@ -1375,6 +1393,14 @@ const handleTriggerSync = () => {
 const handleExportCsv = () => {
   showSpreadsheetDropdown.value = false;
   exportCsv();
+};
+
+// Import No PO/SJ & No Transaksi dari Excel (dicocokkan dari Kode BT + Nama Program)
+const showPoImportModal = ref(false);
+
+const openPoImport = () => {
+  showSpreadsheetDropdown.value = false;
+  showPoImportModal.value = true;
 };
 
 // Filter states
@@ -1555,7 +1581,7 @@ useAutoRefresh(() => fetchData(pagination.current_page, { silent: true }), {
   isPaused: () => !autoRefresh.value || isLoading.value || isSyncing.value
     || reconcilingRowId.value !== null || isSendingTelemarketing.value || sendingWaId.value !== null
     || activeCell.value !== null || cellEditor.open || fillBox.value !== null
-    || editModal.isOpen || urlModal.isOpen || telemarketingModal.isOpen
+    || editModal.isOpen || urlModal.isOpen || telemarketingModal.isOpen || showPoImportModal.value
     || showHistoryModal.value || showTestModal.value,
 });
 

@@ -731,7 +731,7 @@ const quickSendInvoice = async (inv) => {
 const askSendBatch = () => {
   if (selectedIds.value.length === 0 || sendingBatch.value) return;
   confirmState.title = 'Kirim Batch Notifikasi (Email & WA)';
-  confirmState.message = `Kirim ${selectedIds.value.length} invoice terpilih? Email dikirim ke masing-masing dealer. WhatsApp dikirim ke telemarketing per region: invoice satu region digabung jadi satu PDF (satu invoice per halaman).`;
+  confirmState.message = `Kirim ${selectedIds.value.length} invoice terpilih? Email dikirim ke masing-masing dealer. WhatsApp dikirim ke telemarketing per region: invoice satu region dikirim dalam satu file ZIP (satu PDF per invoice).`;
   confirmState.confirmText = `Ya, Kirim (${selectedIds.value.length}) Invoice`;
   confirmState.showSenderSelect = true;
   confirmState.action = async () => {
@@ -770,7 +770,7 @@ const executeSendBatch = async () => {
 const askSendAll = () => {
   if (sendingAll.value) return;
   confirmState.title = 'Kirim Semua Notifikasi Invoice';
-  confirmState.message = 'Kirim semua invoice yang belum terkirim? Email dikirim ke masing-masing dealer. WhatsApp dikirim ke telemarketing per region: invoice satu region digabung jadi satu PDF (satu invoice per halaman).';
+  confirmState.message = 'Kirim semua invoice yang belum terkirim? Email dikirim ke masing-masing dealer. WhatsApp dikirim ke telemarketing per region: invoice satu region dikirim dalam satu file ZIP (satu PDF per invoice).';
   confirmState.confirmText = 'Ya, Kirim Semua';
   confirmState.showSenderSelect = true;
   confirmState.action = async () => {
