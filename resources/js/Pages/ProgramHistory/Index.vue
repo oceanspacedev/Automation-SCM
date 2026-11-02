@@ -628,6 +628,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
+import { confirmAction } from '@/composables/useNotify';
 import AreaTabs from '@/components/AreaTabs.vue';
 import {
   Search as SearchIcon,
@@ -762,7 +763,7 @@ const openDetailModal = (row) => {
 };
 
 const handleTriggerBatchReconcile = async () => {
-  if (!confirm('Jalankan proses pencocokan antara Data Program dan Test Program?')) {
+  if (!(await confirmAction({ title: 'Jalankan pencocokan?', message: 'Data Program akan dicocokkan dengan Form Program sekarang.', confirmText: 'Ya, Jalankan' }))) {
     return;
   }
 

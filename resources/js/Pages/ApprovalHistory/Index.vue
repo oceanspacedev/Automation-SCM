@@ -13,7 +13,7 @@
       <div>
         <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Riwayat Approval</h1>
         <p class="text-xs text-gray-500 mt-0.5">
-          Alur potong klaim tiap baris Data Program: WA ke telemarketing, persetujuan dealer, WA ke AR, dipotong AR, dicek Tim Pajak, lalu hasilnya ke Tim SCM.
+          Alur potong klaim per baris Data Program: notifikasi WhatsApp ke Telemarketing, persetujuan dealer, notifikasi WhatsApp ke AR, dipotong oleh AR, notifikasi WhatsApp ke Tim Pajak, dicek Tim Pajak, lalu hasilnya dikirim ke Tim SCM.
         </p>
       </div>
       <button
@@ -33,7 +33,7 @@
 
         <!-- Filter tahap & pencarian; di layar kecil cari di atas, tahap di bawahnya -->
         <div class="flex flex-col-reverse sm:flex-row sm:items-center gap-2">
-          <div class="relative sm:w-60">
+          <div class="relative sm:w-72">
             <select
               v-model="stage"
               @change="fetchRows(1)"
@@ -93,7 +93,7 @@
                   <span v-if="step.state === 'current'" class="flow-runner"></span>
                 </span>
                 <StepDot :state="step.state" class="relative z-10 ring-4 ring-white" />
-                <p :class="['mt-1.5 text-[10px] font-medium leading-[14px]', stepLabelClass(step.state)]">{{ step.label }}</p>
+                <p :class="['mt-1.5 min-h-[28px] text-[10px] font-medium leading-[14px]', stepLabelClass(step.state)]">{{ step.label }}</p>
                 <!-- Tinggi baris tetap walau kosong, supaya semua langkah sejajar; nama panjang turun baris, tidak dipotong -->
                 <p :class="['w-full min-h-[14px] text-[10px] leading-[14px] break-words', step.state === 'waiting' ? 'text-gray-400' : 'text-gray-600']">
                   {{ displayName(step.person) }}
@@ -274,9 +274,9 @@ const waMessage = ref(null);
 
 // WA yang bisa dikirim (ulang) dari Detail: ke Tim Pajak selama belum dicek, lalu hasilnya ke Tim SCM bila belum terkirim
 const resendAction = computed(() => {
-  if (detail.value?.stage === 'cut') return { endpoint: 'send-wa-tax', label: 'Kirim WA ke Tim Pajak' };
+  if (detail.value?.stage === 'cut') return { endpoint: 'send-wa-tax', label: 'Kirim notifikasi WhatsApp ke Tim Pajak' };
   const scmStep = detail.value?.steps?.find((step) => step.key === 'scm');
-  if (detail.value?.stage === 'tax_checked' && scmStep && scmStep.state !== 'done') return { endpoint: 'send-wa-scm', label: 'Kirim hasil ke WA SCM' };
+  if (detail.value?.stage === 'tax_checked' && scmStep && scmStep.state !== 'done') return { endpoint: 'send-wa-scm', label: 'Kirim hasil cek pajak ke WhatsApp Tim SCM' };
   return null;
 });
 const pagination = reactive({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
@@ -314,7 +314,7 @@ const stepTime = (step, long = false) => {
 const STEP_STATE_LABELS = {
   done: 'Selesai',
   current: 'Menunggu',
-  waiting: 'Belum',
+  waiting: 'Belum dimulai',
   failed: 'Gagal terkirim',
   postponed: 'Ditunda',
 };

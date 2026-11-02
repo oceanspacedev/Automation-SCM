@@ -3,7 +3,7 @@
     <Transition name="modal-scale">
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-50 flex items-center justify-center p-4"
+        :class="['fixed inset-0 flex items-center justify-center p-4', layerClass]"
         @click.self="handleCancel"
       >
         <!-- Backdrop with soft blur -->
@@ -89,6 +89,8 @@ const props = defineProps({
   icon: { type: String, default: 'mail' },
   variant: { type: String, default: 'default' },
   loading: { type: Boolean, default: false },
+  // Lapisan (z-index); dialog konfirmasi global memakai lapisan di atas modal halaman
+  layerClass: { type: String, default: 'z-50' },
 });
 
 const emit = defineEmits(['update:modelValue', 'confirm', 'cancel']);

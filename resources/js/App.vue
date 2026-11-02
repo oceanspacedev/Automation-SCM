@@ -409,6 +409,9 @@
     <main :class="['flex-1 w-full', isStandalonePage ? 'p-0 m-0' : 'mx-auto px-4 sm:px-6 py-5']">
       <router-view :key="`${route.name}-${route.params.brand || ''}-${route.params.area || ''}`" />
     </main>
+
+    <!-- Notifikasi & konfirmasi untuk semua halaman (pengganti alert/confirm browser) -->
+    <NotificationHost />
   </div>
 </template>
 
@@ -428,6 +431,7 @@ import {
   navigationMenuTriggerStyle,
 } from '@/components/ui/navigation-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import NotificationHost from '@/components/NotificationHost.vue';
 import {
   Bot as BotIcon,
   CheckCircle2 as CheckCircle2Icon,

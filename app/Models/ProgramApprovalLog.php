@@ -79,7 +79,7 @@ class ProgramApprovalLog extends Model
 
         $contact = ArContact::forRegion($dataProgram->areaEnum(), $dataProgram->region, $dataProgram->big_region);
 
-        return $contact ? trim("{$contact->name} {$contact->whatsapp}") : 'AR default';
+        return $contact ? trim("{$contact->name} {$contact->whatsapp}") : 'Nomor AR default';
     }
 
     /**

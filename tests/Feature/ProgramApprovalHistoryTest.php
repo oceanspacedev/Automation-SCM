@@ -117,7 +117,7 @@ class ProgramApprovalHistoryTest extends TestCase
             && str_contains($request['message']['text'], "/dp/confirm/{$row->id}?")
             && str_contains($request['message']['text'], 'role=pajak'));
         $this->history(['stage' => 'cut'])
-            ->assertJsonPath('data.0.stage_label', 'Dipotong · menunggu cek pajak')
+            ->assertJsonPath('data.0.stage_label', 'Dipotong AR · menunggu Tim Pajak')
             ->assertJsonPath('data.0.steps.*.state', ['done', 'done', 'done', 'done', 'done', 'done', 'current', 'waiting']);
 
         // Hanya link Tim Pajak yang bisa mengisi cek pajak
@@ -155,6 +155,32 @@ class ProgramApprovalHistoryTest extends TestCase
             ->assertJsonPath('data.timeline.4.recipient', 'TIM PAJAK JABAR 081300000009')
             ->assertJsonPath('data.timeline.5.actor', 'Tim Pajak (link WA)')
             ->assertJsonPath('data.timeline.6.recipient', 'TIM SCM JABAR 081300000008');
+    }
+
+    public function test_the_confirmation_page_opens_the_uploaded_cn_agreement_and_faktur(): void
+    {
+        $row = $this->dataProgram([
+            'status_potong_purchase' => 'SUDAH POTONG',
+            'status_potong_ar' => 'DONE',
+            'wajib_pajak' => 'PRIBADI',
+            'cn' => 'https://files.contoh.test/cn-2610000201.pdf',
+            'agrement' => 'https://files.contoh.test/agreement-sinar.pdf',
+            'cek_fp' => '-',
+        ]);
+
+        $this->get(URL::temporarySignedRoute('data-programs.confirm', now()->addDay(), ['id' => $row->id, 'role' => 'pajak']))
+            ->assertOk()
+            ->assertSee('href="https://files.contoh.test/cn-2610000201.pdf"', false)
+            ->assertSee('href="https://files.contoh.test/agreement-sinar.pdf"', false)
+            ->assertSee('Faktur Pajak tidak wajib.');
+
+        // Toko PKP tanpa faktur: tertulis belum ada
+        $row->update(['wajib_pajak' => 'BADAN']);
+        $this->get(URL::temporarySignedRoute('data-programs.confirm', now()->addDay(), ['id' => $row->id, 'role' => 'telemarketing']))
+            ->assertOk()
+            ->assertSee('href="https://files.contoh.test/cn-2610000201.pdf"', false)
+            ->assertSee('Faktur Pajak belum ada.')
+            ->assertDontSee('tidak wajib');
     }
 
     public function test_a_tax_check_result_the_scm_team_did_not_get_can_be_sent_again_from_riwayat_approval(): void
@@ -233,7 +259,7 @@ class ProgramApprovalHistoryTest extends TestCase
         $this->history(['stage' => 'postponed'])
             ->assertJsonPath('data.0.steps.*.state', ['done', 'done', 'postponed', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting'])
             // Region tanpa AR di Master AR: WA ke nomor AR default
-            ->assertJsonPath('data.0.steps.3.person', 'AR default');
+            ->assertJsonPath('data.0.steps.3.person', 'Nomor AR default');
         $this->history(['stage' => 'waiting_telemarketing'])->assertJsonPath('data.0.steps.*.state', ['done', 'current', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting']);
         $cutRow = collect($this->history(['stage' => 'cut'])->assertJsonCount(2, 'data')->json('data'))->firstWhere('id', $cut->id);
         $this->assertSame('10/20/2026', $cutRow['steps'][4]['date']);

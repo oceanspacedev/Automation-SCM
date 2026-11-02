@@ -23,15 +23,15 @@ class ProgramApprovalController extends Controller
      * @var array<string, string>
      */
     private const EVENT_LABELS = [
-        ProgramApprovalLog::TELEMARKETING_NOTIFIED => 'WA ke telemarketing',
-        ProgramApprovalLog::TELEMARKETING_REMINDED => 'Pengingat ke telemarketing',
+        ProgramApprovalLog::TELEMARKETING_NOTIFIED => 'Notifikasi WhatsApp ke Telemarketing',
+        ProgramApprovalLog::TELEMARKETING_REMINDED => 'Pengingat WhatsApp ke Telemarketing',
         ProgramApprovalLog::APPROVED => 'Dealer setuju dipotong',
         ProgramApprovalLog::POSTPONED => 'Dealer menunda',
-        ProgramApprovalLog::AR_NOTIFIED => 'WA ke AR',
-        ProgramApprovalLog::CUT => 'Sudah dipotong AR',
-        ProgramApprovalLog::TAX_NOTIFIED => 'WA ke Tim Pajak',
+        ProgramApprovalLog::AR_NOTIFIED => 'Notifikasi WhatsApp ke AR',
+        ProgramApprovalLog::CUT => 'Dipotong oleh AR',
+        ProgramApprovalLog::TAX_NOTIFIED => 'Notifikasi WhatsApp ke Tim Pajak',
         ProgramApprovalLog::TAX_CHECKED => 'Dicek Tim Pajak',
-        ProgramApprovalLog::SCM_NOTIFIED => 'WA hasil ke Tim SCM',
+        ProgramApprovalLog::SCM_NOTIFIED => 'Notifikasi WhatsApp ke Tim SCM (hasil cek pajak)',
     ];
 
     public function __construct(private ProgramApprovalFlow $flow) {}

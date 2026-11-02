@@ -104,6 +104,7 @@
 <script setup>
 import { ref } from 'vue';
 import axios from 'axios';
+import { confirmAction } from '@/composables/useNotify';
 import {
   X as XIcon,
   UploadCloud as UploadCloudIcon,
@@ -144,7 +145,7 @@ const clearFile = () => {
 
 const upload = async () => {
   if (!selectedFile.value) return;
-  if (replaceExisting.value && !confirm('Bila file ini file CV TOP, semua dealer lama di Jawa Barat dan Jawa Tengah akan dihapus dan diganti isi file ini. Lanjutkan?')) return;
+  if (replaceExisting.value && !(await confirmAction({ title: 'Ganti semua dealer?', message: 'Bila file ini file CV TOP, semua dealer lama di Jawa Barat dan Jawa Tengah akan dihapus dan diganti isi file ini.', confirmText: 'Ya, Ganti Semua' }))) return;
 
   uploading.value = true;
   errorMessage.value = '';

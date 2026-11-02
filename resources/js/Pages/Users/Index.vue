@@ -489,6 +489,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
+import { notify } from '@/composables/useNotify';
 import { useAuth } from '@/composables/useAuth';
 import { useAutoRefresh } from '@/composables/useAutoRefresh';
 import {
@@ -695,7 +696,7 @@ const handleToggleStatus = async (user) => {
       user.is_active = res.data.data.is_active;
     }
   } catch (err) {
-    alert(err.response?.data?.message || 'Gagal mengubah status pengguna.');
+    notify.error(err.response?.data?.message || 'Gagal mengubah status pengguna.');
   }
 };
 
@@ -707,7 +708,7 @@ const handleApproveUser = async (user) => {
       await fetchUsers();
     }
   } catch (err) {
-    alert(err.response?.data?.message || 'Gagal menyetujui akun pengguna.');
+    notify.error(err.response?.data?.message || 'Gagal menyetujui akun pengguna.');
   }
 };
 
@@ -723,7 +724,7 @@ const executeDeleteUser = async () => {
     userToDelete.value = null;
     await fetchUsers();
   } catch (err) {
-    alert(err.response?.data?.message || 'Gagal menghapus pengguna.');
+    notify.error(err.response?.data?.message || 'Gagal menghapus pengguna.');
   } finally {
     isDeleting.value = false;
   }

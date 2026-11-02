@@ -601,6 +601,7 @@
 <script setup>
 import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
+import { notify } from '@/composables/useNotify';
 import AreaTabs from '@/components/AreaTabs.vue';
 import {
   ChevronRight as ChevronRightIcon,
@@ -709,7 +710,7 @@ async function analyzeRowWithAi(item, isSilent = false) {
     }
   } catch (err) {
     if (!isSilent) {
-      alert('Gagal menganalisis dokumen: ' + (err.response?.data?.message || err.message));
+      notify.error(err.response?.data?.message || err.message, { title: 'Gagal menganalisis dokumen' });
     }
   } finally {
     analyzingRowIds.value.delete(item.id);

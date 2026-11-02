@@ -666,6 +666,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
+import { notify } from '@/composables/useNotify';
 import AreaTabs from '@/components/AreaTabs.vue';
 import DealerImportModal from '@/components/DealerImportModal.vue';
 import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
@@ -776,7 +777,7 @@ async function fetchDealers(page = 1, { silent = false } = {}) {
       }
     }
   } catch (e) {
-    if (!silent) alert('Gagal memuat data dealer: ' + (e.response?.data?.message || e.message));
+    if (!silent) notify.error(e.response?.data?.message || e.message, { title: 'Gagal memuat data dealer' });
   } finally {
     if (!silent && isLatest()) isLoading.value = false;
   }
@@ -860,7 +861,7 @@ async function submitForm() {
     isModalOpen.value = false;
     await fetchDealers(currentPage.value);
   } catch (e) {
-    alert(e.response?.data?.message || 'Gagal menyimpan data dealer.');
+    notify.error(e.response?.data?.message || 'Gagal menyimpan data dealer.');
   } finally {
     isSaving.value = false;
   }
@@ -873,7 +874,7 @@ async function toggleDealerStatus(d) {
       d.is_active = res.data.data.is_active;
     }
   } catch (e) {
-    alert('Gagal mengubah status: ' + (e.response?.data?.message || e.message));
+    notify.error(e.response?.data?.message || e.message, { title: 'Gagal mengubah status' });
   }
 }
 
@@ -891,7 +892,7 @@ async function executeDelete() {
       await fetchDealers(currentPage.value);
     }
   } catch (e) {
-    alert(e.response?.data?.message || 'Gagal menghapus dealer.');
+    notify.error(e.response?.data?.message || 'Gagal menghapus dealer.');
   } finally {
     isDeleting.value = false;
   }

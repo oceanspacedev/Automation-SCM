@@ -414,6 +414,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
+import { notify } from '@/composables/useNotify';
 import { downloadExport } from '@/lib/download';
 import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
 import {
@@ -479,7 +480,7 @@ async function fetchCustomers(page = 1, { silent = false } = {}) {
       perPage.value = res.data.data.per_page || 20;
     }
   } catch (e) {
-    if (!silent) alert('Gagal memuat data badan usaha: ' + (e.response?.data?.message || e.message));
+    if (!silent) notify.error(e.response?.data?.message || e.message, { title: 'Gagal memuat data badan usaha' });
   } finally {
     if (!silent && isLatest()) isLoading.value = false;
   }
@@ -535,7 +536,7 @@ async function submitForm() {
     isModalOpen.value = false;
     await fetchCustomers(currentPage.value);
   } catch (e) {
-    alert(e.response?.data?.message || 'Gagal menyimpan data customer.');
+    notify.error(e.response?.data?.message || 'Gagal menyimpan data badan usaha.');
   } finally {
     isSaving.value = false;
   }
@@ -548,7 +549,7 @@ async function toggleCustomerStatus(c) {
       c.is_active = res.data.data.is_active;
     }
   } catch (e) {
-    alert('Gagal mengubah status: ' + (e.response?.data?.message || e.message));
+    notify.error(e.response?.data?.message || e.message, { title: 'Gagal mengubah status' });
   }
 }
 
@@ -566,7 +567,7 @@ async function executeDelete() {
       await fetchCustomers(currentPage.value);
     }
   } catch (e) {
-    alert(e.response?.data?.message || 'Gagal menghapus customer.');
+    notify.error(e.response?.data?.message || 'Gagal menghapus badan usaha.');
   } finally {
     isDeleting.value = false;
   }

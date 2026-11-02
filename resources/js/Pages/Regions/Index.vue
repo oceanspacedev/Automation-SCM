@@ -244,6 +244,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
+import { notify } from '@/composables/useNotify';
 import AreaTabs from '@/components/AreaTabs.vue';
 import { useArea } from '@/composables/useArea';
 import { useAutoRefresh } from '@/composables/useAutoRefresh';
@@ -335,7 +336,7 @@ const toggleStatus = async (r) => {
     const res = await axios.patch(`/api/regions/${r.id}/toggle-status`);
     r.is_active = res.data?.data?.is_active ?? !r.is_active;
   } catch (err) {
-    alert('Gagal mengubah status region');
+    notify.error('Gagal mengubah status region.');
   }
 };
 
@@ -346,7 +347,7 @@ const executeDelete = async () => {
     regionToDelete.value = null;
     fetchRegions();
   } catch (err) {
-    alert(err.response?.data?.message || 'Gagal menghapus region.');
+    notify.error(err.response?.data?.message || 'Gagal menghapus region.');
   } finally {
     isDeleting.value = false;
   }

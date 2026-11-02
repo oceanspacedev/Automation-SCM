@@ -209,6 +209,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue';
 import axios from 'axios';
+import { confirmAction } from '@/composables/useNotify';
 import { AlertTriangle as AlertTriangleIcon, ChevronRight as ChevronRightIcon, X as XIcon } from 'lucide-vue-next';
 
 const buttonClass = 'h-9 px-3.5 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap disabled:opacity-50';
@@ -377,7 +378,7 @@ async function save(key) {
 
 async function runNow(key) {
   // Yang dijalankan adalah pengaturan yang sudah disimpan
-  if (!confirm(RUN_CONFIRMATIONS[key] || 'Jalankan sekarang?')) return;
+  if (!(await confirmAction({ title: 'Jalankan sekarang?', message: RUN_CONFIRMATIONS[key] || 'Tugas ini akan dijalankan sekarang.', confirmText: 'Ya, Jalankan' }))) return;
 
   busy[key] = 'run';
   messages[key] = null;

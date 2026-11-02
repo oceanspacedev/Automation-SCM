@@ -54,28 +54,60 @@
             No WhatsApp {{ team.label }} belum diisi, jadi WhatsApp ke {{ team.label }} belum bisa dikirim.
           </p>
         </div>
-        <form @submit.prevent="saveTeam(team.key)" class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 lg:w-[520px] lg:shrink-0">
-          <input
-            type="text"
-            v-model="teamContacts[team.key].name"
-            :aria-label="`Nama ${team.label}`"
-            :placeholder="`Nama, cth: ${team.label}`"
-            class="w-full h-9 px-3 rounded-lg border border-gray-300 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-900"
-          />
-          <input
-            type="tel"
-            v-model="teamContacts[team.key].whatsapp"
-            :aria-label="`No WhatsApp ${team.label}`"
-            placeholder="No WhatsApp, cth: 081234567890"
-            class="w-full h-9 px-3 rounded-lg border border-gray-300 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-900"
-          />
-          <button
-            type="submit"
-            :disabled="savingTeam === team.key"
-            class="h-9 px-4 rounded-lg bg-gray-900 hover:bg-gray-800 text-white text-xs font-medium cursor-pointer disabled:opacity-50 whitespace-nowrap"
-          >
-            {{ savingTeam === team.key ? 'Menyimpan...' : 'Simpan' }}
-          </button>
+        <!-- Setelah disimpan isian terkunci; klik Edit untuk mengubah -->
+        <form @submit.prevent="saveTeam(team.key)" class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 lg:w-[560px] lg:shrink-0">
+          <div class="relative">
+            <input
+              :ref="(el) => { if (el) nameInputs[team.key] = el; }"
+              type="text"
+              v-model="teamContacts[team.key].name"
+              :readonly="!editingTeam[team.key]"
+              :aria-label="`Nama ${team.label}`"
+              :placeholder="`Nama, cth: ${team.label}`"
+              :class="[teamInputClass, editingTeam[team.key] ? editableInputClass : lockedInputClass]"
+            />
+            <LockIcon v-if="!editingTeam[team.key]" class="w-3.5 h-3.5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+          <div class="relative">
+            <input
+              type="tel"
+              v-model="teamContacts[team.key].whatsapp"
+              :readonly="!editingTeam[team.key]"
+              :aria-label="`No WhatsApp ${team.label}`"
+              placeholder="No WhatsApp, cth: 081234567890"
+              :class="[teamInputClass, editingTeam[team.key] ? editableInputClass : lockedInputClass]"
+            />
+            <LockIcon v-if="!editingTeam[team.key]" class="w-3.5 h-3.5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+          <div class="flex gap-2">
+            <button
+              v-if="!editingTeam[team.key]"
+              type="button"
+              @click="editTeam(team.key)"
+              class="h-9 px-4 flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium cursor-pointer whitespace-nowrap"
+            >
+              <PencilIcon class="w-3.5 h-3.5 text-gray-500" />
+              Edit
+            </button>
+            <template v-else>
+              <button
+                v-if="savedTeam[team.key].whatsapp"
+                type="button"
+                @click="cancelTeamEdit(team.key)"
+                :disabled="savingTeam === team.key"
+                class="h-9 px-3 flex-1 sm:flex-none rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium cursor-pointer disabled:opacity-50 whitespace-nowrap"
+              >
+                Batal
+              </button>
+              <button
+                type="submit"
+                :disabled="savingTeam === team.key"
+                class="h-9 px-4 flex-1 sm:flex-none rounded-lg bg-gray-900 hover:bg-gray-800 text-white text-xs font-medium cursor-pointer disabled:opacity-50 whitespace-nowrap"
+              >
+                {{ savingTeam === team.key ? 'Menyimpan...' : 'Simpan' }}
+              </button>
+            </template>
+          </div>
         </form>
       </div>
     </section>
@@ -323,8 +355,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted, nextTick } from 'vue';
 import axios from 'axios';
+import { notify } from '@/composables/useNotify';
 import AreaTabs from '@/components/AreaTabs.vue';
 import { useArea } from '@/composables/useArea';
 import { useAutoRefresh } from '@/composables/useAutoRefresh';
@@ -334,6 +367,7 @@ import {
   Search as SearchIcon,
   X as XIcon,
   Pencil as PencilIcon,
+  Lock as LockIcon,
   Trash2 as Trash2Icon,
 } from 'lucide-vue-next';
 
@@ -365,14 +399,36 @@ const TEAMS = [
 ];
 
 const teamContacts = reactive({ tax: { name: '', whatsapp: '' }, scm: { name: '', whatsapp: '' } });
-const savedTeamWhatsapp = reactive({ tax: '', scm: '' });
+const savedTeam = reactive({ tax: { name: '', whatsapp: '' }, scm: { name: '', whatsapp: '' } });
+const savedTeamWhatsapp = computed(() => ({ tax: savedTeam.tax.whatsapp, scm: savedTeam.scm.whatsapp }));
 const teamMessages = reactive({ tax: null, scm: null });
 const savingTeam = ref(null);
+// Tim yang sudah punya nomor tampil terkunci; tim tanpa nomor langsung bisa diisi
+const editingTeam = reactive({ tax: true, scm: true });
+const nameInputs = {};
+const teamInputClass = 'w-full h-9 pl-3 pr-8 rounded-lg border text-xs focus:outline-none';
+const lockedInputClass = 'bg-gray-50 border-gray-200 text-gray-600 cursor-default';
+const editableInputClass = 'bg-white border-gray-300 text-gray-800 focus:ring-1 focus:ring-gray-900';
 
 const fillTeam = (key, data) => {
-  teamContacts[key].name = data?.name || '';
-  teamContacts[key].whatsapp = data?.whatsapp || '';
-  savedTeamWhatsapp[key] = teamContacts[key].whatsapp;
+  savedTeam[key].name = data?.name || '';
+  savedTeam[key].whatsapp = data?.whatsapp || '';
+  teamContacts[key].name = savedTeam[key].name;
+  teamContacts[key].whatsapp = savedTeam[key].whatsapp;
+  editingTeam[key] = !savedTeam[key].whatsapp;
+};
+
+const editTeam = (key) => {
+  editingTeam[key] = true;
+  teamMessages[key] = null;
+  nextTick(() => nameInputs[key]?.focus());
+};
+
+const cancelTeamEdit = (key) => {
+  teamContacts[key].name = savedTeam[key].name;
+  teamContacts[key].whatsapp = savedTeam[key].whatsapp;
+  editingTeam[key] = false;
+  teamMessages[key] = null;
 };
 
 const saveTeam = async (key) => {
@@ -486,7 +542,7 @@ const toggleStatus = async (c) => {
     const res = await axios.patch(`/api/ar-contacts/${c.id}/toggle-status`);
     c.is_active = res.data?.data?.is_active ?? !c.is_active;
   } catch (err) {
-    alert('Gagal mengubah status AR');
+    notify.error('Gagal mengubah status AR.');
   }
 };
 
@@ -497,7 +553,7 @@ const executeDelete = async () => {
     contactToDelete.value = null;
     fetchData();
   } catch (err) {
-    alert(err.response?.data?.message || 'Gagal menghapus AR.');
+    notify.error(err.response?.data?.message || 'Gagal menghapus AR.');
   } finally {
     isDeleting.value = false;
   }

@@ -261,7 +261,25 @@ class ProgramClaimConfirmationController extends Controller
         return view('data_programs.confirm', [
             'dp' => $dp,
             'role' => $role,
+            'documents' => $this->documentsOf($dp),
         ]);
+    }
+
+    /**
+     * The claim's uploaded documents for the confirmation page: a link to open each one, or why it is missing
+     * (Faktur Pajak is not required for a non-PKP store).
+     *
+     * @return list<array{label: string, url: ?string, note: string}>
+     */
+    protected function documentsOf(DataProgram $dp): array
+    {
+        $link = fn (?string $value) => $this->reconciliationService->isValidUrl($value) ? trim($value) : null;
+
+        return [
+            ['label' => 'CN', 'url' => $link($dp->cn), 'note' => 'Belum ada'],
+            ['label' => 'Agreement', 'url' => $link($dp->agrement), 'note' => 'Belum ada'],
+            ['label' => 'Faktur Pajak', 'url' => $link($dp->cek_fp), 'note' => $this->reconciliationService->isPkp($dp) ? 'Belum ada' : 'Tidak wajib'],
+        ];
     }
 
     /**

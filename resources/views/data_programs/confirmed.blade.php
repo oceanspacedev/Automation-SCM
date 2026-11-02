@@ -1,166 +1,62 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Konfirmasi Selesai - SCM Automation</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        html, body, input, button, select, textarea {
-            font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            letter-spacing: -0.011em;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-        }
-    </style>
-</head>
-<body class="bg-gray-50 text-gray-900 text-xs min-h-screen flex items-center justify-center p-4">
-    <div class="max-w-md w-full bg-white rounded-xl border border-gray-200 shadow-2xs p-5">
+@extends('data_programs.layout')
 
-        <!-- Header -->
-        <div class="pb-3 border-b border-gray-100 flex items-center justify-between">
-            <span class="text-xs font-medium text-gray-500">SCM Automation</span>
-            <span class="text-xs font-medium px-2.5 py-0.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700">
-                Konfirmasi Sukses
-            </span>
-        </div>
+@section('title', 'Konfirmasi Selesai')
+@section('tag', 'Konfirmasi Sukses')
+@section('tag_class', 'bg-emerald-50 text-emerald-700')
+@section('footer', 'Halaman ini boleh ditutup. Data sudah tersimpan dan tersinkron ke Google Spreadsheet.')
 
-        <div class="py-3.5">
-            @if($action === 'setuju')
-                <h1 class="text-sm font-semibold text-gray-950">Dealer Setuju Dipotong</h1>
-                <p class="text-xs text-gray-500 mt-1 leading-relaxed">
-                    Pengajuan berhasil dicatat dan otomatis diteruskan ke WhatsApp Tim AR untuk proses pemotongan piutang. Status di Google Spreadsheet juga telah diperbarui.
-                </p>
+@php
+    $rupiah = fn ($amount) => 'Rp '.number_format((float) ($amount ?? 0), 0, ',', '.');
 
-                @if(isset($arNotification))
-                    @if($arNotification['success'] ?? false)
-                        <div class="mt-3 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs">
-                            <p class="font-medium text-emerald-900">WhatsApp terkirim ke Tim AR</p>
-                            <p class="text-emerald-700 mt-0.5">{{ $arNotification['message'] ?? 'Pesan notifikasi telah masuk ke nomor WhatsApp Tim AR.' }}</p>
-                        </div>
-                    @else
-                        <div class="mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs">
-                            <p class="font-medium text-amber-900">WhatsApp ke Tim AR gagal terkirim</p>
-                            <p class="text-amber-800 mt-0.5">{{ $arNotification['message'] ?? 'Status di sistem tetap tersimpan dan diteruskan.' }}</p>
-                        </div>
-                    @endif
-                @endif
-            @elseif($action === 'potong')
-                <h1 class="text-sm font-semibold text-gray-950">Pemotongan Selesai Diproses</h1>
-                <p class="text-xs text-gray-500 mt-1 leading-relaxed">
-                    Status klaim telah diperbarui menjadi SUDAH POTONG di database dan Google Spreadsheet, lalu diteruskan ke Tim Pajak untuk cek PPh.
-                </p>
+    [$title, $description, $status] = match ($action) {
+        'setuju' => ['Dealer Setuju Dipotong', 'Pengajuan dicatat dan otomatis diteruskan ke WhatsApp Tim AR untuk proses pemotongan piutang.', ['label' => 'DEALER SETUJU (PROSES AR)', 'tone' => 'blue']],
+        'potong' => ['Pemotongan Selesai Diproses', 'Status klaim menjadi SUDAH POTONG, lalu diteruskan ke Tim Pajak untuk cek PPh.', ['label' => 'SUDAH POTONG', 'tone' => 'emerald']],
+        'cek_pajak' => ['Cek Pajak Tersimpan', 'Cek Pajak, Selisih, dan Note PPh tersimpan, lalu hasilnya diteruskan ke Tim SCM.', ['label' => 'SUDAH DICEK PAJAK', 'tone' => 'emerald']],
+        default => ['Klaim Ditunda', 'Status dicatat sebagai pending. Tawarkan kembali pada pesanan dealer berikutnya.', ['label' => 'PENDING DEALER', 'tone' => 'gray']],
+    };
 
-                @if(isset($taxNotification))
-                    @if($taxNotification['success'] ?? false)
-                        <div class="mt-3 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs">
-                            <p class="font-medium text-emerald-900">WhatsApp terkirim ke Tim Pajak</p>
-                            <p class="text-emerald-700 mt-0.5">{{ $taxNotification['message'] }}</p>
-                        </div>
-                    @else
-                        <div class="mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs">
-                            <p class="font-medium text-amber-900">WhatsApp ke Tim Pajak gagal terkirim</p>
-                            <p class="text-amber-800 mt-0.5">{{ $taxNotification['message'] ?? 'Status potong tetap tersimpan.' }} Bisa dikirim ulang dari menu Riwayat Approval.</p>
-                        </div>
-                    @endif
-                @endif
-            @elseif($action === 'cek_pajak')
-                <h1 class="text-sm font-semibold text-gray-950">Cek Pajak Tersimpan</h1>
-                <p class="text-xs text-gray-500 mt-1 leading-relaxed">
-                    Cek Pajak, Selisih, dan Note PPh sudah disimpan di database dan dikirim ke Google Spreadsheet, lalu hasilnya diteruskan ke Tim SCM.
-                </p>
+    // [judul berhasil, judul gagal, keterangan bila gagal] per WhatsApp lanjutan
+    [$notification, $sentTitle, $failedTitle, $failedNote] = match ($action) {
+        'setuju' => [$arNotification ?? null, 'WhatsApp terkirim ke Tim AR', 'WhatsApp ke Tim AR gagal terkirim', 'Status di sistem tetap tersimpan.'],
+        'potong' => [$taxNotification ?? null, 'WhatsApp terkirim ke Tim Pajak', 'WhatsApp ke Tim Pajak gagal terkirim', 'Status potong tetap tersimpan. Bisa dikirim ulang dari menu Riwayat Approval.'],
+        'cek_pajak' => [$scmNotification ?? null, 'Hasil terkirim ke WhatsApp Tim SCM', 'WhatsApp ke Tim SCM gagal terkirim', 'Cek pajak tetap tersimpan. Bisa dikirim ulang dari menu Riwayat Approval.'],
+        default => [null, '', '', ''],
+    };
 
-                @if(isset($scmNotification))
-                    @if($scmNotification['success'] ?? false)
-                        <div class="mt-3 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs">
-                            <p class="font-medium text-emerald-900">Hasil terkirim ke WhatsApp Tim SCM</p>
-                            <p class="text-emerald-700 mt-0.5">{{ $scmNotification['message'] }}</p>
-                        </div>
-                    @else
-                        <div class="mt-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg text-xs">
-                            <p class="font-medium text-amber-900">WhatsApp ke Tim SCM gagal terkirim</p>
-                            <p class="text-amber-800 mt-0.5">{{ $scmNotification['message'] ?? 'Cek pajak tetap tersimpan.' }} Bisa dikirim ulang dari menu Riwayat Approval.</p>
-                        </div>
-                    @endif
-                @endif
-            @else
-                <h1 class="text-sm font-semibold text-gray-950">Klaim Ditunda</h1>
-                <p class="text-xs text-gray-500 mt-1 leading-relaxed">
-                    Status dicatat sebagai pending. Anda dapat menawarkannya kembali pada pesanan dealer berikutnya.
-                </p>
-            @endif
-        </div>
+    $rows = [['label' => 'Program', 'value' => $dp->program_name ?: $dp->program, 'sub' => preg_replace('/^periode\s+/i', '', (string) $dp->periode), 'wide' => true]];
+    if ($action === 'cek_pajak') {
+        $rows[] = ['label' => 'Cek Pajak', 'value' => $dp->cek_pajak_tarif];
+        $rows[] = ['label' => 'Selisih', 'value' => $rupiah($dp->selisih)];
+        $rows[] = ['label' => 'Note PPh', 'value' => $dp->note_pph, 'wide' => true];
+    }
+    $rows[] = ['label' => 'Nominal Potongan', 'value' => $rupiah($dp->net_pay), 'strong' => true];
+    $rows[] = $action === 'potong'
+        ? ['label' => 'No. Pembayaran', 'value' => $dp->no_pembayaran]
+        : ['label' => 'Waktu (WIB)', 'value' => date('d/m/Y H:i')];
+    if ($action === 'potong') {
+        $rows[] = ['label' => 'Waktu (WIB)', 'value' => date('d/m/Y H:i'), 'wide' => true];
+    }
+@endphp
 
-        <!-- Details List (Persis sama dengan invoice) -->
-        <div class="border-t border-b border-gray-100 py-2.5 my-2">
-            <table class="w-full text-xs">
-                <tbody>
-                    <tr>
-                        <td class="py-1 text-gray-500 w-36 align-top">Nama Dealer</td>
-                        <td class="py-1 text-gray-900 font-medium text-right">{{ $dp->dealer_name ?: '-' }}</td>
-                    </tr>
-                    <tr>
-                        <td class="py-1 text-gray-500 align-top">Kode BT / ID Real</td>
-                        <td class="py-1 text-gray-800 text-right">{{ $dp->kode_bt ?: '-' }}</td>
-                    </tr>
-                    <tr>
-                        <td class="py-1 text-gray-500 align-top">Nama Program</td>
-                        <td class="py-1 text-gray-800 text-right">{{ $dp->program_name ?: ($dp->program ?: '-') }}</td>
-                    </tr>
-                    @if(!empty($dp->net_pay))
-                    <tr>
-                        <td class="py-1 text-gray-500 align-top">Nominal Potongan</td>
-                        <td class="py-1 font-semibold text-gray-950 text-right">Rp {{ number_format((float) $dp->net_pay, 0, ',', '.') }}</td>
-                    </tr>
-                    @endif
-                    @if($action === 'potong' && !empty($dp->no_pembayaran))
-                    <tr>
-                        <td class="py-1 text-gray-500 align-top">No. Pembayaran</td>
-                        <td class="py-1 font-medium text-gray-900 text-right">{{ $dp->no_pembayaran }}</td>
-                    </tr>
-                    @endif
-                    @if($action === 'cek_pajak')
-                    <tr>
-                        <td class="py-1 text-gray-500 align-top">Cek Pajak</td>
-                        <td class="py-1 font-medium text-gray-900 text-right">{{ $dp->cek_pajak_tarif ?: '-' }}</td>
-                    </tr>
-                    <tr>
-                        <td class="py-1 text-gray-500 align-top">Selisih</td>
-                        <td class="py-1 text-gray-900 text-right">Rp {{ number_format((float) $dp->selisih, 0, ',', '.') }}</td>
-                    </tr>
-                    <tr>
-                        <td class="py-1 text-gray-500 align-top">Note PPh</td>
-                        <td class="py-1 text-gray-900 text-right break-words">{{ $dp->note_pph ?: '-' }}</td>
-                    </tr>
-                    @endif
-                    <tr>
-                        <td class="py-1 text-gray-500 align-top">Status</td>
-                        <td class="py-1 text-right">
-                            @if($action === 'setuju')
-                                <span class="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200">DEALER SETUJU (PROSES AR)</span>
-                            @elseif($action === 'cek_pajak')
-                                <span class="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">SUDAH DICEK PAJAK</span>
-                            @elseif($action === 'potong')
-                                <span class="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">SUDAH POTONG</span>
-                            @else
-                                <span class="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-gray-50 text-gray-700 border border-gray-200">PENDING DEALER</span>
-                            @endif
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="py-1 text-gray-500 align-top">Waktu Konfirmasi</td>
-                        <td class="py-1 text-gray-800 text-right">{{ date('d/m/Y H:i') }} WIB</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <p class="text-[11px] text-gray-400 text-center mt-4">
-            Anda dapat menutup halaman ini. Data telah tersimpan dan disinkronkan ke Google Spreadsheet.
-        </p>
+@section('content')
+    <div>
+        <h1 class="text-base font-semibold text-gray-950">{{ $title }}</h1>
+        <p class="mt-1 text-sm text-gray-500 leading-relaxed">{{ $description }}</p>
     </div>
-</body>
-</html>
+
+    @if($notification)
+        @if($notification['success'] ?? false)
+            <div class="rounded-lg px-3 py-2.5 bg-emerald-50 text-xs leading-relaxed">
+                <p class="font-medium text-emerald-900">{{ $sentTitle }}</p>
+                <p class="mt-0.5 text-emerald-800">{{ $notification['message'] ?? '' }}</p>
+            </div>
+        @else
+            <div class="rounded-lg px-3 py-2.5 bg-amber-50 text-xs leading-relaxed">
+                <p class="font-medium text-amber-900">{{ $failedTitle }}</p>
+                <p class="mt-0.5 text-amber-800">{{ $notification['message'] ?? '' }} {{ $failedNote }}</p>
+            </div>
+        @endif
+    @endif
+
+    @include('data_programs.partials.claim', ['status' => $status, 'rows' => $rows])
+@endsection

@@ -817,6 +817,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import axios from 'axios';
+import { notify, confirmAction } from '@/composables/useNotify';
 import { useArea } from '@/composables/useArea';
 import { DEFAULT_BRAND, useBrands } from '@/composables/useBrands';
 import {
@@ -1316,7 +1317,7 @@ function handleFileChange(event, slot) {
   if (!file) return;
 
   if (file.size > 15 * 1024 * 1024) {
-    alert(`File ${file.name} melebihi batas ukuran maksimal 15 MB.`);
+    notify.error(`${file.name} melebihi batas ukuran maksimal 15 MB.`, { title: 'File terlalu besar' });
     return;
   }
 
@@ -1610,8 +1611,8 @@ async function handleSubmit() {
   }
 }
 
-function handleClearForm() {
-  if (confirm('Kosongkan semua isian dan hapus dokumen yang dipilih?')) {
+async function handleClearForm() {
+  if (await confirmAction({ title: 'Kosongkan formulir?', message: 'Semua isian dan dokumen yang dipilih akan dihapus.', confirmText: 'Ya, Kosongkan' })) {
     form.program_name = '';
     form.region = '';
     form.id_real = '';

@@ -19,12 +19,12 @@ class ProgramApprovalFlow
      * @var array<string, string>
      */
     public const STAGES = [
-        'waiting_telemarketing' => 'Belum dikirim ke telemarketing',
+        'waiting_telemarketing' => 'Belum dikirim ke Telemarketing',
         'waiting_approval' => 'Menunggu persetujuan dealer',
         'postponed' => 'Ditunda dealer',
-        'approved' => 'Disetujui · proses AR',
-        'cut' => 'Dipotong · menunggu cek pajak',
-        'tax_checked' => 'Selesai · sudah dicek pajak',
+        'approved' => 'Disetujui dealer · menunggu AR',
+        'cut' => 'Dipotong AR · menunggu Tim Pajak',
+        'tax_checked' => 'Selesai · sudah dicek Tim Pajak',
     ];
 
     private const READY = 'BISA DI POTONG';
@@ -140,14 +140,14 @@ class ProgramApprovalFlow
         $checkedThroughLink = $taxChecked && $row->tax_checked_at !== null;
 
         $telemarketingName = trim((string) $row->telemarketing) ?: null;
-        $arName = trim((string) $arName) ?: 'AR default';
+        $arName = trim((string) $arName) ?: 'Nomor AR default';
         $taxName = trim((string) $taxName) ?: 'Tim Pajak';
         $scmName = trim((string) $scmName) ?: 'Tim SCM';
 
         $steps = [
-            $this->step('ready', 'Bisa dipotong', true, note: $row->cek_dokumen ? "Cek dokumen: {$row->cek_dokumen}" : null,
+            $this->step('ready', 'Klaim bisa dipotong', true, note: $row->cek_dokumen ? "Cek dokumen: {$row->cek_dokumen}" : null,
                 person: $row->cek_dokumen ? 'Dokumen '.strtolower(trim($row->cek_dokumen)) : null),
-            $this->step('telemarketing', 'WA ke telemarketing', $telemarketing !== null || $row->telemarketing_notified_at !== null || $answered,
+            $this->step('telemarketing', 'Notifikasi WhatsApp ke Telemarketing', $telemarketing !== null || $row->telemarketing_notified_at !== null || $answered,
                 log: $telemarketing ?? ($telemarketingFailed?->success === false ? $telemarketingFailed : null),
                 at: $telemarketing?->created_at?->toIso8601String() ?? $row->telemarketing_notified_at?->toIso8601String(),
                 failed: $telemarketing === null && $row->telemarketing_notified_at === null && ! $answered && $telemarketingFailed?->success === false,
@@ -156,26 +156,26 @@ class ProgramApprovalFlow
                 log: $answer, postponed: $stage === 'postponed', person: $telemarketingName, role: 'Telemarketing',
                 note: $row->telemarketing_reminder_count > 0 ? "{$row->telemarketing_reminder_count} pengingat terkirim ke telemarketing" : null),
             // WA ke AR terkirim otomatis saat dealer setuju; baris lama tanpa catatan dianggap sudah terkirim
-            $this->step('ar', 'WA ke AR', $ar !== null || $isCut || ($stage === 'approved' && $arAttempt === null),
+            $this->step('ar', 'Notifikasi WhatsApp ke AR', $ar !== null || $isCut || ($stage === 'approved' && $arAttempt === null),
                 log: $ar ?? ($arAttempt?->success === false ? $arAttempt : null),
                 failed: $ar === null && $stage === 'approved' && $arAttempt?->success === false,
                 person: $arName, role: 'AR'),
-            $this->step('cut', 'Dipotong AR', $isCut, log: $cut,
+            $this->step('cut', 'Dipotong oleh AR', $isCut, log: $cut,
                 note: $cut?->note ?? ($row->no_pembayaran ? "No. Pembayaran: {$row->no_pembayaran}" : null),
                 at: $cut?->created_at?->toIso8601String(), date: $cut ? null : ($row->tgl_potong_tf ?: null),
                 person: $arName, role: 'AR'),
             // WA ke Tim Pajak terkirim otomatis saat AR memotong; bisa dikirim ulang dari Riwayat Approval
-            $this->step('tax', 'WA ke Tim Pajak', $tax !== null || $row->tax_notified_at !== null || $taxChecked,
+            $this->step('tax', 'Notifikasi WhatsApp ke Tim Pajak', $tax !== null || $row->tax_notified_at !== null || $taxChecked,
                 log: $tax ?? ($taxAttempt?->success === false ? $taxAttempt : null),
                 at: $tax?->created_at?->toIso8601String() ?? $row->tax_notified_at?->toIso8601String(),
                 failed: $tax === null && $row->tax_notified_at === null && $isCut && ! $taxChecked && $taxAttempt?->success === false,
                 person: $taxName, role: 'Pajak'),
-            $this->step('tax_check', 'Dicek pajak', $taxChecked, log: $taxCheck,
+            $this->step('tax_check', 'Dicek Tim Pajak', $taxChecked, log: $taxCheck,
                 note: $taxChecked ? 'Cek Pajak: '.($row->cek_pajak_tarif ?: '-').' · Selisih: '.number_format((float) $row->selisih, 0, ',', '.').($row->note_pph ? " · Note PPh: {$row->note_pph}" : '') : null,
                 at: $taxCheck?->created_at?->toIso8601String() ?? $row->tax_checked_at?->toIso8601String(),
                 person: $taxName, role: 'Pajak'),
             // Hasil cek pajak dikirim otomatis ke Tim SCM; baris yang dicek di spreadsheet dianggap sudah selesai
-            $this->step('scm', 'WA ke SCM', $scm !== null || ($taxChecked && ! $checkedThroughLink),
+            $this->step('scm', 'Notifikasi WhatsApp ke Tim SCM', $scm !== null || ($taxChecked && ! $checkedThroughLink),
                 log: $scm ?? ($scmAttempt?->success === false ? $scmAttempt : null),
                 failed: $scm === null && $checkedThroughLink && $scmAttempt?->success === false,
                 person: $scmName, role: 'SCM'),

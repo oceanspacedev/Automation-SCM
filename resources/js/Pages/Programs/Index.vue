@@ -406,6 +406,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
+import { notify } from '@/composables/useNotify';
 import { downloadExport } from '@/lib/download';
 import BrandTabs from '@/components/BrandTabs.vue';
 import { useBrands } from '@/composables/useBrands';
@@ -580,7 +581,7 @@ const toggleStatus = async (p) => {
       p.is_active = res.data.data.is_active;
     }
   } catch (err) {
-    alert('Gagal mengubah status program');
+    notify.error('Gagal mengubah status program.');
   } finally {
     p._isToggling = false;
   }
@@ -602,7 +603,7 @@ const executeDelete = async () => {
     }
   } catch (err) {
     const msg = err.response?.data?.message || 'Gagal menghapus program.';
-    alert(msg);
+    notify.error(msg);
   } finally {
     isDeleting.value = false;
   }

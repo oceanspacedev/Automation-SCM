@@ -20,14 +20,14 @@
         </p>
       </div>
 
-      <!-- Action Buttons (Spreadsheet Dropdown & Direct Sync); di layar kecil dua tombol sama lebar dengan label pendek -->
-      <div class="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2">
+      <!-- Menu Spreadsheet: sinkron, buka, atur link, export -->
+      <div class="flex items-center gap-2">
         <!-- Dropdown Spreadsheet -->
         <div class="relative" ref="spreadsheetDropdownRef">
           <button
             type="button"
             @click="showSpreadsheetDropdown = !showSpreadsheetDropdown"
-            class="h-9 w-full sm:w-auto px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer whitespace-nowrap"
+            class="h-9 px-3 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer whitespace-nowrap"
             title="Menu aksi Spreadsheet & Export"
           >
             <RefreshCwIcon v-if="isSyncing" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
@@ -84,61 +84,6 @@
           </div>
         </div>
 
-        <!-- Dropdown Pencocokan & Sinkronisasi Test Program -->
-        <div class="relative" ref="reconcileDropdownRef">
-          <button
-            type="button"
-            @click="showReconcileDropdown = !showReconcileDropdown"
-            class="h-9 w-full sm:w-auto px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer whitespace-nowrap"
-            title="Menu sinkronisasi & pencocokan Test Program"
-          >
-            <RefreshCwIcon v-if="isSyncing || isReconciling" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
-            <CheckCircleIcon v-else class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
-            <span class="sm:hidden">{{ isSyncing ? 'Sinkron...' : (isReconciling ? 'Mencocokkan...' : 'Cocokkan') }}</span>
-            <span class="hidden sm:inline">{{ isSyncing ? 'Menyinkronkan...' : (isReconciling ? 'Mencocokkan...' : 'Cocokkan Test Program') }}</span>
-            <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 ml-0.5 transition-transform duration-150" :class="showReconcileDropdown && 'rotate-180'" />
-          </button>
-
-          <!-- Dropdown Menu -->
-          <div
-            v-if="showReconcileDropdown"
-            class="absolute right-0 top-full mt-1.5 w-52 bg-white rounded-lg shadow-lg border border-gray-200 p-1 z-50 font-sans"
-          >
-            <!-- 1. Sinkronkan Sekarang -->
-            <button
-              type="button"
-              @click="handleTriggerSyncFromDropdown"
-              :disabled="isSyncing"
-              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCwIcon :class="['w-3.5 h-3.5 text-gray-500 shrink-0', isSyncing && 'animate-spin text-emerald-600']" />
-              <span>Sinkronkan Sekarang</span>
-            </button>
-
-            <!-- 2. Cocokkan Test Program -->
-            <button
-              type="button"
-              @click="handleOpenReconcileFromDropdown"
-              :disabled="isReconciling"
-              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              <CheckCircleIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-              <span>Cocokkan Test Program</span>
-            </button>
-
-            <div class="my-1 border-t border-gray-100"></div>
-
-            <!-- 3. Riwayat Pencocokan -->
-            <button
-              type="button"
-              @click="handleOpenHistoryFromDropdown"
-              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer"
-            >
-              <HistoryIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-              <span>Riwayat Pencocokan</span>
-            </button>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -1019,210 +964,6 @@
       />
     </div>
 
-    <!-- Modal Rekonsiliasi & Pencocokan Test Program -->
-    <Teleport to="body">
-      <Transition name="fade">
-        <div
-          v-if="showReconcileModal"
-          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs font-sans"
-          @click.self="showReconcileModal = false"
-        >
-          <div class="relative w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
-            <!-- Modal Header -->
-            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <div class="flex items-center gap-2.5">
-                <div class="w-8 h-8 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-700">
-                  <CheckCircleIcon class="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 class="text-sm font-bold text-gray-900">Cocokkan dengan Test Program</h3>
-                  <p class="text-[11px] text-gray-500">
-                    Otomatisasi pencocokan identitas, finansial, dan pemindahan link dokumen
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                @click="showReconcileModal = false"
-                class="w-7 h-7 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 flex items-center justify-center transition cursor-pointer"
-              >
-                <XIcon class="w-4 h-4" />
-              </button>
-            </div>
-
-            <!-- Modal Content -->
-            <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
-              <!-- Penjelasan Konsep Alur -->
-              <div class="p-3 bg-gray-50 border border-gray-200 rounded-xl space-y-1.5 text-gray-600">
-                <div class="font-semibold text-gray-800 flex items-center gap-1.5">
-                  <InfoIcon class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                  <span>Aturan & Cara Kerja:</span>
-                </div>
-                <ul class="list-disc list-inside space-y-1 text-[11px] text-gray-600 pl-1 leading-relaxed">
-                  <li><strong>Identitas & Finansial:</strong> Sistem mencari Dealer & Program yang cocok, lalu memvalidasi nominal DPP & Net Pay (toleransi selisih &le; Rp 10).</li>
-                  <li><strong>Pemindahan Dokumen:</strong> Link Dokumen (CN, Agreement, Faktur Pajak) dari Test Program otomatis disalin ke kolom <code>cn</code>, <code>agrement</code>, <code>cek_fp</code>.</li>
-                  <li><strong>Penentuan Status:</strong> Jika data finansial cocok dan ketiga dokumen lengkap, status diset <strong>BISA DI POTONG</strong>. Jika ada selisih nominal atau dokumen belum lengkap, status diset <strong>BELUM BISA POTONG</strong> dengan rincian selisih di kolom keterangan.</li>
-                </ul>
-              </div>
-
-              <!-- Form Options -->
-              <div class="space-y-3 pt-1">
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <label class="block text-[11px] font-medium text-gray-700 mb-1">Tahun Periode</label>
-                    <select
-                      v-model="reconcileForm.year"
-                      class="h-8 w-full rounded-md border border-gray-200 bg-white px-2.5 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-                    >
-                      <option value="2026">2026</option>
-                      <option value="2025">2025</option>
-                      <option value="">Semua Tahun</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label class="block text-[11px] font-medium text-gray-700 mb-1">Maksimal Baris</label>
-                    <select
-                      v-model="reconcileForm.limit"
-                      class="h-8 w-full rounded-md border border-gray-200 bg-white px-2.5 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
-                    >
-                      <option :value="50">50 baris</option>
-                      <option :value="100">100 baris</option>
-                      <option :value="200">200 baris</option>
-                      <option :value="500">500 baris</option>
-                      <option :value="0">Semua yang memenuhi syarat</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div class="space-y-2 pt-1">
-                  <label class="flex items-start gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      v-model="reconcileForm.only_unreconciled"
-                      class="mt-0.5 rounded border-gray-300 text-black focus:ring-black cursor-pointer"
-                    />
-                    <span class="text-[11px] text-gray-700">
-                      Hanya proses baris yang belum memiliki link CN atau belum berstatus
-                    </span>
-                  </label>
-                  <label class="flex items-start gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      v-model="reconcileForm.force"
-                      class="mt-0.5 rounded border-gray-300 text-black focus:ring-black cursor-pointer"
-                    />
-                    <span class="text-[11px] text-gray-700">
-                      Perbarui ulang dokumen meskipun kolom CN/Agrement/FP sudah terisi sebelumnya
-                    </span>
-                  </label>
-                  <label class="flex items-start gap-2 cursor-pointer select-none bg-indigo-50/50 p-2 rounded-lg border border-indigo-100">
-                    <input
-                      type="checkbox"
-                      v-model="reconcileForm.push_to_sheet"
-                      class="mt-0.5 rounded border-indigo-300 text-indigo-600 focus:ring-indigo-600 cursor-pointer"
-                    />
-                    <div>
-                      <span class="text-[11px] font-medium text-indigo-900 block">
-                        Sinkronisasi Balik ke Google Spreadsheet (Two-Way Sync)
-                      </span>
-                      <span class="text-[10px] text-indigo-700 block">
-                        Kirim otomatis perubahan status, keterangan, dan link Drive ke Google Spreadsheet master.
-                      </span>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              <!-- Hasil Eksekusi Terakhir -->
-              <div v-if="reconcileResult" class="p-3.5 bg-emerald-50/60 border border-emerald-200 rounded-xl space-y-2">
-                <div class="flex items-center justify-between text-emerald-900 font-semibold text-xs">
-                  <div class="flex items-center gap-1.5">
-                    <CheckCircleIcon class="w-4 h-4 text-emerald-600" />
-                    <span>Hasil Pencocokan:</span>
-                  </div>
-                  <span class="text-[11px] font-normal text-emerald-700">
-                    {{ reconcileResult.matched_count }} dari {{ reconcileResult.total_evaluated }} cocok
-                  </span>
-                </div>
-
-                <!-- Metric Cards -->
-                <div class="grid grid-cols-3 gap-2 pt-1 text-center">
-                  <div class="bg-white p-2 rounded-lg border border-emerald-100">
-                    <div class="text-sm font-bold text-teal-700">{{ reconcileResult.bisa_potong_count }}</div>
-                    <div class="text-[10px] text-gray-500">Bisa Dipotong</div>
-                  </div>
-                  <div class="bg-white p-2 rounded-lg border border-emerald-100">
-                    <div class="text-sm font-bold text-amber-700">{{ reconcileResult.belum_bisa_potong_count }}</div>
-                    <div class="text-[10px] text-gray-500">Belum Bisa Dipotong</div>
-                  </div>
-                  <div class="bg-white p-2 rounded-lg border border-emerald-100">
-                    <div class="text-sm font-bold text-indigo-700">{{ reconcileResult.drive_transferred_count }}</div>
-                    <div class="text-[10px] text-gray-500">Drive Dipindahkan</div>
-                  </div>
-                </div>
-
-                <!-- Preview sample of matches -->
-                <div v-if="reconcileResult.results && reconcileResult.results.length > 0" class="pt-1.5 space-y-1 max-h-36 overflow-y-auto">
-                  <div
-                    v-for="(item, idx) in reconcileResult.results.slice(0, 5)"
-                    :key="idx"
-                    class="p-2 bg-white rounded border border-emerald-100 text-[11px] space-y-0.5"
-                  >
-                    <div class="flex items-center justify-between font-medium text-gray-800">
-                      <span class="truncate max-w-[240px]">{{ item.dealer }}</span>
-                      <span
-                        :class="[
-                          'px-1.5 py-0.5 rounded text-[10px]',
-                          item.status === 'BISA DI POTONG' ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        ]"
-                      >
-                        {{ item.status }}
-                      </span>
-                    </div>
-                    <div class="text-[10px] text-gray-500 truncate" :title="item.keterangan">{{ item.keterangan }}</div>
-                  </div>
-                  <div class="pt-2 flex items-center justify-between border-t border-emerald-100">
-                    <span v-if="reconcileResult.results.length > 5" class="text-[10px] text-emerald-800">
-                      +{{ reconcileResult.results.length - 5 }} data lainnya berhasil diperbarui
-                    </span>
-                    <button
-                      type="button"
-                      @click="openHistoryFromReconcile"
-                      class="text-[11px] font-medium text-emerald-900 hover:underline inline-flex items-center gap-1 cursor-pointer ml-auto"
-                    >
-                      <HistoryIcon class="w-3.5 h-3.5 text-emerald-700" />
-                      <span>Buka Riwayat Lengkap Batch Ini</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Modal Footer -->
-            <div class="px-6 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2 text-xs">
-              <button
-                type="button"
-                @click="showReconcileModal = false"
-                class="h-8 px-3 rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-100 transition cursor-pointer"
-              >
-                {{ reconcileResult ? 'Selesai' : 'Batal' }}
-              </button>
-              <button
-                type="button"
-                @click="handleReconcile"
-                :disabled="isReconciling"
-                class="h-8 px-3.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shadow-xs"
-              >
-                <RefreshCwIcon v-if="isReconciling" class="w-3.5 h-3.5 animate-spin" />
-                <ZapIcon v-else class="w-3.5 h-3.5" />
-                <span>{{ isReconciling ? 'Sedang Memproses...' : 'Mulai Pencocokan Sekarang' }}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-
     <!-- Modal Hasil Uji Kecocokan Satu-per-Satu (Single Row Test Match) -->
     <Teleport to="body">
       <Transition
@@ -1444,6 +1185,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import axios from 'axios';
+import { notify } from '@/composables/useNotify';
 import AreaTabs from '@/components/AreaTabs.vue';
 import WhatsAppIcon from '@/components/WhatsAppIcon.vue';
 import TelemarketingSelectModal from '@/components/TelemarketingSelectModal.vue';
@@ -1468,7 +1210,6 @@ import {
   Zap as ZapIcon,
   Info as InfoIcon,
   ArrowRight as ArrowRightIcon,
-  History as HistoryIcon,
   Eye as EyeIcon,
   Pencil as PencilIcon,
   Settings as SettingsIcon,
@@ -1634,31 +1375,6 @@ const handleTriggerSync = () => {
 const handleExportCsv = () => {
   showSpreadsheetDropdown.value = false;
   exportCsv();
-};
-
-// Dropdown Pencocokan Form Program state
-const showReconcileDropdown = ref(false);
-const reconcileDropdownRef = ref(null);
-
-const handleClickOutsideReconcileDropdown = (e) => {
-  if (reconcileDropdownRef.value && !reconcileDropdownRef.value.contains(e.target)) {
-    showReconcileDropdown.value = false;
-  }
-};
-
-const handleTriggerSyncFromDropdown = () => {
-  showReconcileDropdown.value = false;
-  triggerSync();
-};
-
-const handleOpenReconcileFromDropdown = () => {
-  showReconcileDropdown.value = false;
-  openReconcileModal();
-};
-
-const handleOpenHistoryFromDropdown = () => {
-  showReconcileDropdown.value = false;
-  openHistoryModal(null);
 };
 
 // Filter states
@@ -1834,13 +1550,13 @@ const onPageInputBlur = (e) => {
   }
 };
 
-// Auto-Refresh: berhenti selama sel tabel dipilih/diisi, modal terbuka, atau proses (sinkron, cocokkan, kirim WA) berjalan
+// Auto-Refresh: berhenti selama sel tabel dipilih/diisi, modal terbuka, atau proses (sinkron, uji ulang, kirim WA) berjalan
 useAutoRefresh(() => fetchData(pagination.current_page, { silent: true }), {
-  isPaused: () => !autoRefresh.value || isLoading.value || isSyncing.value || isReconciling.value
+  isPaused: () => !autoRefresh.value || isLoading.value || isSyncing.value
     || reconcilingRowId.value !== null || isSendingTelemarketing.value || sendingWaId.value !== null
     || activeCell.value !== null || cellEditor.open || fillBox.value !== null
     || editModal.isOpen || urlModal.isOpen || telemarketingModal.isOpen
-    || showReconcileModal.value || showHistoryModal.value || showTestModal.value,
+    || showHistoryModal.value || showTestModal.value,
 });
 
 const triggerSync = async () => {
@@ -1888,45 +1604,6 @@ const exportCsv = () => {
   }, 2000);
 };
 
-// State for Reconcile with Form Program
-const isReconciling = ref(false);
-const showReconcileModal = ref(false);
-const reconcileResult = ref(null);
-const reconcileForm = reactive({
-  limit: 200,
-  year: '2026',
-  force: false,
-  only_unreconciled: true,
-  push_to_sheet: true,
-});
-
-const openReconcileModal = () => {
-  reconcileResult.value = null;
-  showReconcileModal.value = true;
-};
-
-const handleReconcile = async () => {
-  isReconciling.value = true;
-  try {
-    const res = await axios.post('/api/data-program/reconcile', {
-      limit: reconcileForm.limit,
-      year: reconcileForm.year,
-      force: reconcileForm.force,
-      only_unreconciled: reconcileForm.only_unreconciled,
-      push_to_sheet: reconcileForm.push_to_sheet,
-    });
-    reconcileResult.value = res.data.data;
-    syncMessage.value = res.data.message || 'Rekonsiliasi data berhasil diproses.';
-    syncError.value = false;
-    await fetchData(pagination.current_page);
-  } catch (err) {
-    syncMessage.value = err.response?.data?.message || 'Gagal melakukan rekonsiliasi.';
-    syncError.value = true;
-  } finally {
-    isReconciling.value = false;
-  }
-};
-
 // State for Reconciliation History Modal
 const showHistoryModal = ref(false);
 const historyInitialRowId = ref(null);
@@ -1938,12 +1615,6 @@ const openHistoryModal = (row = null, batchId = null) => {
   historyFilteredRowName.value = row ? (row.dealer_name || row.kode_bt) : null;
   historyInitialBatchId.value = batchId || null;
   showHistoryModal.value = true;
-};
-
-const openHistoryFromReconcile = () => {
-  const batchId = reconcileResult.value?.batch_id || null;
-  showReconcileModal.value = false;
-  openHistoryModal(null, batchId);
 };
 
 // State for Single Row Reconciliation Test
@@ -2023,7 +1694,7 @@ const testMatchSingleRow = async (row, force = false) => {
     }
     showTestModal.value = true;
   } catch (err) {
-    alert(err.response?.data?.message || 'Gagal melakukan tes kecocokan data.');
+    notify.error(err.response?.data?.message || 'Gagal melakukan tes kecocokan data.', { title: 'Uji kecocokan gagal' });
   } finally {
     reconcilingRowId.value = null;
   }
@@ -2055,14 +1726,14 @@ const handleConfirmSendTelemarketing = async ({ phone, telemarketing_name, targe
       phone,
       telemarketing_name,
     });
-    alert(res.data.message || `Notifikasi klaim "${target.dealer_name || target.kode_bt}" berhasil dikirim ke WhatsApp Telemarketing!`);
+    notify.success(res.data.message || `Notifikasi klaim ${target.dealer_name || target.kode_bt} berhasil dikirim ke WhatsApp Telemarketing.`, { title: 'WhatsApp terkirim ke Telemarketing' });
     telemarketingModal.isOpen = false;
     target.telemarketing_notified_at = res.data.telemarketing_notified_at || new Date().toISOString();
     if (telemarketing_name) {
       target.telemarketing = telemarketing_name;
     }
   } catch (err) {
-    alert('Gagal mengirim WhatsApp ke Telemarketing: ' + (err.response?.data?.message || err.message));
+    notify.error(err.response?.data?.message || err.message, { title: 'WhatsApp ke Telemarketing gagal terkirim' });
   } finally {
     isSendingTelemarketing.value = false;
     sendingWaId.value = null;
@@ -2080,13 +1751,11 @@ onMounted(async () => {
     // Keep default URL on error
   }
   document.addEventListener('click', handleClickOutsideSpreadsheetDropdown);
-  document.addEventListener('click', handleClickOutsideReconcileDropdown);
   document.addEventListener('click', handleClickOutsideProgramDropdown);
 });
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutsideSpreadsheetDropdown);
-  document.removeEventListener('click', handleClickOutsideReconcileDropdown);
   document.removeEventListener('click', handleClickOutsideProgramDropdown);
 });
 </script>
