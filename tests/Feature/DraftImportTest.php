@@ -23,7 +23,7 @@ class DraftImportTest extends TestCase
         $this->actingAs(User::factory()->create(['role' => 'admin']));
     }
 
-    public function test_can_import_draft_excel_with_success_and_row_errors(): void
+    public function test_import_reports_rows_with_errors_without_saving_them_as_drafts(): void
     {
         $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
@@ -56,7 +56,7 @@ class DraftImportTest extends TestCase
             'CN002', '2026-03-02', 'Ref Note 2', 'NPS FL',
         ];
 
-        // 4. Row 3: Invalid DSA/NPS FL (should be error status, but not crash import)
+        // 4. Row 3: Invalid DSA/NPS FL (reported as an error, not saved, and doesn't crash the import)
         $row3 = [
             '3', 'JABO', 'RSM01', 'DLR003', 'BT03', 'Cust C',
             'Toko C', 2, '03.234.567.8-901.000', 'Toko C', 'BADAN', 'BADAN',
@@ -94,20 +94,17 @@ class DraftImportTest extends TestCase
             ],
         ]);
 
-        // Verify database records
-        $this->assertDatabaseCount('drafts', 3);
+        $response->assertJsonPath('data.errors.0.row', 4);
 
-        $readyDrafts = Draft::where('status', 'ready')->get();
-        $this->assertCount(2, $readyDrafts);
-
-        $errorDraft = Draft::where('status', 'error')->first();
-        $this->assertNotNull($errorDraft);
-        $this->assertEquals('DLR003', $errorDraft->dealer_code);
+        // Only the two valid rows become drafts
+        $this->assertDatabaseCount('drafts', 2);
+        $this->assertSame(['DLR001', 'DLR002'], Draft::orderBy('dealer_code')->pluck('dealer_code')->all());
+        $this->assertSame(['ready'], Draft::distinct()->pluck('status')->all());
 
         @unlink($tempPath);
     }
 
-    public function test_import_marks_rows_with_empty_or_already_used_cn_number_as_error(): void
+    public function test_import_skips_rows_with_empty_or_already_used_cn_number(): void
     {
         Draft::create(['area' => 'jateng', 'dealer_name' => 'TOKO LAMA', 'support_amount' => 1000, 'cn_number' => '2608000045', 'status' => 'ready']);
 
@@ -134,6 +131,7 @@ class DraftImportTest extends TestCase
             'No CN 2608000043 sudah dipakai baris 2 di file ini.',
             'No CN 2608000045 sudah dipakai draft TOKO LAMA (Jawa Tengah).',
         ], array_column($errors, 'error'));
+        $this->assertSame(['TOKO A', 'TOKO LAMA'], Draft::withoutGlobalScopes()->orderBy('dealer_name')->pluck('dealer_name')->all());
         $this->assertSame('ready', Draft::where('dealer_name', 'TOKO A')->value('status'));
     }
 

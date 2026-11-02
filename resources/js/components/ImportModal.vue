@@ -168,11 +168,11 @@
                 <div class="text-lg font-bold text-slate-900 mt-0.5">{{ result.total_rows }}</div>
               </div>
               <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-                <div class="text-[11px] font-medium text-emerald-600">Berhasil (Ready)</div>
+                <div class="text-[11px] font-medium text-emerald-600">Masuk ke Draft</div>
                 <div class="text-lg font-bold text-emerald-700 mt-0.5">{{ result.success }}</div>
               </div>
               <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-center">
-                <div class="text-[11px] font-medium text-rose-600">Gagal (Error)</div>
+                <div class="text-[11px] font-medium text-rose-600">Tidak Masuk (Error)</div>
                 <div class="text-lg font-bold text-rose-700 mt-0.5">{{ result.failed }}</div>
               </div>
               <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center">
@@ -192,10 +192,11 @@
 
             <!-- Error Details Table if any -->
             <div v-if="result.errors && result.errors.length > 0">
-              <div class="text-xs font-semibold text-rose-700 mb-2 flex items-center gap-1.5">
+              <div class="text-xs font-semibold text-rose-700 flex items-center gap-1.5">
                 <AlertCircleIcon class="w-3.5 h-3.5" />
-                <span>Detail Kesalahan Baris:</span>
+                <span>Baris yang tidak masuk ke draft</span>
               </div>
+              <p class="mt-1 mb-2 text-xs text-gray-600">Perbaiki baris ini di Excel, lalu import ulang. Baris yang sudah masuk tidak akan dobel.</p>
               <div class="max-h-56 overflow-y-auto border border-gray-200 rounded-xl">
                 <Table>
                   <TableHeader>

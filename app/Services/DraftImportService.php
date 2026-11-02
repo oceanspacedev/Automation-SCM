@@ -237,6 +237,14 @@ class DraftImportService
                 $cnNumbersInFile[$cnNumber] ??= $excelRowNumber;
             }
 
+            // Baris yang error tidak masuk ke draft, cukup dilaporkan di hasil import
+            if (! empty($rowErrors)) {
+                $failedCount++;
+                array_push($errors, ...$rowErrors);
+
+                continue;
+            }
+
             // Calculation validation & comparison
             $calcResult = $this->calculator->calculateFromValues(
                 (float) $cleanData['support_amount'],
@@ -269,23 +277,14 @@ class DraftImportService
                 $warningCount++;
             }
 
-            // Determine status
-            if (! empty($rowErrors)) {
-                $cleanData['status'] = 'error';
-                $failedCount++;
-                foreach ($rowErrors as $err) {
-                    $errors[] = $err;
-                }
-            } else {
-                $cleanData['status'] = 'ready';
-                $successCount++;
-            }
+            $cleanData['status'] = 'ready';
+            $successCount++;
 
             $cleanData['validation_notes'] = [
                 'is_matched' => ! $hasDiff,
                 'comparison' => $comparison,
                 'calculated' => $calcResult,
-                'errors' => $rowErrors,
+                'errors' => [],
             ];
 
             // Area mengikuti toko di Master Dealer (mis. diimport dari tab Jawa Barat tapi tokonya Jawa Tengah)
@@ -300,9 +299,7 @@ class DraftImportService
                 Draft::create($cleanData);
             } catch (Exception $e) {
                 $failedCount++;
-                if ($cleanData['status'] === 'ready') {
-                    $successCount = max(0, $successCount - 1);
-                }
+                $successCount = max(0, $successCount - 1);
                 $errors[] = [
                     'row' => $excelRowNumber,
                     'field' => 'Database',

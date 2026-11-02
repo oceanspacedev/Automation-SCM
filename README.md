@@ -84,9 +84,10 @@ flowchart TD
    - Baris header dikenali otomatis. Kolom yang dibaca, sesuai urutan standar: No, Region, RSM, Dealer Code, Kode BT, Nama Cust, Dealer Name, Realqty, NPWP, Nama NPWP, Jenis NPWP, Jenis PPh, Support Amount, DPP, DPP Lain, PPN, PPh, Netpay, Kode Item, Nama Item, Alamat, Email, WhatsApp, Nama Program, Periode Program, **No CN**, Tanggal Inv, Refnote, DSA/NPS FL.
    - **Tipe invoice** diisi dari kolom DSA/NPS FL. Kalau kosong, dipakai *Tipe Invoice Default* yang dipilih saat import.
    - **Area draft mengikuti tokonya di Master Dealer.** Toko Jawa Tengah yang diimport dari tab Jawa Barat otomatis masuk tab Jawa Tengah.
+   - **Baris yang error tidak masuk ke draft**, misalnya No CN kosong atau sudah dipakai, atau tipe invoice tidak dikenal. Baris itu hanya tampil di hasil import beserta alasannya; perbaiki di Excel lalu import ulang. Baris yang sudah masuk tidak akan dobel karena No CN-nya sudah dipakai.
 2. Sistem menghitung ulang DPP, DPP Lain, PPN, PPh, dan Net Pay dari Support Amount (lihat [rumus](#perhitungan-pajak)) lalu membandingkannya dengan angka di Excel. Status draft:
    - **Ready**: siap diterbitkan.
-   - **Error**: ada masalah, misalnya No CN kosong atau sudah dipakai, atau tipe invoice tidak dikenal. Draft error tidak bisa diedit; hapus, perbaiki Excel, lalu import ulang.
+   - **Error**: hanya muncul kalau **Validasi ulang** menemukan tipe invoice yang tidak dikenal. Draft error tidak bisa digenerate; hapus lalu import ulang.
 3. Klik **Generate** per baris, **Generate (n) Terpilih**, atau **Generate Semua Invoice**, lalu pilih **Bill To** (badan usaha dari Master Badan Usaha, mis. CV TOP SELULAR).
 4. **Nomor invoice = No CN** dari Excel. No CN wajib diisi dan unik di semua area. Invoice yang sudah terbit otomatis dibuatkan baris **Data Program** di area yang sama.
 5. Draft bisa juga dibuat manual lewat **Tambah Manual** (No CN tetap wajib).
