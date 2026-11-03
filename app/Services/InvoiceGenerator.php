@@ -148,7 +148,7 @@ class InvoiceGenerator
 
     /**
      * One ZIP holding the PDF of each invoice, e.g. all invoices of a region for its telemarketing. Each PDF is
-     * named after its invoice, e.g. "2004000091 - 888 CELL.pdf".
+     * named after its invoice, dealer and program.
      *
      * @param  iterable<Invoice>  $invoices
      */
@@ -186,11 +186,13 @@ class InvoiceGenerator
     }
 
     /**
-     * File name of an invoice's PDF inside a ZIP: invoice number and dealer, without characters a file name can't hold.
+     * File name of an invoice's PDF inside a ZIP: invoice number, dealer and program, without characters a file name
+     * can't hold, e.g. "2610000357 - MAJU HARDWARE - PROGRAM PEAKSEASON SEPTEMBER 2026.pdf".
      */
     private function pdfFilename(Invoice $invoice): string
     {
-        $name = Str::squish(preg_replace('#[\\\\/:*?"<>|]+#', ' ', "{$invoice->invoice_number} - {$invoice->dealer_name}"));
+        $parts = array_filter([$invoice->invoice_number, $invoice->dealer_name, $invoice->program_name], 'filled');
+        $name = Str::squish(preg_replace('#[\\\\/:*?"<>|]+#', ' ', implode(' - ', $parts)));
 
         return "{$name}.pdf";
     }

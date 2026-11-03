@@ -260,7 +260,7 @@ class InvoiceNotificationTest extends TestCase
         $zip->close();
         unlink($zipPath);
 
-        $this->assertSame(['CN-REG-002 - 888 CELL.pdf', 'CN-REG-003 - A1 CELL.pdf'], $pdfs->keys()->sort()->values()->all());
+        $this->assertSame(['CN-REG-002 - 888 CELL - PROGRAM SEPTEMBER 2026.pdf', 'CN-REG-003 - A1 CELL - PROGRAM SEPTEMBER 2026.pdf'], $pdfs->keys()->sort()->values()->all());
         foreach ($pdfs as $pdf) {
             $this->assertStringStartsWith('%PDF', $pdf);
             $this->assertSame(1, preg_match_all('#/Type\s*/Page[^s]#', $pdf));
