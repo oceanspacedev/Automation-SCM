@@ -14,7 +14,10 @@
 
         <!-- Modal Dialog Box -->
         <div
-          class="relative z-10 w-full max-w-xl bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden transform transition-all font-sans"
+          :class="[
+            'relative z-10 w-full bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden transform transition-all font-sans max-h-[90vh] flex flex-col',
+            preview && !result ? 'max-w-5xl' : 'max-w-xl',
+          ]"
         >
           <!-- Header -->
           <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -34,7 +37,9 @@
                   Import Draft Excel
                 </h3>
                 <p class="text-xs text-gray-500 mt-0.5">
-                  Unggah berkas Excel DSA atau NPS FL untuk diproses ke draft invoice.
+                  {{ preview && !result
+                    ? 'Cek dulu baris yang akan masuk ke draft sebelum diimport.'
+                    : 'Unggah berkas Excel DSA atau NPS FL untuk diproses ke draft invoice.' }}
                 </p>
               </div>
             </div>
@@ -49,7 +54,7 @@
           </div>
 
           <!-- Body: Upload Form -->
-          <div v-if="!result" class="p-6 space-y-4">
+          <div v-if="!preview && !result" class="p-6 space-y-4 overflow-y-auto min-h-0">
             <!-- Hidden native file input -->
             <input
               type="file"
@@ -159,8 +164,114 @@
             </div>
           </div>
 
+          <!-- Body: Preview (sebelum disimpan) -->
+          <div v-else-if="preview && !result" class="p-6 space-y-4 overflow-y-auto min-h-0">
+            <p class="text-xs text-gray-600">
+              <strong class="text-gray-900">{{ selectedFile?.name }}</strong> · tipe invoice default {{ selectedInvoiceType }}. Belum ada yang disimpan.
+            </p>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
+                <div class="text-[11px] font-medium text-slate-500">Total Baris</div>
+                <div class="text-lg font-bold text-slate-900 mt-0.5">{{ preview.total_rows }}</div>
+              </div>
+              <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                <div class="text-[11px] font-medium text-emerald-600">Akan Masuk</div>
+                <div class="text-lg font-bold text-emerald-700 mt-0.5">{{ preview.success }}</div>
+              </div>
+              <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl text-center">
+                <div class="text-[11px] font-medium text-rose-600">Tidak Masuk (Error)</div>
+                <div class="text-lg font-bold text-rose-700 mt-0.5">{{ preview.failed }}</div>
+              </div>
+              <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                <div class="text-[11px] font-medium text-amber-600">Peringatan Rumus</div>
+                <div class="text-lg font-bold text-amber-700 mt-0.5">{{ preview.warning }}</div>
+              </div>
+            </div>
+
+            <p
+              v-for="(count, areaLabel) in (preview.moved_to_area || {})"
+              :key="areaLabel"
+              class="text-xs text-gray-600"
+            >
+              {{ count }} draft masuk ke tab <strong class="text-gray-900">{{ areaLabel }}</strong> (sesuai Master Dealer).
+            </p>
+
+            <!-- Filter baris -->
+            <div class="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5 text-xs">
+              <button
+                v-for="option in previewFilters"
+                :key="option.value"
+                type="button"
+                @click="previewFilter = option.value"
+                :class="[
+                  'h-7 px-3 rounded-md font-medium transition cursor-pointer',
+                  previewFilter === option.value ? 'bg-white text-gray-900 shadow-xs' : 'text-gray-500 hover:text-gray-800',
+                ]"
+              >
+                {{ option.label }} ({{ option.count }})
+              </button>
+            </div>
+
+            <div class="max-h-[45vh] overflow-auto border border-gray-200 rounded-xl">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead class="w-14">Baris</TableHead>
+                    <TableHead>Dealer</TableHead>
+                    <TableHead>No CN</TableHead>
+                    <TableHead>Program</TableHead>
+                    <TableHead>Tipe</TableHead>
+                    <TableHead class="text-right">Net Pay</TableHead>
+                    <TableHead class="min-w-[200px]">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow v-for="row in visiblePreviewRows" :key="row.row" :class="row.status === 'error' && 'bg-rose-50/40'">
+                    <TableCell class="text-xs tabular-nums text-gray-500">{{ row.row }}</TableCell>
+                    <TableCell class="text-xs">
+                      <span class="block font-medium text-gray-900">{{ row.dealer_name || '-' }}</span>
+                      <span v-if="row.dealer_code" class="block text-gray-500">{{ row.dealer_code }}</span>
+                    </TableCell>
+                    <TableCell class="text-xs tabular-nums text-gray-800">{{ row.cn_number || '-' }}</TableCell>
+                    <TableCell class="text-xs text-gray-800">{{ row.program_name || '-' }}</TableCell>
+                    <TableCell class="text-xs text-gray-800 whitespace-nowrap">{{ row.invoice_type || '-' }}</TableCell>
+                    <TableCell class="text-xs text-right tabular-nums text-gray-900 whitespace-nowrap">{{ rupiah(row.netpay) }}</TableCell>
+                    <TableCell class="text-xs">
+                      <template v-if="row.status === 'ready'">
+                        <span class="inline-flex items-center gap-1.5 text-emerald-700 font-medium">
+                          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Masuk ke draft
+                        </span>
+                        <span v-if="row.area && movedAreas.includes(row.area)" class="block text-gray-500">Tab {{ row.area }}</span>
+                        <span v-if="row.formula_warning" class="block text-amber-700">Angka pajak beda dengan sistem</span>
+                      </template>
+                      <template v-else>
+                        <span class="inline-flex items-center gap-1.5 text-rose-700 font-medium">
+                          <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>Tidak masuk
+                        </span>
+                        <span v-for="message in row.errors" :key="message" class="block text-rose-700">{{ message }}</span>
+                      </template>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow v-if="visiblePreviewRows.length === 0">
+                    <TableCell colspan="7" class="text-xs text-center text-gray-500 py-6">Tidak ada baris.</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+
+            <!-- Error Alert -->
+            <div
+              v-if="uploadError"
+              class="p-3.5 bg-rose-50 border border-rose-200 text-xs text-rose-700 rounded-xl flex items-start gap-2.5"
+            >
+              <AlertCircleIcon class="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+              <span>{{ uploadError }}</span>
+            </div>
+          </div>
+
           <!-- Body: Result View (Setelah berhasil/gagal import) -->
-          <div v-else class="p-6 space-y-4">
+          <div v-else class="p-6 space-y-4 overflow-y-auto min-h-0">
             <!-- Summary Stats Cards -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-center">
@@ -222,7 +333,7 @@
 
           <!-- Footer Actions -->
           <div class="px-6 py-4 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-2.5">
-            <template v-if="!result">
+            <template v-if="!preview && !result">
               <button
                 type="button"
                 @click="close"
@@ -233,7 +344,7 @@
               </button>
               <button
                 type="button"
-                @click="uploadFile"
+                @click="loadPreview"
                 :disabled="!selectedFile || uploading"
                 class="h-10 px-5 rounded-lg bg-[#1D70F5] hover:bg-blue-600 text-white text-sm font-medium transition cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
               >
@@ -241,8 +352,32 @@
                   v-if="uploading"
                   class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
                 ></span>
+                <EyeIcon v-else class="w-4 h-4 text-white" />
+                <span>{{ uploading ? 'Membaca file...' : 'Lihat Preview' }}</span>
+              </button>
+            </template>
+
+            <template v-else-if="preview && !result">
+              <button
+                type="button"
+                @click="backToFile"
+                :disabled="uploading"
+                class="h-10 px-4 rounded-lg border border-gray-200 bg-white text-sm font-medium text-gray-700 hover:bg-gray-100 transition cursor-pointer disabled:opacity-50"
+              >
+                Kembali
+              </button>
+              <button
+                type="button"
+                @click="uploadFile"
+                :disabled="!preview.success || uploading"
+                class="h-10 px-5 rounded-lg bg-[#1D70F5] hover:bg-blue-600 text-white text-sm font-medium transition cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-2"
+              >
+                <span
+                  v-if="uploading"
+                  class="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"
+                ></span>
                 <UploadCloudIcon v-else class="w-4 h-4 text-white" />
-                <span>{{ uploading ? 'Memproses Import...' : 'Upload & Import' }}</span>
+                <span>{{ uploading ? 'Mengimport...' : `Import ${preview.success} Baris` }}</span>
               </button>
             </template>
 
@@ -263,13 +398,14 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import axios from 'axios';
 import {
   UploadCloud as UploadCloudIcon,
   X as XIcon,
   Trash2 as Trash2Icon,
   AlertCircle as AlertCircleIcon,
+  Eye as EyeIcon,
 } from 'lucide-vue-next';
 import {
   Table,
@@ -293,6 +429,28 @@ const uploadError = ref(null);
 const result = ref(null);
 const selectedInvoiceType = ref('NPS FL');
 const isDragging = ref(false);
+
+// Preview: isi file dicek dulu tanpa disimpan, lalu diimport bila sudah sesuai
+const preview = ref(null);
+const previewFilter = ref('all');
+
+const previewFilters = computed(() => {
+  const rows = preview.value?.rows || [];
+  return [
+    { value: 'all', label: 'Semua', count: rows.length },
+    { value: 'ready', label: 'Akan masuk', count: rows.filter((row) => row.status === 'ready').length },
+    { value: 'error', label: 'Error', count: rows.filter((row) => row.status === 'error').length },
+  ];
+});
+
+const visiblePreviewRows = computed(() =>
+  (preview.value?.rows || []).filter((row) => previewFilter.value === 'all' || row.status === previewFilter.value),
+);
+
+// Area tujuan hanya disebut untuk draft yang pindah ke tab area lain
+const movedAreas = computed(() => Object.keys(preview.value?.moved_to_area || {}));
+
+const rupiah = (value) => `Rp ${new Intl.NumberFormat('id-ID').format(Math.round(Number(value) || 0))}`;
 
 const triggerFileInput = () => {
   if (fileInput.value) {
@@ -319,6 +477,7 @@ const handleDrop = (e) => {
 
 const removeSelectedFile = () => {
   selectedFile.value = null;
+  preview.value = null;
   if (fileInput.value) fileInput.value.value = '';
 };
 
@@ -330,43 +489,78 @@ const formatFileSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 };
 
+/**
+ * Kirim file ke server: preview hanya membaca & memvalidasi, tanpa menyimpan draft.
+ */
+const sendFile = async ({ previewOnly }) => {
+  const formData = new FormData();
+  formData.append('file', selectedFile.value);
+  formData.append('invoice_type', selectedInvoiceType.value);
+  if (previewOnly) formData.append('preview', '1');
+
+  const res = await axios.post('/api/drafts/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
+  return res.data.data;
+};
+
+const uploadErrorMessage = (err) =>
+  err.response?.data?.errors?.file?.[0] ||
+  err.response?.data?.message ||
+  (err.response?.status === 413 ? 'Ukuran file terlalu besar (Payload Too Large).' : null) ||
+  (err.response?.status === 419 ? 'Sesi kedaluwarsa. Silakan refresh browser.' : null) ||
+  err.message ||
+  'Gagal mengunggah file.';
+
+const loadPreview = async () => {
+  if (!selectedFile.value) return;
+
+  uploading.value = true;
+  uploadError.value = null;
+
+  try {
+    preview.value = await sendFile({ previewOnly: true });
+    previewFilter.value = 'all';
+  } catch (err) {
+    console.error('Import preview error:', err);
+    uploadError.value = uploadErrorMessage(err);
+  } finally {
+    uploading.value = false;
+  }
+};
+
 const uploadFile = async () => {
   if (!selectedFile.value) return;
 
   uploading.value = true;
   uploadError.value = null;
 
-  const formData = new FormData();
-  formData.append('file', selectedFile.value);
-  formData.append('invoice_type', selectedInvoiceType.value);
-
   try {
-    const res = await axios.post('/api/drafts/import', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    result.value = res.data.data;
+    result.value = await sendFile({ previewOnly: false });
     emit('imported');
   } catch (err) {
     console.error('Import upload error:', err);
-    uploadError.value =
-      err.response?.data?.errors?.file?.[0] ||
-      err.response?.data?.message ||
-      (err.response?.status === 413 ? 'Ukuran file terlalu besar (Payload Too Large).' : null) ||
-      (err.response?.status === 419 ? 'Sesi kedaluwarsa. Silakan refresh browser.' : null) ||
-      err.message ||
-      'Gagal mengunggah file.';
+    uploadError.value = uploadErrorMessage(err);
   } finally {
     uploading.value = false;
   }
 };
 
+const backToFile = () => {
+  preview.value = null;
+  uploadError.value = null;
+};
+
 const close = () => {
   if (uploading.value) return;
+  preview.value = null;
   emit('close');
 };
 
 const resetAndClose = () => {
   result.value = null;
+  preview.value = null;
   selectedFile.value = null;
   if (fileInput.value) fileInput.value.value = '';
   emit('close');

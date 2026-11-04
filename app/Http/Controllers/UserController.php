@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\UserImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use PhpOffice\PhpSpreadsheet\Exception as SpreadsheetException;
+use RuntimeException;
 
 class UserController extends Controller
 {
@@ -79,7 +82,7 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'email' => ['nullable', 'string', 'email', 'max:255', 'unique:users,email'],
             'whatsapp' => ['nullable', 'string', 'max:25'],
             'role' => ['required', Rule::in(['admin', 'scm', 'ar', 'telemarketing'])],
             'permissions' => ['nullable', 'array'],
@@ -95,7 +98,7 @@ class UserController extends Controller
 
         $user = User::create([
             'name' => $validated['name'],
-            'email' => $validated['email'],
+            'email' => $validated['email'] ?? null,
             'whatsapp' => $cleanWa,
             'role' => $validated['role'],
             'permissions' => $permissions,
@@ -111,6 +114,46 @@ class UserController extends Controller
     }
 
     /**
+     * Buat akun dari file Excel berisi nama, nomor WhatsApp, dan (opsional) email & peran, mis. daftar pengguna atau
+     * file Master Customer CV TOP (telemarketing), satu akun per nomor. Baris tanpa peran memakai peran yang dipilih.
+     */
+    public function import(Request $request, UserImportService $importService): JsonResponse
+    {
+        $role = (string) $request->input('role', 'telemarketing');
+        $this->authorizeUserManagement($request, newRole: $role);
+
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'extensions:xlsx,xls,csv', 'max:51200'],
+            'password' => ['nullable', 'string', 'min:6'],
+            'role' => ['nullable', Rule::in(['admin', 'scm', 'ar', 'telemarketing'])],
+        ], [
+            'file.required' => 'Pilih file Excel terlebih dahulu.',
+            'file.extensions' => 'File harus berformat .xlsx, .xls, atau .csv.',
+            'file.max' => 'Ukuran file maksimal 50 MB.',
+            'password.min' => 'Password awal minimal 6 karakter.',
+        ]);
+
+        try {
+            $result = $importService->import(
+                $request->file('file')->getRealPath(),
+                $validated['password'] ?? null,
+                $validated['role'] ?? 'telemarketing',
+                canCreateAdmin: (bool) $request->user()?->isAdmin(),
+            );
+        } catch (RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (SpreadsheetException) {
+            return response()->json(['success' => false, 'message' => 'File Excel tidak bisa dibaca.'], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => count($result['created']).' akun dibuat.',
+            'data' => $result,
+        ]);
+    }
+
+    /**
      * Update data user.
      */
     public function update(Request $request, int $id): JsonResponse
@@ -120,7 +163,7 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'email' => ['nullable', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'whatsapp' => ['nullable', 'string', 'max:25'],
             'role' => ['required', Rule::in(['admin', 'scm', 'ar', 'telemarketing'])],
             'permissions' => ['nullable', 'array'],
@@ -148,7 +191,7 @@ class UserController extends Controller
         }
 
         $user->name = $validated['name'];
-        $user->email = $validated['email'];
+        $user->email = $validated['email'] ?? null;
         $user->whatsapp = User::normalizeWhatsapp($validated['whatsapp'] ?? null);
         $user->role = $validated['role'];
         $user->is_active = $targetActive;

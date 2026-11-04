@@ -112,6 +112,7 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         // Master Users (butuh akses Master User; akun Admin hanya bisa diubah Admin)
         Route::get('/users', [UserController::class, 'index']);
         Route::post('/users', [UserController::class, 'store']);
+        Route::post('/users/import', [UserController::class, 'import']);
         Route::put('/users/{id}', [UserController::class, 'update']);
         Route::delete('/users/{id}', [UserController::class, 'destroy']);
         Route::patch('/users/{id}/toggle-status', [UserController::class, 'toggleStatus']);

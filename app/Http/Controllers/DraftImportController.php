@@ -55,11 +55,13 @@ class DraftImportController extends Controller
 
         try {
             $defaultType = $request->input('invoice_type', 'NPS FL');
-            $result = $this->importService->import($file, $defaultType);
+            // preview=1: cek isi file tanpa menyimpan, untuk ditampilkan sebelum import
+            $preview = $request->boolean('preview');
+            $result = $this->importService->import($file, $defaultType, previewOnly: $preview);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Proses import selesai.',
+                'message' => $preview ? 'Preview import siap.' : 'Proses import selesai.',
                 'data' => $result,
             ]);
         } catch (Exception $e) {

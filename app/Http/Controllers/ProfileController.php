@@ -19,7 +19,7 @@ class ProfileController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
+            'email' => ['nullable', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'whatsapp' => ['nullable', 'string', 'max:25'],
         ], [
             'email.unique' => 'Email ini sudah dipakai akun lain.',
@@ -27,7 +27,7 @@ class ProfileController extends Controller
 
         $user->update([
             'name' => $validated['name'],
-            'email' => $validated['email'],
+            'email' => $validated['email'] ?? null,
             'whatsapp' => User::normalizeWhatsapp($validated['whatsapp'] ?? null),
         ]);
 

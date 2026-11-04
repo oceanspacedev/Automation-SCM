@@ -4,7 +4,7 @@
       <div class="px-5 py-4 border-b border-gray-200 flex items-start justify-between gap-3">
         <div>
           <h3 class="text-sm font-bold text-gray-950">Import No PO/SJ & No Transaksi</h3>
-          <p class="text-xs text-gray-500 mt-0.5">Baris Data Program dicari dari Kode BT dan Nama Program, di semua area.</p>
+          <p class="text-xs text-gray-500 mt-0.5">Dicocokkan dari Kode BT dan Nama Program.</p>
         </div>
         <button type="button" @click="close" :disabled="uploading" class="text-gray-400 hover:text-gray-600 cursor-pointer disabled:opacity-50">
           <XIcon class="w-4 h-4" />
@@ -39,12 +39,7 @@
           </button>
         </div>
 
-        <ul class="space-y-1 text-gray-500 list-disc pl-4">
-          <li>Kolom yang dibaca: <strong class="text-gray-800">Kode BT</strong>, <strong class="text-gray-800">Nama Program</strong>, <strong class="text-gray-800">No PO/SJ</strong>, dan <strong class="text-gray-800">No. Trs</strong>.</li>
-          <li>Kode BT "BTO…" dan "BT0…" dianggap sama. Spasi dan tanda baca di nama program diabaikan.</li>
-          <li>Sel kosong tidak menghapus nomor yang sudah ada. Nomor yang berbeda diganti isi file.</li>
-          <li>Hasilnya langsung dikirim juga ke Google Spreadsheet area masing-masing, kalau areanya sudah terhubung.</li>
-        </ul>
+        <p class="text-gray-500">Kolom: Kode BT, Nama Program, No PO/SJ, No. Trs</p>
 
         <p v-if="errorMessage" class="text-rose-600">{{ errorMessage }}</p>
       </div>
@@ -58,9 +53,7 @@
           </div>
         </div>
 
-        <p v-if="result.replaced" class="text-gray-600">
-          {{ result.replaced }} baris sebelumnya sudah berisi nomor lain dan diganti isi file.
-        </p>
+        <p v-if="result.replaced" class="text-gray-600">{{ result.replaced }} nomor lama diganti.</p>
 
         <ul v-if="result.sheet_push.length" class="space-y-1">
           <li v-for="(push, index) in result.sheet_push" :key="index" class="flex items-start gap-2">
@@ -72,8 +65,7 @@
         </ul>
 
         <div v-if="result.not_found.length">
-          <p class="font-medium text-gray-900">Tidak ditemukan di Data Program</p>
-          <p class="mt-0.5 mb-2 text-gray-500">Cek lagi Kode BT dan Nama Program baris ini di file.</p>
+          <p class="font-medium text-gray-900 mb-2">Tidak ditemukan</p>
           <div class="max-h-56 overflow-y-auto border border-gray-200 rounded-lg">
             <table class="w-full text-left">
               <thead class="bg-gray-50 text-gray-500">

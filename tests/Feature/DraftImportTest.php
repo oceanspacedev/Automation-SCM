@@ -135,6 +135,39 @@ class DraftImportTest extends TestCase
         $this->assertSame('ready', Draft::where('dealer_name', 'TOKO A')->value('status'));
     }
 
+    public function test_preview_lists_each_row_without_saving_any_draft(): void
+    {
+        $spreadsheet = new Spreadsheet;
+        $spreadsheet->getActiveSheet()->fromArray([
+            ['Dealer Code', 'Dealer Name', 'Support Amount', 'Netpay', 'Nama Program', 'No CN', 'DSA/NPS FL'],
+            ['DLR001', 'TOKO A', 1000000, 500000, 'PROGRAM DSA JULI 2026', '2608000043', 'DSA'],
+            ['DLR002', 'TOKO B', 1000000, 500000, 'PROGRAM DSA JULI 2026', null, 'DSA'],
+        ]);
+        $path = tempnam(sys_get_temp_dir(), 'draft_preview').'.xlsx';
+        (new Xlsx($spreadsheet))->save($path);
+        $file = fn () => new UploadedFile($path, 'draft.xlsx', null, null, true);
+
+        $this->postJson('/api/drafts/import', ['file' => $file(), 'preview' => '1'])
+            ->assertOk()
+            ->assertJsonPath('data.success', 1)
+            ->assertJsonPath('data.failed', 1)
+            ->assertJsonPath('data.rows.0', [
+                'row' => 2, 'status' => 'ready', 'dealer_code' => 'DLR001', 'dealer_name' => 'TOKO A',
+                'program_name' => 'PROGRAM DSA JULI 2026', 'cn_number' => '2608000043', 'invoice_type' => 'DSA',
+                'support_amount' => 1000000, 'netpay' => 500000, 'area' => 'Jawa Barat', 'formula_warning' => true,
+                'errors' => [],
+            ])
+            ->assertJsonPath('data.rows.1.status', 'error')
+            ->assertJsonPath('data.rows.1.errors', ['No CN wajib diisi karena dipakai sebagai nomor invoice.']);
+        $this->assertDatabaseCount('drafts', 0);
+
+        // Importing the same file afterwards saves the rows the preview showed as ready
+        $this->postJson('/api/drafts/import', ['file' => $file()])
+            ->assertOk()
+            ->assertJsonMissingPath('data.rows');
+        $this->assertSame(['TOKO A'], Draft::pluck('dealer_name')->all());
+    }
+
     public function test_can_import_excel_with_numbering_row_on_top_and_headers_on_row_2(): void
     {
         $spreadsheet = new Spreadsheet;

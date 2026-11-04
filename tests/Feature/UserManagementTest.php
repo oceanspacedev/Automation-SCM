@@ -64,6 +64,27 @@ class UserManagementTest extends TestCase
         ]);
     }
 
+    public function test_accounts_can_be_saved_without_email(): void
+    {
+        $id = $this->postJson('/api/users', [
+            'name' => 'Tele Tanpa Email',
+            'email' => '',
+            'whatsapp' => '081300000005',
+            'role' => 'telemarketing',
+            'password' => 'secret123',
+        ])->assertCreated()->assertJsonPath('data.email', null)->json('data.id');
+
+        $other = User::factory()->create(['role' => 'telemarketing']);
+        $this->putJson("/api/users/{$other->id}", [
+            'name' => $other->name,
+            'email' => '',
+            'whatsapp' => '081300000006',
+            'role' => 'telemarketing',
+        ])->assertOk();
+
+        $this->assertSame([null, null], [User::find($id)->email, $other->fresh()->email]);
+    }
+
     public function test_can_update_user(): void
     {
         $user = User::factory()->create([

@@ -68,8 +68,8 @@
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label for="profile-email" class="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Email</label>
-            <input id="profile-email" v-model="profileForm.email" type="email" required autocomplete="email" :class="inputClass" />
+            <label for="profile-email" class="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Email <span class="font-normal text-gray-400">(opsional)</span></label>
+            <input id="profile-email" v-model="profileForm.email" type="email" autocomplete="email" :class="inputClass" />
           </div>
           <div>
             <label for="profile-wa" class="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">No. WhatsApp</label>

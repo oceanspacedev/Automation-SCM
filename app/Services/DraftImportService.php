@@ -92,9 +92,10 @@ class DraftImportService
     ];
 
     /**
-     * Import draft Excel file.
+     * Import draft Excel file. With $previewOnly nothing is saved: the result also lists every row ("rows") with
+     * whether it will become a draft or why not, so the file can be checked before importing it.
      */
-    public function import(UploadedFile|string $file, string $defaultInvoiceType = 'NPS FL'): array
+    public function import(UploadedFile|string $file, string $defaultInvoiceType = 'NPS FL', bool $previewOnly = false): array
     {
         $filePath = is_string($file) ? $file : $file->getRealPath();
 
@@ -158,6 +159,7 @@ class DraftImportService
         $importArea = app(AreaContext::class)->resolve()->value;
         $movedToArea = [];
         $cnNumbersInFile = [];
+        $previewRows = [];
 
         foreach ($dataRows as $rowIndex => $rowData) {
             $excelRowNumber = $headerRowIndex + 1 + $rowIndex + 1; // 1-indexed Excel row
@@ -241,6 +243,7 @@ class DraftImportService
             if (! empty($rowErrors)) {
                 $failedCount++;
                 array_push($errors, ...$rowErrors);
+                $previewRows[] = $this->previewRow($excelRowNumber, $cleanData, array_column($rowErrors, 'error'));
 
                 continue;
             }
@@ -294,6 +297,12 @@ class DraftImportService
                 $movedToArea[$cleanData['area']] = ($movedToArea[$cleanData['area']] ?? 0) + 1;
             }
 
+            if ($previewOnly) {
+                $previewRows[] = $this->previewRow($excelRowNumber, $cleanData, [], $hasDiff);
+
+                continue;
+            }
+
             // Save to database
             try {
                 Draft::create($cleanData);
@@ -319,6 +328,32 @@ class DraftImportService
             'moved_to_area' => collect($movedToArea)
                 ->mapWithKeys(fn (int $count, string $area) => [Area::from($area)->label() => $count])
                 ->all(),
+            ...($previewOnly ? ['rows' => $previewRows] : []),
+        ];
+    }
+
+    /**
+     * One row of the import preview: what will become a draft, or why the row stays out.
+     *
+     * @param  array<string, mixed>  $cleanData
+     * @param  list<string>  $errors
+     * @return array{row: int, status: 'ready'|'error', dealer_code: ?string, dealer_name: ?string, program_name: ?string, cn_number: ?string, invoice_type: ?string, support_amount: float, netpay: float, area: ?string, formula_warning: bool, errors: list<string>}
+     */
+    protected function previewRow(int $excelRowNumber, array $cleanData, array $errors, bool $formulaWarning = false): array
+    {
+        return [
+            'row' => $excelRowNumber,
+            'status' => $errors === [] ? 'ready' : 'error',
+            'dealer_code' => $cleanData['dealer_code'] ?? null,
+            'dealer_name' => $cleanData['dealer_name'] ?: ($cleanData['customer_name'] ?? null),
+            'program_name' => $cleanData['program_name'] ?? null,
+            'cn_number' => $cleanData['cn_number'] ?? null,
+            'invoice_type' => $cleanData['invoice_type'] ?? null,
+            'support_amount' => (float) ($cleanData['support_amount'] ?? 0),
+            'netpay' => (float) ($cleanData['netpay'] ?? 0),
+            'area' => isset($cleanData['area']) ? Area::from($cleanData['area'])->label() : null,
+            'formula_warning' => $formulaWarning,
+            'errors' => $errors,
         ];
     }
 

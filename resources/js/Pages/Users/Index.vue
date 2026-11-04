@@ -17,7 +17,14 @@
       </div>
 
       <!-- Di layar kecil tombol selebar layar -->
-      <div class="grid grid-cols-1 sm:block">
+      <div class="grid grid-cols-2 gap-2 sm:flex">
+        <button
+          type="button"
+          @click="showUserImport = true"
+          class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium shadow-2xs transition cursor-pointer whitespace-nowrap"
+        >
+          <span>Import</span>
+        </button>
         <button
           type="button"
           @click="openCreateModal"
@@ -116,7 +123,7 @@
                 <p class="text-sm font-medium text-gray-900 break-words">
                   {{ user.name }}<span v-if="currentUser?.id === user.id" class="text-gray-400 font-normal ml-1">(Anda)</span>
                 </p>
-                <p class="mt-0.5 text-gray-500 break-words">{{ user.email }}</p>
+                <p class="mt-0.5 text-gray-500 break-words">{{ user.email || '-' }}</p>
               </div>
               <button
                 type="button"
@@ -215,7 +222,7 @@
 
               <!-- 3. Email -->
               <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
-                {{ user.email }}
+                {{ user.email || '-' }}
               </td>
 
               <!-- 4. Peran -->
@@ -331,11 +338,10 @@
 
             <!-- Email -->
             <div>
-              <label class="block font-medium text-gray-700 mb-1">Email</label>
+              <label class="block font-medium text-gray-700 mb-1">Email <span class="font-normal text-gray-400">(opsional)</span></label>
               <input
                 v-model="userForm.email"
                 type="email"
-                required
                 placeholder="email@perusahaan.com"
                 class="w-full h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
               />
@@ -462,7 +468,7 @@
       <div class="bg-white rounded-xl max-w-sm w-full p-5 shadow-lg border border-gray-200 space-y-3">
         <h3 class="text-sm font-bold text-gray-950">Hapus Pengguna</h3>
         <p class="text-xs text-gray-600">
-          Hapus pengguna <strong class="text-gray-900">{{ userToDelete.name }}</strong> ({{ userToDelete.email }})?
+          Hapus pengguna <strong class="text-gray-900">{{ userToDelete.name }}</strong><template v-if="userToDelete.email"> ({{ userToDelete.email }})</template>?
         </p>
         <div class="flex items-center justify-end gap-2 pt-2">
           <button
@@ -483,6 +489,13 @@
         </div>
       </div>
     </div>
+
+    <UserImportModal
+      :is-open="showUserImport"
+      :can-create-admin="currentUser?.role === 'admin'"
+      @close="showUserImport = false"
+      @imported="fetchUsers({ silent: true })"
+    />
   </div>
 </template>
 
@@ -492,6 +505,7 @@ import axios from 'axios';
 import { notify } from '@/composables/useNotify';
 import { useAuth } from '@/composables/useAuth';
 import { useAutoRefresh } from '@/composables/useAutoRefresh';
+import UserImportModal from '@/components/UserImportModal.vue';
 import {
   ChevronRightIcon,
   ChevronDownIcon,
@@ -624,8 +638,12 @@ onMounted(() => {
 });
 
 // Pendaftar baru (Menunggu ACC) muncul sendiri; berhenti selama form user terbuka
+// Import akun dari Excel (nama, No WA, email & peran; juga file CV TOP untuk telemarketing)
+const showUserImport = ref(false);
+
 useAutoRefresh(() => fetchUsers({ silent: true }), {
-  isPaused: () => isLoading.value || isModalOpen.value || userToDelete.value !== null || isSaving.value || isDeleting.value,
+  isPaused: () => isLoading.value || isModalOpen.value || userToDelete.value !== null || isSaving.value || isDeleting.value
+    || showUserImport.value,
 });
 
 // Modal Actions
