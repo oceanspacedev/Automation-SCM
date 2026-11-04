@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * AR sebuah region (mis. BIG CIREBON): penerima WA "dealer setuju dipotong" dari telemarketing.
+ * AR sebuah area (Jawa Barat / Jawa Tengah), satu per area: penerima WA "dealer setuju dipotong" dari telemarketing.
  */
 class ArContact extends Model
 {
@@ -23,32 +23,13 @@ class ArContact extends Model
     ];
 
     /**
-     * The active AR of the first given region that has one (e.g. a Data Program's region, then its big region).
+     * The active AR of the area (null: the area has none, so the default AR number is used).
      */
-    public static function forRegion(Area $area, ?string ...$regions): ?self
+    public static function forArea(Area $area): ?self
     {
-        $regions = array_values(array_unique(array_filter(array_map(
-            fn (?string $region) => strtoupper(trim((string) $region)),
-            $regions
-        ), fn (string $region) => $region !== '' && $region !== '-')));
-
-        if ($regions === []) {
-            return null;
-        }
-
-        $contacts = static::withoutGlobalScope('area')
+        return static::withoutGlobalScope('area')
             ->where('area', $area->value)
             ->where('is_active', true)
-            ->whereIn('region', $regions)
-            ->get()
-            ->keyBy('region');
-
-        foreach ($regions as $region) {
-            if ($contact = $contacts->get($region)) {
-                return $contact;
-            }
-        }
-
-        return null;
+            ->first();
     }
 }

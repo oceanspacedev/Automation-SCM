@@ -105,11 +105,11 @@ class ProgramApprovalFlow
     /**
      * The eight steps of the row, each done, current, waiting, failed (a WhatsApp that didn't go out) or postponed,
      * with the person in charge: the row's telemarketing for the WhatsApp to telemarketing and the dealer's answer
-     * (given through the telemarketing's link), the region's AR for the WhatsApp to AR and the cut, the area's tax
+     * (given through the telemarketing's link), the area's AR for the WhatsApp to AR and the cut, the area's tax
      * team for the WhatsApp to the tax team and the tax check, and the area's SCM team for the result's WhatsApp.
      *
      * @param  Collection<int, ProgramApprovalLog>  $logs  the row's recorded steps
-     * @param  string|null  $arName  the AR of the row's region in Master AR (null: the default AR number)
+     * @param  string|null  $arName  the AR of the row's area in Master AR (null: the default AR number)
      * @param  string|null  $taxName  the tax team in Master Tim Pajak & SCM (null: not named yet)
      * @param  string|null  $scmName  the SCM team in Master Tim Pajak & SCM (null: not named yet)
      * @return list<array{key: string, label: string, state: string, at: ?string, date: ?string, person: ?string, role: ?string, actor: ?string, recipient: ?string, note: ?string}>

@@ -1,18 +1,18 @@
 @extends('data_programs.layout')
 
 @section('title', 'Konfirmasi Selesai')
-@section('tag', 'Konfirmasi Sukses')
-@section('tag_class', 'bg-emerald-50 text-emerald-700')
+@section('tag', 'Konfirmasi sukses')
+@section('tag_class', 'text-emerald-700')
 @section('footer', 'Halaman ini boleh ditutup. Data sudah tersimpan dan tersinkron ke Google Spreadsheet.')
 
 @php
     $rupiah = fn ($amount) => 'Rp '.number_format((float) ($amount ?? 0), 0, ',', '.');
 
     [$title, $description, $status] = match ($action) {
-        'setuju' => ['Dealer Setuju Dipotong', 'Pengajuan dicatat dan otomatis diteruskan ke WhatsApp Tim AR untuk proses pemotongan piutang.', ['label' => 'DEALER SETUJU (PROSES AR)', 'tone' => 'blue']],
-        'potong' => ['Pemotongan Selesai Diproses', 'Status klaim menjadi SUDAH POTONG, lalu diteruskan ke Tim Pajak untuk cek PPh.', ['label' => 'SUDAH POTONG', 'tone' => 'emerald']],
-        'cek_pajak' => ['Cek Pajak Tersimpan', 'Cek Pajak, Selisih, dan Note PPh tersimpan, lalu hasilnya diteruskan ke Tim SCM.', ['label' => 'SUDAH DICEK PAJAK', 'tone' => 'emerald']],
-        default => ['Klaim Ditunda', 'Status dicatat sebagai pending. Tawarkan kembali pada pesanan dealer berikutnya.', ['label' => 'PENDING DEALER', 'tone' => 'gray']],
+        'setuju' => ['Dealer setuju dipotong', 'Pengajuan dicatat dan otomatis diteruskan ke WhatsApp Tim AR untuk proses pemotongan piutang.', ['label' => 'DEALER SETUJU (PROSES AR)', 'tone' => 'blue']],
+        'potong' => ['Pemotongan selesai diproses', 'Status klaim menjadi SUDAH POTONG, lalu diteruskan ke Tim Pajak untuk cek PPh.', ['label' => 'SUDAH POTONG', 'tone' => 'emerald']],
+        'cek_pajak' => ['Cek pajak tersimpan', 'Cek Pajak, Selisih, dan Note PPh tersimpan, lalu hasilnya diteruskan ke Tim SCM.', ['label' => 'SUDAH DICEK PAJAK', 'tone' => 'emerald']],
+        default => ['Klaim ditunda', 'Status dicatat sebagai pending. Tawarkan kembali pada pesanan dealer berikutnya.', ['label' => 'PENDING DEALER', 'tone' => 'gray']],
     };
 
     // [judul berhasil, judul gagal, keterangan bila gagal] per WhatsApp lanjutan
@@ -40,20 +40,20 @@
 
 @section('content')
     <div>
-        <h1 class="text-base font-semibold text-gray-950">{{ $title }}</h1>
-        <p class="mt-1 text-sm text-gray-500 leading-relaxed">{{ $description }}</p>
+        <h1 class="text-base font-medium leading-6 text-gray-950">{{ $title }}</h1>
+        <p class="mt-1 text-sm leading-5 text-gray-500">{{ $description }}</p>
     </div>
 
     @if($notification)
         @if($notification['success'] ?? false)
-            <div class="rounded-lg px-3 py-2.5 bg-emerald-50 text-xs leading-relaxed">
+            <div class="rounded-[10px] px-4 py-3 bg-emerald-50 text-xs leading-5">
                 <p class="font-medium text-emerald-900">{{ $sentTitle }}</p>
-                <p class="mt-0.5 text-emerald-800">{{ $notification['message'] ?? '' }}</p>
+                <p class="mt-1 text-emerald-800">{{ $notification['message'] ?? '' }}</p>
             </div>
         @else
-            <div class="rounded-lg px-3 py-2.5 bg-amber-50 text-xs leading-relaxed">
+            <div class="rounded-[10px] px-4 py-3 bg-amber-50 text-xs leading-5">
                 <p class="font-medium text-amber-900">{{ $failedTitle }}</p>
-                <p class="mt-0.5 text-amber-800">{{ $notification['message'] ?? '' }} {{ $failedNote }}</p>
+                <p class="mt-1 text-amber-800">{{ $notification['message'] ?? '' }} {{ $failedNote }}</p>
             </div>
         @endif
     @endif

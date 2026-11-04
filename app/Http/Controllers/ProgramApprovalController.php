@@ -102,21 +102,17 @@ class ProgramApprovalController extends Controller
     }
 
     /**
-     * The AR of a row in Master AR, picked like the WhatsApp to AR: its region first, then its big region.
+     * The AR of a row in Master AR, picked like the WhatsApp to AR: the AR of the row's area.
      *
      * @return Closure(DataProgram): ?string
      */
     private function arNameResolver(): Closure
     {
-        $contacts = ArContact::withoutGlobalScope('area')
+        $names = ArContact::withoutGlobalScope('area')
             ->where('is_active', true)
-            ->get()
-            ->keyBy(fn (ArContact $contact) => $contact->area.'|'.strtoupper(trim((string) $contact->region)));
+            ->pluck('name', 'area');
 
-        return fn (DataProgram $row): ?string => collect([$row->region, $row->big_region])
-            ->map(fn (?string $region) => $contacts->get($row->area.'|'.strtoupper(trim((string) $region))))
-            ->filter()
-            ->first()?->name;
+        return fn (DataProgram $row): ?string => $names->get($row->area);
     }
 
     /**

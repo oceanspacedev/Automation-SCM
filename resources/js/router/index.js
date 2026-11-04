@@ -83,7 +83,9 @@ const routes = [
   { path: `/programs/:brand(${BRAND_ROUTE_PATTERN})`, name: 'programs.index', component: ProgramsIndex, meta: { requiresAuth: true, permission: 'master_program' } },
   { path: '/brands', name: 'brands.index', component: BrandsIndex, meta: { requiresAuth: true, permission: 'master_program' } },
   ...areaRoutes('/regions', 'regions.index', RegionsIndex, 'master_program'),
-  ...areaRoutes('/ar', 'ar-contacts.index', ArContactsIndex, 'master_program'),
+  // Master AR satu halaman untuk Jawa Barat & Jawa Tengah (satu AR per area); link lama per area diarahkan ke sini
+  { path: '/ar', name: 'ar-contacts.index', component: ArContactsIndex, meta: { requiresAuth: true, permission: 'master_program' } },
+  { path: `/ar/:area(${AREA_ROUTE_PATTERN})`, redirect: '/ar' },
   // Tim Pajak & SCM satu untuk semua area; link per area diarahkan ke halaman yang sama
   { path: '/tim-pajak-scm', name: 'team-contacts.index', component: TeamContactsIndex, meta: { requiresAuth: true, permission: 'master_program' } },
   { path: `/tim-pajak-scm/:area(${AREA_ROUTE_PATTERN})`, redirect: '/tim-pajak-scm' },

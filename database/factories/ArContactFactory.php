@@ -20,7 +20,6 @@ class ArContactFactory extends Factory
     {
         return [
             'area' => Area::Jabar->value,
-            'region' => 'BIG '.strtoupper(fake()->unique()->city()),
             'name' => strtoupper(fake()->name()),
             'whatsapp' => '08'.fake()->numerify('##########'),
             'is_active' => true,

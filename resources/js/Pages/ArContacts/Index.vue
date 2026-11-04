@@ -7,13 +7,11 @@
       <span class="text-gray-800">Master AR</span>
     </div>
 
-    <AreaTabs />
-
     <!-- Header Page -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Master AR {{ area.label }}</h1>
-        <p class="text-xs text-gray-500 mt-0.5">Penerima WhatsApp klaim yang disetujui dealer, per region.</p>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Master AR</h1>
+        <p class="text-xs text-gray-500 mt-0.5">Penerima WhatsApp klaim yang disetujui dealer, satu per area.</p>
       </div>
 
       <!-- Tombol aksi; di layar kecil dua tombol sama lebar dengan label pendek -->
@@ -26,6 +24,7 @@
           <span class="sm:hidden">Export</span><span class="hidden sm:inline">Export Excel</span>
         </button>
         <button
+          v-if="freeAreas.length"
           type="button"
           @click="openCreateModal"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
@@ -35,8 +34,8 @@
       </div>
     </div>
 
-    <p v-if="regionsWithoutAr.length" class="text-xs text-amber-700">
-      Belum ada AR: {{ regionsWithoutAr.join(', ') }} (memakai nomor AR default).
+    <p v-if="!isLoading && areasWithoutAr.length" class="text-xs text-amber-700">
+      Belum ada AR aktif: {{ areasWithoutAr.join(', ') }} (memakai nomor AR default).
     </p>
 
     <!-- Table Card -->
@@ -51,7 +50,7 @@
           <input
             type="text"
             v-model="searchQuery"
-            placeholder="Cari region, nama, no. WA..."
+            placeholder="Cari area, nama, no. WA..."
             class="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-7 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-900 shadow-2xs"
           />
           <button
@@ -72,7 +71,7 @@
         <ul v-else class="divide-y divide-gray-100">
           <li v-for="c in filteredContacts" :key="c.id" class="p-4 space-y-2 text-xs text-gray-700">
             <div class="flex items-start justify-between gap-3">
-              <p class="min-w-0 text-sm font-medium text-gray-900 break-words">{{ c.region }}</p>
+              <p class="min-w-0 text-sm font-medium text-gray-900 break-words">{{ areaLabel(c.area) }}</p>
               <button
                 type="button"
                 @click="toggleStatus(c)"
@@ -112,7 +111,7 @@
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">
               <th scope="col" class="py-2.5 px-3 text-center w-12 border-r border-gray-200">No</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Region</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Area</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Nama AR</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">No. WhatsApp</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
@@ -128,7 +127,7 @@
             </tr>
             <tr v-else v-for="(c, index) in filteredContacts" :key="c.id" class="hover:bg-gray-50/70 text-gray-800">
               <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap text-gray-600">{{ index + 1 }}</td>
-              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap font-medium text-gray-950">{{ c.region }}</td>
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap font-medium text-gray-950">{{ areaLabel(c.area) }}</td>
               <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">{{ c.name }}</td>
               <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">{{ formatPhone(c.whatsapp) }}</td>
               <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
@@ -172,9 +171,7 @@
     <div v-if="isModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
       <div class="bg-white rounded-xl max-w-sm w-full p-5 shadow-xl border border-gray-200 space-y-4">
         <div class="flex items-center justify-between border-b border-gray-200 pb-2.5">
-          <h3 class="text-sm font-bold text-gray-950">
-            {{ formData.id ? 'Edit AR' : 'Tambah AR' }} {{ area.label }}
-          </h3>
+          <h3 class="text-sm font-bold text-gray-950">{{ formData.id ? 'Edit AR' : 'Tambah AR' }}</h3>
           <button type="button" @click="isModalOpen = false" class="text-gray-400 hover:text-gray-600 cursor-pointer">
             <XIcon class="w-4 h-4" />
           </button>
@@ -182,18 +179,17 @@
 
         <form @submit.prevent="submitForm" class="space-y-3.5 text-xs">
           <div>
-            <label class="block font-medium text-gray-900 mb-1">Region <span class="text-rose-500">*</span></label>
+            <label class="block font-medium text-gray-900 mb-1">Area <span class="text-rose-500">*</span></label>
             <select
-              v-model="formData.region"
+              v-model="formData.area"
               required
               class="w-full h-9 px-3 rounded-lg border border-gray-300 bg-white text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-900 cursor-pointer"
             >
-              <option value="" disabled>Pilih region</option>
-              <option v-for="region in modalRegionOptions" :key="region.name" :value="region.name" :disabled="region.taken">
-                {{ region.name }}{{ region.taken ? ' (sudah ada AR)' : '' }}
+              <option value="" disabled>Pilih area</option>
+              <option v-for="option in modalAreaOptions" :key="option.value" :value="option.value" :disabled="option.taken">
+                {{ option.label }}{{ option.taken ? ' (sudah ada AR)' : '' }}
               </option>
             </select>
-            <p class="mt-1 text-[11px] text-gray-500">Region diambil dari Master Region {{ area.label }}.</p>
           </div>
 
           <div>
@@ -257,8 +253,8 @@
       <div class="bg-white rounded-xl max-w-sm w-full p-5 shadow-lg border border-gray-200 space-y-3">
         <h3 class="text-sm font-bold text-gray-950">Hapus AR</h3>
         <p class="text-xs text-gray-600">
-          Hapus AR <strong class="text-gray-900">{{ contactToDelete.name }}</strong> untuk region
-          <strong class="text-gray-900">{{ contactToDelete.region }}</strong>? WhatsApp dealer region ini akan kembali ke nomor AR default.
+          Hapus AR <strong class="text-gray-900">{{ contactToDelete.name }}</strong> untuk
+          <strong class="text-gray-900">{{ areaLabel(contactToDelete.area) }}</strong>? WhatsApp klaim area ini akan kembali ke nomor AR default.
         </p>
         <div class="flex items-center justify-end gap-2 pt-2">
           <button
@@ -286,8 +282,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { notify } from '@/composables/useNotify';
-import AreaTabs from '@/components/AreaTabs.vue';
-import { useArea } from '@/composables/useArea';
+import { AREAS } from '@/composables/useArea';
 import { useAutoRefresh } from '@/composables/useAutoRefresh';
 import { downloadExport } from '@/lib/download';
 import {
@@ -298,10 +293,7 @@ import {
   Trash2 as Trash2Icon,
 } from 'lucide-vue-next';
 
-const { area } = useArea();
-
 const contacts = ref([]);
-const regionNames = ref([]);
 const isLoading = ref(false);
 const searchQuery = ref('');
 
@@ -313,11 +305,13 @@ const isDeleting = ref(false);
 
 const formData = reactive({
   id: null,
-  region: '',
+  area: '',
   name: '',
   whatsapp: '',
   is_active: true,
 });
+
+const areaLabel = (value) => AREAS.find((area) => area.value === value)?.label || value;
 
 // Nomor WA ditulis seperti di Master User: 081224290502 → +6281224290502
 const formatPhone = (phone) => {
@@ -330,31 +324,26 @@ const formatPhone = (phone) => {
 const filteredContacts = computed(() => {
   const q = searchQuery.value.trim().toLowerCase();
   if (!q) return contacts.value;
-  return contacts.value.filter(c => [c.region, c.name, c.whatsapp].some(v => (v || '').toLowerCase().includes(q)));
+  return contacts.value.filter(c => [areaLabel(c.area), c.name, c.whatsapp].some(v => (v || '').toLowerCase().includes(q)));
 });
 
-const regionsWithoutAr = computed(() => {
-  const covered = new Set(contacts.value.filter(c => c.is_active).map(c => c.region));
-  return regionNames.value.filter(name => !covered.has(name));
+const areasWithoutAr = computed(() => {
+  const covered = new Set(contacts.value.filter(c => c.is_active).map(c => c.area));
+  return AREAS.filter(area => !covered.has(area.value)).map(area => area.label);
 });
 
-// Region Master Region area ini; region yang sudah punya AR (selain yang sedang diedit) tidak bisa dipilih lagi
-const modalRegionOptions = computed(() => {
-  const names = new Set(regionNames.value);
-  if (formData.region) names.add(formData.region);
-  const taken = new Set(contacts.value.filter(c => c.id !== formData.id).map(c => c.region));
-  return [...names].sort().map(name => ({ name, taken: taken.has(name) }));
+// Satu AR per area: area yang sudah punya AR (selain yang sedang diedit) tidak bisa dipilih lagi
+const modalAreaOptions = computed(() => {
+  const taken = new Set(contacts.value.filter(c => c.id !== formData.id).map(c => c.area));
+  return AREAS.map(area => ({ ...area, taken: taken.has(area.value) }));
 });
+const freeAreas = computed(() => AREAS.filter(area => !contacts.value.some(c => c.area === area.value)));
 
 const fetchData = async () => {
   isLoading.value = true;
   try {
-    const [contactRes, regionRes] = await Promise.all([
-      axios.get('/api/ar-contacts'),
-      axios.get('/api/regions/options'),
-    ]);
-    contacts.value = contactRes.data?.data || [];
-    regionNames.value = regionRes.data?.data || [];
+    const res = await axios.get('/api/ar-contacts');
+    contacts.value = res.data?.data || [];
   } catch (err) {
     console.error('Failed to fetch AR contacts:', err);
   } finally {
@@ -372,7 +361,7 @@ useAutoRefresh(async () => {
 
 const openCreateModal = () => {
   formData.id = null;
-  formData.region = '';
+  formData.area = freeAreas.value[0]?.value || '';
   formData.name = '';
   formData.whatsapp = '';
   formData.is_active = true;
@@ -382,7 +371,7 @@ const openCreateModal = () => {
 
 const openEditModal = (c) => {
   formData.id = c.id;
-  formData.region = c.region;
+  formData.area = c.area;
   formData.name = c.name;
   formData.whatsapp = c.whatsapp;
   formData.is_active = c.is_active !== false;
@@ -395,7 +384,7 @@ const submitForm = async () => {
   errorMessage.value = '';
   try {
     const payload = {
-      region: formData.region,
+      area: formData.area,
       name: formData.name,
       whatsapp: formData.whatsapp,
       is_active: formData.is_active,

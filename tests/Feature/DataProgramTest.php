@@ -1058,7 +1058,7 @@ class DataProgramTest extends TestCase
 
         $response->assertOk()
             ->assertViewIs('data_programs.confirmed')
-            ->assertSee('Dealer Setuju Dipotong');
+            ->assertSee('Dealer setuju dipotong');
 
         $this->assertEquals('DEALER SETUJU (PROSES AR)', $dp->fresh()->status_potong_ar);
 
@@ -1111,7 +1111,7 @@ class DataProgramTest extends TestCase
 
         $response->assertOk()
             ->assertViewIs('data_programs.confirmed')
-            ->assertSee('Pemotongan Selesai Diproses');
+            ->assertSee('Pemotongan selesai diproses');
 
         $fresh = $dp->fresh();
         $this->assertEquals('SUDAH POTONG', $fresh->status_potong_purchase);

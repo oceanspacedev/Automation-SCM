@@ -85,13 +85,13 @@ class ProgramApprovalHistoryTest extends TestCase
     public function test_each_step_from_the_whatsapp_to_telemarketing_until_the_tax_check_is_recorded(): void
     {
         Cache::put(DataProgramSyncService::CACHE_KEY_SPREADSHEET_URL, 'https://script.google.com/macros/s/test_token/exec');
-        ArContact::factory()->create(['area' => 'jabar', 'region' => 'BIG BANDUNG', 'name' => 'SITI AMINAH', 'whatsapp' => '081300000002']);
+        ArContact::factory()->create(['area' => 'jabar', 'name' => 'SITI AMINAH', 'whatsapp' => '081300000002']);
         $this->postJson('/api/team-contacts', ['team' => 'tax', 'name' => 'TIM PAJAK JABAR', 'whatsapp' => '081300000009'], self::HEADERS)->assertCreated();
         $this->postJson('/api/team-contacts', ['team' => 'scm', 'name' => 'TIM SCM JABAR', 'whatsapp' => '081300000008'], self::HEADERS)->assertCreated();
         $row = $this->dataProgram(['nilai_pph' => 15000]);
 
         $this->postJson("/api/data-program/{$row->id}/send-wa-telemarketing", [], self::HEADERS)->assertOk();
-        // Nama di bawah tiap langkah: telemarketing toko, AR region-nya di Master AR, lalu Tim Pajak area-nya
+        // Nama di bawah tiap langkah: telemarketing toko, AR area-nya di Master AR, lalu Tim Pajak
         $this->history()
             ->assertJsonPath('data.0.stage', 'waiting_approval')
             ->assertJsonPath('data.0.steps.1.state', 'done')
@@ -124,11 +124,11 @@ class ProgramApprovalHistoryTest extends TestCase
         $this->confirm($row, 'ar', ['action' => 'cek_pajak', 'cek_pajak_tarif' => '1'])->assertForbidden();
         $this->get(URL::temporarySignedRoute('data-programs.confirm', now()->addDay(), ['id' => $row->id, 'role' => 'pajak']))
             ->assertOk()
-            ->assertSee('Cek Pajak Klaim yang Sudah Dipotong');
+            ->assertSee('Cek pajak klaim yang sudah dipotong');
         // Tim Pajak menyimpan cek pajak; hasilnya terkirim otomatis ke WA Tim SCM
         $this->confirm($row, 'pajak', ['action' => 'cek_pajak', 'cek_pajak_tarif' => '16.500', 'selisih' => '-1.500', 'note_pph' => 'Kurang potong'])
             ->assertOk()
-            ->assertSee('Cek Pajak Tersimpan')
+            ->assertSee('Cek pajak tersimpan')
             ->assertSee('Hasil terkirim ke WhatsApp Tim SCM');
         Http::assertSent(fn (Request $request) => ($request['recipient']['value'] ?? null) === '6281300000008'
             && str_contains($request['message']['text'], 'HASIL CEK PAJAK KLAIM')
@@ -172,14 +172,14 @@ class ProgramApprovalHistoryTest extends TestCase
             ->assertOk()
             ->assertSee('href="https://files.contoh.test/cn-2610000201.pdf"', false)
             ->assertSee('href="https://files.contoh.test/agreement-sinar.pdf"', false)
-            ->assertSee('Faktur Pajak tidak wajib.');
+            ->assertSee('Faktur Pajak (tidak wajib)');
 
         // Toko PKP tanpa faktur: tertulis belum ada
         $row->update(['wajib_pajak' => 'BADAN']);
         $this->get(URL::temporarySignedRoute('data-programs.confirm', now()->addDay(), ['id' => $row->id, 'role' => 'telemarketing']))
             ->assertOk()
             ->assertSee('href="https://files.contoh.test/cn-2610000201.pdf"', false)
-            ->assertSee('Faktur Pajak belum ada.')
+            ->assertSee('Faktur Pajak (belum ada)')
             ->assertDontSee('tidak wajib');
     }
 

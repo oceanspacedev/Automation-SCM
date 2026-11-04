@@ -637,8 +637,8 @@ class WhatsAppService
      */
     public function sendProgramClaimNotificationToAr(ProgramSubmission $submission, ?string $overridePhone = null): array
     {
-        // AR tujuan mengikuti region dealer di Master AR; region yang belum punya AR memakai nomor AR default
-        $arContact = $overridePhone ? null : ArContact::forRegion($submission->areaEnum(), $submission->region);
+        // AR tujuan: AR area pengajuan (Jawa Barat / Jawa Tengah) di Master AR; area tanpa AR aktif memakai nomor AR default
+        $arContact = $overridePhone ? null : ArContact::forArea($submission->areaEnum());
         $phone = $overridePhone ?: ($arContact?->whatsapp ?: config('services.wag.ar_phone', '081224290502'));
         $cleanPhone = $this->formatPhone($phone);
 
@@ -929,8 +929,8 @@ class WhatsAppService
      */
     public function sendDataProgramClaimNotificationToAr(DataProgram $dp, ?string $overridePhone = null): array
     {
-        // AR tujuan mengikuti region (lalu big region) di Master AR; region yang belum punya AR memakai nomor AR default
-        $arContact = $overridePhone ? null : ArContact::forRegion($dp->areaEnum(), $dp->region, $dp->big_region);
+        // AR tujuan: AR area baris (Jawa Barat / Jawa Tengah) di Master AR; area tanpa AR aktif memakai nomor AR default
+        $arContact = $overridePhone ? null : ArContact::forArea($dp->areaEnum());
         $phone = $overridePhone ?: ($arContact?->whatsapp ?: config('services.wag.ar_phone', '081224290502'));
         $cleanPhone = $this->formatPhone($phone);
 

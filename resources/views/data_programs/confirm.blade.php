@@ -2,7 +2,7 @@
 
 @section('title', 'Konfirmasi Klaim Program')
 @section('tag', match ($role) { 'ar' => 'Tim AR', 'pajak' => 'Tim Pajak', default => 'Telemarketing' })
-@section('footer', 'Keputusan tersimpan dan tersinkron otomatis ke Google Spreadsheet master.')
+@section('footer', 'Keputusan tersimpan dan tersinkron otomatis ke Google Spreadsheet master')
 
 @php
     $rupiah = fn ($amount) => 'Rp '.number_format((float) ($amount ?? 0), 0, ',', '.');
@@ -32,26 +32,27 @@
             ['label' => 'Status Dokumen', 'value' => $dp->cek_dokumen ?: 'LENGKAP'],
         ];
 
-    $inputClass = 'w-full h-10 px-3 text-sm bg-white text-gray-900 placeholder:text-gray-400 border rounded-lg focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 transition';
-    $buttonClass = 'w-full h-10 px-4 rounded-lg text-sm font-medium transition cursor-pointer';
+    $inputClass = 'w-full h-10 px-3 text-sm bg-white text-gray-900 placeholder:text-gray-400 border rounded-[10px] focus:outline-none focus:ring-1 focus:ring-[#1769e0] focus:border-[#1769e0] transition-colors';
+    // Satu warna aksen (biru logo SCM) untuk aksi utama di semua peran; fokus keyboard terlihat
+    $buttonClass = 'w-full h-10 px-4 rounded-[10px] text-sm font-medium transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1769e0]';
 @endphp
 
 @section('content')
     <div>
-        <h1 class="text-base font-semibold text-gray-950">
+        <h1 class="text-base font-medium leading-6 text-gray-950">
             @if($role === 'pajak')
-                Cek Pajak Klaim yang Sudah Dipotong
+                Cek pajak klaim yang sudah dipotong
             @elseif($role === 'ar')
-                Konfirmasi Pemotongan Piutang (AR)
+                Konfirmasi pemotongan piutang (AR)
             @else
-                Konfirmasi Klaim Program Dealer
+                Konfirmasi klaim program dealer
             @endif
         </h1>
-        <p class="mt-1 text-sm text-gray-500 leading-relaxed">
+        <p class="mt-1 text-sm leading-5 text-gray-500">
             @if($role === 'pajak')
-                Klaim ini sudah dipotong AR. Cek PPh-nya, lalu isi Cek Pajak, Selisih, dan Note PPh.
+                Cek PPh-nya, lalu isi Cek Pajak, Selisih, dan Note PPh
             @elseif($role === 'ar')
-                Konfirmasi bila pemotongan saldo sudah diproses pada invoice order dealer.
+                Konfirmasi bila pemotongan saldo sudah diproses pada invoice order dealer
             @else
                 Apakah dealer setuju saldo insentif klaim ini dipotong pada order pembeliannya?
             @endif
@@ -60,16 +61,16 @@
 
     @if($role === 'pajak')
         @if($dp->tax_checked_at)
-            <p class="rounded-lg px-3 py-2.5 bg-emerald-50 text-xs text-emerald-800 leading-relaxed">
+            <p class="rounded-[10px] px-4 py-3 bg-emerald-50 text-xs text-emerald-800 leading-5">
                 Sudah dicek pada {{ $dp->tax_checked_at->format('d/m/Y H:i') }} WIB. Simpan lagi bila ingin mengubah isinya.
             </p>
         @endif
     @elseif($dp->status_potong_purchase === 'SUDAH POTONG')
-        <p class="rounded-lg px-3 py-2.5 bg-emerald-50 text-xs text-emerald-800 leading-relaxed">
+        <p class="rounded-[10px] px-4 py-3 bg-emerald-50 text-xs text-emerald-800 leading-5">
             Klaim ini sudah selesai dipotong pada tanggal {{ $dp->tgl_potong_tf ?: 'sebelumnya' }}.
         </p>
     @elseif($dp->status_potong_ar === 'DEALER SETUJU (PROSES AR)' && $role !== 'ar')
-        <p class="rounded-lg px-3 py-2.5 bg-gray-50 text-xs text-gray-700 leading-relaxed">
+        <p class="rounded-[10px] px-4 py-3 bg-gray-50 text-xs text-gray-700 leading-5">
             Pengajuan ini sudah disetujui sebelumnya dan telah diteruskan ke Tim AR.
         </p>
     @endif
@@ -78,6 +79,7 @@
         'status' => ['label' => $dp->status_potong_purchase ?: 'BISA DI POTONG', 'tone' => 'emerald'],
         'rows' => $rows,
         'documents' => $documents,
+        'compact' => $role === 'pajak',
     ])
 
     <form method="POST" action="{{ request()->fullUrl() }}">
@@ -89,21 +91,20 @@
                 <div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label for="cek_pajak_tarif" class="block text-xs font-medium text-gray-700 mb-1.5">Cek Pajak</label>
+                            <label for="cek_pajak_tarif" class="block text-xs font-medium text-gray-700 mb-2">Cek Pajak</label>
                             <input type="text" id="cek_pajak_tarif" name="cek_pajak_tarif" required maxlength="100" autocomplete="off"
                                    value="{{ old('cek_pajak_tarif', $dp->cek_pajak_tarif) }}"
                                    placeholder="mis. 15.000"
                                    class="{{ $inputClass }} {{ $errors->has('cek_pajak_tarif') ? 'border-red-400' : 'border-gray-200' }}">
                         </div>
                         <div>
-                            <label for="selisih" class="block text-xs font-medium text-gray-700 mb-1.5">Selisih</label>
+                            <label for="selisih" class="block text-xs font-medium text-gray-700 mb-2">Selisih <span class="font-normal text-gray-500">(otomatis, boleh diubah)</span></label>
                             <input type="text" id="selisih" name="selisih" inputmode="decimal" maxlength="30" autocomplete="off"
                                    value="{{ old('selisih', $dp->tax_checked_at || $dp->selisih ? number_format((float) $dp->selisih, 0, ',', '.') : '') }}"
                                    placeholder="mis. 0"
                                    class="{{ $inputClass }} {{ $errors->has('selisih') ? 'border-red-400' : 'border-gray-200' }}">
                         </div>
                     </div>
-                    <p class="mt-1.5 text-xs text-gray-500">Selisih terisi otomatis: PPh − Cek Pajak (boleh diubah).</p>
                     @error('cek_pajak_tarif')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
@@ -113,7 +114,7 @@
                 </div>
 
                 <div>
-                    <label for="note_pph" class="block text-xs font-medium text-gray-700 mb-1.5">Note PPh</label>
+                    <label for="note_pph" class="block text-xs font-medium text-gray-700 mb-2">Note PPh</label>
                     <input type="text" id="note_pph" name="note_pph" maxlength="255" autocomplete="off"
                            value="{{ old('note_pph', $dp->note_pph) }}"
                            placeholder="mis. OK, kurang potong, salah tarif"
@@ -124,8 +125,8 @@
                 </div>
 
                 <button type="submit" name="action" value="cek_pajak" id="btn-submit-cek-pajak"
-                        class="{{ $buttonClass }} bg-gray-900 hover:bg-gray-800 text-white">
-                    Simpan Cek Pajak
+                        class="{{ $buttonClass }} bg-[#1769e0] hover:bg-[#1257c2] text-white">
+                    Simpan cek pajak
                 </button>
             </div>
 
@@ -158,19 +159,19 @@
             <!-- Langkah 1: pilihan aksi -->
             <div id="ar-actions" class="space-y-2 {{ $showPaymentForm ? 'hidden' : '' }}">
                 <button type="button" id="btn-show-payment-form" onclick="togglePaymentForm(true)"
-                        class="{{ $buttonClass }} bg-emerald-600 hover:bg-emerald-700 text-white">
-                    Iya, Sudah Dipotong
+                        class="{{ $buttonClass }} bg-[#1769e0] hover:bg-[#1257c2] text-white">
+                    Iya, sudah dipotong
                 </button>
                 <button type="submit" name="action" value="tunda" formnovalidate id="btn-tunda"
-                        class="{{ $buttonClass }} bg-white hover:bg-gray-50 text-gray-700 border border-gray-200">
-                    Tunda Pemotongan
+                        class="{{ $buttonClass }} bg-white hover:bg-gray-50 text-gray-900 border border-gray-200">
+                    Tunda pemotongan
                 </button>
             </div>
 
             <!-- Langkah 2: isi No. Pembayaran -->
             <div id="payment-form" class="{{ $showPaymentForm ? '' : 'hidden' }} space-y-4">
                 <div>
-                    <label for="no_pembayaran" class="block text-xs font-medium text-gray-700 mb-1.5">No. Pembayaran</label>
+                    <label for="no_pembayaran" class="block text-xs font-medium text-gray-700 mb-2">No. Pembayaran</label>
                     <input type="text" id="no_pembayaran" name="no_pembayaran"
                            value="{{ old('no_pembayaran', $dp->no_pembayaran) }}"
                            placeholder="mis. PAY/2026/10/0001"
@@ -185,12 +186,12 @@
 
                 <div class="grid grid-cols-2 gap-2">
                     <button type="button" onclick="togglePaymentForm(false)" id="btn-batal"
-                            class="{{ $buttonClass }} bg-white hover:bg-gray-50 text-gray-700 border border-gray-200">
+                            class="{{ $buttonClass }} bg-white hover:bg-gray-50 text-gray-900 border border-gray-200">
                         Batal
                     </button>
                     <button type="submit" name="action" value="potong" id="btn-submit-potong"
-                            class="{{ $buttonClass }} bg-emerald-600 hover:bg-emerald-700 text-white">
-                        Simpan &amp; Selesaikan
+                            class="{{ $buttonClass }} bg-[#1769e0] hover:bg-[#1257c2] text-white">
+                        Simpan &amp; selesaikan
                     </button>
                 </div>
             </div>
@@ -213,12 +214,12 @@
         @else
             <div class="space-y-2">
                 <button type="submit" name="action" value="setuju"
-                        class="{{ $buttonClass }} bg-[#1D70F5] hover:bg-blue-600 text-white">
-                    Dealer Setuju Dipotong (Kirim ke AR)
+                        class="{{ $buttonClass }} bg-[#1769e0] hover:bg-[#1257c2] text-white">
+                    Dealer setuju dipotong (kirim ke AR)
                 </button>
                 <button type="submit" name="action" value="tunda"
-                        class="{{ $buttonClass }} bg-white hover:bg-gray-50 text-gray-700 border border-gray-200">
-                    Dealer Menolak / Tunda Dulu
+                        class="{{ $buttonClass }} bg-white hover:bg-gray-50 text-gray-900 border border-gray-200">
+                    Dealer menolak / tunda dulu
                 </button>
             </div>
         @endif

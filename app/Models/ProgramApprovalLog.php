@@ -65,7 +65,7 @@ class ProgramApprovalLog extends Model
 
     /**
      * Who a WhatsApp to AR about the row goes to, picked like WhatsAppService does: the given number, else the AR of
-     * the row's region in Master AR, else the default AR number.
+     * the row's area in Master AR, else the default AR number.
      */
     public static function arRecipient(?DataProgram $dataProgram, ?string $phone = null): ?string
     {
@@ -77,7 +77,7 @@ class ProgramApprovalLog extends Model
             return null;
         }
 
-        $contact = ArContact::forRegion($dataProgram->areaEnum(), $dataProgram->region, $dataProgram->big_region);
+        $contact = ArContact::forArea($dataProgram->areaEnum());
 
         return $contact ? trim("{$contact->name} {$contact->whatsapp}") : 'Nomor AR default';
     }
