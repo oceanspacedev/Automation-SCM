@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AppSetting;
 use App\Models\ArContact;
 use App\Models\DataProgram;
 use App\Models\ProgramApprovalLog;
+use App\Models\TeamContact;
 use App\Services\ProgramApprovalFlow;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
@@ -120,20 +120,18 @@ class ProgramApprovalController extends Controller
     }
 
     /**
-     * The tax and SCM teams of a row's area in Master AR, read once per area.
+     * Names of the active tax and SCM team members in Master Tim Pajak & SCM (the same for every area), read once.
      *
      * @return Closure(DataProgram): array{tax: ?string, scm: ?string}
      */
     private function teamNamesResolver(): Closure
     {
-        $names = [];
+        $names = null;
 
         return function (DataProgram $row) use (&$names): array {
-            $area = $row->areaEnum();
-
-            return $names[$area->value] ??= [
-                'tax' => AppSetting::teamContact($area, AppSetting::TAX_TEAM)['name'],
-                'scm' => AppSetting::teamContact($area, AppSetting::SCM_TEAM)['name'],
+            return $names ??= [
+                'tax' => TeamContact::namesOf(TeamContact::TAX),
+                'scm' => TeamContact::namesOf(TeamContact::SCM),
             ];
         };
     }

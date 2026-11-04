@@ -12,9 +12,7 @@
     <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
       <div>
         <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Riwayat Approval</h1>
-        <p class="text-xs text-gray-500 mt-0.5">
-          Alur potong klaim per baris Data Program: notifikasi WhatsApp ke Telemarketing, persetujuan dealer, notifikasi WhatsApp ke AR, dipotong oleh AR, notifikasi WhatsApp ke Tim Pajak, dicek Tim Pajak, lalu hasilnya dikirim ke Tim SCM.
-        </p>
+        <p class="text-xs text-gray-500 mt-0.5">Alur potong klaim per baris Data Program.</p>
       </div>
       <button
         type="button"
@@ -62,9 +60,7 @@
 
       <p v-if="errorMessage" class="px-5 py-3 text-xs text-rose-700 border-b border-gray-100">{{ errorMessage }}</p>
       <p v-if="loading && rows.length === 0" class="py-12 text-center text-xs text-gray-500">Memuat riwayat approval...</p>
-      <p v-else-if="rows.length === 0" class="py-12 px-4 text-center text-xs text-gray-500">
-        Belum ada baris di tahap ini. Baris masuk ke alur setelah statusnya <span class="font-medium text-gray-700">BISA DI POTONG</span>.
-      </p>
+      <p v-else-if="rows.length === 0" class="py-12 px-4 text-center text-xs text-gray-500">Belum ada baris di tahap ini.</p>
 
       <ul v-else class="divide-y divide-gray-100">
         <li v-for="row in rows" :key="row.id" class="px-4 sm:px-5 py-3.5">
@@ -85,20 +81,19 @@
               <button type="button" @click="openDetail(row)" :class="[detailButtonClass, 'lg:hidden']">Detail</button>
             </div>
 
-            <!-- Alur langkah (layar sedang & lebar), satu kolom per langkah -->
+            <!-- Alur langkah (layar sedang & lebar): label singkat dan nama penanggung jawab; waktu di tooltip dan Detail -->
             <ol class="hidden md:grid w-full max-w-4xl xl:max-w-5xl lg:flex-1" :style="{ gridTemplateColumns: `repeat(${row.steps.length}, minmax(0, 1fr))` }">
-              <li v-for="(step, index) in row.steps" :key="step.key" class="relative flex flex-col items-center text-center px-1.5 min-w-0">
+              <li v-for="(step, index) in row.steps" :key="step.key" :title="stepTooltip(step)" class="relative flex flex-col items-center text-center px-1 min-w-0 cursor-default">
                 <!-- Garis dari langkah sebelumnya: hijau penuh bila sudah lewat, hijau berjalan menuju langkah sekarang -->
                 <span v-if="index > 0" :class="['absolute top-2 right-1/2 w-full h-0.5 rounded-full overflow-hidden', connectorClass(step.state)]">
                   <span v-if="step.state === 'current'" class="flow-runner"></span>
                 </span>
                 <StepDot :state="step.state" class="relative z-10 ring-4 ring-white" />
-                <p :class="['mt-1.5 min-h-[28px] text-[10px] font-medium leading-[14px]', stepLabelClass(step.state)]">{{ step.label }}</p>
-                <!-- Tinggi baris tetap walau kosong, supaya semua langkah sejajar; nama panjang turun baris, tidak dipotong -->
-                <p :class="['w-full min-h-[14px] text-[10px] leading-[14px] break-words', step.state === 'waiting' ? 'text-gray-400' : 'text-gray-600']">
+                <p :class="['mt-1.5 w-full truncate text-[10px] font-medium leading-[14px]', stepLabelClass(step.state)]">{{ shortLabel(step) }}</p>
+                <!-- Nama panjang turun paling banyak dua baris -->
+                <p v-if="step.person" :class="['w-full line-clamp-2 break-words text-[10px] leading-[14px]', step.state === 'waiting' ? 'text-gray-400' : 'text-gray-600']">
                   {{ displayName(step.person) }}
                 </p>
-                <p class="min-h-[14px] text-[10px] leading-[14px] text-gray-400 tabular-nums">{{ stepTime(step) }}</p>
               </li>
             </ol>
 
@@ -114,7 +109,7 @@
                 <StepDot :state="step.state" small class="relative z-10 shrink-0" />
                 <div class="min-w-0 flex-1 flex items-start justify-between gap-3">
                   <div class="min-w-0">
-                    <p :class="['text-[11px] font-medium leading-4', stepLabelClass(step.state)]">{{ step.label }}</p>
+                    <p :class="['text-[11px] font-medium leading-4', stepLabelClass(step.state)]">{{ shortLabel(step) }}</p>
                     <p v-if="step.person" class="text-[10px] leading-[14px] text-gray-500 break-words">{{ displayName(step.person) }}</p>
                   </div>
                   <span class="text-[10px] leading-4 text-gray-400 tabular-nums whitespace-nowrap">{{ stepTime(step) }}</span>
@@ -194,9 +189,7 @@
           <div class="space-y-2 border-t border-gray-100">
             <p class="pt-3 font-medium text-gray-900">Semua catatan</p>
             <p v-if="detailLoading" class="text-gray-500">Memuat...</p>
-            <p v-else-if="!detail.timeline?.length" class="text-gray-500">
-              Belum ada catatan. Langkah sebelum Riwayat Approval dipasang tidak tercatat waktunya; statusnya diambil dari Data Program.
-            </p>
+            <p v-else-if="!detail.timeline?.length" class="text-gray-500">Belum ada catatan.</p>
             <ul v-else class="rounded-lg border border-gray-200 divide-y divide-gray-100">
               <li v-for="item in detail.timeline" :key="item.id" class="px-3 py-2 space-y-px">
                 <div class="flex items-start justify-between gap-3">
@@ -241,7 +234,7 @@ const StepDot = (props) => {
     failed: 'bg-rose-500 text-white',
     postponed: 'bg-amber-500 text-white',
     current: 'bg-white border-2 border-amber-400',
-    waiting: 'bg-white border border-gray-300',
+    waiting: 'bg-white border border-gray-300 dark:border-slate-500',
   };
   const inner = {
     done: () => h(CheckIcon, { class: icon, 'stroke-width': 3 }),
@@ -274,9 +267,9 @@ const waMessage = ref(null);
 
 // WA yang bisa dikirim (ulang) dari Detail: ke Tim Pajak selama belum dicek, lalu hasilnya ke Tim SCM bila belum terkirim
 const resendAction = computed(() => {
-  if (detail.value?.stage === 'cut') return { endpoint: 'send-wa-tax', label: 'Kirim notifikasi WhatsApp ke Tim Pajak' };
+  if (detail.value?.stage === 'cut') return { endpoint: 'send-wa-tax', label: 'Kirim WA ke Tim Pajak' };
   const scmStep = detail.value?.steps?.find((step) => step.key === 'scm');
-  if (detail.value?.stage === 'tax_checked' && scmStep && scmStep.state !== 'done') return { endpoint: 'send-wa-scm', label: 'Kirim hasil cek pajak ke WhatsApp Tim SCM' };
+  if (detail.value?.stage === 'tax_checked' && scmStep && scmStep.state !== 'done') return { endpoint: 'send-wa-scm', label: 'Kirim hasil ke WA Tim SCM' };
   return null;
 });
 const pagination = reactive({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
@@ -311,6 +304,20 @@ const stepTime = (step, long = false) => {
   return step.date || '';
 };
 
+// Label singkat di daftar; label lengkap tetap di tooltip dan Detail
+const STEP_SHORT_LABELS = {
+  ready: 'Bisa dipotong',
+  telemarketing: 'WA Telemarketing',
+  approval: 'Dealer setuju',
+  ar: 'WA AR',
+  cut: 'Dipotong AR',
+  tax: 'WA Pajak',
+  tax_check: 'Cek Pajak',
+  scm: 'WA SCM',
+};
+const shortLabel = (step) => (step.state === 'postponed' ? 'Ditunda dealer' : STEP_SHORT_LABELS[step.key] || step.label);
+const stepTooltip = (step) => [step.label, displayName(step.person), stepTime(step, true)].filter(Boolean).join(' · ');
+
 const STEP_STATE_LABELS = {
   done: 'Selesai',
   current: 'Menunggu',
@@ -328,10 +335,10 @@ const detailButtonClass = 'h-7 px-2.5 shrink-0 items-center rounded-lg border bo
 // Garis menuju sebuah langkah: hijau penuh bila sudah lewat, jalur hijau muda (dengan kilatan berjalan) menuju posisi sekarang
 const connectorClass = (state) => ({
   done: 'bg-emerald-500',
-  current: 'bg-emerald-100',
-  failed: 'bg-rose-300',
-  postponed: 'bg-amber-300',
-}[state] || 'bg-gray-200');
+  current: 'bg-emerald-100 dark:bg-emerald-900',
+  failed: 'bg-rose-300 dark:bg-rose-800',
+  postponed: 'bg-amber-300 dark:bg-amber-700',
+}[state] || 'bg-gray-200 dark:bg-slate-700');
 
 const stepLabelClass = (state) => ({
   done: 'text-gray-900',
@@ -340,14 +347,15 @@ const stepLabelClass = (state) => ({
   postponed: 'text-amber-700',
 }[state] || 'text-gray-400');
 
+// Mode gelap: latar transparan berwarna, teks lebih terang, cincin redup (amber & emerald diatur di app.css)
 const stageBadgeClass = (value) => ({
-  waiting_telemarketing: 'bg-gray-50 text-gray-600 ring-gray-200',
-  waiting_approval: 'bg-amber-50 text-amber-700 ring-amber-200',
-  postponed: 'bg-orange-50 text-orange-700 ring-orange-200',
-  approved: 'bg-sky-50 text-sky-700 ring-sky-200',
-  cut: 'bg-violet-50 text-violet-700 ring-violet-200',
-  tax_checked: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
-}[value] || 'bg-gray-50 text-gray-600 ring-gray-200');
+  waiting_telemarketing: 'bg-gray-50 text-gray-600 ring-gray-200 dark:ring-slate-700',
+  waiting_approval: 'bg-amber-50 text-amber-700 ring-amber-200 dark:ring-amber-500/30',
+  postponed: 'bg-orange-50 text-orange-700 ring-orange-200 dark:bg-orange-500/15 dark:text-orange-300 dark:ring-orange-500/30',
+  approved: 'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-500/30',
+  cut: 'bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-500/30',
+  tax_checked: 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:ring-emerald-500/30',
+}[value] || 'bg-gray-50 text-gray-600 ring-gray-200 dark:ring-slate-700');
 
 const startRowsRequest = createRequestTracker();
 

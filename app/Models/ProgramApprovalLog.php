@@ -83,13 +83,16 @@ class ProgramApprovalLog extends Model
     }
 
     /**
-     * Who a WhatsApp to the tax or SCM team about the row goes to: the given number, else the area's team in Master AR.
+     * Who a WhatsApp to the tax or SCM team about the row goes to: the given number, else the team's active members in
+     * Master Tim Pajak & SCM.
      */
     public static function teamRecipient(DataProgram $dataProgram, string $team, ?string $phone = null): ?string
     {
-        $contact = AppSetting::teamContact($dataProgram->areaEnum(), $team);
+        if ($phone) {
+            return $phone;
+        }
 
-        return trim(($contact['name'] ?? '').' '.($phone ?: ($contact['whatsapp'] ?? ''))) ?: null;
+        return TeamContact::activeOf($team)->map(fn (TeamContact $contact) => "{$contact->name} {$contact->whatsapp}")->implode(', ') ?: null;
     }
 
     /**

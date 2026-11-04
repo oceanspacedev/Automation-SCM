@@ -13,9 +13,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
         <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Master AR {{ area.label }}</h1>
-        <p class="text-xs text-gray-500 mt-0.5">
-          AR tiap region. Setelah telemarketing mengonfirmasi dealer setuju dipotong, WhatsApp dikirim ke AR region dealer tersebut.
-        </p>
+        <p class="text-xs text-gray-500 mt-0.5">Penerima WhatsApp klaim yang disetujui dealer, per region.</p>
       </div>
 
       <!-- Tombol aksi; di layar kecil dua tombol sama lebar dengan label pendek -->
@@ -37,90 +35,15 @@
       </div>
     </div>
 
-    <!-- Tim Pajak & Tim SCM: penerima WA cek pajak setelah AR memotong klaim, lalu hasilnya -->
-    <section class="rounded-xl border border-gray-200 bg-white shadow-xs divide-y divide-gray-100">
-      <div
-        v-for="team in TEAMS"
-        :key="team.key"
-        class="p-4 sm:px-5 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6"
-      >
-        <div class="min-w-0 lg:flex-1">
-          <h2 class="text-sm font-semibold text-gray-950">{{ team.label }}</h2>
-          <p class="text-xs text-gray-500 mt-0.5">{{ team.description }}</p>
-          <p v-if="teamMessages[team.key]" class="mt-1.5 text-xs" :class="teamMessages[team.key].error ? 'text-red-600' : 'text-emerald-700'">
-            {{ teamMessages[team.key].text }}
-          </p>
-          <p v-else-if="!isLoading && !savedTeamWhatsapp[team.key]" class="mt-1.5 text-xs text-amber-700">
-            No WhatsApp {{ team.label }} belum diisi, jadi WhatsApp ke {{ team.label }} belum bisa dikirim.
-          </p>
-        </div>
-        <!-- Setelah disimpan isian terkunci; klik Edit untuk mengubah -->
-        <form @submit.prevent="saveTeam(team.key)" class="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 lg:w-[560px] lg:shrink-0">
-          <div class="relative">
-            <input
-              :ref="(el) => { if (el) nameInputs[team.key] = el; }"
-              type="text"
-              v-model="teamContacts[team.key].name"
-              :readonly="!editingTeam[team.key]"
-              :aria-label="`Nama ${team.label}`"
-              :placeholder="`Nama, cth: ${team.label}`"
-              :class="[teamInputClass, editingTeam[team.key] ? editableInputClass : lockedInputClass]"
-            />
-            <LockIcon v-if="!editingTeam[team.key]" class="w-3.5 h-3.5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-          <div class="relative">
-            <input
-              type="tel"
-              v-model="teamContacts[team.key].whatsapp"
-              :readonly="!editingTeam[team.key]"
-              :aria-label="`No WhatsApp ${team.label}`"
-              placeholder="No WhatsApp, cth: 081234567890"
-              :class="[teamInputClass, editingTeam[team.key] ? editableInputClass : lockedInputClass]"
-            />
-            <LockIcon v-if="!editingTeam[team.key]" class="w-3.5 h-3.5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-          <div class="flex gap-2">
-            <button
-              v-if="!editingTeam[team.key]"
-              type="button"
-              @click="editTeam(team.key)"
-              class="h-9 px-4 flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium cursor-pointer whitespace-nowrap"
-            >
-              <PencilIcon class="w-3.5 h-3.5 text-gray-500" />
-              Edit
-            </button>
-            <template v-else>
-              <button
-                v-if="savedTeam[team.key].whatsapp"
-                type="button"
-                @click="cancelTeamEdit(team.key)"
-                :disabled="savingTeam === team.key"
-                class="h-9 px-3 flex-1 sm:flex-none rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium cursor-pointer disabled:opacity-50 whitespace-nowrap"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                :disabled="savingTeam === team.key"
-                class="h-9 px-4 flex-1 sm:flex-none rounded-lg bg-gray-900 hover:bg-gray-800 text-white text-xs font-medium cursor-pointer disabled:opacity-50 whitespace-nowrap"
-              >
-                {{ savingTeam === team.key ? 'Menyimpan...' : 'Simpan' }}
-              </button>
-            </template>
-          </div>
-        </form>
-      </div>
-    </section>
-
     <p v-if="regionsWithoutAr.length" class="text-xs text-amber-700">
-      Belum ada AR untuk {{ regionsWithoutAr.join(', ') }}. WhatsApp dealer region ini masih dikirim ke nomor AR default.
+      Belum ada AR: {{ regionsWithoutAr.join(', ') }} (memakai nomor AR default).
     </p>
 
     <!-- Table Card -->
     <div class="rounded-xl border border-gray-200 bg-white shadow-xs overflow-hidden">
       <div class="p-3 sm:px-4 border-b border-gray-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         <div class="text-xs text-gray-600 font-medium">
-          <span>Total: {{ contacts.length }} AR</span>
+          <span>Total: {{ filteredContacts.length }} data</span>
         </div>
 
         <div class="relative w-full sm:w-64">
@@ -128,18 +51,24 @@
           <input
             type="text"
             v-model="searchQuery"
-            placeholder="Cari region, nama, atau nomor..."
-            class="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-3 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-900 shadow-2xs"
+            placeholder="Cari region, nama, no. WA..."
+            class="h-9 w-full rounded-lg border border-gray-300 bg-white pl-8 pr-7 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-gray-900 shadow-2xs"
           />
+          <button
+            v-if="searchQuery"
+            type="button"
+            @click="searchQuery = ''"
+            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+          >
+            <XIcon class="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
       <!-- Layar kecil: satu kartu per AR -->
       <div class="md:hidden">
         <p v-if="isLoading" class="py-8 text-center text-xs text-gray-500">Memuat data...</p>
-        <p v-else-if="filteredContacts.length === 0" class="py-8 px-4 text-center text-xs text-gray-500">
-          Belum ada AR untuk {{ area.label }}. Klik "Tambah AR" untuk menambahkan.
-        </p>
+        <p v-else-if="filteredContacts.length === 0" class="py-8 px-4 text-center text-xs text-gray-500">Tidak ada data AR.</p>
         <ul v-else class="divide-y divide-gray-100">
           <li v-for="c in filteredContacts" :key="c.id" class="p-4 space-y-2 text-xs text-gray-700">
             <div class="flex items-start justify-between gap-3">
@@ -147,15 +76,16 @@
               <button
                 type="button"
                 @click="toggleStatus(c)"
-                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer shrink-0"
-                :class="c.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100' : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'"
+                class="inline-flex items-center gap-1.5 shrink-0 font-medium cursor-pointer"
+                :class="c.is_active ? 'text-gray-900' : 'text-gray-500'"
+                :title="c.is_active ? 'Klik untuk nonaktifkan' : 'Klik untuk aktifkan'"
               >
-                <span class="w-1.5 h-1.5 rounded-full" :class="c.is_active ? 'bg-emerald-600' : 'bg-gray-400'"></span>
-                <span>{{ c.is_active ? 'Aktif' : 'Nonaktif' }}</span>
+                <span class="w-1.5 h-1.5 rounded-full" :class="c.is_active ? 'bg-emerald-500' : 'bg-gray-400'"></span>
+                {{ c.is_active ? 'Aktif' : 'Nonaktif' }}
               </button>
             </div>
-            <div class="flex items-center justify-between gap-3">
-              <p class="min-w-0 text-gray-500 break-words">{{ c.name }} · {{ c.whatsapp }}</p>
+            <div class="flex items-end justify-between gap-3">
+              <p class="min-w-0 text-gray-500 break-words">{{ c.name }} · {{ formatPhone(c.whatsapp) }}</p>
               <div class="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
@@ -182,44 +112,42 @@
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">
               <th scope="col" class="py-2.5 px-3 text-center w-12 border-r border-gray-200">No</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">REGION</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">NAMA AR</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">NO WHATSAPP</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Region</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Nama AR</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">No. WhatsApp</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
-              <th scope="col" class="py-2.5 px-3 text-right">Aksi</th>
+              <th scope="col" class="py-2.5 px-3 text-center w-28">Aksi</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
-            <tr v-if="isLoading">
-              <td colspan="6" class="py-8 text-center text-gray-500">Memuat data...</td>
+          <tbody class="divide-y divide-gray-100">
+            <tr v-if="isLoading" class="text-center">
+              <td colspan="6" class="py-10 text-gray-500">Memuat data...</td>
             </tr>
-            <tr v-else-if="filteredContacts.length === 0">
-              <td colspan="6" class="py-8 text-center text-gray-500">
-                Belum ada AR untuk {{ area.label }}. Klik "Tambah AR" untuk menambahkan.
-              </td>
+            <tr v-else-if="filteredContacts.length === 0" class="text-center">
+              <td colspan="6" class="py-10 text-gray-500">Tidak ada data AR.</td>
             </tr>
-            <tr v-else v-for="(c, index) in filteredContacts" :key="c.id" class="hover:bg-gray-50/80 transition">
-              <td class="py-2 px-3 text-center text-gray-500 border-r border-gray-200">{{ index + 1 }}</td>
-              <td class="py-2 px-3 font-medium text-gray-900 border-r border-gray-200 whitespace-nowrap">{{ c.region }}</td>
-              <td class="py-2 px-3 text-gray-800 border-r border-gray-200 whitespace-nowrap">{{ c.name }}</td>
-              <td class="py-2 px-3 text-gray-700 border-r border-gray-200 whitespace-nowrap">{{ c.whatsapp }}</td>
-              <td class="py-2 px-3 text-center border-r border-gray-200 whitespace-nowrap">
+            <tr v-else v-for="(c, index) in filteredContacts" :key="c.id" class="hover:bg-gray-50/70 text-gray-800">
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap text-gray-600">{{ index + 1 }}</td>
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap font-medium text-gray-950">{{ c.region }}</td>
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">{{ c.name }}</td>
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">{{ formatPhone(c.whatsapp) }}</td>
+              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
                 <button
                   type="button"
                   @click="toggleStatus(c)"
-                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer"
-                  :class="c.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100' : 'bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200'"
+                  class="cursor-pointer text-xs font-medium transition hover:underline"
+                  :class="c.is_active ? 'text-gray-900' : 'text-gray-500'"
+                  :title="c.is_active ? 'Klik untuk nonaktifkan' : 'Klik untuk aktifkan'"
                 >
-                  <span class="w-1.5 h-1.5 rounded-full" :class="c.is_active ? 'bg-emerald-600' : 'bg-gray-400'"></span>
-                  <span>{{ c.is_active ? 'Aktif' : 'Nonaktif' }}</span>
+                  {{ c.is_active ? 'Aktif' : 'Nonaktif' }}
                 </button>
               </td>
-              <td class="py-2 px-3 text-right whitespace-nowrap">
-                <div class="inline-flex items-center gap-1">
+              <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                <div class="inline-flex items-center justify-center gap-1">
                   <button
                     type="button"
                     @click="openEditModal(c)"
-                    class="h-7 w-7 inline-flex items-center justify-center rounded border border-gray-200 hover:bg-gray-100 text-gray-600 transition cursor-pointer"
+                    class="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition cursor-pointer"
                     title="Edit AR"
                   >
                     <PencilIcon class="w-3.5 h-3.5" />
@@ -227,7 +155,7 @@
                   <button
                     type="button"
                     @click="contactToDelete = c"
-                    class="h-7 w-7 inline-flex items-center justify-center rounded border border-gray-200 hover:bg-red-50 text-red-600 hover:border-red-200 transition cursor-pointer"
+                    class="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
                     title="Hapus AR"
                   >
                     <Trash2Icon class="w-3.5 h-3.5" />
@@ -355,7 +283,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, nextTick } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { notify } from '@/composables/useNotify';
 import AreaTabs from '@/components/AreaTabs.vue';
@@ -367,7 +295,6 @@ import {
   Search as SearchIcon,
   X as XIcon,
   Pencil as PencilIcon,
-  Lock as LockIcon,
   Trash2 as Trash2Icon,
 } from 'lucide-vue-next';
 
@@ -392,58 +319,12 @@ const formData = reactive({
   is_active: true,
 });
 
-// Tim Pajak menerima WA cek PPh setelah AR memotong klaim; Tim SCM menerima hasil cek pajaknya
-const TEAMS = [
-  { key: 'tax', label: 'Tim Pajak', description: 'Setelah AR memotong klaim, WhatsApp dikirim ke sini untuk cek PPh, lalu Tim Pajak mengisi Cek Pajak, Selisih, dan Note PPh lewat link.' },
-  { key: 'scm', label: 'Tim SCM', description: 'Setelah Tim Pajak menyimpan cek pajak, hasilnya (Cek Pajak, Selisih, Note PPh) dikirim ke WhatsApp ini.' },
-];
-
-const teamContacts = reactive({ tax: { name: '', whatsapp: '' }, scm: { name: '', whatsapp: '' } });
-const savedTeam = reactive({ tax: { name: '', whatsapp: '' }, scm: { name: '', whatsapp: '' } });
-const savedTeamWhatsapp = computed(() => ({ tax: savedTeam.tax.whatsapp, scm: savedTeam.scm.whatsapp }));
-const teamMessages = reactive({ tax: null, scm: null });
-const savingTeam = ref(null);
-// Tim yang sudah punya nomor tampil terkunci; tim tanpa nomor langsung bisa diisi
-const editingTeam = reactive({ tax: true, scm: true });
-const nameInputs = {};
-const teamInputClass = 'w-full h-9 pl-3 pr-8 rounded-lg border text-xs focus:outline-none';
-const lockedInputClass = 'bg-gray-50 border-gray-200 text-gray-600 cursor-default';
-const editableInputClass = 'bg-white border-gray-300 text-gray-800 focus:ring-1 focus:ring-gray-900';
-
-const fillTeam = (key, data) => {
-  savedTeam[key].name = data?.name || '';
-  savedTeam[key].whatsapp = data?.whatsapp || '';
-  teamContacts[key].name = savedTeam[key].name;
-  teamContacts[key].whatsapp = savedTeam[key].whatsapp;
-  editingTeam[key] = !savedTeam[key].whatsapp;
-};
-
-const editTeam = (key) => {
-  editingTeam[key] = true;
-  teamMessages[key] = null;
-  nextTick(() => nameInputs[key]?.focus());
-};
-
-const cancelTeamEdit = (key) => {
-  teamContacts[key].name = savedTeam[key].name;
-  teamContacts[key].whatsapp = savedTeam[key].whatsapp;
-  editingTeam[key] = false;
-  teamMessages[key] = null;
-};
-
-const saveTeam = async (key) => {
-  savingTeam.value = key;
-  teamMessages[key] = null;
-  try {
-    const res = await axios.put(`/api/ar-contacts/${key}-team`, { name: teamContacts[key].name, whatsapp: teamContacts[key].whatsapp });
-    fillTeam(key, res.data?.data);
-    teamMessages[key] = { error: false, text: res.data?.message || 'Tersimpan.' };
-  } catch (err) {
-    const errors = err.response?.data?.errors;
-    teamMessages[key] = { error: true, text: errors ? Object.values(errors).flat()[0] : (err.response?.data?.message || 'Gagal menyimpan.') };
-  } finally {
-    savingTeam.value = null;
-  }
+// Nomor WA ditulis seperti di Master User: 081224290502 → +6281224290502
+const formatPhone = (phone) => {
+  let digits = String(phone || '').replace(/\D/g, '');
+  if (!digits) return '-';
+  if (digits.startsWith('0')) digits = `62${digits.slice(1)}`;
+  return `+${digits}`;
 };
 
 const filteredContacts = computed(() => {
@@ -468,16 +349,12 @@ const modalRegionOptions = computed(() => {
 const fetchData = async () => {
   isLoading.value = true;
   try {
-    const [contactRes, regionRes, taxTeamRes, scmTeamRes] = await Promise.all([
+    const [contactRes, regionRes] = await Promise.all([
       axios.get('/api/ar-contacts'),
       axios.get('/api/regions/options'),
-      axios.get('/api/ar-contacts/tax-team'),
-      axios.get('/api/ar-contacts/scm-team'),
     ]);
     contacts.value = contactRes.data?.data || [];
     regionNames.value = regionRes.data?.data || [];
-    fillTeam('tax', taxTeamRes.data?.data);
-    fillTeam('scm', scmTeamRes.data?.data);
   } catch (err) {
     console.error('Failed to fetch AR contacts:', err);
   } finally {
@@ -485,7 +362,7 @@ const fetchData = async () => {
   }
 };
 
-// Muat ulang otomatis hanya daftar AR; kartu Tim Pajak & Tim SCM tidak ditimpa selagi mungkin sedang diisi
+// Muat ulang otomatis daftar AR
 useAutoRefresh(async () => {
   const res = await axios.get('/api/ar-contacts');
   contacts.value = res.data?.data || [];

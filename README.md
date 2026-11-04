@@ -34,12 +34,13 @@ Dibangun dengan **Laravel 13 (PHP 8.3+)**, **Vue 3** (SPA) dan **Tailwind CSS v4
 
 | Modul | Fungsi |
 | :--- | :--- |
+| **Dashboard** | Menu pertama: jumlah Data Program, Form Program, klaim bisa / sudah / belum bisa dipotong, dan rinciannya per region (semua area atau satu area), plus ringkasan draft & invoice. |
 | **Draft** | Impor file Excel klaim (DSA / NPS FL / REGULAR), validasi rumus pajak, lalu terbitkan jadi invoice. |
 | **Invoice** | Daftar invoice resmi: lihat, cetak/unduh PDF, kirim lewat email (Gmail API / SMTP) dan WhatsApp. |
 | **Form Program** | Formulir publik untuk sales (mis. `/form/realme/jabar`) mengirim dokumen klaim (Credit Note, Agreement, Faktur Pajak). Dokumen dicek AI. |
 | **Data Program** | Daftar klaim (56 kolom) per area. Baris otomatis dibuat saat invoice terbit, lalu dicocokkan dengan Form Program. |
-| **Riwayat** | Riwayat Program (log pencocokan), Riwayat Approval (alur persetujuan telemarketing, AR, cek Tim Pajak & hasil ke Tim SCM), Riwayat Email, dan Dashboard ringkasan. |
-| **Master** | Brand, Program, Region, AR, Dealer, Badan Usaha (Bill To), User. Bisa import & export Excel. |
+| **Riwayat** | Riwayat Program (log pencocokan), Riwayat Approval (alur persetujuan telemarketing, AR, cek Tim Pajak & hasil ke Tim SCM), dan Riwayat Email. |
+| **Master** | Brand, Program, Region, AR, Tim Pajak & SCM, Dealer, Badan Usaha (Bill To), User. Bisa import & export Excel. |
 | **Profil** | Ubah foto, nama, email, WhatsApp, dan password akun sendiri. |
 
 **Brand & area.** Data dikelompokkan per **brand** (Realme, Oppo, ... dari **Master → Brand**) lalu per **area** (Jawa Barat / Jawa Tengah):
@@ -171,8 +172,8 @@ sequenceDiagram
     participant TM as Telemarketing
     participant SYS as Sistem
     participant AR as AR (per region)
-    participant TP as Tim Pajak (per area)
-    participant SCM as Tim SCM (per area)
+    participant TP as Tim Pajak (semua area)
+    participant SCM as Tim SCM (semua area)
     DP->>TM: Kirim WA Telemarketing (link berlaku 30 hari)
     TM->>SYS: Buka link, pilih "Dealer Setuju" atau "Tunda"
     alt Dealer setuju
@@ -180,10 +181,10 @@ sequenceDiagram
         SYS->>AR: WA otomatis ke AR region dealer (Master AR)
         AR->>SYS: Buka link, isi No. Pembayaran, konfirmasi potong
         SYS->>DP: SUDAH POTONG · DONE · tanggal potong
-        SYS->>TP: WA otomatis ke Tim Pajak (Master AR → Tim Pajak)
+        SYS->>TP: WA otomatis ke Tim Pajak (Master Tim Pajak & SCM)
         TP->>SYS: Buka link, cek PPh, isi Cek Pajak, Selisih, Note PPh
         SYS->>DP: Cek Pajak · Selisih · Note PPh (juga ke spreadsheet)
-        SYS->>SCM: WA otomatis hasil cek pajak (Master AR → Tim SCM)
+        SYS->>SCM: WA otomatis hasil cek pajak (Master Tim Pajak & SCM)
     else Tunda
         SYS->>DP: Status AR = PENDING DEALER
     end
@@ -193,8 +194,8 @@ sequenceDiagram
 - **Pengingat:** selama dealer belum setuju (belum dijawab, atau ditunda), cron yang sama mengirim ulang WA berjudul *PENGINGAT KE-n* ke telemarketing dengan link konfirmasi baru. Bawaannya **3 hari setelah WA terakhir, paling banyak 3 kali**; bisa diubah atau dimatikan di **Master → Jadwal Otomatis → Pengingat** (1–7 hari, 1–5 kali). Baris yang baru ditunda menunggu jarak yang sama sejak ditunda. Hanya WA yang benar-benar terkirim (tercatat di **Riwayat Approval**) yang diingatkan, jadi baris lama yang cuma ditandai terkirim saat WA otomatis dipasang tidak ikut. Setiap pengingat tercatat di Riwayat Approval.
 - **Manual:** tombol **WA** / **Kirim ke WA Telemarketing** muncul di Data Program untuk baris **BISA DI POTONG**. Nomor tujuan diambil dari telemarketing toko di Master Dealer (bisa dipilih ulang saat mengirim). Baris yang sudah dikirim manual tidak dikirim ulang oleh cron.
 - **AR tujuan** dicari dari **Master AR** berdasarkan region dealer (Region, lalu Big Region). Kalau region belum punya AR aktif, WA dikirim ke nomor AR default (`AR_DEFAULT_PHONE`).
-- **Tim Pajak:** begitu AR menekan **Simpan & Selesaikan** (potong) di link-nya, WA otomatis dikirim ke Tim Pajak area itu, diisi di kartu **Tim Pajak** di halaman **Master AR** (nama & No WhatsApp, per area; setelah **Simpan** isiannya terkunci, klik **Edit** untuk mengubah). Jawa Barat dan Jawa Tengah diisi masing-masing. Lewat link-nya, Tim Pajak mengecek PPh lalu mengisi **Cek Pajak**, **Selisih** (otomatis PPh − Cek Pajak bila Cek Pajak berupa angka, boleh diubah), dan **Note PPh**; isinya tersimpan di Data Program dan dikirim ke Google Spreadsheet. Bila nomor Tim Pajak belum diisi atau WA gagal, potong tetap tersimpan dan WA bisa dikirim ulang dengan tombol **Kirim notifikasi WhatsApp ke Tim Pajak** di **Detail** Riwayat Approval (juga untuk baris yang dipotong sebelum fitur ini ada).
-- **Tim SCM:** begitu Tim Pajak menyimpan cek pajak, hasilnya (dealer, program, Net Pay, tanggal potong & No. Pembayaran, PPh, Cek Pajak, Selisih, Note PPh) otomatis dikirim ke WA Tim SCM area itu, diisi di halaman **Master AR** di bawah Tim Pajak. Bila nomornya belum diisi atau WA gagal, cek pajak tetap tersimpan dan hasilnya bisa dikirim ulang dengan tombol **Kirim hasil cek pajak ke WhatsApp Tim SCM** di **Detail** Riwayat Approval.
+- **Tim Pajak:** begitu AR menekan **Simpan & Selesaikan** (potong) di link-nya, WA otomatis dikirim ke setiap anggota Tim Pajak yang aktif di **Master → Tim Pajak & SCM** (satu daftar untuk semua area). Lewat link-nya, Tim Pajak mengecek PPh lalu mengisi **Cek Pajak**, **Selisih** (otomatis PPh − Cek Pajak bila Cek Pajak berupa angka, boleh diubah), dan **Note PPh**; isinya tersimpan di Data Program dan dikirim ke Google Spreadsheet. Bila nomor Tim Pajak belum diisi atau WA gagal, potong tetap tersimpan dan WA bisa dikirim ulang dengan tombol **Kirim WA ke Tim Pajak** di **Detail** Riwayat Approval (juga untuk baris yang dipotong sebelum fitur ini ada).
+- **Tim SCM:** begitu Tim Pajak menyimpan cek pajak, hasilnya (dealer, program, Net Pay, tanggal potong & No. Pembayaran, PPh, Cek Pajak, Selisih, Note PPh) otomatis dikirim ke WA setiap anggota Tim SCM yang aktif di **Master → Tim Pajak & SCM**. Bila nomornya belum diisi atau WA gagal, cek pajak tetap tersimpan dan hasilnya bisa dikirim ulang dengan tombol **Kirim hasil ke WA Tim SCM** di **Detail** Riwayat Approval.
 - **Halaman link konfirmasi** (Telemarketing, AR, Tim Pajak) menampilkan ringkasan klaim (dealer, kode BT, region, program, nominal; untuk Tim Pajak juga DPP, PPN, PPh, Net Pay, NPWP) dan tombol untuk membuka dokumen **CN**, **Agreement**, dan **Faktur Pajak** yang diunggah. Dokumen yang belum ada ditandai, dan Faktur Pajak ditandai *tidak wajib* untuk toko Non-PKP.
 - Link konfirmasi ditandatangani (*signed URL*) dan kedaluwarsa 30 hari setelah dikirim.
 - Setiap langkah dicatat di **Riwayat → Riwayat Approval**: notifikasi WhatsApp ke Telemarketing (otomatis atau oleh siapa), dealer setuju / tunda (lewat link Telemarketing), notifikasi WhatsApp ke AR (berhasil atau gagal), dipotong oleh AR (lewat link AR, dengan No. Pembayaran), notifikasi WhatsApp ke Tim Pajak, dicek Tim Pajak (lewat link Tim Pajak), dan notifikasi WhatsApp ke Tim SCM berisi hasil cek pajak, beserta waktunya.
@@ -202,16 +203,16 @@ sequenceDiagram
 ### 7. Akun & Hak Akses
 
 - **Daftar:** `/register` (nama, email, WhatsApp, peran, password). Akun baru berstatus **Menunggu ACC** sampai disetujui admin di **Master → User**.
-- **Masuk:** `/login` dengan username/email + password, atau **Masuk dengan WhatsApp** (kode OTP dikirim ke nomor WA terdaftar). Setelah masuk, pengguna dibawa ke halaman yang tadi dibuka atau ke Dashboard.
+- **Masuk:** `/login` dengan username/email + password, atau **Masuk dengan WhatsApp** (kode OTP dikirim ke nomor WA terdaftar). Setelah masuk, semua pengguna dibawa ke **Dashboard** (atau ke halaman yang tadi dibuka sebelum diminta masuk).
 - **Peran:**
 
   | Peran | Akses bawaan |
   | :--- | :--- |
   | Admin, SCM | Semua menu |
-  | AR | Draft, Invoice, Riwayat Email, Dashboard, Riwayat Program |
+  | AR | Draft, Invoice, Riwayat Email, Riwayat Program |
   | Telemarketing | Form Program, Riwayat Program |
 
-  Admin bisa mengatur akses per menu untuk tiap user di **Master → User**.
+  Admin bisa mengatur akses per menu untuk tiap user di **Master → User**. Halaman di luar akses pengguna tidak tampil di menu dan tidak bisa dibuka lewat URL (diarahkan ke Dashboard). **Dashboard** terbuka untuk semua pengguna, jadi tidak ada di daftar hak akses.
 - **Profil:** klik lingkaran inisial/foto di kanan atas → **Profil** untuk ganti foto, nama, email, WhatsApp, dan password. Menu yang sama berisi **Mode Gelap** dan **Keluar**.
 
 ---
@@ -242,9 +243,14 @@ sequenceDiagram
 
 ### Riwayat
 - **Riwayat Program**: log pencocokan (Sesuai, Dokumen Kurang, Selisih, Belum Ada Form) dengan nominal dan dokumen.
-- **Riwayat Approval** (per brand & area, ikut hak akses Riwayat Program): tiap baris Data Program yang sudah **BISA DI POTONG** tampil dengan alur 8 langkah: *Klaim bisa dipotong → Notifikasi WhatsApp ke Telemarketing → Persetujuan dealer → Notifikasi WhatsApp ke AR → Dipotong oleh AR → Notifikasi WhatsApp ke Tim Pajak → Dicek Tim Pajak → Notifikasi WhatsApp ke Tim SCM*. Langkah selesai berwarna hijau, posisi sekarang kuning, WhatsApp yang gagal terkirim merah, dan "Ditunda dealer" oranye. Region tanpa AR di Master AR tertulis **Nomor AR default**. Filter per tahap (Belum dikirim ke Telemarketing, Menunggu persetujuan dealer, Ditunda dealer, Disetujui dealer · menunggu AR, Dipotong AR · menunggu Tim Pajak, Selesai · sudah dicek Tim Pajak) beserta jumlahnya. Baris yang Cek Pajak-nya sudah terisi di spreadsheet dianggap sudah dicek pajak; dan pencarian dealer / kode BT / program / telemarketing. **Detail** menampilkan waktu, pelaku, tujuan WA, dan catatan tiap langkah. Tahap diambil dari status Data Program, jadi baris lama ikut tampil; hanya waktu & pelaku langkah sebelum fitur ini dipasang yang tidak tercatat.
+- **Riwayat Approval** (per brand & area, ikut hak akses Riwayat Program): tiap baris Data Program yang sudah **BISA DI POTONG** tampil dengan alur 8 langkah: *Bisa dipotong → WA Telemarketing → Dealer setuju → WA AR → Dipotong AR → WA Pajak → Cek Pajak → WA SCM*. Di bawah tiap langkah tampil nama penanggung jawabnya; arahkan kursor ke langkah untuk label lengkap dan waktunya. Langkah selesai berwarna hijau, posisi sekarang kuning, WhatsApp yang gagal terkirim merah, dan "Ditunda dealer" oranye. Region tanpa AR di Master AR tertulis **Nomor AR default**. Filter per tahap (Belum ke Telemarketing, Menunggu dealer, Ditunda dealer, Menunggu AR, Menunggu Tim Pajak, Selesai) beserta jumlahnya. Baris yang Cek Pajak-nya sudah terisi di spreadsheet dianggap sudah dicek pajak; dan pencarian dealer / kode BT / program / telemarketing. **Detail** menampilkan waktu, pelaku, tujuan WA, dan catatan tiap langkah. Tahap diambil dari status Data Program, jadi baris lama ikut tampil; hanya waktu & pelaku langkah sebelum fitur ini dipasang yang tidak tercatat.
 - **Riwayat Email**: log pengiriman invoice.
-- **Dashboard**: ringkasan jumlah draft, invoice per tipe, dan total Net Pay.
+
+### Dashboard
+- Menu pertama di navigasi dan halaman pertama setelah masuk, untuk semua pengguna.
+- Kartu: **Data Program**, **Form Program**, **Bisa Dipotong** (`BISA DI POTONG`), **Sudah Dipotong** (`SUDAH POTONG`), dan **Belum Bisa Dipotong** (status lainnya), dengan persentasenya dari Data Program.
+- Tabel **Per Region**: angka yang sama per region (sesuai tulisan region di data), dengan baris Total. Pilih **Semua area**, **Jawa Barat**, atau **Jawa Tengah**.
+- Ringkasan **Draft & Invoice**: jumlah draft (ready / error), invoice per tipe, dan total Net Pay.
 
 ### Master
 | Menu | Isi | Import / Export |
@@ -253,6 +259,7 @@ sequenceDiagram
 | **Program** | Kode program (mis. PROGRAM 345), nama, periode. Satu daftar per brand untuk semua area (tab brand di atas halaman). Nama program di draft otomatis mengisi kodenya. Saat program disimpan (tambah, edit, atau import), kolom **Program** di Data Program & draft yang bernama program sama tapi masih kosong (atau masih memakai kode lamanya) langsung terisi kodenya dan dikirim ke Google Spreadsheet; kode yang diisi sendiri tidak diubah. | Import & export Excel (kolom PROGRAM, NAMA PROGRAM, PERIODE) |
 | **Region** | Region per area (dipakai di Form Program & Master Dealer). | Export |
 | **AR** | AR per region: nama & nomor WhatsApp penerima WA "dealer setuju dipotong". | Export |
+| **Tim Pajak & SCM** | Anggota Tim Pajak dan Tim SCM (nama, tim, nomor WhatsApp, aktif/nonaktif), satu daftar untuk semua area: **Tambah Kontak**, Edit, Hapus, dan klik status untuk aktif/nonaktif. Setiap anggota aktif menerima WA cek pajak (Tim Pajak) atau hasilnya (Tim SCM); WA dianggap terkirim bila minimal satu anggota menerimanya. | — |
 | **Dealer** | Toko dari file Master Customer CV TOP: kode BT, nama, alias, ID Realme/Nama GS, Jenis NPWP, NPWP, region, telemarketing (+ nomor WA), sales, status. Kolom **Agreement** (link dokumen agreement toko) diisi dari Form Program atau diedit manual, dan tetap ada walau dealer diimport ulang. Daftar bisa difilter **Ada / Belum ada agreement** (ikut ke Export). Di file export, agreement ada di kolom terakhir **Agreement** sebagai teks pendek **Link AGR** yang bisa diklik (kolom ini diabaikan saat import). | Import (file CV TOP; satu file untuk semua area) & export dengan format yang sama |
 | **Badan Usaha** | Badan usaha Bill To invoice (CV TOP SELULAR, PT RISM, PT MSI, ...): kode, nama, NPWP, alamat. Dulu bernama Master Customer; link lama `/customers` diarahkan ke `/badan-usaha`. | Export |
 | **User** | Akun pengguna, peran, akses per menu, persetujuan (ACC). | Import akun (daftar Nama, No WA, Email, Peran, atau file CV TOP untuk telemarketing) |
@@ -519,10 +526,11 @@ vendor/bin/pint --dirty
 | `program_approval_logs` | Langkah alur approval per baris Data Program: WA ke telemarketing, pengingat, setuju / tunda, WA ke AR, sudah dipotong, WA ke Tim Pajak, dicek Tim Pajak, WA hasil cek pajak ke Tim SCM (waktu, pelaku, tujuan WA, catatan). Ikut terhapus bila baris Data Program-nya dihapus. |
 | `dealers` | Master Dealer per area (kode BT unik). |
 | `regions` | Master Region per area. |
-| `ar_contacts` | Master AR per region per area. Tim Pajak & Tim SCM per area (nama & No WhatsApp) disimpan di `app_settings`. |
+| `ar_contacts` | Master AR per region per area. |
+| `team_contacts` | Anggota Tim Pajak & Tim SCM (`team` = `tax` / `scm`, nama, No WhatsApp, aktif), satu daftar untuk semua area. |
 | `brands` | Master Brand (Realme, Oppo, ...); kode URL-nya dipakai di kolom `brand` tabel data. |
 | `master_programs` | Master Program per brand (kode unik per brand, dipakai semua area). |
-| `app_settings` | Pengaturan yang diubah dari aplikasi, mis. hash password Reset Data dan kontak Tim Pajak & Tim SCM per area. |
+| `app_settings` | Pengaturan yang diubah dari aplikasi, mis. hash password Reset Data. |
 | `customers` | Master Badan Usaha (Bill To invoice). |
 | `automation_schedules` | Master Jadwal Otomatis: kapan tugas otomatis (WA ke telemarketing) berjalan, pengaturan pengingatnya (`options`), dan hasil jalan terakhirnya. |
 | `email_accounts` | Akun pengirim email invoice. |
@@ -540,7 +548,7 @@ vendor/bin/pint --dirty
 | Analisis dokumen hasilnya aneh (DPP kosong, nama dealer salah) | AI router sedang error, sehingga yang dipakai pembacaan cadangan. Cek `storage/logs/laravel.log` ("AI vision call … returned HTTP …"), ganti model di `.env`, lalu klik **Analisis AI Ulang**. |
 | WA tidak terkirim | Cek `WAG_URL` dan `WAG_TOKEN`, serta nomor tujuan (format 08… / 628…). |
 | WA invoice gagal: *URL lampiran harus dapat diakses publik* | WA Gateway tidak bisa mengambil file dari alamat lokal. Biasanya file otomatis diunggah ke link publik sementara; bila tetap gagal, host sementara itu tidak bisa dijangkau dari komputer server. Isi `WAG_PUBLIC_URL` dengan domain atau tunnel yang bisa diakses dari internet. |
-| WA ke Tim Pajak / Tim SCM gagal: *nomor belum diisi di Master AR* | Isi nama & No WhatsApp di kartu **Tim Pajak** / **Tim SCM** halaman **Master AR** untuk area itu (Jawa Barat dan Jawa Tengah terpisah), lalu kirim ulang lewat **Riwayat Approval → Detail**. |
+| WA ke Tim Pajak / Tim SCM gagal: *nomor belum diisi* | Tambahkan (atau aktifkan) anggota tim itu di **Master → Tim Pajak & SCM**, lalu kirim ulang lewat **Riwayat Approval → Detail**. |
 | No PO/SJ hasil import hilang lagi | Baris belum terkirim ke Google Spreadsheet, lalu tertimpa saat sinkron dari sheet. Atur link Apps Script area itu di **Data Program → Spreadsheet → Atur Link Spreadsheet**, lalu import ulang. |
 | Jadwal Otomatis tidak pernah jalan / muncul peringatan *Scheduler belum berjalan* | Scheduler Laravel mati. Jalankan `php artisan schedule:work` (lokal) atau pasang cron `php artisan schedule:run` (server). Lihat [Perintah Artisan & Scheduler](#perintah-artisan--scheduler). |
 | Email invoice gagal | Hubungkan ulang Google Workspace dari halaman Invoice, atau cek `MAIL_*`. |

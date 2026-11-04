@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AppSetting;
 use App\Models\DataProgram;
 use App\Models\ProgramApprovalLog;
 use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
+use App\Models\TeamContact;
 use App\Services\DataProgramPoImportService;
 use App\Services\DataProgramSyncService;
 use App\Services\ProgramApprovalFlow;
@@ -889,7 +889,7 @@ class DataProgramController extends Controller
 
         $result = $this->waService->sendDataProgramTaxCheckNotification($dp, $phone);
         ProgramApprovalLog::record($dp, ProgramApprovalLog::TAX_NOTIFIED, $result['success'],
-            actor: $request->user()?->email, recipient: ProgramApprovalLog::teamRecipient($dp, AppSetting::TAX_TEAM, $phone), note: $result['message']);
+            actor: $request->user()?->email, recipient: ProgramApprovalLog::teamRecipient($dp, TeamContact::TAX, $phone), note: $result['message']);
 
         if (! $result['success']) {
             return response()->json([
@@ -924,7 +924,7 @@ class DataProgramController extends Controller
 
         $result = $this->waService->sendDataProgramScmNotification($dp, $phone);
         ProgramApprovalLog::record($dp, ProgramApprovalLog::SCM_NOTIFIED, $result['success'],
-            actor: $request->user()?->email, recipient: ProgramApprovalLog::teamRecipient($dp, AppSetting::SCM_TEAM, $phone), note: $result['message']);
+            actor: $request->user()?->email, recipient: ProgramApprovalLog::teamRecipient($dp, TeamContact::SCM, $phone), note: $result['message']);
 
         if (! $result['success']) {
             return response()->json([

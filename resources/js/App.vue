@@ -24,6 +24,20 @@
             <!-- Menu utama (layar lebar) -->
             <NavigationMenu>
               <NavigationMenuList class="flex items-center gap-1">
+                <!-- Dashboard: menu pertama, terbuka untuk semua pengguna -->
+                <NavigationMenuItem>
+                  <router-link
+                    to="/dashboard"
+                    :class="[
+                      navigationMenuTriggerStyle(),
+                      isActive('/dashboard') && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
+                      'dark:text-slate-200 dark:hover:bg-slate-800'
+                    ]"
+                  >
+                    Dashboard
+                  </router-link>
+                </NavigationMenuItem>
+
                 <!-- 1-4. Draft, Invoice, Form Program, Data Program: dropdown per brand → area -->
                 <NavigationMenuItem v-for="menu in areaMenus" :key="menu.path">
                   <Popover :open="openAreaMenu === menu.path" @update:open="(open) => (openAreaMenu = open ? menu.path : null)">
@@ -73,7 +87,7 @@
                         type="button"
                         :class="[
                           navigationMenuTriggerStyle(),
-                          (isActive('/dashboard') || isActive('/riwayat-program') || isActive('/riwayat-approval') || isActive('/email-logs')) && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
+                          (isActive('/riwayat-program') || isActive('/riwayat-approval') || isActive('/email-logs')) && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
                           'gap-1.5 dark:text-slate-200 dark:hover:bg-slate-800'
                         ]"
                       >
@@ -121,18 +135,6 @@
                         ]"
                       >
                         Riwayat Email
-                      </router-link>
-
-                      <router-link
-                        v-if="canAccess('dashboard')"
-                        to="/dashboard"
-                        @click="isRiwayatOpen = false"
-                        :class="[
-                          'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
-                          isActive('/dashboard') ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold' : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
-                        ]"
-                      >
-                        Dashboard
                       </router-link>
                     </PopoverContent>
                   </Popover>
@@ -366,6 +368,18 @@
               </button>
             </div>
       <nav class="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
+        <!-- Dashboard: menu pertama untuk semua pengguna, langsung tanpa sub-menu -->
+        <router-link
+          to="/dashboard"
+          @click="isMobileNavOpen = false"
+          :class="[
+            'block px-3 py-2.5 rounded-lg text-sm transition-colors hover:bg-gray-100 dark:hover:bg-slate-800',
+            isActive('/dashboard') ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-700 dark:text-slate-300'
+          ]"
+        >
+          Dashboard
+        </router-link>
+
         <!-- Sub-menu muncul saat menu diklik -->
         <div v-for="group in mobileNavGroups" :key="group.title">
           <button
@@ -420,6 +434,7 @@ import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { useAuth } from '@/composables/useAuth';
+import { canAccess as canAccessFeature } from '@/lib/access';
 import { useTheme } from '@/composables/useTheme';
 import { AREAS, findArea } from '@/composables/useArea';
 import { DEFAULT_BRAND, brandName, useBrands } from '@/composables/useBrands';
@@ -485,64 +500,8 @@ const isActive = (path) => {
   return route.path.startsWith(path);
 };
 
-// Role & Permission Access Control
-const canAccess = (feature) => {
-  if (!user.value) return true;
-
-  // 1. Jika user memiliki daftar custom permissions
-  if (Array.isArray(user.value.permissions) && user.value.permissions.length > 0) {
-    if (feature === 'drafts') return user.value.permissions.includes('drafts');
-    if (feature === 'invoices') return user.value.permissions.includes('invoices');
-    if (feature === 'form_program') return user.value.permissions.includes('form_program');
-    if (feature === 'data_program') return user.value.permissions.includes('data_program');
-    if (feature === 'riwayat') {
-      return (
-        user.value.permissions.includes('riwayat_program') ||
-        user.value.permissions.includes('email_logs') ||
-        user.value.permissions.includes('dashboard')
-      );
-    }
-    if (feature === 'riwayat_program') return user.value.permissions.includes('riwayat_program');
-    if (feature === 'email_logs') return user.value.permissions.includes('email_logs');
-    if (feature === 'dashboard') return user.value.permissions.includes('dashboard');
-    if (feature === 'master') {
-      return (
-        user.value.permissions.includes('master_program') ||
-        user.value.permissions.includes('master_dealer') ||
-        user.value.permissions.includes('master_customer') ||
-        user.value.permissions.includes('master_user')
-      );
-    }
-    if (feature === 'master_program') return user.value.permissions.includes('master_program');
-    if (feature === 'master_dealer') return user.value.permissions.includes('master_dealer');
-    if (feature === 'master_customer') return user.value.permissions.includes('master_customer');
-    if (feature === 'master_user') return user.value.permissions.includes('master_user');
-    return user.value.permissions.includes(feature);
-  }
-
-  // 2. Fallback ke default role
-  const role = user.value.role || 'scm';
-  // Admin & SCM default bisa melihat semuanya
-  if (role === 'admin' || role === 'scm') {
-    return true;
-  }
-
-  if (feature === 'drafts') return role === 'ar';
-  if (feature === 'invoices') return role === 'ar';
-  if (feature === 'form_program') return role === 'telemarketing';
-  if (feature === 'data_program') return false;
-  if (feature === 'riwayat') return true;
-  if (feature === 'riwayat_program') return true;
-  if (feature === 'email_logs') return role === 'ar';
-  if (feature === 'dashboard') return role === 'ar';
-  if (feature === 'master') return false;
-  if (feature === 'master_program') return false;
-  if (feature === 'master_dealer') return false;
-  if (feature === 'master_customer') return false;
-  if (feature === 'master_user') return false;
-
-  return false;
-};
+// Role & Permission Access Control (sama dengan yang dipakai router)
+const canAccess = (feature) => canAccessFeature(user.value, feature);
 
 // Menu Master dibagi dua kolom: program & wilayah, lalu toko, badan usaha & akun
 const masterColumns = computed(() => [
@@ -551,6 +510,7 @@ const masterColumns = computed(() => [
     canAccess('master_program') && { label: 'Program', to: '/programs' },
     canAccess('master_program') && { label: 'Region', to: '/regions' },
     canAccess('master_program') && { label: 'AR', to: '/ar' },
+    canAccess('master_program') && { label: 'Tim Pajak & SCM', to: '/tim-pajak-scm' },
   ],
   [
     canAccess('master_dealer') && { label: 'Dealer', to: '/dealers' },
@@ -580,7 +540,6 @@ const mobileNavGroups = computed(() => {
         canAccess('riwayat_program') && { label: 'Riwayat Program', to: '/riwayat-program' },
         canAccess('riwayat_program') && { label: 'Riwayat Approval', to: '/riwayat-approval' },
         canAccess('email_logs') && { label: 'Riwayat Email', to: '/email-logs' },
-        canAccess('dashboard') && { label: 'Dashboard', to: '/dashboard' },
       ],
     },
     canAccess('master') && { title: 'Master', links: masterColumns.value.flat() },

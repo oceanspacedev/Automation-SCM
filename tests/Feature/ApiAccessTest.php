@@ -53,4 +53,24 @@ class ApiAccessTest extends TestCase
         $this->actingAs($admin);
         $this->postJson('/api/users', $newUser('admin'))->assertCreated();
     }
+
+    public function test_every_signed_in_user_sees_the_dashboard_metrics(): void
+    {
+        $this->assertArrayNotHasKey('dashboard', User::AVAILABLE_PERMISSIONS);
+
+        $this->actingAs(User::factory()->create(['role' => 'telemarketing', 'is_active' => true, 'permissions' => User::getDefaultPermissionsForRole('telemarketing')]));
+        $this->getJson('/api/dashboard')->assertOk();
+
+        $this->actingAs(User::factory()->create(['role' => 'ar', 'is_active' => true, 'permissions' => ['drafts']]));
+        $this->getJson('/api/dashboard')->assertOk();
+    }
+
+    public function test_dashboard_is_taken_out_of_saved_user_permissions(): void
+    {
+        $user = User::factory()->create(['permissions' => ['drafts', 'dashboard', 'invoices']]);
+
+        (require database_path('migrations/2026_11_04_131535_remove_dashboard_from_user_permissions.php'))->up();
+
+        $this->assertSame(['drafts', 'invoices'], $user->fresh()->permissions);
+    }
 }

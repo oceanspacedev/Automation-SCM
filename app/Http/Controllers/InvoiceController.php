@@ -705,31 +705,4 @@ class InvoiceController extends Controller
 
         return response()->json($logs);
     }
-
-    /**
-     * Dashboard metrics.
-     */
-    public function dashboard(): JsonResponse
-    {
-        $totalDraft = Draft::count();
-        $draftReady = Draft::where('status', 'ready')->count();
-        $draftError = Draft::where('status', 'error')->count();
-
-        $totalInvoice = Invoice::count();
-        $invoiceDsa = Invoice::where('invoice_type', 'DSA')->count();
-        $invoiceNpsFl = Invoice::where('invoice_type', 'NPS FL')->count();
-        $invoiceRegular = Invoice::whereIn('invoice_type', ['REGULAR', 'REGULER'])->count();
-        $totalNetpay = (float) Invoice::sum('netpay');
-
-        return response()->json([
-            'total_draft' => $totalDraft,
-            'draft_ready' => $draftReady,
-            'draft_error' => $draftError,
-            'total_invoice' => $totalInvoice,
-            'invoice_dsa' => $invoiceDsa,
-            'invoice_nps_fl' => $invoiceNpsFl,
-            'invoice_regular' => $invoiceRegular,
-            'total_netpay' => $totalNetpay,
-        ]);
-    }
 }

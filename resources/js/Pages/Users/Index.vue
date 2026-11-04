@@ -527,18 +527,17 @@ const permissionList = ref({
   data_program: 'Data Program',
   riwayat_program: 'Riwayat Program & Approval',
   email_logs: 'Riwayat Email',
-  dashboard: 'Dashboard',
   master_program: 'Master Program',
   master_dealer: 'Master Dealer',
   master_customer: 'Master Badan Usaha',
   master_user: 'Master User',
 });
 
-const ALL_MODULES = ['drafts', 'invoices', 'form_program', 'data_program', 'riwayat_program', 'email_logs', 'dashboard', 'master_program', 'master_dealer', 'master_customer', 'master_user'];
+const ALL_MODULES = ['drafts', 'invoices', 'form_program', 'data_program', 'riwayat_program', 'email_logs', 'master_program', 'master_dealer', 'master_customer', 'master_user'];
 const roleDefaults = ref({
   admin: ALL_MODULES,
   scm: ALL_MODULES,
-  ar: ['drafts', 'invoices', 'riwayat_program', 'dashboard'],
+  ar: ['drafts', 'invoices', 'riwayat_program'],
   telemarketing: ['form_program', 'riwayat_program'],
 });
 

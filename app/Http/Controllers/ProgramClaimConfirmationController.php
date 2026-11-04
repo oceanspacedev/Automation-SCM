@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AppSetting;
 use App\Models\DataProgram;
 use App\Models\ProgramApprovalLog;
 use App\Models\ProgramSubmission;
+use App\Models\TeamContact;
 use App\Services\DataProgramSyncService;
 use App\Services\ProgramReconciliationService;
 use App\Services\WhatsAppService;
@@ -311,7 +311,7 @@ class ProgramClaimConfirmationController extends Controller
         }
 
         ProgramApprovalLog::record($dp, ProgramApprovalLog::TAX_NOTIFIED, $result['success'],
-            actor: ProgramApprovalLog::AUTOMATIC, recipient: ProgramApprovalLog::teamRecipient($dp, AppSetting::TAX_TEAM), note: $result['message']);
+            actor: ProgramApprovalLog::AUTOMATIC, recipient: ProgramApprovalLog::teamRecipient($dp, TeamContact::TAX), note: $result['message']);
 
         return $result;
     }
@@ -335,7 +335,7 @@ class ProgramClaimConfirmationController extends Controller
         }
 
         ProgramApprovalLog::record($dp, ProgramApprovalLog::SCM_NOTIFIED, $result['success'],
-            actor: ProgramApprovalLog::AUTOMATIC, recipient: ProgramApprovalLog::teamRecipient($dp, AppSetting::SCM_TEAM), note: $result['message']);
+            actor: ProgramApprovalLog::AUTOMATIC, recipient: ProgramApprovalLog::teamRecipient($dp, TeamContact::SCM), note: $result['message']);
 
         return $result;
     }

@@ -19,11 +19,13 @@ import DealersIndex from '../Pages/Dealers/Index.vue';
 import ProgramsIndex from '../Pages/Programs/Index.vue';
 import RegionsIndex from '../Pages/Regions/Index.vue';
 import ArContactsIndex from '../Pages/ArContacts/Index.vue';
+import TeamContactsIndex from '../Pages/TeamContacts/Index.vue';
 import ProfileIndex from '../Pages/Profile/Index.vue';
 import BrandsIndex from '../Pages/Brands/Index.vue';
 import SchedulesIndex from '../Pages/Schedules/Index.vue';
 import DataResetIndex from '../Pages/DataReset/Index.vue';
 import { useAuth } from '../composables/useAuth';
+import { canOpenRoute, HOME_PATH } from '../lib/access';
 import { AREA_ROUTE_PATTERN, DEFAULT_AREA } from '../composables/useArea';
 import { BRAND_ROUTE_PATTERN, DEFAULT_BRAND } from '../composables/useBrands';
 
@@ -31,10 +33,10 @@ import { BRAND_ROUTE_PATTERN, DEFAULT_BRAND } from '../composables/useBrands';
  * Route halaman yang datanya terpisah per area (/path/jabar, /path/jateng).
  * Link lama tanpa area (/path) diarahkan ke Jawa Barat dengan query yang sama.
  */
-function areaRoutes(path, name, component) {
+function areaRoutes(path, name, component, permission) {
   return [
     { path, redirect: to => ({ path: `${path}/${DEFAULT_AREA}`, query: to.query }) },
-    { path: `${path}/:area(${AREA_ROUTE_PATTERN})`, name, component, meta: { requiresAuth: true } },
+    { path: `${path}/:area(${AREA_ROUTE_PATTERN})`, name, component, meta: { requiresAuth: true, permission } },
   ];
 }
 
@@ -42,11 +44,11 @@ function areaRoutes(path, name, component) {
  * Route halaman yang datanya terpisah per brand & area (/path/realme/jabar).
  * Link lama tanpa brand (/path/jabar) atau tanpa area (/path) diarahkan ke Realme dengan query yang sama.
  */
-function brandAreaRoutes(path, name, component) {
+function brandAreaRoutes(path, name, component, permission) {
   return [
     { path, redirect: to => ({ path: `${path}/${DEFAULT_BRAND}/${DEFAULT_AREA}`, query: to.query }) },
     { path: `${path}/:area(${AREA_ROUTE_PATTERN})`, redirect: to => ({ path: `${path}/${DEFAULT_BRAND}/${to.params.area}`, query: to.query }) },
-    { path: `${path}/:brand(${BRAND_ROUTE_PATTERN})/:area(${AREA_ROUTE_PATTERN})`, name, component, meta: { requiresAuth: true } },
+    { path: `${path}/:brand(${BRAND_ROUTE_PATTERN})/:area(${AREA_ROUTE_PATTERN})`, name, component, meta: { requiresAuth: true, permission } },
   ];
 }
 
@@ -55,11 +57,11 @@ const routes = [
   { path: '/register', name: 'register', component: Register, meta: { guestOnly: true } },
   { path: '/', redirect: '/dashboard' },
   { path: '/dashboard', name: 'dashboard', component: Dashboard, meta: { requiresAuth: true } },
-  ...brandAreaRoutes('/drafts', 'drafts.index', DraftsIndex),
-  { path: '/drafts/:id', name: 'drafts.detail', component: DraftDetail, props: true, meta: { requiresAuth: true } },
-  ...brandAreaRoutes('/invoices', 'invoices.index', InvoicesIndex),
-  { path: '/invoices/:id', name: 'invoices.detail', component: InvoiceDetail, props: true, meta: { requiresAuth: true } },
-  { path: '/email-logs', name: 'email-logs.index', component: EmailLogsIndex, meta: { requiresAuth: true } },
+  ...brandAreaRoutes('/drafts', 'drafts.index', DraftsIndex, 'drafts'),
+  { path: '/drafts/:id', name: 'drafts.detail', component: DraftDetail, props: true, meta: { requiresAuth: true, permission: 'drafts' } },
+  ...brandAreaRoutes('/invoices', 'invoices.index', InvoicesIndex, 'invoices'),
+  { path: '/invoices/:id', name: 'invoices.detail', component: InvoiceDetail, props: true, meta: { requiresAuth: true, permission: 'invoices' } },
+  { path: '/email-logs', name: 'email-logs.index', component: EmailLogsIndex, meta: { requiresAuth: true, permission: 'email_logs' } },
   // Link form publik lama (sudah tersebar) diarahkan ke form Realme Jawa Barat / area yang sama
   { path: '/form-submission', redirect: to => ({ path: `/form/${DEFAULT_BRAND}/${DEFAULT_AREA}`, query: to.query }) },
   { path: '/form-realme', redirect: to => ({ path: `/form/${DEFAULT_BRAND}/${DEFAULT_AREA}`, query: to.query }) },
@@ -68,27 +70,30 @@ const routes = [
   // Form publik per brand & area, contoh: /form/realme/jateng
   { path: `/form/:brand(${BRAND_ROUTE_PATTERN})/:area(${AREA_ROUTE_PATTERN})`, name: 'program-area.public-form', component: ProgramPublicForm, meta: { requiresAuth: false, isStandalone: true } },
   // Halaman per brand & area (mis. /data-program/realme/jabar); link lama diarahkan ke Realme
-  ...brandAreaRoutes('/data-program', 'data-program.index', DataProgramIndex),
-  ...brandAreaRoutes('/form-program', 'form-program.index', TestProgramIndex),
+  ...brandAreaRoutes('/data-program', 'data-program.index', DataProgramIndex, 'data_program'),
+  ...brandAreaRoutes('/form-program', 'form-program.index', TestProgramIndex, 'form_program'),
   // Link lama /test-program dan /test-program/:area diarahkan ke /form-program Realme
   { path: '/test-program', redirect: to => ({ path: `/form-program/${DEFAULT_BRAND}/${DEFAULT_AREA}`, query: to.query }) },
   { path: `/test-program/:area(${AREA_ROUTE_PATTERN})`, redirect: to => ({ path: `/form-program/${DEFAULT_BRAND}/${to.params.area}`, query: to.query }) },
-  ...brandAreaRoutes('/riwayat-program', 'program-history.index', ProgramHistoryIndex),
-  ...brandAreaRoutes('/riwayat-approval', 'approval-history.index', ApprovalHistoryIndex),
+  ...brandAreaRoutes('/riwayat-program', 'program-history.index', ProgramHistoryIndex, 'riwayat_program'),
+  ...brandAreaRoutes('/riwayat-approval', 'approval-history.index', ApprovalHistoryIndex, 'riwayat_program'),
   // Master Program per brand (satu daftar untuk semua area); link lama /programs dan /programs/jabar diarahkan ke Realme
   { path: '/programs', redirect: `/programs/${DEFAULT_BRAND}` },
   { path: `/programs/:area(${AREA_ROUTE_PATTERN})`, redirect: `/programs/${DEFAULT_BRAND}` },
-  { path: `/programs/:brand(${BRAND_ROUTE_PATTERN})`, name: 'programs.index', component: ProgramsIndex, meta: { requiresAuth: true } },
-  { path: '/brands', name: 'brands.index', component: BrandsIndex, meta: { requiresAuth: true } },
-  ...areaRoutes('/regions', 'regions.index', RegionsIndex),
-  ...areaRoutes('/ar', 'ar-contacts.index', ArContactsIndex),
+  { path: `/programs/:brand(${BRAND_ROUTE_PATTERN})`, name: 'programs.index', component: ProgramsIndex, meta: { requiresAuth: true, permission: 'master_program' } },
+  { path: '/brands', name: 'brands.index', component: BrandsIndex, meta: { requiresAuth: true, permission: 'master_program' } },
+  ...areaRoutes('/regions', 'regions.index', RegionsIndex, 'master_program'),
+  ...areaRoutes('/ar', 'ar-contacts.index', ArContactsIndex, 'master_program'),
+  // Tim Pajak & SCM satu untuk semua area; link per area diarahkan ke halaman yang sama
+  { path: '/tim-pajak-scm', name: 'team-contacts.index', component: TeamContactsIndex, meta: { requiresAuth: true, permission: 'master_program' } },
+  { path: `/tim-pajak-scm/:area(${AREA_ROUTE_PATTERN})`, redirect: '/tim-pajak-scm' },
   // Master Badan Usaha (Bill To invoice); link lama /customers diarahkan ke sini
-  { path: '/badan-usaha', name: 'customers.index', component: CustomersIndex, meta: { requiresAuth: true } },
+  { path: '/badan-usaha', name: 'customers.index', component: CustomersIndex, meta: { requiresAuth: true, permission: 'master_customer' } },
   { path: '/customers', redirect: '/badan-usaha' },
-  ...areaRoutes('/dealers', 'dealers.index', DealersIndex),
-  { path: '/users', name: 'users.index', component: UsersIndex, meta: { requiresAuth: true } },
-  { path: '/jadwal-otomatis', name: 'schedules.index', component: SchedulesIndex, meta: { requiresAuth: true } },
-  { path: '/reset-data', name: 'data-reset.index', component: DataResetIndex, meta: { requiresAuth: true } },
+  ...areaRoutes('/dealers', 'dealers.index', DealersIndex, 'master_dealer'),
+  { path: '/users', name: 'users.index', component: UsersIndex, meta: { requiresAuth: true, permission: 'master_user' } },
+  { path: '/jadwal-otomatis', name: 'schedules.index', component: SchedulesIndex, meta: { requiresAuth: true, permission: 'master_user' } },
+  { path: '/reset-data', name: 'data-reset.index', component: DataResetIndex, meta: { requiresAuth: true, adminOnly: true } },
   { path: '/profile', name: 'profile', component: ProfileIndex, meta: { requiresAuth: true } },
 ];
 
@@ -103,7 +108,7 @@ router.beforeEach(async (to, from, next) => {
     return next();
   }
 
-  const { isInitialized, checkAuth, isAuthenticated } = useAuth();
+  const { isInitialized, checkAuth, isAuthenticated, user } = useAuth();
 
   if (!isInitialized.value) {
     await checkAuth();
@@ -114,7 +119,12 @@ router.beforeEach(async (to, from, next) => {
   }
 
   if (to.meta.guestOnly && isAuthenticated.value) {
-    return next({ name: 'dashboard' });
+    return next(HOME_PATH);
+  }
+
+  // Halaman di luar hak akses (mis. Draft untuk telemarketing) diarahkan ke Dashboard
+  if (to.meta.requiresAuth && !canOpenRoute(user.value, to.meta)) {
+    return next(HOME_PATH);
   }
 
   next();

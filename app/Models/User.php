@@ -22,7 +22,7 @@ class User extends Authenticatable
     use HasFactory, Notifiable;
 
     /**
-     * Daftar seluruh permission yang tersedia di aplikasi
+     * Daftar seluruh permission yang tersedia di aplikasi (Dashboard terbuka untuk semua user, jadi tidak termasuk)
      */
     public const AVAILABLE_PERMISSIONS = [
         'drafts' => 'Draft',
@@ -31,7 +31,6 @@ class User extends Authenticatable
         'data_program' => 'Data Program',
         'riwayat_program' => 'Riwayat Program & Approval',
         'email_logs' => 'Riwayat Email',
-        'dashboard' => 'Dashboard',
         'master_program' => 'Master Program',
         'master_dealer' => 'Master Dealer',
         'master_customer' => 'Master Badan Usaha',
@@ -98,7 +97,6 @@ class User extends Authenticatable
                 'data_program',
                 'riwayat_program',
                 'email_logs',
-                'dashboard',
                 'master_program',
                 'master_dealer',
                 'master_customer',
@@ -108,7 +106,6 @@ class User extends Authenticatable
                 'drafts',
                 'invoices',
                 'riwayat_program',
-                'dashboard',
             ],
             'telemarketing' => [
                 'form_program',

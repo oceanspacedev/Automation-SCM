@@ -19,12 +19,12 @@ class ProgramApprovalFlow
      * @var array<string, string>
      */
     public const STAGES = [
-        'waiting_telemarketing' => 'Belum dikirim ke Telemarketing',
-        'waiting_approval' => 'Menunggu persetujuan dealer',
+        'waiting_telemarketing' => 'Belum ke Telemarketing',
+        'waiting_approval' => 'Menunggu dealer',
         'postponed' => 'Ditunda dealer',
-        'approved' => 'Disetujui dealer · menunggu AR',
-        'cut' => 'Dipotong AR · menunggu Tim Pajak',
-        'tax_checked' => 'Selesai · sudah dicek Tim Pajak',
+        'approved' => 'Menunggu AR',
+        'cut' => 'Menunggu Tim Pajak',
+        'tax_checked' => 'Selesai',
     ];
 
     private const READY = 'BISA DI POTONG';
@@ -110,8 +110,8 @@ class ProgramApprovalFlow
      *
      * @param  Collection<int, ProgramApprovalLog>  $logs  the row's recorded steps
      * @param  string|null  $arName  the AR of the row's region in Master AR (null: the default AR number)
-     * @param  string|null  $taxName  the area's tax team in Master AR (null: not named yet)
-     * @param  string|null  $scmName  the area's SCM team in Master AR (null: not named yet)
+     * @param  string|null  $taxName  the tax team in Master Tim Pajak & SCM (null: not named yet)
+     * @param  string|null  $scmName  the SCM team in Master Tim Pajak & SCM (null: not named yet)
      * @return list<array{key: string, label: string, state: string, at: ?string, date: ?string, person: ?string, role: ?string, actor: ?string, recipient: ?string, note: ?string}>
      */
     public function steps(DataProgram $row, Collection $logs, ?string $arName = null, ?string $taxName = null, ?string $scmName = null): array

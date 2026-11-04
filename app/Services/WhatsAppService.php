@@ -2,11 +2,11 @@
 
 namespace App\Services;
 
-use App\Models\AppSetting;
 use App\Models\ArContact;
 use App\Models\DataProgram;
 use App\Models\Invoice;
 use App\Models\ProgramSubmission;
+use App\Models\TeamContact;
 use App\Models\WhatsAppLog;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Exception;
@@ -1029,7 +1029,7 @@ class WhatsAppService
     }
 
     /**
-     * Ask the area's tax team (Master AR → Tim Pajak) to check the PPh of a claim AR has cut, with a link to fill in
+     * Ask the tax team (Master Tim Pajak & SCM) to check the PPh of a claim AR has cut, with a link to fill in
      * Cek Pajak, Selisih and Note PPh.
      *
      * @return array{success: bool, message: string, provider_id: ?string}
@@ -1047,46 +1047,48 @@ class WhatsAppService
             ['id' => $dp->id, 'role' => 'pajak']
         );
 
-        return $this->sendToTeam($dp, AppSetting::TAX_TEAM, 'Tim Pajak', $overridePhone, "DP-TAX-CHECK-{$dp->id}",
+        return $this->sendToTeam($dp, TeamContact::TAX, 'Tim Pajak', $overridePhone, "DP-TAX-CHECK-{$dp->id}",
             fn (?string $name) => $this->buildDataProgramTaxCheckMessage($dp, $confirmUrl, $name),
             "Permintaan cek pajak {$dp->dealer_name}");
     }
 
     /**
-     * Send the result of the tax check of a cut claim (Cek Pajak, Selisih, Note PPh) to the area's SCM team
-     * (Master AR → Tim SCM).
+     * Send the result of the tax check of a cut claim (Cek Pajak, Selisih, Note PPh) to the SCM team
+     * (Master Tim Pajak & SCM).
      *
      * @return array{success: bool, message: string, provider_id: ?string}
      */
     public function sendDataProgramScmNotification(DataProgram $dp, ?string $overridePhone = null): array
     {
-        return $this->sendToTeam($dp, AppSetting::SCM_TEAM, 'Tim SCM', $overridePhone, "DP-SCM-RESULT-{$dp->id}",
+        return $this->sendToTeam($dp, TeamContact::SCM, 'Tim SCM', $overridePhone, "DP-SCM-RESULT-{$dp->id}",
             fn (?string $name) => $this->buildDataProgramScmMessage($dp, $name),
             "Hasil cek pajak {$dp->dealer_name}");
     }
 
     /**
-     * Send a Data Program message to the area's tax or SCM team in Master AR (or the given number).
+     * Send a Data Program message to every active member of the tax or SCM team in Master Tim Pajak & SCM (or only to
+     * the given number). It succeeds when at least one member got it.
      *
-     * @param  \Closure(?string): string  $buildMessage  the message for the team's name
+     * @param  \Closure(?string): string  $buildMessage  the message for a member's name
      * @return array{success: bool, message: string, provider_id: ?string}
      */
     protected function sendToTeam(DataProgram $dp, string $team, string $teamLabel, ?string $overridePhone, string $clientReference, \Closure $buildMessage, string $subject): array
     {
-        $contact = AppSetting::teamContact($dp->areaEnum(), $team);
-        $cleanPhone = $this->formatPhone($overridePhone ?: $contact['whatsapp']);
+        $recipients = ($overridePhone ? collect([['name' => null, 'whatsapp' => $overridePhone]]) : TeamContact::activeOf($team)->map->only(['name', 'whatsapp']))
+            ->map(fn (array $recipient) => [...$recipient, 'phone' => $this->formatPhone($recipient['whatsapp'])])
+            ->filter(fn (array $recipient) => ! empty($recipient['phone']))
+            ->unique('phone')
+            ->values();
 
-        if (empty($cleanPhone)) {
+        if ($recipients->isEmpty()) {
             return [
                 'success' => false,
-                'message' => "Nomor WhatsApp {$teamLabel} belum diisi di Master AR.",
+                'message' => "Nomor WhatsApp {$teamLabel} belum diisi di Master Tim Pajak & SCM.",
                 'provider_id' => null,
             ];
         }
 
-        $token = config('services.wag.token');
-
-        if (empty($token)) {
+        if (empty(config('services.wag.token'))) {
             return [
                 'success' => false,
                 'message' => 'WAG_TOKEN belum dikonfigurasi pada sistem.',
@@ -1094,17 +1096,56 @@ class WhatsAppService
             ];
         }
 
+        $sent = [];
+        $failed = [];
+        $providerId = null;
+
+        foreach ($recipients as $index => $recipient) {
+            $reference = $recipients->count() > 1 ? "{$clientReference}-".($index + 1) : $clientReference;
+            $result = $this->sendTeamText($recipient['phone'], $buildMessage($recipient['name']), $reference);
+            $who = trim(($recipient['name'] ?? '')." ({$recipient['phone']})");
+
+            if ($result['success']) {
+                $sent[] = $who;
+                $providerId ??= $result['provider_id'];
+            } else {
+                $failed[] = "{$who}: {$result['error']}";
+            }
+        }
+
+        if ($sent === []) {
+            return [
+                'success' => false,
+                'message' => "Gagal mengirim pesan WhatsApp ke {$teamLabel}: ".implode('; ', $failed),
+                'provider_id' => null,
+            ];
+        }
+
+        return [
+            'success' => true,
+            'message' => "{$subject} berhasil dikirim ke WhatsApp {$teamLabel} ".implode(', ', $sent).'.'.($failed ? ' Gagal ke '.implode('; ', $failed).'.' : ''),
+            'provider_id' => $providerId,
+        ];
+    }
+
+    /**
+     * Send one text WhatsApp to a team member through the gateway.
+     *
+     * @return array{success: bool, error: ?string, provider_id: ?string}
+     */
+    private function sendTeamText(string $phone, string $text, string $clientReference): array
+    {
         $uuid = Str::uuid()->toString();
 
         $payload = [
             'idempotency_key' => $uuid,
             'recipient' => [
                 'type' => 'phone',
-                'value' => $cleanPhone,
+                'value' => $phone,
             ],
             'message' => [
                 'type' => 'text',
-                'text' => $buildMessage($contact['name']),
+                'text' => $text,
             ],
             'purpose' => 'transactional',
             'mode' => 'async',
@@ -1113,7 +1154,7 @@ class WhatsAppService
         ];
 
         try {
-            $client = Http::withToken($token)
+            $client = Http::withToken(config('services.wag.token'))
                 ->acceptJson()
                 ->asJson()
                 ->withHeaders([
@@ -1132,7 +1173,7 @@ class WhatsAppService
             if ($response->successful() && ($response->status() === 200 || $response->status() === 201)) {
                 return [
                     'success' => true,
-                    'message' => "{$subject} berhasil dikirim ke WhatsApp {$teamLabel}".($contact['name'] && ! $overridePhone ? " {$contact['name']}" : '')." ({$cleanPhone}).",
+                    'error' => null,
                     'provider_id' => $data['data']['provider_message_id'] ?? ($data['data']['id'] ?? null),
                 ];
             }
@@ -1142,17 +1183,9 @@ class WhatsAppService
                 $errorMessage .= ' ('.json_encode($data['errors']).')';
             }
 
-            return [
-                'success' => false,
-                'message' => "Gagal mengirim pesan WhatsApp ke {$teamLabel}: ".$errorMessage,
-                'provider_id' => null,
-            ];
+            return ['success' => false, 'error' => $errorMessage, 'provider_id' => null];
         } catch (Exception $e) {
-            return [
-                'success' => false,
-                'message' => "Exception pengiriman WhatsApp ke {$teamLabel}: ".$e->getMessage(),
-                'provider_id' => null,
-            ];
+            return ['success' => false, 'error' => 'Exception: '.$e->getMessage(), 'provider_id' => null];
         }
     }
 

@@ -116,10 +116,16 @@ input, button, select, textarea {
     border-color: #243046 !important;
 }
 
-.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
-.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]),
-.dark .divide-gray-300 > :not([hidden]) ~ :not([hidden]) {
+/* Tailwind v4 memberi garis divide-* di bawah tiap anak kecuali yang terakhir */
+.dark .divide-gray-100 > :not(:last-child),
+.dark .divide-gray-200 > :not(:last-child),
+.dark .divide-gray-300 > :not(:last-child) {
     border-color: #1E2B3E !important;
+}
+
+/* Cincin pemisah titik (mis. langkah Riwayat Approval) mengikuti warna kartu */
+.dark .ring-white:not([class*="dark:ring-"]) {
+    --tw-ring-color: #131D2F !important;
 }
 
 /* 3. Typography & Text Hierarchy */

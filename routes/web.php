@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AutomationScheduleController;
 use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DataProgramController;
 use App\Http\Controllers\DataResetController;
 use App\Http\Controllers\DealerController;
@@ -18,6 +19,7 @@ use App\Http\Controllers\ProgramApprovalController;
 use App\Http\Controllers\ProgramClaimConfirmationController;
 use App\Http\Controllers\ProgramSubmissionController;
 use App\Http\Controllers\RegionController;
+use App\Http\Controllers\TeamContactController;
 use App\Http\Controllers\UserController;
 use App\Http\Middleware\SetAreaContext;
 use App\Http\Middleware\SetBrandContext;
@@ -101,13 +103,17 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         // Master AR (per region, per area)
         Route::get('/ar-contacts', [ArContactController::class, 'index']);
         Route::get('/ar-contacts/export', [ArContactController::class, 'export']);
-        // Tim Pajak & Tim SCM per area (/ar-contacts/tax-team, /ar-contacts/scm-team)
-        Route::get('/ar-contacts/{team}-team', [ArContactController::class, 'teamContact'])->whereIn('team', ['tax', 'scm']);
-        Route::put('/ar-contacts/{team}-team', [ArContactController::class, 'updateTeamContact'])->whereIn('team', ['tax', 'scm']);
         Route::post('/ar-contacts', [ArContactController::class, 'store']);
         Route::put('/ar-contacts/{id}', [ArContactController::class, 'update']);
         Route::delete('/ar-contacts/{id}', [ArContactController::class, 'destroy']);
         Route::patch('/ar-contacts/{id}/toggle-status', [ArContactController::class, 'toggleStatus']);
+
+        // Master Tim Pajak & SCM (satu daftar untuk semua area)
+        Route::get('/team-contacts', [TeamContactController::class, 'index']);
+        Route::post('/team-contacts', [TeamContactController::class, 'store']);
+        Route::put('/team-contacts/{teamContact}', [TeamContactController::class, 'update']);
+        Route::delete('/team-contacts/{teamContact}', [TeamContactController::class, 'destroy']);
+        Route::patch('/team-contacts/{teamContact}/toggle-status', [TeamContactController::class, 'toggleStatus']);
 
         // Master Users (butuh akses Master User; akun Admin hanya bisa diubah Admin)
         Route::get('/users', [UserController::class, 'index']);
@@ -150,7 +156,7 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         Route::post('/google/disconnect', [GoogleAuthController::class, 'disconnect']);
 
         // Dashboard
-        Route::get('/dashboard', [InvoiceController::class, 'dashboard']);
+        Route::get('/dashboard', [DashboardController::class, 'index']);
 
         // Drafts
         Route::post('/drafts/import', [DraftImportController::class, 'import']);

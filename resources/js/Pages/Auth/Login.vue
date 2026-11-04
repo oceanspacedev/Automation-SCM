@@ -212,6 +212,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
+import { HOME_PATH } from '@/lib/access';
 import { useTheme } from '@/composables/useTheme';
 import { Eye, EyeOff, Moon, Sun } from 'lucide-vue-next';
 import axios from 'axios';
@@ -290,7 +291,7 @@ async function triggerSuccessRedirect() {
 
   isLoginSuccess.value = true;
   const redirect = route.query.redirect;
-  const target = typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/dashboard';
+  const target = typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : HOME_PATH;
 
   setTimeout(() => {
     router.replace(target);
