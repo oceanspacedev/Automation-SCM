@@ -82,14 +82,15 @@
             </div>
 
             <!-- Alur langkah (layar sedang & lebar): label singkat dan nama penanggung jawab; waktu di tooltip dan Detail -->
-            <ol class="hidden md:grid w-full max-w-4xl xl:max-w-5xl lg:flex-1" :style="{ gridTemplateColumns: `repeat(${row.steps.length}, minmax(0, 1fr))` }">
-              <li v-for="(step, index) in row.steps" :key="step.key" :title="stepTooltip(step)" class="relative flex flex-col items-center text-center px-1 min-w-0 cursor-default">
+            <!-- Titik, label, dan nama berbagi baris (subgrid): label yang turun dua baris tidak menggeser nama di kolom lain -->
+            <ol class="hidden md:grid grid-rows-[auto_auto_auto] w-full max-w-4xl xl:max-w-5xl lg:flex-1" :style="{ gridTemplateColumns: `repeat(${row.steps.length}, minmax(0, 1fr))` }">
+              <li v-for="(step, index) in row.steps" :key="step.key" :title="stepTooltip(step)" class="relative row-span-3 grid grid-rows-subgrid justify-items-center content-start text-center px-0.5 min-w-0 cursor-default">
                 <!-- Garis dari langkah sebelumnya: hijau penuh bila sudah lewat, hijau berjalan menuju langkah sekarang -->
                 <span v-if="index > 0" :class="['absolute top-2 right-1/2 w-full h-0.5 rounded-full overflow-hidden', connectorClass(step.state)]">
                   <span v-if="step.state === 'current'" class="flow-runner"></span>
                 </span>
                 <StepDot :state="step.state" class="relative z-10 ring-4 ring-white" />
-                <p :class="['mt-1.5 w-full truncate text-[10px] font-medium leading-[14px]', stepLabelClass(step.state)]">{{ shortLabel(step) }}</p>
+                <p :class="['mt-1.5 w-full line-clamp-2 text-balance text-[10px] font-medium leading-[14px]', stepLabelClass(step.state)]">{{ shortLabel(step) }}</p>
                 <!-- Nama panjang turun paling banyak dua baris -->
                 <p v-if="step.person" :class="['w-full line-clamp-2 break-words text-[10px] leading-[14px]', step.state === 'waiting' ? 'text-gray-400' : 'text-gray-600']">
                   {{ displayName(step.person) }}
@@ -305,15 +306,16 @@ const stepTime = (step, long = false) => {
 };
 
 // Label singkat di daftar; label lengkap tetap di tooltip dan Detail
+// Tiap langkah dibaca sebagai kejadian; WhatsApp hanya alat kirimnya, nama penerimanya ada di bawah label
 const STEP_SHORT_LABELS = {
   ready: 'Bisa dipotong',
-  telemarketing: 'WA Telemarketing',
+  telemarketing: 'Dikirim ke Telemarketing',
   approval: 'Dealer setuju',
-  ar: 'WA AR',
+  ar: 'Dikirim ke AR',
   cut: 'Dipotong AR',
-  tax: 'WA Pajak',
-  tax_check: 'Cek Pajak',
-  scm: 'WA SCM',
+  tax: 'Dikirim ke Pajak',
+  tax_check: 'Dicek Pajak',
+  scm: 'Hasil ke SCM',
 };
 const shortLabel = (step) => (step.state === 'postponed' ? 'Ditunda dealer' : STEP_SHORT_LABELS[step.key] || step.label);
 const stepTooltip = (step) => [step.label, displayName(step.person), stepTime(step, true)].filter(Boolean).join(' · ');
