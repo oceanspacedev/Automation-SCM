@@ -203,7 +203,7 @@ sequenceDiagram
 ### 7. Akun & Hak Akses
 
 - **Daftar:** `/register` (nama, email, WhatsApp, peran, password). Akun baru berstatus **Menunggu ACC** sampai disetujui admin di **Master → User**.
-- **Masuk:** `/login` dengan username/email + password, atau **Masuk dengan WhatsApp** (kode OTP dikirim ke nomor WA terdaftar). Setelah masuk, semua pengguna dibawa ke **Dashboard** (atau ke halaman yang tadi dibuka sebelum diminta masuk).
+- **Masuk:** `/login` dengan username/email + password, atau **Masuk dengan WhatsApp** (kode OTP dikirim ke nomor WA terdaftar). Setelah masuk, semua pengguna dibawa ke **Dashboard** (atau ke halaman yang tadi dibuka sebelum diminta masuk). Password akun baru (daftar, ganti password, Master User, password awal import) minimal **8 karakter dan berisi huruf dan angka**; password lama tetap bisa dipakai masuk.
 - **Peran:**
 
   | Peran | Akses bawaan |
@@ -249,8 +249,12 @@ sequenceDiagram
 ### Dashboard
 - Menu pertama di navigasi dan halaman pertama setelah masuk, untuk semua pengguna.
 - Kartu: **Data Program**, **Form Program**, **Bisa Dipotong** (`BISA DI POTONG`), **Sudah Dipotong** (`SUDAH POTONG`), dan **Belum Bisa Dipotong** (status lainnya), dengan persentasenya dari Data Program.
-- Tabel **Per Region**: angka yang sama per region (sesuai tulisan region di data), dengan baris Total. Pilih **Semua area**, **Jawa Barat**, atau **Jawa Tengah**.
-- Ringkasan **Draft & Invoice**: jumlah draft (ready / error), invoice per tipe, dan total Net Pay.
+- **Per region** (sesuai tulisan region di data), tiga tampilan yang pilihannya diingat browser:
+  - **Bar**: Data Program per status potong, dan jumlah Form Program di kolom kanan.
+  - **3D**: pie Data Program per region, tiap irisan berlabel jumlah & persennya. Paling banyak 8 irisan; region selebihnya digabung jadi **Lainnya**. Arahkan kursor ke irisan untuk rincian status potongnya (atau daftar region di Lainnya).
+  - **Tabel**: semua angkanya dengan baris Total.
+  Area region ada di tabel dan di tooltip. Pilih **Semua area**, **Jawa Barat**, atau **Jawa Tengah**.
+- Ringkasan **Draft & Invoice**: jumlah draft, invoice terbit, invoice per jenis (DSA, NPS FL, Regular), dan total Net Pay.
 
 ### Master
 | Menu | Isi | Import / Export |

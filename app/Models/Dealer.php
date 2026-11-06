@@ -51,6 +51,25 @@ class Dealer extends Model
     }
 
     /**
+     * The store's email for the public Form Program, partly hidden ("toko.abadi@gmail.com" → "to•••@gmail.com"), so the
+     * form can show it is filled without handing out the address. Null when the store has none.
+     */
+    public function maskedEmail(): ?string
+    {
+        if (blank($this->email)) {
+            return null;
+        }
+
+        return collect(preg_split('/[,;\s]+/', trim($this->email), -1, PREG_SPLIT_NO_EMPTY))
+            ->map(function (string $email) {
+                [$local, $domain] = array_pad(explode('@', $email, 2), 2, '');
+
+                return mb_substr($local, 0, min(2, max(1, mb_strlen($local) - 1))).'•••'.($domain !== '' ? "@{$domain}" : '');
+            })
+            ->implode(', ');
+    }
+
+    /**
      * Normalize a kode BT: uppercase, trimmed, and "BTO…" (letter O) written as "BT0…" (zero),
      * e.g. "bto5768" → "BT05768".
      */

@@ -97,7 +97,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label for="new-password" class="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Password baru</label>
-            <input id="new-password" v-model="passwordForm.password" type="password" required autocomplete="new-password" placeholder="Minimal 6 karakter" :class="inputClass" />
+            <input id="new-password" v-model="passwordForm.password" type="password" required autocomplete="new-password" placeholder="Min. 8 karakter, huruf &amp; angka" :class="inputClass" />
           </div>
           <div>
             <label for="confirm-password" class="block text-xs font-medium text-gray-700 dark:text-slate-300 mb-1.5">Konfirmasi password baru</label>

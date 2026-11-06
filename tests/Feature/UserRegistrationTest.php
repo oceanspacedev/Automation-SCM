@@ -129,6 +129,28 @@ class UserRegistrationTest extends TestCase
             ->assertJsonValidationErrors(['password']);
     }
 
+    public function test_a_new_password_needs_8_characters_with_letters_and_numbers(): void
+    {
+        $register = fn (string $password) => $this->postJson('/api/register', [
+            'name' => 'Toko Baru',
+            'email' => 'baru@scm.test',
+            'role' => 'scm',
+            'password' => $password,
+            'password_confirmation' => $password,
+        ]);
+
+        $register('abc123')->assertStatus(422)->assertJsonPath('errors.password.0', 'Password minimal 8 karakter.');
+        $register('hanyahuruf')->assertStatus(422)->assertJsonPath('errors.password.0', 'Password harus berisi huruf dan angka.');
+        $register('12345678')->assertStatus(422)->assertJsonPath('errors.password.0', 'Password harus berisi huruf dan angka.');
+        $register('rahasia2026')->assertCreated();
+
+        // Master User memakai aturan yang sama
+        $this->actingAs(User::factory()->create(['role' => 'admin', 'is_active' => true]))
+            ->postJson('/api/users', ['name' => 'User Lemah', 'role' => 'scm', 'password' => 'password'])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.password.0', 'Password harus berisi huruf dan angka.');
+    }
+
     public function test_user_can_verify_wa_otp(): void
     {
         $user = User::factory()->create([

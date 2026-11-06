@@ -409,13 +409,24 @@
           :class="validationErrors.email ? 'border-rose-300 ring-1 ring-rose-100' : 'border-gray-200'"
         >
           <div>
-            <label for="store-email" class="block text-sm sm:text-base font-medium text-gray-900">
-              EMAIL TOKO <span v-if="emailRequired" class="text-rose-500">*</span>
-            </label>
-            <p class="text-xs text-gray-500 mt-0.5">{{ emailHint }}</p>
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <label for="store-email" class="block text-sm sm:text-base font-medium text-gray-900">
+                EMAIL TOKO <span v-if="emailRequired" class="text-rose-500">*</span>
+              </label>
+              <span v-if="usesMasterEmail" class="text-xs text-gray-500 flex items-center gap-1 font-normal">
+                <CheckIcon class="w-3.5 h-3.5 text-gray-400" /> Terisi otomatis dari Master Dealer
+              </span>
+            </div>
+            <p v-if="!usesMasterEmail" class="text-xs text-gray-500 mt-0.5">{{ emailHint }}</p>
           </div>
 
-          <div class="pt-1">
+          <!-- Toko sudah punya email: dipakai otomatis (ditampilkan tersamar), bisa diganti untuk pengajuan ini -->
+          <div v-if="usesMasterEmail" class="pt-1 flex items-center justify-between gap-3 border-b border-gray-300 pb-1.5">
+            <span class="text-xs sm:text-sm text-gray-900 break-all">{{ dealerEmailMasked }}</span>
+            <button type="button" @click="changeEmail" class="shrink-0 text-xs font-medium text-[#1a73e8] hover:underline cursor-pointer">Ganti</button>
+          </div>
+
+          <div v-else class="pt-1">
             <input
               id="store-email"
               type="email"
@@ -427,6 +438,14 @@
               class="w-full text-xs sm:text-sm border-b pb-1.5 focus:outline-none transition bg-transparent placeholder:text-gray-400"
               :class="validationErrors.email ? 'border-rose-400 focus:border-rose-500' : 'border-gray-300 focus:border-[#1a73e8]'"
             />
+            <button
+              v-if="dealerHasEmail === true"
+              type="button"
+              @click="useMasterEmail"
+              class="mt-2 text-xs font-medium text-[#1a73e8] hover:underline cursor-pointer"
+            >
+              Pakai email dari Master Dealer
+            </button>
           </div>
 
           <div v-if="validationErrors.email" class="flex items-center gap-1.5 text-xs text-rose-600 pt-1">
@@ -897,12 +916,28 @@ const dealerTaxStatus = ref(null);
 const dealerHasAgreement = ref(false);
 const usesMasterAgreement = computed(() => brand.value.slug === DEFAULT_BRAND && dealerHasAgreement.value);
 
-// Email toko di Master Dealer: hanya tahu ada/tidaknya (emailnya tidak dikirim ke form publik).
+// Email toko di Master Dealer: form hanya menerima versi tersamar (email lengkap tidak dikirim ke form publik).
+// Toko yang sudah punya email memakainya otomatis; email yang diketik menggantikannya untuk pengajuan ini.
 // Wajib diisi selama toko belum punya email; email yang diisi lalu tersimpan ke Master Dealer.
 const dealerHasEmail = ref(null);
+const dealerEmailMasked = ref('');
+const isChangingEmail = ref(false);
+const usesMasterEmail = computed(() => dealerHasEmail.value === true && !isChangingEmail.value);
 const emailRequired = computed(() => dealerHasEmail.value !== true);
+
+const changeEmail = () => {
+  isChangingEmail.value = true;
+  setTimeout(() => document.getElementById('store-email')?.focus(), 0);
+};
+
+const useMasterEmail = () => {
+  isChangingEmail.value = false;
+  form.email = '';
+  validationErrors.email = '';
+};
+
 const emailHint = computed(() => {
-  if (dealerHasEmail.value === true) return 'Email toko ini sudah tercatat di Master Dealer, jadi boleh dikosongkan.';
+  if (dealerHasEmail.value === true) return 'Email ini dipakai untuk pengajuan ini saja; email di Master Dealer tidak berubah.';
   if (dealerHasEmail.value === false) return 'Toko ini belum punya email di Master Dealer, jadi wajib diisi. Email ini otomatis disimpan ke Master Dealer.';
   return 'Wajib diisi bila toko belum punya email di Master Dealer; email ini otomatis disimpan ke sana.';
 });
@@ -912,6 +947,13 @@ function applyMasterDealerTax(dealer) {
   form.is_pkp = dealer?.is_pkp === true;
   dealerHasAgreement.value = dealer?.has_agreement === true;
   dealerHasEmail.value = typeof dealer?.has_email === 'boolean' ? dealer.has_email : null;
+  dealerEmailMasked.value = dealer?.email_masked || '';
+  // Toko lain dipilih: kembali memakai email Master Dealer toko itu
+  isChangingEmail.value = false;
+  if (dealerHasEmail.value === true) {
+    form.email = '';
+    validationErrors.email = '';
+  }
   if (usesMasterAgreement.value) validationErrors.agreement = '';
   dealerTaxStatus.value = typeof dealer?.is_pkp === 'boolean'
     ? { npwpType: dealer.npwp_type, isPkp: dealer.is_pkp }

@@ -343,6 +343,8 @@ class DealerController extends Controller
                 'is_pkp' => $dealer->isPkp(),
                 'has_agreement' => filled($dealer->agreement_url),
                 'has_email' => filled($dealer->email),
+                // Email lengkap tidak dikirim ke form publik; cukup versi tersamar sebagai tanda sudah terisi
+                'email_masked' => $dealer->maskedEmail(),
             ]);
 
         return response()->json([

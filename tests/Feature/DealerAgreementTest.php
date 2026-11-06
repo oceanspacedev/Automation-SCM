@@ -372,10 +372,12 @@ class DealerAgreementTest extends TestCase
             'agreement_url' => self::MASTER_AGREEMENT, 'email' => 'lama@toko.test']);
         $otherStore = ['id_real' => 'DLBB0002', 'kode_bt' => 'BT08888', 'dealer_name' => 'TOKO SUDAH EMAIL'];
 
-        // Form publik hanya tahu toko sudah punya email, emailnya tidak dikirim
+        // Form publik hanya menerima email tersamar sebagai tanda sudah terisi, bukan emailnya
         $this->getJson('/api/dealers/suggestions?query=TOKO', ['X-Area' => 'jabar'])
             ->assertJsonPath('data.0.has_email', false)
+            ->assertJsonPath('data.0.email_masked', null)
             ->assertJsonPath('data.1.has_email', true)
+            ->assertJsonPath('data.1.email_masked', 'la•••@toko.test')
             ->assertJsonMissingPath('data.1.email');
 
         // Toko tanpa email di Master Dealer: email wajib diisi dengan format yang benar
@@ -386,8 +388,9 @@ class DealerAgreementTest extends TestCase
         $this->assertSame('jaya.selular@gmail.com', $withoutEmail->fresh()->email);
         $this->assertSame('jaya.selular@gmail.com', ProgramSubmission::where('id_real', 'DLAA0001')->value('email'));
 
-        // Toko yang sudah punya email boleh mengosongkannya, dan email di Master Dealer tidak ditimpa
+        // Toko yang sudah punya email boleh mengosongkannya: pengajuan memakai email Master Dealer, yang tidak ditimpa
         $this->submitForm($otherStore + ['email' => null])->assertOk();
+        $this->assertSame('lama@toko.test', ProgramSubmission::where('id_real', 'DLBB0002')->latest('id')->value('email'));
         $this->submitForm($otherStore + ['email' => 'baru@toko.test'])->assertOk();
         $this->assertSame('lama@toko.test', $withEmail->fresh()->email);
         $this->assertSame('baru@toko.test', ProgramSubmission::where('id_real', 'DLBB0002')->latest('id')->value('email'));

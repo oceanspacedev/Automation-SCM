@@ -420,7 +420,7 @@
                 v-model="userForm.password"
                 type="password"
                 :required="!isEditMode"
-                placeholder="Minimal 6 karakter"
+                placeholder="Min. 8 karakter, huruf &amp; angka"
                 class="w-full h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
               />
             </div>

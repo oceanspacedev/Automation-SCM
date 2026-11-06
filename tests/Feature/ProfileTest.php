@@ -72,14 +72,14 @@ class ProfileTest extends TestCase
         $user = User::factory()->create(['password' => 'rahasia-lama']);
 
         $this->actingAs($user)
-            ->putJson('/api/profile/password', ['current_password' => 'salah', 'password' => 'rahasia-baru', 'password_confirmation' => 'rahasia-baru'])
+            ->putJson('/api/profile/password', ['current_password' => 'salah', 'password' => 'rahasiabaru2026', 'password_confirmation' => 'rahasiabaru2026'])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['current_password']);
 
         $this->actingAs($user)
-            ->putJson('/api/profile/password', ['current_password' => 'rahasia-lama', 'password' => 'rahasia-baru', 'password_confirmation' => 'rahasia-baru'])
+            ->putJson('/api/profile/password', ['current_password' => 'rahasia-lama', 'password' => 'rahasiabaru2026', 'password_confirmation' => 'rahasiabaru2026'])
             ->assertOk();
 
-        $this->assertTrue(Hash::check('rahasia-baru', $user->fresh()->password));
+        $this->assertTrue(Hash::check('rahasiabaru2026', $user->fresh()->password));
     }
 }

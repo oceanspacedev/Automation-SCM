@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen flex flex-col justify-center items-center bg-gray-50 dark:bg-[#0B1120] text-gray-900 dark:text-slate-100 px-4 pt-16 pb-8 font-sans transition-colors relative">
+  <div class="min-h-screen flex flex-col justify-center items-center bg-gray-50 dark:bg-[#0B1120] text-gray-900 dark:text-slate-100 px-4 pt-14 pb-6 sm:py-8 font-sans transition-colors relative">
     <!-- Mode terang/gelap -->
     <button
       type="button"
@@ -15,12 +15,21 @@
     <div class="w-full max-w-sm space-y-4 transition duration-200 ease-out" :class="isLoginSuccess && 'opacity-0 -translate-y-1'">
       <div class="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm p-6 sm:p-7">
         <!-- Judul -->
-        <div class="mb-6">
+        <div class="mb-6 text-center">
+          <!-- Logo: huruf S (Supply) sebagai jalur barang: titik pemasok → titik gudang/hub → panah ke toko -->
+          <div class="w-12 h-12 mx-auto mb-5 rounded-[14px] bg-[#1769e0] flex items-center justify-center" role="img" aria-label="SCM">
+            <svg viewBox="0 0 48 48" class="w-10 h-10 text-white" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M35 11H19.5a7 7 0 0 0 0 14h9a7 7 0 0 1 0 14H14" stroke-width="4.5" />
+              <path d="M19 33.5 13.5 39l5.5 5.5" stroke-width="4.5" />
+              <circle cx="35" cy="11" r="4.5" fill="currentColor" stroke="none" />
+              <circle cx="24" cy="25" r="4.5" fill="currentColor" stroke="#1769e0" stroke-width="2.5" />
+            </svg>
+          </div>
           <h1 class="text-lg font-semibold tracking-tight text-gray-950 dark:text-white">
             {{ loginMode === 'email' ? 'Supply Chain Management' : (otpStep === 'phone' ? 'Masuk dengan WhatsApp' : 'Verifikasi kode OTP') }}
           </h1>
           <p class="mt-1 text-sm text-gray-500 dark:text-slate-400">
-            {{ loginMode === 'email' ? 'Masuk untuk melanjutkan.' : (otpStep === 'phone' ? 'Masukkan nomor WhatsApp yang terdaftar.' : `Kode OTP dikirim ke ${waPhone}.`) }}
+            {{ loginMode === 'email' ? 'Masuk ke akun Anda.' : (otpStep === 'phone' ? 'Masukkan nomor WhatsApp yang terdaftar.' : `Kode OTP dikirim ke ${waPhone}.`) }}
           </p>
         </div>
 
@@ -51,7 +60,7 @@
               required
               autocomplete="username email"
               placeholder="nama@email.com"
-              class="w-full h-10 px-3 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-slate-300 focus:border-gray-900 dark:focus:border-slate-300 transition"
+              class="w-full h-10 px-3 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#1769e0]/20 focus:border-[#1769e0] dark:focus:border-[#4a8df0] transition"
             />
           </div>
 
@@ -65,7 +74,7 @@
                 required
                 autocomplete="current-password"
                 placeholder="••••••••"
-                class="w-full h-10 pl-3 pr-10 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-slate-300 focus:border-gray-900 dark:focus:border-slate-300 transition"
+                class="w-full h-10 pl-3 pr-10 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#1769e0]/20 focus:border-[#1769e0] dark:focus:border-[#4a8df0] transition"
               />
               <button
                 type="button"
@@ -93,9 +102,9 @@
           <button
             type="submit"
             :disabled="loading || isLoginSuccess"
-            class="w-full h-10 rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-gray-900 text-sm font-medium transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+            class="w-full h-10 rounded-lg bg-[#1769e0] hover:bg-[#1257c2] text-white text-sm font-medium transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
           >
-            <span v-if="loading" class="h-4 w-4 border-2 border-white/30 dark:border-gray-900/30 border-t-white dark:border-t-gray-900 rounded-full animate-spin"></span>
+            <span v-if="loading" class="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
             <span>{{ loading ? 'Memproses...' : 'Masuk' }}</span>
           </button>
 
@@ -108,8 +117,9 @@
           <button
             type="button"
             @click="switchToWhatsApp"
-            class="w-full h-10 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-200 text-sm font-medium transition cursor-pointer"
+            class="w-full h-10 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-slate-200 text-sm font-medium transition cursor-pointer inline-flex items-center justify-center gap-2"
           >
+            <WhatsAppIcon class="w-4 h-4 text-emerald-500" />
             Masuk dengan WhatsApp
           </button>
         </form>
@@ -127,16 +137,16 @@
                 required
                 autofocus
                 placeholder="081234567890"
-                class="w-full h-10 px-3 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-slate-300 focus:border-gray-900 dark:focus:border-slate-300 transition"
+                class="w-full h-10 px-3 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#1769e0]/20 focus:border-[#1769e0] dark:focus:border-[#4a8df0] transition"
               />
             </div>
 
             <button
               type="submit"
               :disabled="loading || !waPhone"
-              class="w-full h-10 rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-gray-900 text-sm font-medium transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              class="w-full h-10 rounded-lg bg-[#1769e0] hover:bg-[#1257c2] text-white text-sm font-medium transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <span v-if="loading" class="h-4 w-4 border-2 border-white/30 dark:border-gray-900/30 border-t-white dark:border-t-gray-900 rounded-full animate-spin"></span>
+              <span v-if="loading" class="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               <span>{{ loading ? 'Mengirim kode...' : 'Kirim kode OTP' }}</span>
             </button>
 
@@ -159,16 +169,16 @@
                 autofocus
                 placeholder="000000"
                 @input="onOtpInput"
-                class="w-full h-11 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-center text-lg font-semibold tracking-[0.5em] text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-gray-900 dark:focus:ring-slate-300 focus:border-gray-900 dark:focus:border-slate-300 transition"
+                class="w-full h-11 rounded-lg bg-white dark:bg-slate-800 border border-gray-300 dark:border-slate-700 text-center text-lg font-semibold tracking-[0.5em] text-gray-900 dark:text-white placeholder:text-gray-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#1769e0]/20 focus:border-[#1769e0] dark:focus:border-[#4a8df0] transition"
               />
             </div>
 
             <button
               type="submit"
               :disabled="loading || cleanOtpLength !== 6 || isLoginSuccess"
-              class="w-full h-10 rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-slate-200 text-white dark:text-gray-900 text-sm font-medium transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              class="w-full h-10 rounded-lg bg-[#1769e0] hover:bg-[#1257c2] text-white text-sm font-medium transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <span v-if="loading" class="h-4 w-4 border-2 border-white/30 dark:border-gray-900/30 border-t-white dark:border-t-gray-900 rounded-full animate-spin"></span>
+              <span v-if="loading" class="h-4 w-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               <span>{{ loading ? 'Memverifikasi...' : 'Verifikasi & masuk' }}</span>
             </button>
 
@@ -184,7 +194,7 @@
                 type="button"
                 @click="handleSendOtp"
                 :disabled="resendCooldown > 0 || loading"
-                class="text-gray-900 dark:text-white font-medium hover:underline cursor-pointer disabled:text-gray-400 disabled:no-underline disabled:cursor-default"
+                class="text-[#1769e0] dark:text-[#4a8df0] font-medium hover:underline cursor-pointer disabled:text-gray-400 disabled:no-underline disabled:cursor-default"
               >
                 {{ resendCooldown > 0 ? `Kirim ulang (${resendCooldown}s)` : 'Kirim ulang kode' }}
               </button>
@@ -199,10 +209,7 @@
 
       <p class="text-center text-sm text-gray-500 dark:text-slate-400">
         Belum punya akun?
-        <router-link to="/register" class="font-medium text-gray-900 dark:text-white hover:underline">Daftar</router-link>
-      </p>
-      <p class="text-center text-xs text-gray-400 dark:text-slate-500">
-        &copy; {{ new Date().getFullYear() }} Supply Chain Management
+        <router-link to="/register" class="font-medium text-[#1769e0] dark:text-[#4a8df0] hover:underline">Daftar</router-link>
       </p>
     </div>
   </div>
@@ -214,6 +221,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
 import { HOME_PATH } from '@/lib/access';
 import { useTheme } from '@/composables/useTheme';
+import WhatsAppIcon from '@/components/WhatsAppIcon.vue';
 import { Eye, EyeOff, Moon, Sun } from 'lucide-vue-next';
 import axios from 'axios';
 

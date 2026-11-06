@@ -38,6 +38,30 @@ class User extends Authenticatable
     ];
 
     /**
+     * Rules for a new account password (daftar, ganti password, Master User, import): at least 8 characters with
+     * both letters and numbers. Signing in doesn't check them, so older passwords keep working.
+     *
+     * @return list<string>
+     */
+    public static function passwordRules(): array
+    {
+        return ['string', 'min:8', 'regex:/[A-Za-z]/', 'regex:/[0-9]/'];
+    }
+
+    /**
+     * Messages for passwordRules().
+     *
+     * @return array<string, string>
+     */
+    public static function passwordMessages(string $field = 'password', string $label = 'Password'): array
+    {
+        return [
+            "{$field}.min" => "{$label} minimal 8 karakter.",
+            "{$field}.regex" => "{$label} harus berisi huruf dan angka.",
+        ];
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

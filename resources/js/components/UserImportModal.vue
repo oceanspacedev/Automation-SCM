@@ -58,7 +58,7 @@
             v-model="password"
             type="password"
             autocomplete="new-password"
-            placeholder="Minimal 6 karakter"
+            placeholder="Min. 8 karakter, huruf &amp; angka"
             class="w-full h-9 px-3 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400"
           />
           <p class="mt-1 text-gray-500">Kosongkan untuk login lewat WhatsApp saja.</p>

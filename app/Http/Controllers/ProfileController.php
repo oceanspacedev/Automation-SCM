@@ -85,10 +85,10 @@ class ProfileController extends Controller
     {
         $validated = $request->validate([
             'current_password' => ['required', 'current_password'],
-            'password' => ['required', 'string', 'min:6', 'confirmed'],
+            'password' => ['required', ...User::passwordRules(), 'confirmed'],
         ], [
             'current_password.current_password' => 'Password saat ini salah.',
-            'password.min' => 'Password baru minimal 6 karakter.',
+            ...User::passwordMessages(label: 'Password baru'),
             'password.confirmed' => 'Konfirmasi password baru tidak cocok.',
         ]);
 

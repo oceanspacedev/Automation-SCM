@@ -23,11 +23,11 @@ class AuthController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'whatsapp' => ['nullable', 'string', 'max:25'],
             'role' => ['required', Rule::in(['scm', 'ar', 'telemarketing'])],
-            'password' => ['required', 'string', 'min:6', 'confirmed'],
+            'password' => ['required', ...User::passwordRules(), 'confirmed'],
         ], [
             'email.unique' => 'Email ini sudah terdaftar di sistem.',
             'password.confirmed' => 'Konfirmasi password tidak cocok.',
-            'password.min' => 'Password minimal 6 karakter.',
+            ...User::passwordMessages(),
         ]);
 
         $normalizedWa = ! empty($validated['whatsapp']) ? $this->normalizePhone($validated['whatsapp']) : null;

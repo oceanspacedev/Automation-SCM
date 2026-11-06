@@ -87,9 +87,9 @@ class UserController extends Controller
             'role' => ['required', Rule::in(['admin', 'scm', 'ar', 'telemarketing'])],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', Rule::in(array_keys(User::AVAILABLE_PERMISSIONS))],
-            'password' => ['required', 'string', 'min:6'],
+            'password' => ['required', ...User::passwordRules()],
             'is_active' => ['boolean'],
-        ]);
+        ], User::passwordMessages());
 
         $cleanWa = User::normalizeWhatsapp($validated['whatsapp'] ?? null);
 
@@ -124,13 +124,13 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'file' => ['required', 'file', 'extensions:xlsx,xls,csv', 'max:51200'],
-            'password' => ['nullable', 'string', 'min:6'],
+            'password' => ['nullable', ...User::passwordRules()],
             'role' => ['nullable', Rule::in(['admin', 'scm', 'ar', 'telemarketing'])],
         ], [
             'file.required' => 'Pilih file Excel terlebih dahulu.',
             'file.extensions' => 'File harus berformat .xlsx, .xls, atau .csv.',
             'file.max' => 'Ukuran file maksimal 50 MB.',
-            'password.min' => 'Password awal minimal 6 karakter.',
+            ...User::passwordMessages(label: 'Password awal'),
         ]);
 
         try {
@@ -168,9 +168,9 @@ class UserController extends Controller
             'role' => ['required', Rule::in(['admin', 'scm', 'ar', 'telemarketing'])],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', Rule::in(array_keys(User::AVAILABLE_PERMISSIONS))],
-            'password' => ['nullable', 'string', 'min:6'],
+            'password' => ['nullable', ...User::passwordRules()],
             'is_active' => ['boolean'],
-        ]);
+        ], User::passwordMessages());
 
         // Proteksi: jangan izinkan admin terakhir mengubah role-nya sendiri atau dinonaktifkan
         $targetActive = $validated['is_active'] ?? $user->is_active;

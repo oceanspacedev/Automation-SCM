@@ -1405,7 +1405,8 @@ class ProgramSubmissionController extends Controller
             'program_name' => $formData['program_name'],
             'sales_name' => $formData['sales_name'],
             'whatsapp' => $formData['whatsapp'] ?: null,
-            'email' => strtolower(trim((string) $request->input('email'))) ?: null,
+            // Email yang diketik menggantikan; kosong berarti memakai email toko di Master Dealer
+            'email' => strtolower(trim((string) $request->input('email'))) ?: ($masterDealer?->email ?: null),
             'credit_note_url' => $cnUrl,
             'agreement_url' => $agrUrl,
             'tax_invoice_url' => $taxUrl,
