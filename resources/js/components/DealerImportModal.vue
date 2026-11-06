@@ -3,10 +3,9 @@
     <div class="bg-white rounded-xl max-w-lg w-full shadow-xl border border-gray-200 max-h-[90vh] flex flex-col">
       <div class="px-5 py-4 border-b border-gray-200 flex items-start justify-between gap-3">
         <div>
-          <h3 class="text-sm font-bold text-gray-950">Import Master Dealer</h3>
+          <h3 class="text-sm font-bold text-gray-950">{{ isAgreement ? 'Import Agreement' : 'Import Data Dealer' }}</h3>
           <p class="text-xs text-gray-500 mt-0.5">
-            File <strong class="text-gray-700">Master Customer CV TOP</strong> untuk data toko, atau file
-            <strong class="text-gray-700">Draft Program</strong> (sheet RAW JABAR) untuk agreement toko. Jenis file dikenali otomatis.
+            {{ isAgreement ? 'File Draft Program (mis. sheet RAW JABAR) untuk agreement toko.' : 'File Master Customer CV TOP untuk data toko di semua area.' }}
           </p>
         </div>
         <button type="button" @click="close" :disabled="uploading" class="text-gray-400 hover:text-gray-600 cursor-pointer disabled:opacity-50">
@@ -44,19 +43,11 @@
           </button>
         </div>
 
-        <ul class="space-y-1 text-gray-500 list-disc pl-4">
-          <li>
-            <strong class="text-gray-800">CV TOP:</strong> wajib ada kolom ID Customer (kode BT), Nama Customer, dan Big Area atau Reffnote.
-            Area tiap toko diambil dari Big Area / Reffnote, jadi satu file berisi semua area.
-          </li>
-          <li>
-            <strong class="text-gray-800">Draft Program:</strong> kolom Kode BT dan AGREMENT. Isi tiap agreement dicek AI, jadi bisa butuh
-            beberapa menit. Import data toko CV TOP dulu bila Master Dealer masih kosong.
-          </li>
-        </ul>
+        <p v-if="isAgreement" class="text-gray-500">Kolom: Kode BT dan AGREMENT. Isi tiap agreement dicek AI, jadi bisa butuh beberapa menit.</p>
+        <p v-else class="text-gray-500">Kolom wajib: ID Customer (kode BT), Nama Customer, dan Big Area atau Reffnote. Area tiap toko diambil dari Big Area / Reffnote.</p>
 
-        <fieldset class="space-y-2">
-          <legend class="font-medium text-gray-900 mb-1.5">Dealer yang sudah ada <span class="font-normal text-gray-500">(file CV TOP)</span></legend>
+        <fieldset v-if="!isAgreement" class="space-y-2">
+          <legend class="font-medium text-gray-900 mb-1.5">Dealer yang sudah ada</legend>
           <label class="flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer" :class="!replaceExisting ? 'border-gray-900' : 'border-gray-200'">
             <input type="radio" :value="false" v-model="replaceExisting" class="mt-0.5 cursor-pointer" />
             <span>
@@ -91,7 +82,7 @@
           @click="upload"
           :disabled="!selectedFile || uploading"
           class="h-8 px-4 inline-flex items-center gap-1.5 rounded-lg text-white text-xs font-medium cursor-pointer disabled:opacity-50"
-          :class="replaceExisting ? 'bg-rose-600 hover:bg-rose-700' : 'bg-gray-900 hover:bg-gray-800'"
+          :class="replaceExisting && !isAgreement ? 'bg-rose-600 hover:bg-rose-700' : 'bg-gray-900 hover:bg-gray-800'"
         >
           <span v-if="uploading" class="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
           <span>{{ uploading ? 'Mengunggah...' : 'Mulai import' }}</span>
@@ -102,7 +93,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import axios from 'axios';
 import { confirmAction } from '@/composables/useNotify';
 import {
@@ -111,9 +102,13 @@ import {
   FileSpreadsheet as FileSpreadsheetIcon,
 } from 'lucide-vue-next';
 
-defineProps({
+const props = defineProps({
   isOpen: Boolean,
+  // 'dealers': file CV TOP; 'agreements': file Draft Program
+  type: { type: String, default: 'dealers' },
 });
+
+const isAgreement = computed(() => props.type === 'agreements');
 
 const emit = defineEmits(['close', 'started']);
 
@@ -145,14 +140,16 @@ const clearFile = () => {
 
 const upload = async () => {
   if (!selectedFile.value) return;
-  if (replaceExisting.value && !(await confirmAction({ title: 'Ganti semua dealer?', message: 'Bila file ini file CV TOP, semua dealer lama di Jawa Barat dan Jawa Tengah akan dihapus dan diganti isi file ini.', confirmText: 'Ya, Ganti Semua' }))) return;
+  const replace = replaceExisting.value && !isAgreement.value;
+  if (replace && !(await confirmAction({ title: 'Ganti semua dealer?', message: 'Semua dealer lama di Jawa Barat dan Jawa Tengah akan dihapus dan diganti isi file ini.', confirmText: 'Ya, Ganti Semua' }))) return;
 
   uploading.value = true;
   errorMessage.value = '';
 
   const formData = new FormData();
   formData.append('file', selectedFile.value);
-  formData.append('replace_existing', replaceExisting.value ? '1' : '0');
+  formData.append('type', props.type);
+  formData.append('replace_existing', replace ? '1' : '0');
 
   try {
     const res = await axios.post('/api/dealers/import', formData, {

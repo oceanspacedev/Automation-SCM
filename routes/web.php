@@ -138,6 +138,7 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         Route::get('/dealers', [DealerController::class, 'index']);
         Route::get('/dealers/export', [DealerController::class, 'export']);
         Route::post('/dealers/import', [DealerController::class, 'import']);
+        Route::post('/dealers/import-emails', [DealerController::class, 'importEmails']);
         Route::get('/dealers/import/skipped', [DealerController::class, 'downloadSkippedImportRows']);
         Route::get('/dealers/import/status', [DealerController::class, 'importStatus']);
         Route::post('/dealers', [DealerController::class, 'store']);

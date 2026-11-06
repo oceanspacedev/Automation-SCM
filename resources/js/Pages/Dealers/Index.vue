@@ -18,18 +18,34 @@
         </p>
       </div>
 
-      <!-- Tombol aksi; di layar kecil tiga tombol sama lebar dengan label pendek -->
+      <!-- Tombol aksi; di layar kecil tiga tombol sama lebar -->
       <div class="grid grid-cols-3 sm:flex sm:items-center gap-2">
+        <!-- Import: tiga jenis file, masing-masing dengan jendelanya sendiri -->
+        <div class="relative" ref="importMenuRef">
+          <button
+            type="button"
+            @click="showImportMenu = !showImportMenu"
+            class="h-9 w-full px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
+          >
+            <span>Import</span>
+            <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 transition-transform duration-150" :class="showImportMenu && 'rotate-180'" />
+          </button>
+          <div v-if="showImportMenu" class="absolute left-0 sm:left-auto sm:right-0 top-full mt-1.5 w-56 bg-white rounded-lg shadow-lg border border-gray-200 p-1 z-50">
+            <button
+              v-for="option in IMPORT_OPTIONS"
+              :key="option.type"
+              type="button"
+              @click="openImport(option.type)"
+              class="w-full text-left px-2.5 py-1.5 rounded-md text-xs hover:bg-gray-100 cursor-pointer"
+            >
+              <span class="block font-medium text-gray-800">{{ option.label }}</span>
+              <span class="block text-[11px] text-gray-500">{{ option.hint }}</span>
+            </button>
+          </div>
+        </div>
         <button
           type="button"
-          @click="isImportModalOpen = true"
-          class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
-        >
-          <span class="sm:hidden">Import</span><span class="hidden sm:inline">Import Excel</span>
-        </button>
-        <button
-          type="button"
-          @click="downloadExport('/api/dealers/export', { search: searchQuery, region: filterRegion, agreement: filterAgreement })"
+          @click="downloadExport('/api/dealers/export', { search: searchQuery, region: filterRegion, agreement: filterAgreement, email: filterEmail })"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
           title="Export dealer area ini sesuai pencarian & filter (format sama dengan file import CV TOP)"
         >
@@ -47,8 +63,15 @@
 
     <DealerImportModal
       :is-open="isImportModalOpen"
+      :type="importType"
       @close="isImportModalOpen = false"
       @started="applyImportStatus"
+    />
+
+    <DealerEmailImportModal
+      :is-open="isEmailImportOpen"
+      @close="isEmailImportOpen = false"
+      @imported="fetchDealers(currentPage)"
     />
 
     <!-- Import yang berjalan di background: status, progres, lalu hasilnya -->
@@ -157,6 +180,20 @@
               <option value="all">Semua Agreement</option>
               <option value="yes">Ada agreement</option>
               <option value="no">Belum ada agreement</option>
+            </select>
+            <ChevronDownIcon class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          </div>
+
+          <!-- Email Filter -->
+          <div class="relative min-w-[140px]">
+            <select
+              v-model="filterEmail"
+              @change="fetchDealers(1)"
+              class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 pr-8 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-900 cursor-pointer appearance-none shadow-2xs"
+            >
+              <option value="all">Semua Email</option>
+              <option value="yes">Ada email</option>
+              <option value="no">Belum ada email</option>
             </select>
             <ChevronDownIcon class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           </div>
@@ -669,6 +706,7 @@ import axios from 'axios';
 import { notify } from '@/composables/useNotify';
 import AreaTabs from '@/components/AreaTabs.vue';
 import DealerImportModal from '@/components/DealerImportModal.vue';
+import DealerEmailImportModal from '@/components/DealerEmailImportModal.vue';
 import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
 import { downloadExport } from '@/lib/download';
 import {
@@ -682,6 +720,33 @@ import {
 } from 'lucide-vue-next';
 
 const isImportModalOpen = ref(false);
+const isEmailImportOpen = ref(false);
+
+// Menu Import: data toko (CV TOP) dan agreement memakai import di background, email langsung dengan preview
+const IMPORT_OPTIONS = [
+  { type: 'dealers', label: 'Data Dealer', hint: 'File Master Customer CV TOP' },
+  { type: 'agreements', label: 'Agreement', hint: 'File Draft Program (Kode BT + AGREMENT)' },
+  { type: 'email', label: 'Email', hint: 'Kode BT / ID GS / Nama + Email' },
+];
+const importType = ref('dealers');
+const showImportMenu = ref(false);
+const importMenuRef = ref(null);
+
+const openImport = (type) => {
+  showImportMenu.value = false;
+  if (type === 'email') {
+    isEmailImportOpen.value = true;
+    return;
+  }
+  importType.value = type;
+  isImportModalOpen.value = true;
+};
+
+const closeImportMenuOnOutsideClick = (event) => {
+  if (importMenuRef.value && !importMenuRef.value.contains(event.target)) {
+    showImportMenu.value = false;
+  }
+};
 const dealers = ref([]);
 const totalRows = ref(0);
 const currentPage = ref(1);
@@ -708,6 +773,7 @@ const fetchMasterRegions = async () => {
 const searchQuery = ref('');
 const filterRegion = ref('all');
 const filterAgreement = ref('all');
+const filterEmail = ref('all');
 let searchTimeout = null;
 
 const isModalOpen = ref(false);
@@ -764,6 +830,7 @@ async function fetchDealers(page = 1, { silent = false } = {}) {
       search: searchQuery.value.trim() || undefined,
       region: filterRegion.value !== 'all' ? filterRegion.value : undefined,
       agreement: filterAgreement.value !== 'all' ? filterAgreement.value : undefined,
+      email: filterEmail.value !== 'all' ? filterEmail.value : undefined,
     };
     const res = await axios.get('/api/dealers', { params });
     if (!isLatest()) return;
@@ -960,7 +1027,11 @@ onMounted(() => {
   fetchMasterRegions();
   fetchDealers(1);
   fetchImportStatus();
+  document.addEventListener('click', closeImportMenuOnOutsideClick);
 });
 
-onUnmounted(() => clearTimeout(importPollTimer));
+onUnmounted(() => {
+  clearTimeout(importPollTimer);
+  document.removeEventListener('click', closeImportMenuOnOutsideClick);
+});
 </script>

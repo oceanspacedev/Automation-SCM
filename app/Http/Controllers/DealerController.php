@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\ImportDealerFile;
 use App\Models\Dealer;
 use App\Services\AreaContext;
+use App\Services\DealerEmailImportService;
 use App\Services\DealerImportService;
 use App\Services\SpreadsheetExport;
 use Illuminate\Database\Eloquent\Builder;
@@ -12,27 +13,31 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
+use PhpOffice\PhpSpreadsheet\Exception as SpreadsheetException;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DealerController extends Controller
 {
     /**
-     * Start importing a file in the background (see ImportDealerFile): the CV TOP master customer file (every area;
-     * each store's area comes from its Big Area or Reffnote), or a Data Program file for the stores' agreements.
+     * Start importing a file in the background (see ImportDealerFile): type "dealers" for the CV TOP master customer
+     * file (every area; each store's area comes from its Big Area or Reffnote), "agreements" for a Data Program file
+     * with the stores' agreements. Without a type the file decides.
      */
     public function import(Request $request): JsonResponse
     {
         $request->validate([
             'file' => ['required', 'file', 'extensions:xlsx,xls,csv', 'max:51200'],
             'replace_existing' => ['nullable', 'boolean'],
+            'type' => ['nullable', Rule::in(['dealers', 'agreements'])],
         ], [
             'file.required' => 'Pilih file Excel terlebih dahulu.',
             'file.extensions' => 'File harus berformat .xlsx, .xls, atau .csv.',
             'file.max' => 'Ukuran file maksimal 50 MB.',
         ]);
 
-        if (! ImportDealerFile::start($request->file('file'), $request->boolean('replace_existing'), (string) $request->user()?->email)) {
+        if (! ImportDealerFile::start($request->file('file'), $request->boolean('replace_existing'), (string) $request->user()?->email, $request->input('type'))) {
             return response()->json([
                 'success' => false,
                 'message' => 'Masih ada import yang berjalan. Tunggu sampai selesai, lalu coba lagi.',
@@ -53,6 +58,44 @@ class DealerController extends Controller
     public function importStatus(): JsonResponse
     {
         return response()->json(['success' => true, 'status' => ImportDealerFile::status()]);
+    }
+
+    /**
+     * Fill the stores' emails from an Excel file (Email + Kode BT / ID GS / Nama Dealer), in every area. With preview,
+     * only report what would change. "choices" (JSON, file row => store id, 0 to skip) holds the stores picked in the
+     * preview for rows whose name matches several stores or only resembles some.
+     */
+    public function importEmails(Request $request, DealerEmailImportService $importService): JsonResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'extensions:xlsx,xls,csv', 'max:51200'],
+            'choices' => ['nullable', 'json'],
+        ], [
+            'file.required' => 'Pilih file Excel terlebih dahulu.',
+            'file.extensions' => 'File harus berformat .xlsx, .xls, atau .csv.',
+            'file.max' => 'Ukuran file maksimal 50 MB.',
+        ]);
+
+        $choices = collect(json_decode((string) $request->input('choices', '{}'), true) ?: [])
+            ->filter(fn ($dealerId, $row) => is_numeric($row) && is_numeric($dealerId))
+            ->mapWithKeys(fn ($dealerId, $row) => [(int) $row => (int) $dealerId])
+            ->all();
+
+        try {
+            $result = $importService->import($request->file('file')->getRealPath(), previewOnly: $request->boolean('preview'), choices: $choices);
+        } catch (RuntimeException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (SpreadsheetException) {
+            return response()->json(['success' => false, 'message' => 'File Excel tidak bisa dibaca.'], 422);
+        }
+
+        $changed = $result['filled'] + $result['updated'];
+
+        return response()->json([
+            'success' => true,
+            'message' => $request->boolean('preview') ? "{$changed} email toko akan diisi atau diperbarui." : "{$changed} email toko diisi atau diperbarui.",
+            'data' => $result,
+        ]);
     }
 
     /**
@@ -126,6 +169,12 @@ class DealerController extends Controller
             $query->whereNotNull('agreement_url')->where('agreement_url', '!=', '');
         } elseif ($request->input('agreement') === 'no') {
             $query->where(fn (Builder $q) => $q->whereNull('agreement_url')->orWhere('agreement_url', ''));
+        }
+
+        if ($request->input('email') === 'yes') {
+            $query->whereNotNull('email')->where('email', '!=', '');
+        } elseif ($request->input('email') === 'no') {
+            $query->where(fn (Builder $q) => $q->whereNull('email')->orWhere('email', ''));
         }
 
         if ($request->has('is_active') && $request->input('is_active') !== 'all' && $request->input('is_active') !== null) {

@@ -181,6 +181,26 @@ class DealerImportTest extends TestCase
         $this->assertSame([], Storage::disk('local')->allFiles('dealer-import'));
     }
 
+    public function test_the_agreement_import_refuses_a_file_without_kode_bt_and_agrement(): void
+    {
+        $file = new UploadedFile($this->makeMasterFile([$this->row('BT02657', 'AWEI CELL', 'BIG BANDUNG')]), 'Master Customer CV TOP.xlsx', null, null, true);
+
+        // Import Agreement dengan file CV TOP: ditolak, Master Dealer tidak berubah
+        $this->post('/api/dealers/import', ['file' => $file, 'type' => 'agreements'], ['Accept' => 'application/json'])
+            ->assertAccepted()
+            ->assertJsonPath('status.type', 'agreements')
+            ->assertJsonPath('status.state', 'failed')
+            ->assertJsonPath('status.message', 'Bukan file agreement: tidak ada sheet dengan kolom Kode BT dan AGREMENT di baris pertama.');
+        $this->assertDatabaseMissing('dealers', ['kode_bt' => 'BT02657']);
+
+        // Import Data Dealer dengan file yang sama: masuk sebagai data toko
+        $this->post('/api/dealers/import', ['file' => $file, 'type' => 'dealers'], ['Accept' => 'application/json'])
+            ->assertAccepted()
+            ->assertJsonPath('status.type', 'dealers')
+            ->assertJsonPath('status.state', 'done');
+        $this->assertDatabaseHas('dealers', ['kode_bt' => 'BT02657']);
+    }
+
     public function test_only_one_dealer_import_runs_at_a_time(): void
     {
         Queue::fake();

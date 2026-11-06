@@ -17,8 +17,9 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Imports a file uploaded in Master Dealer in the background. A Data Program file (a sheet with Kode BT & AGREMENT)
- * fills the stores' agreements; any other file is read as the CV TOP master customer file.
+ * Imports a file uploaded in Master Dealer in the background: the CV TOP master customer file ("dealers") or a Data
+ * Program file with a sheet of Kode BT & AGREMENT for the stores' agreements ("agreements"). Without a type the file
+ * decides: a sheet with Kode BT & AGREMENT means agreements, anything else the CV TOP file.
  * Its progress and result are kept in the cache for the Master Dealer page (see status()).
  */
 class ImportDealerFile implements ShouldQueue
@@ -36,12 +37,12 @@ class ImportDealerFile implements ShouldQueue
 
     public int $timeout = 3600;
 
-    public function __construct(public string $storedPath, public bool $replaceExisting) {}
+    public function __construct(public string $storedPath, public bool $replaceExisting, public ?string $type = null) {}
 
     /**
      * Store the upload and queue its import; false while another import is still waiting or running.
      */
-    public static function start(UploadedFile $file, bool $replaceExisting, string $startedBy): bool
+    public static function start(UploadedFile $file, bool $replaceExisting, string $startedBy, ?string $type = null): bool
     {
         if (self::isBusy()) {
             return false;
@@ -50,7 +51,7 @@ class ImportDealerFile implements ShouldQueue
         $storedPath = $file->storeAs('dealer-import', Str::uuid().'.'.strtolower($file->getClientOriginalExtension()), 'local');
         Cache::forever(self::STATUS_KEY, [
             'state' => 'queued',
-            'type' => null,
+            'type' => $type,
             'file_name' => $file->getClientOriginalName(),
             'started_by' => $startedBy,
             'progress' => null,
@@ -60,7 +61,7 @@ class ImportDealerFile implements ShouldQueue
             'updated_at' => now()->toIso8601String(),
         ]);
 
-        self::dispatch($storedPath, $replaceExisting);
+        self::dispatch($storedPath, $replaceExisting, $type);
 
         return true;
     }
@@ -89,7 +90,11 @@ class ImportDealerFile implements ShouldQueue
         $this->report(['state' => 'running']);
 
         try {
-            $sheet = $agreements->findSheet($path);
+            $sheet = $this->type === 'dealers' ? null : $agreements->findSheet($path);
+
+            if ($this->type === 'agreements' && $sheet === null) {
+                throw new Exception('Bukan file agreement: tidak ada sheet dengan kolom Kode BT dan AGREMENT di baris pertama.');
+            }
 
             if ($sheet !== null) {
                 $this->report(['type' => 'agreements', 'sheet' => $sheet]);
