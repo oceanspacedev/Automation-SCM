@@ -10,26 +10,32 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Reader\IReadFilter;
 
 /**
- * Fills Master Dealer agreements from a Data Program spreadsheet (e.g. DRAFT TEMPLATE PROGRAM, sheet RAW JABAR).
+ * Fills Master Dealer agreements from a Data Program spreadsheet (e.g. DRAFT TEMPLATE PROGRAM, sheet RAW JABAR, or
+ * sheet RAW of the Jateng file, whose header sits on row 5 under rows of helper formulas).
  * The sheet has one agreement link per program row, oldest rows first. Each store gets its newest link that the AI
  * reads as an acceptable agreement (see DocumentAnalysisService::isAcceptableAgreement); when none is, an agreement
  * from the file is removed. An agreement that is not in the file (e.g. sent later through the Form Program) is kept.
  */
 class DealerAgreementImportService
 {
+    /**
+     * How far down a sheet its header row may sit.
+     */
+    private const HEADER_SEARCH_ROWS = 10;
+
     public function __construct(private DocumentAnalysisService $analysis) {}
 
     /**
-     * The first sheet whose header row has the Kode BT and AGREMENT columns, or null when the file has none.
+     * The first sheet with a Kode BT and AGREMENT header row among its first rows, or null when the file has none.
      */
     public function findSheet(string $path): ?string
     {
         $reader = IOFactory::createReaderForFile($path);
         $reader->setReadDataOnly(true);
-        $reader->setReadFilter($this->readFilter(fn (string $column, int $row) => $row === 1));
+        $reader->setReadFilter($this->readFilter(fn (string $column, int $row) => $row <= self::HEADER_SEARCH_ROWS));
 
         foreach ($reader->load($path)->getAllSheets() as $worksheet) {
-            if ($this->agreementColumns($worksheet->toArray(null, false, false, true)[1] ?? []) !== null) {
+            if ($this->header($worksheet->toArray(null, false, false, true)) !== null) {
                 return $worksheet->getTitle();
             }
         }
@@ -52,18 +58,19 @@ class DealerAgreementImportService
         $reader->setReadDataOnly(true);
         $reader->setLoadSheetsOnly([$sheet]);
 
-        $reader->setReadFilter($this->readFilter(fn (string $column, int $row) => $row === 1));
-        $columns = $this->agreementColumns($reader->load($path)->getSheetByName($sheet)->toArray(null, false, false, true)[1] ?? []);
-        if ($columns === null) {
-            throw new Exception("Kolom \"Kode BT\" dan \"AGREMENT\" tidak ditemukan di baris pertama sheet \"{$sheet}\".");
+        $reader->setReadFilter($this->readFilter(fn (string $column, int $row) => $row <= self::HEADER_SEARCH_ROWS));
+        $header = $this->header($reader->load($path)->getSheetByName($sheet)->toArray(null, false, false, true));
+        if ($header === null) {
+            throw new Exception('Kolom "Kode BT" dan "AGREMENT" tidak ditemukan di '.self::HEADER_SEARCH_ROWS." baris teratas sheet \"{$sheet}\".");
         }
-        [$kodeBtColumn, $agreementColumn] = $columns;
+        [$headerRow, $kodeBtColumn, $agreementColumn] = $header;
+        $firstRow = $headerRow + 1;
 
         $reader->setReadFilter($this->readFilter(fn (string $column) => $column === $kodeBtColumn || $column === $agreementColumn));
         $worksheet = $reader->load($path)->getSheetByName($sheet);
         $lastRow = $worksheet->getHighestDataRow();
-        $kodeBts = $worksheet->rangeToArray("{$kodeBtColumn}2:{$kodeBtColumn}{$lastRow}", null, false, false);
-        $agreements = $worksheet->rangeToArray("{$agreementColumn}2:{$agreementColumn}{$lastRow}", null, false, false);
+        $kodeBts = $worksheet->rangeToArray("{$kodeBtColumn}{$firstRow}:{$kodeBtColumn}{$lastRow}", null, false, false);
+        $agreements = $worksheet->rangeToArray("{$agreementColumn}{$firstRow}:{$agreementColumn}{$lastRow}", null, false, false);
 
         // Link agreement tiap kode BT, urut dari yang lama ke yang terbaru
         $links = [];
@@ -197,6 +204,23 @@ class DealerAgreementImportService
         }
 
         return $accepted;
+    }
+
+    /**
+     * The header row among a sheet's first rows: its number and the Kode BT and AGREMENT column letters, or null.
+     *
+     * @param  array<int, array<string, mixed>>  $rows  row number => column letter => value
+     * @return array{0: int, 1: string, 2: string}|null
+     */
+    private function header(array $rows): ?array
+    {
+        foreach ($rows as $rowNumber => $row) {
+            if (($columns = $this->agreementColumns($row)) !== null) {
+                return [$rowNumber, ...$columns];
+            }
+        }
+
+        return null;
     }
 
     /**

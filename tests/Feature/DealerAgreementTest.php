@@ -276,6 +276,36 @@ class DealerAgreementTest extends TestCase
         $this->assertSame([], Storage::disk('local')->allFiles('dealer-import'));
     }
 
+    public function test_an_agreement_file_whose_header_sits_below_helper_rows_is_recognized(): void
+    {
+        Storage::fake('local');
+        $dealer = $this->dealer();
+        $this->fakeDriveAndAi(['lengkap_toko_a_000000' => $this->inspection()]);
+
+        // Seperti file Jateng: sheet RAW dengan baris-baris rumus bantu di atas judul kolom (judul di baris 5)
+        $spreadsheet = new Spreadsheet;
+        $spreadsheet->getActiveSheet()->setTitle('KAMUS');
+        $spreadsheet->createSheet()->setTitle('RAW')->fromArray([
+            [],
+            ['', '', '3', '', '=G2+1'],
+            ['', '', '2', '', '=G3+1'],
+            ['', '1', '=B4+1', '', '=G4+1'],
+            ['ID GS', 'NAMA DEALER', 'Kode BT', 'PROGRAM', 'AGREMENT'],
+            ['DLGG0001', 'TOKO', 'BT07777', 'PROGRAM SO', 'https://drive.google.com/open?id=lengkap_toko_a_000000'],
+        ]);
+        $file = tempnam(sys_get_temp_dir(), 'data-program').'.xlsx';
+        (new Xlsx($spreadsheet))->save($file);
+
+        $this->actingAs(User::factory()->create(['role' => 'admin']))
+            ->post('/api/dealers/import', ['file' => new UploadedFile($file, 'DRAFT TEMPLATE PROGRAM JATENG.xlsx', null, null, true), 'type' => 'agreements'], ['Accept' => 'application/json'])
+            ->assertAccepted()
+            ->assertJsonPath('status.state', 'done')
+            ->assertJsonPath('status.sheet', 'RAW')
+            ->assertJsonPath('status.result.filled', 1);
+
+        $this->assertSame('https://drive.google.com/open?id=lengkap_toko_a_000000', $dealer->fresh()->agreement_url);
+    }
+
     public function test_agreement_import_progress_moves_after_every_batch_of_documents(): void
     {
         $this->dealer();

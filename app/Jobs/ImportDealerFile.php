@@ -93,7 +93,7 @@ class ImportDealerFile implements ShouldQueue
             $sheet = $this->type === 'dealers' ? null : $agreements->findSheet($path);
 
             if ($this->type === 'agreements' && $sheet === null) {
-                throw new Exception('Bukan file agreement: tidak ada sheet dengan kolom Kode BT dan AGREMENT di baris pertama.');
+                throw new Exception('Bukan file agreement: tidak ada sheet dengan kolom Kode BT dan AGREMENT di 10 baris teratas.');
             }
 
             if ($sheet !== null) {

@@ -190,7 +190,7 @@ class DealerImportTest extends TestCase
             ->assertAccepted()
             ->assertJsonPath('status.type', 'agreements')
             ->assertJsonPath('status.state', 'failed')
-            ->assertJsonPath('status.message', 'Bukan file agreement: tidak ada sheet dengan kolom Kode BT dan AGREMENT di baris pertama.');
+            ->assertJsonPath('status.message', 'Bukan file agreement: tidak ada sheet dengan kolom Kode BT dan AGREMENT di 10 baris teratas.');
         $this->assertDatabaseMissing('dealers', ['kode_bt' => 'BT02657']);
 
         // Import Data Dealer dengan file yang sama: masuk sebagai data toko
