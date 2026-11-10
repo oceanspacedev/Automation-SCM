@@ -20,6 +20,9 @@ use Throwable;
  * Imports a file uploaded in Master Dealer in the background: the CV TOP master customer file ("dealers") or a Data
  * Program file with a sheet of Kode BT & AGREMENT for the stores' agreements ("agreements"). Without a type the file
  * decides: a sheet with Kode BT & AGREMENT means agreements, anything else the CV TOP file.
+ * An agreement file is read once into its stores' links (kept next to the upload as JSON); the AI then checks them a few
+ * stores at a time, and a job that has run for half an hour hands the rest to a new job, so a big file (the Jateng
+ * Draft Program has thousands of links) never reaches the queue's one-hour timeout.
  * Its progress and result are kept in the cache for the Master Dealer page (see status()).
  */
 class ImportDealerFile implements ShouldQueue
@@ -33,11 +36,24 @@ class ImportDealerFile implements ShouldQueue
      */
     private const STALE_AFTER_MINUTES = 70;
 
+    /**
+     * Stores whose agreements are checked before the job looks at the clock again.
+     */
+    private const STORES_PER_BATCH = 50;
+
+    /**
+     * After this long a job leaves the remaining stores of an agreement import to a new job.
+     */
+    private const SECONDS_PER_JOB = 1800;
+
     public int $tries = 1;
 
     public int $timeout = 3600;
 
-    public function __construct(public string $storedPath, public bool $replaceExisting, public ?string $type = null) {}
+    /**
+     * @param  int|null  $offset  a continued agreement import: $storedPath is then its links file and this many stores are done
+     */
+    public function __construct(public string $storedPath, public bool $replaceExisting, public ?string $type = null, public ?int $offset = null) {}
 
     /**
      * Store the upload and queue its import; false while another import is still waiting or running.
@@ -86,8 +102,15 @@ class ImportDealerFile implements ShouldQueue
 
     public function handle(DealerImportService $dealers, DealerAgreementImportService $agreements): void
     {
-        $path = Storage::disk('local')->path($this->storedPath);
         $this->report(['state' => 'running']);
+
+        if ($this->offset !== null) {
+            $this->importAgreements($agreements, $this->storedPath, $this->offset);
+
+            return;
+        }
+
+        $path = Storage::disk('local')->path($this->storedPath);
 
         try {
             $sheet = $this->type === 'dealers' ? null : $agreements->findSheet($path);
@@ -98,8 +121,12 @@ class ImportDealerFile implements ShouldQueue
 
             if ($sheet !== null) {
                 $this->report(['type' => 'agreements', 'sheet' => $sheet]);
-                $counts = $agreements->import($path, $sheet, onProgress: fn (int $done, int $total, int $checked) => $this->report(['progress' => compact('done', 'total', 'checked')]));
-                $this->report(['state' => 'done', 'result' => $counts]);
+                $links = $agreements->readLinks($path, $sheet);
+                $linksPath = Str::beforeLast($this->storedPath, '.').'.links.json';
+                Storage::disk('local')->put($linksPath, json_encode($links));
+                $this->report(['progress' => ['done' => 0, 'total' => count($links), 'checked' => 0], 'counts' => DealerAgreementImportService::NO_COUNTS]);
+
+                $this->importAgreements($agreements, $linksPath, 0);
 
                 return;
             }
@@ -127,12 +154,56 @@ class ImportDealerFile implements ShouldQueue
     }
 
     /**
+     * Check the stores of an agreement import from the given one onwards, a batch at a time; after half an hour the rest
+     * goes to a new job. The counts add up across jobs and become the result when the last store is done.
+     */
+    private function importAgreements(DealerAgreementImportService $agreements, string $linksPath, int $offset): void
+    {
+        $startedAt = now();
+
+        try {
+            $links = json_decode(Storage::disk('local')->get($linksPath), true);
+            $total = count($links);
+
+            while ($offset < $total) {
+                $batch = array_slice($links, $offset, self::STORES_PER_BATCH, true);
+                $checkedBefore = self::status()['progress']['checked'] ?? 0;
+                $counts = $agreements->importLinks($batch, onProgress: fn (int $done, int $batchTotal, int $checked) => $this->report([
+                    'progress' => ['done' => $offset + $done, 'total' => $total, 'checked' => $checkedBefore + $checked],
+                ]));
+
+                $offset += count($batch);
+                $sums = self::status()['counts'] ?? DealerAgreementImportService::NO_COUNTS;
+                foreach ($counts as $key => $count) {
+                    $sums[$key] = ($sums[$key] ?? 0) + $count;
+                }
+                $this->report([
+                    'progress' => ['done' => $offset, 'total' => $total, 'checked' => self::status()['progress']['checked'] ?? $checkedBefore],
+                    'counts' => $sums,
+                ]);
+
+                if ($offset < $total && $startedAt->diffInSeconds(now()) >= self::SECONDS_PER_JOB) {
+                    self::dispatch($linksPath, false, 'agreements', $offset);
+
+                    return;
+                }
+            }
+
+            $this->report(['state' => 'done', 'result' => self::status()['counts'] ?? DealerAgreementImportService::NO_COUNTS]);
+        } catch (Exception $e) {
+            $this->report(['state' => 'failed', 'message' => $e->getMessage()]);
+        }
+
+        Storage::disk('local')->delete($linksPath);
+    }
+
+    /**
      * The job stopped unexpectedly (e.g. ran out of memory or time).
      */
     public function failed(?Throwable $exception): void
     {
         $this->report(['state' => 'failed', 'message' => 'Import berhenti di tengah jalan: '.($exception?->getMessage() ?: 'proses import mati.')]);
-        Storage::disk('local')->delete($this->storedPath);
+        Storage::disk('local')->delete([$this->storedPath, Str::beforeLast($this->storedPath, '.').'.links.json']);
     }
 
     /**

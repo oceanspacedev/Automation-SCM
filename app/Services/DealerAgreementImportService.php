@@ -23,6 +23,11 @@ class DealerAgreementImportService
      */
     private const HEADER_SEARCH_ROWS = 10;
 
+    /**
+     * The outcome of an import before any store is decided.
+     */
+    public const NO_COUNTS = ['filled' => 0, 'replaced' => 0, 'same' => 0, 'removed' => 0, 'none' => 0, 'kept' => 0, 'unchecked' => 0, 'not_found' => 0];
+
     public function __construct(private DocumentAnalysisService $analysis) {}
 
     /**
@@ -50,6 +55,18 @@ class DealerAgreementImportService
      * @throws Exception when the sheet or its Kode BT & AGREMENT columns are missing
      */
     public function import(string $path, string $sheet, int $parallel = 8, ?Closure $onProgress = null): array
+    {
+        return $this->importLinks($this->readLinks($path, $sheet), $parallel, $onProgress);
+    }
+
+    /**
+     * Each store's agreement links in the sheet, oldest first.
+     *
+     * @return array<string, list<string>> kode BT => links
+     *
+     * @throws Exception when the sheet or its Kode BT & AGREMENT columns are missing
+     */
+    public function readLinks(string $path, string $sheet): array
     {
         $reader = IOFactory::createReaderForFile($path);
         if (! in_array($sheet, $sheets = $reader->listWorksheetNames($path), true)) {
@@ -83,7 +100,19 @@ class DealerAgreementImportService
             }
         }
 
-        $counts = ['filled' => 0, 'replaced' => 0, 'same' => 0, 'removed' => 0, 'none' => 0, 'kept' => 0, 'unchecked' => 0, 'not_found' => 0];
+        return array_map(array_keys(...), $links);
+    }
+
+    /**
+     * Give the stores their newest acceptable agreement from their links (oldest first).
+     *
+     * @param  array<string, list<string>>  $links  kode BT => links
+     * @param  (Closure(int $done, int $total, int $checked): void)|null  $onProgress  called as documents are checked: stores decided, stores in total, documents checked
+     * @return array{filled: int, replaced: int, same: int, removed: int, none: int, kept: int, unchecked: int, not_found: int}
+     */
+    public function importLinks(array $links, int $parallel = 8, ?Closure $onProgress = null): array
+    {
+        $counts = self::NO_COUNTS;
         $dealers = [];
         $candidates = [];
         foreach ($links as $kodeBt => $storeLinks) {
@@ -97,7 +126,7 @@ class DealerAgreementImportService
             }
 
             // Agreement yang tidak ada di file (mis. dikirim lewat Form Program) tidak diubah
-            $fileIds = array_map($this->driveFileId(...), array_keys($storeLinks));
+            $fileIds = array_map($this->driveFileId(...), $storeLinks);
             if ($dealer->agreement_url && ! in_array($this->driveFileId($dealer->agreement_url), $fileIds, true)) {
                 $counts['kept']++;
 
@@ -105,7 +134,7 @@ class DealerAgreementImportService
             }
 
             $dealers[$kodeBt] = $dealer;
-            $candidates[$kodeBt] = array_reverse(array_keys($storeLinks));
+            $candidates[$kodeBt] = array_reverse($storeLinks);
         }
 
         $storeNames = array_map(fn (Dealer $dealer) => (string) $dealer->dealer_name, $dealers);

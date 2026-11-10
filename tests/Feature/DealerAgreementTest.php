@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\ImportDealerFile;
 use App\Models\Brand;
 use App\Models\Dealer;
 use App\Models\ProgramSubmission;
@@ -14,6 +15,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -327,6 +329,40 @@ class DealerAgreementTest extends TestCase
             ->assertJsonPath('status.result.filled', 1);
 
         $this->assertSame('https://drive.google.com/open?id=lengkap_toko_a_000000', $dealer->fresh()->agreement_url);
+    }
+
+    public function test_a_big_agreement_file_goes_on_in_a_new_job_before_the_queue_timeout(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $rows = [];
+        $inspections = [];
+        foreach (range(1, 51) as $number) {
+            $id = sprintf('lengkap_toko_%03d_00000', $number);
+            $this->dealer(['kode_bt' => sprintf('BT%05d', $number), 'id_realme' => sprintf('DLAA%04d', $number)]);
+            $rows[] = [sprintf('BT%05d', $number), "https://drive.google.com/open?id={$id}"];
+            $inspections[$id] = $this->inspection();
+        }
+        $this->fakeDriveAndAi($inspections);
+        // Tiap unduhan & pemeriksaan AI memakan satu menit: setelah 50 toko, job pertama sudah lewat setengah jam
+        Http::fake(function () {
+            $this->travel(1)->minutes();
+        });
+        Storage::disk('local')->put('dealer-import/besar.xlsx', file_get_contents($this->dataProgramFile($rows)));
+
+        app()->call([new ImportDealerFile('dealer-import/besar.xlsx', false, 'agreements'), 'handle']);
+
+        $this->assertSame('running', ImportDealerFile::status()['state']);
+        $this->assertSame(['done' => 50, 'total' => 51, 'checked' => 50], ImportDealerFile::status()['progress']);
+        Queue::assertPushed(ImportDealerFile::class, fn (ImportDealerFile $job) => $job->offset === 50);
+
+        // Job lanjutan memeriksa sisa toko, lalu hasil kedua job dijumlahkan
+        app()->call([Queue::pushed(ImportDealerFile::class)->first(), 'handle']);
+
+        $this->assertSame('done', ImportDealerFile::status()['state']);
+        $this->assertSame(51, ImportDealerFile::status()['result']['filled']);
+        $this->assertSame(51, Dealer::query()->whereNotNull('agreement_url')->count());
+        $this->assertSame([], Storage::disk('local')->allFiles('dealer-import'));
     }
 
     public function test_agreement_import_progress_moves_after_every_batch_of_documents(): void
