@@ -248,19 +248,21 @@ class DocumentAnalysisService
     }
 
     /**
-     * Read an agreement document with the AI router: is it an agreement, is the dealer's name filled in, is it signed?
+     * Read an agreement document with the AI router: is it an agreement, is it merged with another document (e.g. a
+     * Credit Note in the same file), is the dealer's name filled in, is it signed?
      * A Word file (.docx) is sent as its text and embedded images (scanned pages, signatures, stamps).
      * Answers are remembered per file, so a file is read once. A file that can't be downloaded (e.g. not shared) counts
      * as no agreement; null when the AI can't read it (try again later).
      *
-     * @return array{is_agreement: bool, name_filled: bool, has_signature: bool, has_stamp: bool, dealer_name: ?string, stamp_name: ?string, note: string}|null
+     * @return array{is_agreement: bool, has_other_document: bool, name_filled: bool, has_signature: bool, has_stamp: bool, dealer_name: ?string, stamp_name: ?string, note: string}|null
      */
     public function inspectAgreement(string $url): ?array
     {
         $fileId = preg_match('/(?:id=|\/d\/)([a-zA-Z0-9_-]{20,})/', $url, $matches) ? $matches[1] : sha1(trim($url));
         $cacheKey = "agreement_inspection:{$fileId}";
-        // Hasil lama tanpa nama di cap dibaca ulang
-        if (is_array($cached = Cache::get($cacheKey)) && array_key_exists('stamp_name', $cached)) {
+        // Hasil lama dibaca ulang bila belum ada nama di cap, atau bila agreement belum dicek digabung dengan dokumen lain
+        if (is_array($cached = Cache::get($cacheKey)) && array_key_exists('stamp_name', $cached)
+            && (array_key_exists('has_other_document', $cached) || ! $cached['is_agreement'])) {
             return $cached;
         }
 
@@ -272,7 +274,7 @@ class DocumentAnalysisService
         $dataUri = $this->fetchDocumentAsDataUri($url);
         if ($dataUri === null) {
             // Tidak disimpan: file bisa saja dibagikan belakangan
-            return ['is_agreement' => false, 'name_filled' => false, 'has_signature' => false, 'has_stamp' => false, 'dealer_name' => null, 'stamp_name' => null, 'note' => 'File tidak bisa diunduh (mungkin tidak dibagikan).'];
+            return ['is_agreement' => false, 'has_other_document' => false, 'name_filled' => false, 'has_signature' => false, 'has_stamp' => false, 'dealer_name' => null, 'stamp_name' => null, 'note' => 'File tidak bisa diunduh (mungkin tidak dibagikan).'];
         }
 
         $payload = [
@@ -305,6 +307,7 @@ class DocumentAnalysisService
 
             $inspection = [
                 'is_agreement' => (bool) ($parsed['is_agreement'] ?? false),
+                'has_other_document' => (bool) ($parsed['has_other_document'] ?? false),
                 'name_filled' => (bool) ($parsed['name_filled'] ?? false),
                 'has_signature' => (bool) ($parsed['has_signature'] ?? false),
                 'has_stamp' => (bool) ($parsed['has_stamp'] ?? false),
@@ -321,14 +324,15 @@ class DocumentAnalysisService
     }
 
     /**
-     * An agreement is accepted for Master Dealer when the dealer's name is filled in. One with a blank name is accepted
-     * only when it is signed and stamped with the store's own name; a signature alone doesn't show which store signed.
+     * An agreement is accepted for Master Dealer when the file holds only the agreement (not merged with e.g. a Credit
+     * Note) and the dealer's name is filled in. One with a blank name is accepted only when it is signed and stamped
+     * with the store's own name; a signature alone doesn't show which store signed.
      *
-     * @param  array{is_agreement: bool, name_filled: bool, has_signature: bool, has_stamp: bool, stamp_name?: ?string}  $inspection
+     * @param  array{is_agreement: bool, has_other_document?: bool, name_filled: bool, has_signature: bool, has_stamp: bool, stamp_name?: ?string}  $inspection
      */
     public function isAcceptableAgreement(array $inspection, ?string $storeName): bool
     {
-        if (! $inspection['is_agreement']) {
+        if (! $inspection['is_agreement'] || ($inspection['has_other_document'] ?? false)) {
             return false;
         }
 
@@ -392,6 +396,7 @@ Kamu memeriksa dokumen AGREEMENT dealer Realme (surat perjanjian/kesepakatan pro
 Nilai dokumen yang dilampirkan dan jawab HANYA dengan JSON berikut, tanpa teks lain:
 {
   "is_agreement": boolean,   // dokumen ini memang agreement/perjanjian/kesepakatan program dealer (bukan Credit Note, faktur, invoice, nota, foto toko, atau dokumen lain)
+  "has_other_document": boolean, // selain agreement, file ini JUGA memuat dokumen lain (mis. Credit Note/nota kredit, faktur pajak, invoice, nota, rekap), misalnya digabung di halaman lain; false bila isinya hanya agreement
   "dealer_name": string|null, // nama toko/dealer/pemilik yang tertulis sebagai pihak dealer di dokumen
   "name_filled": boolean,    // nama pihak dealer tertulis jelas (bukan kosong, titik-titik, atau template)
   "has_signature": boolean,  // ada tanda tangan pihak dealer (basah, scan, atau tanda tangan digital)

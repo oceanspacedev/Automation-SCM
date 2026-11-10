@@ -156,10 +156,10 @@ class DealerAgreementTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function inspection(bool $isAgreement = true, bool $nameFilled = true, bool $hasSignature = true, ?string $stampName = null): array
+    private function inspection(bool $isAgreement = true, bool $nameFilled = true, bool $hasSignature = true, ?string $stampName = null, bool $hasOtherDocument = false): array
     {
         return [
-            'is_agreement' => $isAgreement, 'dealer_name' => $nameFilled ? 'TOKO' : null, 'name_filled' => $nameFilled,
+            'is_agreement' => $isAgreement, 'has_other_document' => $hasOtherDocument, 'dealer_name' => $nameFilled ? 'TOKO' : null, 'name_filled' => $nameFilled,
             'has_signature' => $hasSignature, 'has_stamp' => $stampName !== null, 'stamp_name' => $stampName, 'note' => '',
         ];
     }
@@ -185,6 +185,29 @@ class DealerAgreementTest extends TestCase
         $inspection = app(DocumentAnalysisService::class)->inspectAgreement('https://drive.google.com/open?id=ttd_cap_toko_a_0000000');
 
         $this->assertSame('TOKO JAYA SELULAR', $inspection['stamp_name']);
+    }
+
+    public function test_an_agreement_merged_with_a_credit_note_in_one_file_is_not_accepted(): void
+    {
+        $analysis = app(DocumentAnalysisService::class);
+
+        $this->assertFalse($analysis->isAcceptableAgreement($this->inspection(hasOtherDocument: true), 'CV MAJU CELL'));
+        $this->assertFalse($analysis->isAcceptableAgreement($this->inspection(nameFilled: false, stampName: 'MAJU CELL', hasOtherDocument: true), 'CV MAJU CELL'));
+    }
+
+    public function test_an_agreement_checked_before_merged_files_were_detected_is_checked_again(): void
+    {
+        $this->fakeDriveAndAi(['agr_dan_cn_toko_a_000000' => $this->inspection(hasOtherDocument: true)]);
+        $checkedBefore = ['is_agreement' => true, 'name_filled' => true, 'has_signature' => true, 'has_stamp' => false, 'dealer_name' => 'TOKO', 'stamp_name' => null, 'note' => ''];
+        Cache::forever('agreement_inspection:agr_dan_cn_toko_a_000000', $checkedBefore);
+        Cache::forever('agreement_inspection:foto_toko_a_0000000000', ['is_agreement' => false] + $checkedBefore);
+
+        $analysis = app(DocumentAnalysisService::class);
+
+        $this->assertTrue($analysis->inspectAgreement('https://drive.google.com/open?id=agr_dan_cn_toko_a_000000')['has_other_document']);
+        // Yang dulu sudah bukan agreement tetap ditolak tanpa dibaca ulang
+        $this->assertFalse($analysis->isAcceptableAgreement($analysis->inspectAgreement('https://drive.google.com/open?id=foto_toko_a_0000000000'), 'TOKO'));
+        Http::assertSentCount(2);
     }
 
     public function test_fill_command_takes_each_stores_newest_acceptable_agreement_from_a_data_program_file(): void
