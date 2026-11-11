@@ -17,7 +17,7 @@
       </div>
 
       <!-- Tombol aksi; di layar kecil tiga tombol sama lebar dengan label pendek -->
-      <div class="grid grid-cols-3 sm:flex sm:items-center gap-2">
+      <div v-if="canEdit" class="grid grid-cols-3 sm:flex sm:items-center gap-2">
         <template v-if="selectedIds.length > 0">
           <button
             @click="askGenerateSelected"
@@ -240,10 +240,10 @@
       <div class="md:hidden">
         <div v-if="loading" class="py-8 text-center text-xs text-gray-500">Memuat data draft...</div>
         <div v-else-if="drafts.length === 0" class="py-8 px-4 text-center text-xs text-gray-500">
-          Belum ada data draft. Silakan klik tombol <strong>Import</strong>.
+          Belum ada data draft.<template v-if="canEdit"> Silakan klik tombol <strong>Import</strong>.</template>
         </div>
         <template v-else>
-          <label v-if="selectableDrafts.length > 0" class="px-4 py-2.5 border-b border-gray-100 flex items-center gap-3 text-xs text-gray-600 cursor-pointer">
+          <label v-if="canEdit && selectableDrafts.length > 0" class="px-4 py-2.5 border-b border-gray-100 flex items-center gap-3 text-xs text-gray-600 cursor-pointer">
             <input
               type="checkbox"
               :checked="isAllSelected"
@@ -262,6 +262,7 @@
               :class="selectedIds.includes(draft.id) && 'bg-gray-50'"
             >
               <input
+                v-if="canEdit"
                 type="checkbox"
                 :value="draft.id"
                 v-model="selectedIds"
@@ -295,7 +296,7 @@
                   </div>
                   <div class="flex items-center gap-1.5 shrink-0">
                     <button
-                      v-if="draft.status === 'ready'"
+                      v-if="canEdit && draft.status === 'ready'"
                       type="button"
                       @click="askGenerateSingle(draft)"
                       :disabled="generatingId === draft.id"
@@ -304,7 +305,7 @@
                       {{ generatingId === draft.id ? 'Proses...' : 'Generate' }}
                     </button>
                     <button
-                      v-else-if="draft.status === 'error'"
+                      v-else-if="canEdit && draft.status === 'error'"
                       type="button"
                       @click="validateDraft(draft.id)"
                       class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
@@ -319,7 +320,7 @@
                       Invoice
                     </router-link>
                     <button
-                      v-if="draft.status === 'invoiced'"
+                      v-if="canEdit && draft.status === 'invoiced'"
                       type="button"
                       @click="askPushSingleToDataProgram(draft)"
                       :disabled="pushingId === draft.id"
@@ -328,7 +329,7 @@
                       {{ pushingId === draft.id ? 'Mengirim...' : 'Data Program' }}
                     </button>
                     <button
-                      v-if="draft.status !== 'invoiced'"
+                      v-if="canEdit && draft.status !== 'invoiced'"
                       type="button"
                       @click="askDeleteDraft(draft)"
                       class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer"
@@ -356,7 +357,7 @@
         <table class="w-full text-left text-xs text-gray-900 border-collapse">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">
-              <th scope="col" class="py-2.5 px-3 text-center w-[44px] border-r border-gray-200">
+              <th v-if="canEdit" scope="col" class="py-2.5 px-3 text-center w-[44px] border-r border-gray-200">
                 <input
                   type="checkbox"
                   :checked="isAllSelected"
@@ -406,7 +407,7 @@
 
           <tbody class="divide-y divide-gray-200 bg-white">
             <tr v-if="loading">
-              <td colspan="10" class="py-8 text-center text-gray-500">
+              <td :colspan="canEdit ? 10 : 9" class="py-8 text-center text-gray-500">
                 <div class="inline-flex items-center gap-2">
                   <span class="inline-block w-4 h-4 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></span>
                   <span>Memuat data draft...</span>
@@ -415,8 +416,8 @@
             </tr>
 
             <tr v-else-if="drafts.length === 0">
-              <td colspan="10" class="py-8 text-center text-gray-500">
-                Belum ada data draft. Silakan klik tombol <strong>Import Excel</strong>.
+              <td :colspan="canEdit ? 10 : 9" class="py-8 text-center text-gray-500">
+                Belum ada data draft.<template v-if="canEdit"> Silakan klik tombol <strong>Import Excel</strong>.</template>
               </td>
             </tr>
 
@@ -428,7 +429,7 @@
               class="text-gray-700 font-normal transition"
             >
               <!-- Checkbox Selection -->
-              <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+              <td v-if="canEdit" class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
                 <input
                   type="checkbox"
                   :value="draft.id"
@@ -513,7 +514,7 @@
 
                   <!-- 2. Generate Action (Ready) -->
                   <button
-                    v-if="draft.status === 'ready'"
+                    v-if="canEdit && draft.status === 'ready'"
                     type="button"
                     @click="askGenerateSingle(draft)"
                     :disabled="generatingId === draft.id"
@@ -526,7 +527,7 @@
 
                   <!-- 3. Validasi Action (Error) -->
                   <button
-                    v-else-if="draft.status === 'error'"
+                    v-else-if="canEdit && draft.status === 'error'"
                     type="button"
                     @click="validateDraft(draft.id)"
                     class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
@@ -547,7 +548,7 @@
 
                   <!-- 5. Kirim ke Data Program Action (setelah invoice diterbitkan) -->
                   <button
-                    v-if="draft.status === 'invoiced'"
+                    v-if="canEdit && draft.status === 'invoiced'"
                     type="button"
                     @click="askPushSingleToDataProgram(draft)"
                     :disabled="pushingId === draft.id"
@@ -560,7 +561,7 @@
 
                   <!-- 6. Delete Action (Draft not yet invoiced) -->
                   <button
-                    v-if="draft.status !== 'invoiced'"
+                    v-if="canEdit && draft.status !== 'invoiced'"
                     type="button"
                     @click="askDeleteDraft(draft)"
                     class="h-7 w-7.5 inline-flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
@@ -575,7 +576,7 @@
 
           <tfoot v-if="drafts.length > 0" class="border-t border-gray-200 bg-gray-50/80 font-medium">
             <tr>
-              <td colspan="7" class="py-2.5 px-3 text-xs font-semibold text-gray-900 border-r border-gray-200">
+              <td :colspan="canEdit ? 7 : 6" class="py-2.5 px-3 text-xs font-semibold text-gray-900 border-r border-gray-200">
                 Total
               </td>
               <td class="py-2.5 px-3 text-right whitespace-nowrap text-xs text-gray-800 border-r border-gray-200 font-medium">
@@ -663,6 +664,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
+import { useAuth } from '@/composables/useAuth';
 import ImportModal from '@/components/ImportModal.vue';
 import CreateDraftModal from '@/components/CreateDraftModal.vue';
 import ConfirmModal from '@/components/ConfirmModal.vue';
@@ -671,6 +673,9 @@ import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 
 // Tombol header: tanpa ikon, satu gaya untuk semua aksi
 const headerButtonClass = 'h-9 px-2 sm:px-3.5 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs disabled:opacity-50 transition cursor-pointer whitespace-nowrap';
+
+// AR & Telemarketing hanya melihat: tombol generate, kirim, import, tambah, validasi & hapus disembunyikan
+const { canEdit } = useAuth();
 
 const drafts = ref([]);
 const loading = ref(false);
@@ -866,6 +871,7 @@ const resetFilters = () => {
 };
 
 const validateDraft = async (id) => {
+  if (!canEdit.value) return;
   try {
     const res = await axios.post(`/api/drafts/${id}/validate`);
     alertMessage.value = res.data.message;
@@ -878,7 +884,7 @@ const validateDraft = async (id) => {
 };
 
 const askGenerateSingle = (draft) => {
-  if (generatingId.value === draft.id) return;
+  if (!canEdit.value || generatingId.value === draft.id) return;
   generateModalState.title = 'Terbitkan Invoice';
   generateModalState.subtitle = 'Pilih pihak Bill To untuk dicantumkan pada lembar invoice:';
   generateModalState.targetInfo = `${draft.dealer_name || draft.dealer_code} (${draft.invoice_type || 'Invoice'})`;
@@ -896,6 +902,7 @@ const askGenerateSingle = (draft) => {
 };
 
 const executeGenerateSingle = async (draftId, billTo) => {
+  if (!canEdit.value) return;
   generatingId.value = draftId;
   alertMessage.value = null;
 
@@ -916,7 +923,7 @@ const executeGenerateSingle = async (draftId, billTo) => {
 };
 
 const askGenerateSelected = () => {
-  if (selectedIds.value.length === 0 || generatingBatch.value) return;
+  if (!canEdit.value || selectedIds.value.length === 0 || generatingBatch.value) return;
   generateModalState.title = 'Terbitkan Invoice Terpilih';
   generateModalState.subtitle = `Pilih pihak Bill To untuk ${selectedIds.value.length} invoice terpilih:`;
   generateModalState.targetInfo = `${selectedIds.value.length} Draft Terpilih`;
@@ -934,6 +941,7 @@ const askGenerateSelected = () => {
 };
 
 const executeGenerateSelected = async (billTo) => {
+  if (!canEdit.value) return;
   generatingBatch.value = true;
   alertMessage.value = null;
 
@@ -955,7 +963,7 @@ const executeGenerateSelected = async (billTo) => {
 };
 
 const askGenerateAll = () => {
-  if (generatingAll.value) return;
+  if (!canEdit.value || generatingAll.value) return;
   generateModalState.title = 'Terbitkan Semua Invoice';
   generateModalState.subtitle = 'Pilih pihak Bill To untuk SEMUA draft dengan status Ready:';
   generateModalState.targetInfo = 'Semua Draft (Status Ready)';
@@ -973,6 +981,7 @@ const askGenerateAll = () => {
 };
 
 const executeGenerateAll = async (billTo) => {
+  if (!canEdit.value) return;
   generatingAll.value = true;
   alertMessage.value = null;
 
@@ -998,7 +1007,7 @@ const formatCurrency = (val) => {
 };
 
 const askPushSingleToDataProgram = async (draft) => {
-  if (pushingId.value === draft.id) return;
+  if (!canEdit.value || pushingId.value === draft.id) return;
   pushingId.value = draft.id;
   alertMessage.value = null;
   try {
@@ -1015,7 +1024,7 @@ const askPushSingleToDataProgram = async (draft) => {
 };
 
 const askPushSelectedToDataProgram = () => {
-  if (selectedIds.value.length === 0 || pushingBatch.value) return;
+  if (!canEdit.value || selectedIds.value.length === 0 || pushingBatch.value) return;
   confirmState.title = 'Kirim ke Data Program & Spreadsheet';
   confirmState.message = `Apakah Anda yakin ingin mengirim ${selectedIds.value.length} draft terpilih ke Data Program dan Google Spreadsheet?`;
   confirmState.confirmText = `Ya, Kirim (${selectedIds.value.length}) Draft`;
@@ -1050,6 +1059,7 @@ const onDraftCreated = (newDraft) => {
 };
 
 const askDeleteDraft = (draft) => {
+  if (!canEdit.value) return;
   confirmState.title = 'Hapus Draft Invoice';
   confirmState.message = `Apakah Anda yakin ingin menghapus draft #${draft.no || draft.id} (${draft.dealer_name})? Tindakan ini tidak dapat dibatalkan.`;
   confirmState.confirmText = 'Ya, Hapus Draft';

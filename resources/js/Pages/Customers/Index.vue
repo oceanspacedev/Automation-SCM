@@ -17,7 +17,7 @@
       </div>
 
       <!-- Tombol aksi; di layar kecil dua tombol sama lebar dengan label pendek -->
-      <div class="grid grid-cols-2 sm:flex sm:items-center gap-2">
+      <div class="grid sm:flex sm:items-center gap-2" :class="canEdit ? 'grid-cols-2' : 'grid-cols-1'">
         <button
           type="button"
           @click="downloadExport('/api/customers/export', { search: searchQuery, is_active: filterStatus })"
@@ -27,6 +27,7 @@
           <span class="sm:hidden">Export</span><span class="hidden sm:inline">Export Excel</span>
         </button>
         <button
+          v-if="canEdit"
           type="button"
           @click="openCreateModal"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
@@ -91,6 +92,7 @@
             <div class="flex items-start justify-between gap-3">
               <p class="min-w-0 text-sm font-medium text-gray-900 break-words">{{ c.code || '-' }} · {{ c.name || '-' }}</p>
               <button
+                v-if="canEdit"
                 type="button"
                 @click="toggleCustomerStatus(c)"
                 class="text-xs hover:underline cursor-pointer shrink-0"
@@ -98,10 +100,13 @@
               >
                 {{ c.is_active ? 'Aktif' : 'Nonaktif' }}
               </button>
+              <span v-else class="text-xs shrink-0" :class="c.is_active ? 'text-gray-700' : 'text-gray-400'">
+                {{ c.is_active ? 'Aktif' : 'Nonaktif' }}
+              </span>
             </div>
             <div class="flex items-center justify-between gap-3">
               <p class="min-w-0 text-gray-500 break-words">NPWP {{ c.npwp && c.npwp !== '-' ? c.npwp : '-' }}</p>
-              <div class="flex items-center gap-1.5 shrink-0">
+              <div v-if="canEdit" class="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   @click="openEditModal(c)"
@@ -133,17 +138,17 @@
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">NPWP</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Alamat Bill-To</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
-              <th scope="col" class="py-2.5 px-3 text-right">Aksi</th>
+              <th v-if="canEdit" scope="col" class="py-2.5 px-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <tr v-if="isLoading">
-              <td colspan="7" class="py-8 text-center text-gray-500">
+              <td :colspan="canEdit ? 7 : 6" class="py-8 text-center text-gray-500">
                 Memuat data...
               </td>
             </tr>
             <tr v-else-if="customers.length === 0">
-              <td colspan="7" class="py-8 text-center text-gray-500">
+              <td :colspan="canEdit ? 7 : 6" class="py-8 text-center text-gray-500">
                 Tidak ada data badan usaha yang ditemukan.
               </td>
             </tr>
@@ -182,6 +187,7 @@
               <!-- 6. Status -->
               <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
                 <button
+                  v-if="canEdit"
                   type="button"
                   @click="toggleCustomerStatus(c)"
                   class="text-xs hover:underline cursor-pointer"
@@ -189,10 +195,13 @@
                 >
                   {{ c.is_active ? 'Aktif' : 'Nonaktif' }}
                 </button>
+                <span v-else class="text-xs" :class="c.is_active ? 'text-gray-700' : 'text-gray-400'">
+                  {{ c.is_active ? 'Aktif' : 'Nonaktif' }}
+                </span>
               </td>
 
               <!-- 7. Aksi -->
-              <td class="py-2.5 px-3 text-right whitespace-nowrap">
+              <td v-if="canEdit" class="py-2.5 px-3 text-right whitespace-nowrap">
                 <div class="flex items-center justify-end gap-1">
                   <button
                     type="button"
@@ -415,6 +424,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { notify } from '@/composables/useNotify';
+import { useAuth } from '@/composables/useAuth';
 import { downloadExport } from '@/lib/download';
 import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
 import {
@@ -426,6 +436,8 @@ import {
   PencilIcon,
   Trash2Icon,
 } from 'lucide-vue-next';
+
+const { canEdit } = useAuth();
 
 const customers = ref([]);
 const totalRows = ref(0);
@@ -526,6 +538,7 @@ function openEditModal(c) {
 }
 
 async function submitForm() {
+  if (!canEdit.value) return;
   isSaving.value = true;
   try {
     if (isEditMode.value) {
@@ -543,6 +556,7 @@ async function submitForm() {
 }
 
 async function toggleCustomerStatus(c) {
+  if (!canEdit.value) return;
   try {
     const res = await axios.patch(`/api/customers/${c.id}/toggle-status`);
     if (res.data?.success) {
@@ -558,7 +572,7 @@ function confirmDelete(c) {
 }
 
 async function executeDelete() {
-  if (!customerToDelete.value) return;
+  if (!canEdit.value || !customerToDelete.value) return;
   isDeleting.value = true;
   try {
     const res = await axios.delete(`/api/customers/${customerToDelete.value.id}`);

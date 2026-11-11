@@ -57,6 +57,7 @@
           </a>
 
           <button
+            v-if="canEdit"
             type="button"
             @click="openConfigModal(); isDropdownOpen = false"
             class="w-full text-left px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer"
@@ -575,8 +576,9 @@
         </div>
 
         <!-- Footer -->
-        <div class="px-6 py-3.5 border-t border-gray-100 flex items-center justify-between gap-2 text-xs shrink-0">
+        <div class="px-6 py-3.5 border-t border-gray-100 flex items-center gap-2 text-xs shrink-0" :class="canEdit ? 'justify-between' : 'justify-end'">
           <button
+            v-if="canEdit"
             type="button"
             @click="analyzeRowWithAi(selectedItem)"
             :disabled="analyzingRowIds.has(selectedItem.id)"
@@ -620,10 +622,12 @@ import {
 import { useArea, DEFAULT_AREA } from '@/composables/useArea';
 import { useBrands } from '@/composables/useBrands';
 import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
+import { useAuth } from '@/composables/useAuth';
 
 // ===== AREA (Jabar/Jateng) =====
 const { area } = useArea();
 const { brand } = useBrands();
+const { canEdit } = useAuth();
 const isDefaultArea = area.value.value === DEFAULT_AREA;
 // Form publik per brand & area: /form/realme/jabar, /form/realme/jateng (link lama /form/jabar diarahkan ke Realme)
 const publicFormUrl = `/form/${brand.value.slug}/${area.value.value}`;
@@ -697,7 +701,7 @@ function openFinancialModal(item) {
 }
 
 async function analyzeRowWithAi(item, isSilent = false) {
-  if (!item?.id) return;
+  if (!canEdit.value || !item?.id) return;
   analyzingRowIds.value.add(item.id);
   try {
     const res = await axios.post(`/api/program-submissions/${item.id}/analyze-ai`);
@@ -1093,6 +1097,7 @@ async function loadSheetUrl() {
 }
 
 async function openConfigModal() {
+  if (!canEdit.value) return;
   saveMessage.value = '';
   isConfigModalOpen.value = true;
   try {
@@ -1108,6 +1113,7 @@ async function openConfigModal() {
 }
 
 async function saveSpreadsheetConfig() {
+  if (!canEdit.value) return;
   isSavingConfig.value = true;
   saveMessage.value = '';
   try {

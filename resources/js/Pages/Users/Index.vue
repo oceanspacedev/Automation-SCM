@@ -17,7 +17,7 @@
       </div>
 
       <!-- Di layar kecil tombol selebar layar -->
-      <div class="grid grid-cols-2 gap-2 sm:flex">
+      <div v-if="canEdit" class="grid grid-cols-2 gap-2 sm:flex">
         <button
           type="button"
           @click="showUserImport = true"
@@ -126,6 +126,7 @@
                 <p class="mt-0.5 text-gray-500 break-words">{{ user.email || '-' }}</p>
               </div>
               <button
+                v-if="canEdit"
                 type="button"
                 @click="handleToggleStatus(user)"
                 :disabled="currentUser?.id === user.id && user.is_active"
@@ -136,6 +137,14 @@
                 <span class="w-1.5 h-1.5 rounded-full" :class="user.is_active ? 'bg-emerald-500' : 'bg-amber-500'"></span>
                 {{ user.is_active ? 'Aktif' : 'Menunggu ACC' }}
               </button>
+              <span
+                v-else
+                class="inline-flex items-center gap-1.5 shrink-0 font-medium"
+                :class="user.is_active ? 'text-gray-900' : 'text-amber-700'"
+              >
+                <span class="w-1.5 h-1.5 rounded-full" :class="user.is_active ? 'bg-emerald-500' : 'bg-amber-500'"></span>
+                {{ user.is_active ? 'Aktif' : 'Menunggu ACC' }}
+              </span>
             </div>
 
             <p class="break-words"><span class="text-gray-500">Akses:</span> {{ formatPermissionsDetail(user) || '-' }}</p>
@@ -144,7 +153,7 @@
               <p class="min-w-0 text-gray-500 break-words">
                 {{ formatRole(user.role) }} · {{ user.whatsapp ? `+${user.whatsapp}` : '-' }}
               </p>
-              <div class="flex items-center gap-1.5 shrink-0">
+              <div v-if="canEdit" class="flex items-center gap-1.5 shrink-0">
                 <button
                   v-if="!user.is_active"
                   type="button"
@@ -186,19 +195,19 @@
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Hak Akses Modul</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">No. WhatsApp</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
-              <th scope="col" class="py-2.5 px-3 text-center w-28">Aksi</th>
+              <th v-if="canEdit" scope="col" class="py-2.5 px-3 text-center w-28">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
             <tr v-if="isLoading" class="text-center">
-              <td colspan="8" class="py-10 text-gray-500">
+              <td :colspan="canEdit ? 8 : 7" class="py-10 text-gray-500">
                 <RefreshCwIcon class="w-4 h-4 animate-spin mx-auto mb-1 text-gray-400" />
                 <span>Memuat data...</span>
               </td>
             </tr>
 
             <tr v-else-if="filteredUsers.length === 0" class="text-center">
-              <td colspan="8" class="py-10 text-gray-500">
+              <td :colspan="canEdit ? 8 : 7" class="py-10 text-gray-500">
                 <span>Tidak ada data pengguna.</span>
               </td>
             </tr>
@@ -244,6 +253,7 @@
               <!-- 7. Status -->
               <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap text-gray-700">
                 <button
+                  v-if="canEdit"
                   type="button"
                   @click="handleToggleStatus(user)"
                   :disabled="currentUser?.id === user.id && user.is_active"
@@ -253,10 +263,13 @@
                 >
                   {{ user.is_active ? 'Aktif' : 'Menunggu ACC' }}
                 </button>
+                <span v-else class="text-xs font-medium" :class="user.is_active ? 'text-gray-900' : 'text-amber-700'">
+                  {{ user.is_active ? 'Aktif' : 'Menunggu ACC' }}
+                </span>
               </td>
 
               <!-- 8. Aksi -->
-              <td class="py-2.5 px-3 text-center whitespace-nowrap text-gray-700">
+              <td v-if="canEdit" class="py-2.5 px-3 text-center whitespace-nowrap text-gray-700">
                 <div class="inline-flex items-center justify-center gap-1">
                   <!-- Tombol ACC / Setujui (Hanya untuk akun nonaktif / pending) -->
                   <button
@@ -517,7 +530,7 @@ import {
   Trash2 as Trash2Icon,
 } from 'lucide-vue-next';
 
-const { user: currentUser } = useAuth();
+const { user: currentUser, canEdit } = useAuth();
 
 // Daftar hak akses & bawaan per peran; diganti dengan daftar dari server (User::AVAILABLE_PERMISSIONS) saat data dimuat
 const permissionList = ref({
@@ -647,6 +660,7 @@ useAutoRefresh(() => fetchUsers({ silent: true }), {
 
 // Modal Actions
 const openCreateModal = () => {
+  if (!canEdit.value) return;
   isEditMode.value = false;
   formError.value = '';
   userForm.value = {
@@ -663,6 +677,7 @@ const openCreateModal = () => {
 };
 
 const openEditModal = (user) => {
+  if (!canEdit.value) return;
   isEditMode.value = true;
   formError.value = '';
 
@@ -688,6 +703,7 @@ const openEditModal = (user) => {
 };
 
 const submitUserForm = async () => {
+  if (!canEdit.value) return;
   isSaving.value = true;
   formError.value = '';
   try {
@@ -707,6 +723,7 @@ const submitUserForm = async () => {
 };
 
 const handleToggleStatus = async (user) => {
+  if (!canEdit.value) return;
   try {
     const res = await axios.patch(`/api/users/${user.id}/toggle-status`);
     if (res.data?.success) {
@@ -718,6 +735,7 @@ const handleToggleStatus = async (user) => {
 };
 
 const handleApproveUser = async (user) => {
+  if (!canEdit.value) return;
   try {
     const res = await axios.patch(`/api/users/${user.id}/approve`);
     if (res.data?.success) {
@@ -730,11 +748,12 @@ const handleApproveUser = async (user) => {
 };
 
 const confirmDeleteUser = (user) => {
+  if (!canEdit.value) return;
   userToDelete.value = user;
 };
 
 const executeDeleteUser = async () => {
-  if (!userToDelete.value) return;
+  if (!canEdit.value || !userToDelete.value) return;
   isDeleting.value = true;
   try {
     await axios.delete(`/api/users/${userToDelete.value.id}`);

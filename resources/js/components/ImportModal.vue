@@ -407,6 +407,7 @@ import {
   AlertCircle as AlertCircleIcon,
   Eye as EyeIcon,
 } from 'lucide-vue-next';
+import { useAuth } from '@/composables/useAuth';
 import {
   Table,
   TableHeader,
@@ -421,6 +422,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close', 'imported']);
+
+// Hanya Admin & SCM yang boleh mengimport draft
+const { canEdit } = useAuth();
 
 const fileInput = ref(null);
 const selectedFile = ref(null);
@@ -514,7 +518,7 @@ const uploadErrorMessage = (err) =>
   'Gagal mengunggah file.';
 
 const loadPreview = async () => {
-  if (!selectedFile.value) return;
+  if (!canEdit.value || !selectedFile.value) return;
 
   uploading.value = true;
   uploadError.value = null;
@@ -531,7 +535,7 @@ const loadPreview = async () => {
 };
 
 const uploadFile = async () => {
-  if (!selectedFile.value) return;
+  if (!canEdit.value || !selectedFile.value) return;
 
   uploading.value = true;
   uploadError.value = null;

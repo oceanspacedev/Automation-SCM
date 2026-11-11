@@ -33,6 +33,17 @@ export function canAccess(user, feature) {
   return false;
 }
 
+/**
+ * Whether the user may change data on the web (add, edit, delete, import, send, generate): only Admin and SCM.
+ * AR and Telemarketing only view the menus they can open. Same rule as User::canEdit() on the server.
+ */
+export function canEdit(user) {
+  if (!user) return false;
+
+  const role = user.role || 'scm';
+  return role === 'admin' || role === 'scm';
+}
+
 // Halaman pertama setelah masuk: Dashboard, terbuka untuk semua pengguna (bukan hak akses)
 export const HOME_PATH = '/dashboard';
 

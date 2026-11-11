@@ -38,6 +38,7 @@
             class="absolute right-0 top-full mt-1.5 w-44 bg-white rounded-lg shadow-lg border border-gray-200 p-1 z-30 font-sans"
           >
             <button
+              v-if="canEdit"
               type="button"
               @click="handleTriggerSync"
               :disabled="isSyncing"
@@ -77,7 +78,7 @@
         </div>
 
         <!-- Dropdown Fitur AI -->
-        <div class="relative" ref="aiDropdownRef">
+        <div v-if="canEdit" class="relative" ref="aiDropdownRef">
           <button
             type="button"
             @click="showAiDropdown = !showAiDropdown"
@@ -392,7 +393,7 @@
             <TableEmpty v-else-if="submissions.length === 0" :colspan="23">
               <div class="max-w-md mx-auto py-8 space-y-1.5 text-center text-gray-500">
                 <p class="font-medium text-gray-800 text-xs">Belum ada data form program yang tersimpan.</p>
-                <p class="text-xs text-gray-500">
+                <p v-if="canEdit" class="text-xs text-gray-500">
                   Klik tombol <strong>"Sinkronkan Sekarang"</strong> di atas untuk memuat data dari spreadsheet Anda.
                 </p>
               </div>
@@ -428,7 +429,7 @@
 
               <!-- Nama Dealer -->
               <TableCell class="text-gray-700 py-2 leading-snug text-xs">
-                <div v-if="row.dealer_name === '[Belum Ada Nama Dealer]' || !row.dealer_name" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 border border-gray-200 text-xs font-normal cursor-pointer" @click="openEditModal(row)" title="Klik untuk melengkapi Nama Dealer">
+                <div v-if="row.dealer_name === '[Belum Ada Nama Dealer]' || !row.dealer_name" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 border border-gray-200 text-xs font-normal cursor-pointer" @click="openEditModal(row)" :title="canEdit ? 'Klik untuk melengkapi Nama Dealer' : null">
                   <AlertCircleIcon class="w-3 h-3 text-gray-500 shrink-0" />
                   <span>Tanpa Dealer</span>
                 </div>
@@ -663,6 +664,7 @@
                 <div class="inline-flex items-center rounded-md border border-gray-200 bg-white shadow-2xs divide-x divide-gray-200 overflow-hidden">
                   <!-- Tombol Analisis AI Khusus Baris Ini -->
                   <button
+                    v-if="canEdit"
                     type="button"
                     @click="analyzeRowWithAi(row)"
                     :disabled="analyzingRowId === row.id"
@@ -675,7 +677,7 @@
 
                   <!-- Kirim Info Klaim ke WhatsApp Telemarketing (Netral, Tanpa Hijau Mencolok) -->
                   <button
-                    v-if="row.status_potong_purchase === 'BISA DI POTONG'"
+                    v-if="canEdit && row.status_potong_purchase === 'BISA DI POTONG'"
                     type="button"
                     @click="sendWaToTelemarketing(row)"
                     :disabled="sendingWaId === row.id"
@@ -688,7 +690,7 @@
 
                   <!-- Tombol WhatsApp Notifikasi Dokumen Salah -->
                   <button
-                    v-if="hasDocIssue(row)"
+                    v-if="canEdit && hasDocIssue(row)"
                     type="button"
                     @click="openSendWaModal(row)"
                     :disabled="sendingWaDocRowId === row.id"
@@ -706,7 +708,7 @@
                     type="button"
                     @click="openEditModal(row)"
                     class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
-                    title="Lihat Detail & Edit Pengajuan"
+                    :title="canEdit ? 'Lihat Detail & Edit Pengajuan' : 'Lihat Detail'"
                   >
                     <EyeIcon class="w-3.5 h-3.5 text-gray-600" />
                   </button>
@@ -749,6 +751,7 @@
               </div>
               <div class="flex items-center gap-2 shrink-0">
                 <button
+                  v-if="canEdit"
                   type="button"
                   @click="analyzeCurrentRowWithAi"
                   :disabled="isAnalyzingCurrent"
@@ -793,7 +796,7 @@
                 </ul>
 
                 <!-- Tombol Aksi Cepat Tukar Dokumen Tertukar -->
-                <div class="pt-2 border-t border-gray-200 flex flex-wrap items-center gap-2">
+                <div v-if="canEdit" class="pt-2 border-t border-gray-200 flex flex-wrap items-center gap-2">
                   <span class="text-xs text-gray-500">Tukar Posisi:</span>
                   <button
                     type="button"
@@ -833,6 +836,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Nama Dealer</label>
                     <input
+                      :disabled="!canEdit"
                       v-model="editForm.dealer_name"
                       type="text"
                       placeholder="Masukkan nama dealer..."
@@ -844,6 +848,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">ID Realme (Kode BT)</label>
                     <input
+                      :disabled="!canEdit"
                       v-model="editForm.id_real"
                       type="text"
                       placeholder="Contoh: IDME00652"
@@ -855,6 +860,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Nama Program</label>
                     <input
+                      :disabled="!canEdit"
                       v-model="editForm.program_name"
                       type="text"
                       placeholder="Nama program pengajuan..."
@@ -866,6 +872,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Nama Sales</label>
                     <input
+                      :disabled="!canEdit"
                       v-model="editForm.sales_name"
                       type="text"
                       placeholder="Nama sales pengaju..."
@@ -878,6 +885,7 @@
                     <div class="flex items-center justify-between mb-1">
                       <label class="block text-xs font-medium text-gray-700">Nomor WhatsApp (Sales / Kontak)</label>
                       <button
+                        v-if="canEdit"
                         type="button"
                         @click="editForm.whatsapp = '081224290502'"
                         class="text-[10px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-200 cursor-pointer"
@@ -887,6 +895,7 @@
                       </button>
                     </div>
                     <input
+                      :disabled="!canEdit"
                       v-model="editForm.whatsapp"
                       type="text"
                       placeholder="081224290502"
@@ -904,6 +913,7 @@
                       </a>
                     </div>
                     <input
+                      :disabled="!canEdit"
                       v-model="editForm.credit_note_url"
                       type="text"
                       placeholder="https://drive.google.com/..."
@@ -921,6 +931,7 @@
                       </a>
                     </div>
                     <input
+                      :disabled="!canEdit"
                       v-model="editForm.agreement_url"
                       type="text"
                       placeholder="https://drive.google.com/..."
@@ -938,6 +949,7 @@
                       </a>
                     </div>
                     <input
+                      :disabled="!canEdit"
                       v-model="editForm.tax_invoice_url"
                       type="text"
                       placeholder="https://drive.google.com/..."
@@ -957,6 +969,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">No. PO / SJ</label>
                     <input
+                      :disabled="!canEdit"
                       v-model="editForm.no_po_sj"
                       type="text"
                       placeholder="Contoh: PO/2026/09/123"
@@ -968,6 +981,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">No. Transaksi</label>
                     <input
+                      :disabled="!canEdit"
                       v-model="editForm.no_transaksi"
                       type="text"
                       placeholder="Contoh: TRX-998822"
@@ -979,6 +993,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Tgl Input</label>
                     <DatePicker
+                      :disabled="!canEdit"
                       v-model="editForm.tgl_input"
                       placeholder="Pilih Tgl Input"
                       format="DD/MM/YYYY"
@@ -989,6 +1004,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Tgl Share CN</label>
                     <DatePicker
+                      :disabled="!canEdit"
                       v-model="editForm.tgl_share_cn"
                       placeholder="Pilih Tgl Share CN"
                       format="DD/MM/YYYY"
@@ -999,6 +1015,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Lama Pending</label>
                     <input
+                      :disabled="!canEdit"
                       v-model="editForm.lama_pending"
                       type="text"
                       placeholder="Contoh: 1 Hari / Kurang dari 30 Hari"
@@ -1010,6 +1027,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Tgl Potong / TF</label>
                     <DatePicker
+                      :disabled="!canEdit"
                       v-model="editForm.tgl_potong_tf"
                       placeholder="Pilih Tgl Potong/TF"
                       format="DD/MM/YYYY"
@@ -1020,6 +1038,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Status Potong Purchase</label>
                     <select
+                      :disabled="!canEdit"
                       v-model="editForm.status_potong_purchase"
                       class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition cursor-pointer"
                     >
@@ -1035,6 +1054,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Status Potong AR</label>
                     <input
+                      :disabled="!canEdit"
                       v-model="editForm.status_potong_ar"
                       type="text"
                       placeholder="Contoh: DEALER SETUJU / DONE / PENDING"
@@ -1046,6 +1066,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Cek Dokumen</label>
                     <input
+                      :disabled="!canEdit"
                       v-model="editForm.cek_dokumen"
                       type="text"
                       placeholder="Contoh: LENGKAP, AGR BELUM ADA, FP KURANG..."
@@ -1057,6 +1078,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Keterangan</label>
                     <select
+                      :disabled="!canEdit"
                       v-model="editForm.keterangan"
                       class="h-8.5 w-full px-3 rounded-md border border-gray-200 bg-white text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-black focus:border-black transition cursor-pointer"
                     >
@@ -1078,6 +1100,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Incentive</label>
                     <input
+                      :disabled="!canEdit"
                       v-model.number="editForm.incentive"
                       type="number"
                       step="any"
@@ -1088,6 +1111,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">DPP</label>
                     <input
+                      :disabled="!canEdit"
                       v-model.number="editForm.dpp"
                       type="number"
                       step="any"
@@ -1098,6 +1122,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">DPP Lain</label>
                     <input
+                      :disabled="!canEdit"
                       v-model.number="editForm.dpp_lain"
                       type="number"
                       step="any"
@@ -1108,6 +1133,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">PPN</label>
                     <input
+                      :disabled="!canEdit"
                       v-model.number="editForm.ppn"
                       type="number"
                       step="any"
@@ -1118,6 +1144,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Nilai PPh</label>
                     <input
+                      :disabled="!canEdit"
                       v-model.number="editForm.nilai_pph"
                       type="number"
                       step="any"
@@ -1128,6 +1155,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Net Pay</label>
                     <input
+                      :disabled="!canEdit"
                       v-model.number="editForm.net_pay"
                       type="number"
                       step="any"
@@ -1138,6 +1166,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Cek Pajak</label>
                     <input
+                      :disabled="!canEdit"
                       v-model.number="editForm.cek_pajak_tarif_pph"
                       type="number"
                       step="any"
@@ -1148,6 +1177,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Selisih</label>
                     <input
+                      :disabled="!canEdit"
                       v-model.number="editForm.selisih"
                       type="number"
                       step="any"
@@ -1158,6 +1188,7 @@
                   <div class="col-span-2">
                     <label class="block text-xs font-medium text-gray-700 mb-1">Note PPh</label>
                     <input
+                      :disabled="!canEdit"
                       v-model="editForm.note_pph"
                       type="text"
                       placeholder="Contoh: ok, CAP?, TTD?, NPWP?"
@@ -1167,6 +1198,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">No. Faktur</label>
                     <input
+                      :disabled="!canEdit"
                       v-model="editForm.no_faktur"
                       type="text"
                       placeholder="010.xxx-xx.xxxxxxxx"
@@ -1176,6 +1208,7 @@
                   <div>
                     <label class="block text-xs font-medium text-gray-700 mb-1">Tgl Faktur</label>
                     <input
+                      :disabled="!canEdit"
                       v-model="editForm.tgl_faktur"
                       type="text"
                       placeholder="DD/MM/YYYY"
@@ -1190,7 +1223,7 @@
             <div class="px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between gap-2">
               <div class="flex items-center gap-2">
                 <button
-                  v-if="editingSubmission && editForm.status_potong_purchase === 'BISA DI POTONG'"
+                  v-if="canEdit && editingSubmission && editForm.status_potong_purchase === 'BISA DI POTONG'"
                   type="button"
                   @click="sendWaToTelemarketing(editingSubmission)"
                   :disabled="isSendingWaModal"
@@ -1203,7 +1236,7 @@
                 </button>
 
                 <button
-                  v-if="editingSubmission && hasDocIssue(editingSubmission)"
+                  v-if="canEdit && editingSubmission && hasDocIssue(editingSubmission)"
                   type="button"
                   @click="openSendWaModal(editingSubmission)"
                   :disabled="sendingWaDocRowId === editingSubmission.id"
@@ -1218,7 +1251,7 @@
                 </button>
 
                 <button
-                  v-if="editingSubmission"
+                  v-if="canEdit && editingSubmission"
                   type="button"
                   @click="confirmDeleteSubmission(editingSubmission)"
                   class="h-8 px-3 rounded-md border border-gray-200 bg-white hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 text-gray-600 text-xs font-normal transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
@@ -1236,9 +1269,10 @@
                   :disabled="isSaving"
                   class="h-8 px-3.5 rounded-md border border-gray-200 bg-white hover:bg-gray-100 text-xs text-gray-700 font-normal transition cursor-pointer shadow-2xs"
                 >
-                  Batal
+                  {{ canEdit ? 'Batal' : 'Tutup' }}
                 </button>
                 <button
+                  v-if="canEdit"
                   type="button"
                   @click="saveEditModal"
                   :disabled="isSaving"
@@ -1721,6 +1755,9 @@ import DatePicker from '@/components/ui/DatePicker.vue';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 import FilamentBadge from '@/components/ui/FilamentBadge.vue';
+import { useAuth } from '@/composables/useAuth';
+
+const { canEdit } = useAuth();
 
 const googleSheetUrl = 'https://docs.google.com/spreadsheets/d/1rDYiHsNR43H44g2xyV-igyp1Ijv_jp8v8FblAMHqof8/edit?gid=0#gid=0';
 
@@ -2126,6 +2163,7 @@ const resetFilters = () => {
 
 // Trigger manual Google Sheet sync
 const triggerSync = async () => {
+  if (!canEdit.value) return;
   if (isSyncing.value) return;
   isSyncing.value = true;
   syncMessage.value = '';
@@ -2178,6 +2216,7 @@ const exportExcel = () => {
 };
 
 const runAutoSync = async () => {
+  if (!canEdit.value) return;
   if (isAutoSyncing || isSyncing.value || !autoRefresh.value) return;
   isAutoSyncing = true;
   try {
@@ -2199,6 +2238,7 @@ const runAutoSync = async () => {
 
 // Quick status change from row select
 const quickUpdateStatus = async (row, newStatus) => {
+  if (!canEdit.value) return;
   const previousStatus = row.status_potong_purchase;
   row.status_potong_purchase = newStatus;
 
@@ -2217,6 +2257,7 @@ const quickUpdateStatus = async (row, newStatus) => {
 
 // Quick keterangan change from row select
 const quickUpdateKeterangan = async (row, newKeterangan) => {
+  if (!canEdit.value) return;
   const previousKeterangan = row.keterangan;
   row.keterangan = newKeterangan;
 
@@ -2242,6 +2283,7 @@ const isSendingTelemarketing = ref(false);
 
 // Send WhatsApp notification to Telemarketing (opens contact selection modal)
 const sendWaToTelemarketing = (row) => {
+  if (!canEdit.value) return;
   if (!row) return;
   telemarketingModal.target = row;
   telemarketingModal.isOpen = true;
@@ -2249,6 +2291,7 @@ const sendWaToTelemarketing = (row) => {
 
 // Handle confirmed send from TelemarketingSelectModal
 const handleConfirmSendTelemarketing = async ({ phone, telemarketing_name, target }) => {
+  if (!canEdit.value) return;
   if (!target) return;
   isSendingTelemarketing.value = true;
   isSendingWaModal.value = true;
@@ -2407,6 +2450,7 @@ const formatPhoneForWa = (phone) => {
 };
 
 const openSendWaModal = (row, docType = '') => {
+  if (!canEdit.value) return;
   if (!row) return;
   selectedWaRow.value = row;
   waDocForm.phone = row.whatsapp || '081224290502';
@@ -2416,6 +2460,7 @@ const openSendWaModal = (row, docType = '') => {
 };
 
 const openWaWebDirect = () => {
+  if (!canEdit.value) return;
   const targetPhone = formatPhoneForWa(waDocForm.phone);
   const text = encodeURIComponent(waDocForm.message);
   const url = `https://api.whatsapp.com/send?phone=${targetPhone}&text=${text}`;
@@ -2423,6 +2468,7 @@ const openWaWebDirect = () => {
 };
 
 const submitSendWaDoc = async () => {
+  if (!canEdit.value) return;
   if (!selectedWaRow.value) return;
   isSendingWaDoc.value = true;
   sendingWaDocRowId.value = selectedWaRow.value.id;
@@ -2492,6 +2538,7 @@ watch(
 
 // AI: Analyze Single Row directly
 const analyzeRowWithAi = async (row) => {
+  if (!canEdit.value) return;
   if (!row) return;
   analyzingRowId.value = row.id;
   try {
@@ -2535,6 +2582,7 @@ const analyzeRowWithAi = async (row) => {
 
 // AI: Analyze Current Row inside Edit Modal
 const analyzeCurrentRowWithAi = async () => {
+  if (!canEdit.value) return;
   if (!editingSubmission.value) return;
   isAnalyzingCurrent.value = true;
 
@@ -2590,16 +2638,19 @@ const analyzeCurrentRowWithAi = async () => {
 
 // AI: Batch modal & execution
 const openBatchAiModal = () => {
+  if (!canEdit.value) return;
   batchResultSummary.value = '';
   showBatchAiModal.value = true;
 };
 
 const runBackgroundFromModal = async () => {
+  if (!canEdit.value) return;
   showBatchAiModal.value = false;
   await triggerBackgroundAi(true);
 };
 
 const runBatchAiAnalysis = async () => {
+  if (!canEdit.value) return;
   if (isAnalyzingBatch.value) return;
   isAnalyzingBatch.value = true;
   batchResultSummary.value = 'Memulai analisis AI bertahap...';
@@ -2653,6 +2704,7 @@ const runBatchAiAnalysis = async () => {
 
 // Model AI Modal logic
 const openModelAiModal = async () => {
+  if (!canEdit.value) return;
   showModelAiModal.value = true;
   showModelDropdown.value = false;
   modelSearchQuery.value = '';
@@ -2681,6 +2733,7 @@ const fetchAiConfigAndStats = async () => {
 };
 
 const saveSelectedModel = async () => {
+  if (!canEdit.value) return;
   isSavingModel.value = true;
   try {
     const res = await axios.post('/api/program-submissions/ai-config', {
@@ -2697,6 +2750,7 @@ const saveSelectedModel = async () => {
 };
 
 const triggerBackgroundAi = async (all = false) => {
+  if (!canEdit.value) return;
   if (isTriggeringBgAi.value) return;
   isTriggeringBgAi.value = true;
 
@@ -2744,6 +2798,7 @@ const hasSwappedOrInvalidDocs = (submission) => {
 
 // Quick Swap swapped documents
 const handleQuickSwap = async (type = 'agr_faktur') => {
+  if (!canEdit.value) return;
   if (!editingSubmission.value) return;
   isSwappingDocs.value = true;
   try {
@@ -2775,6 +2830,7 @@ const handleQuickSwap = async (type = 'agr_faktur') => {
 
 // Confirm delete submission
 const confirmDeleteSubmission = async (row) => {
+  if (!canEdit.value) return;
   if (!row) return;
   const dealer = row.dealer_name || row.id_real || 'pengajuan ini';
   if (!confirm(`Apakah Anda yakin ingin menghapus data pengajuan "${dealer}"?\n\nCatatan: Data yang dihapus tidak akan dimunculkan lagi saat sinkronisasi spreadsheet.`)) {
@@ -2833,6 +2889,7 @@ const openEditModal = (row) => {
 };
 
 const saveEditModal = async () => {
+  if (!canEdit.value) return;
   if (!editingSubmission.value) return;
   isSaving.value = true;
 

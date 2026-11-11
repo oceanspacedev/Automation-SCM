@@ -180,7 +180,7 @@
           </ol>
 
           <!-- Kirim (ulang) WA ke Tim Pajak (sudah dipotong, belum dicek) atau hasil cek pajak ke Tim SCM, mis. bila WA otomatis gagal -->
-          <div v-if="resendAction || waMessage" class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <div v-if="canEdit && (resendAction || waMessage)" class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <button v-if="resendAction" type="button" @click="resendWhatsApp" :disabled="sendingWa" :class="[detailButtonClass, 'inline-flex disabled:opacity-50']">
               {{ sendingWa ? 'Mengirim...' : resendAction.label }}
             </button>
@@ -216,6 +216,7 @@ import axios from 'axios';
 import AreaTabs from '@/components/AreaTabs.vue';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
+import { useAuth } from '@/composables/useAuth';
 import {
   ChevronRight as ChevronRightIcon,
   ChevronDown as ChevronDownIcon,
@@ -253,6 +254,8 @@ const StepDot = (props) => {
   );
 };
 StepDot.props = { state: { type: String, default: 'waiting' }, small: Boolean };
+
+const { canEdit } = useAuth();
 
 const rows = ref([]);
 const counts = ref({});
@@ -415,6 +418,7 @@ async function openDetail(row) {
 watch(() => detail.value?.id, () => { waMessage.value = null; });
 
 async function resendWhatsApp() {
+  if (!canEdit.value) return;
   const action = resendAction.value;
   sendingWa.value = true;
   waMessage.value = null;

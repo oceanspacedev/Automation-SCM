@@ -174,6 +174,7 @@
 import { ref, computed } from 'vue';
 import axios from 'axios';
 import { notify } from '@/composables/useNotify';
+import { useAuth } from '@/composables/useAuth';
 import {
   X as XIcon,
   UploadCloud as UploadCloudIcon,
@@ -186,6 +187,8 @@ defineProps({
 });
 
 const emit = defineEmits(['close', 'imported']);
+
+const { canEdit } = useAuth();
 
 const secondaryButtonClass = 'h-8 px-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium cursor-pointer disabled:opacity-50';
 const primaryButtonClass = 'h-8 px-4 inline-flex items-center gap-1.5 rounded-lg bg-gray-900 hover:bg-gray-800 text-white text-xs font-medium cursor-pointer disabled:opacity-50';
@@ -260,7 +263,7 @@ const clearFile = () => {
 };
 
 const send = async (previewOnly) => {
-  if (!selectedFile.value) return;
+  if (!canEdit.value || !selectedFile.value) return;
 
   uploading.value = true;
   errorMessage.value = '';

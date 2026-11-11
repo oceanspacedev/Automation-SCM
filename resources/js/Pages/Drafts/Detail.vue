@@ -49,7 +49,7 @@
           <span>{{ draft.status }}</span>
         </span>
         <button
-          v-if="draft.status !== 'invoiced'"
+          v-if="canEdit && draft.status !== 'invoiced'"
           @click="validateDraft"
           :disabled="validating"
           class="h-8 px-2 sm:px-3 flex-1 sm:flex-initial border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition cursor-pointer shadow-2xs whitespace-nowrap"
@@ -59,7 +59,7 @@
         </button>
 
         <button
-          v-if="draft.status === 'ready'"
+          v-if="canEdit && draft.status === 'ready'"
           @click="showGenerateModal = true"
           :disabled="generating"
           class="h-8 px-2 sm:px-3.5 flex-1 sm:flex-initial bg-[#1D70F5] text-white text-xs font-medium rounded-lg hover:bg-blue-600 disabled:opacity-50 transition cursor-pointer shadow-2xs whitespace-nowrap"
@@ -329,6 +329,7 @@ import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { CheckCircle as CheckCircleIcon, AlertCircle as AlertCircleIcon } from '@lucide/vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useAuth } from '@/composables/useAuth';
 import GenerateInvoiceModal from '@/components/GenerateInvoiceModal.vue';
 import {
   Table,
@@ -344,6 +345,8 @@ const props = defineProps({
 });
 
 const router = useRouter();
+// AR & Telemarketing hanya melihat: tombol validasi & generate disembunyikan
+const { canEdit } = useAuth();
 const draft = ref({});
 const comparison = ref(null);
 const loading = ref(true);
@@ -372,6 +375,7 @@ const fetchDetail = async () => {
 };
 
 const validateDraft = async () => {
+  if (!canEdit.value) return;
   validating.value = true;
   alertMessage.value = null;
   try {
@@ -389,6 +393,7 @@ const validateDraft = async () => {
 };
 
 const handleGenerateConfirm = async (billTo) => {
+  if (!canEdit.value) return;
   generating.value = true;
   alertMessage.value = null;
   try {

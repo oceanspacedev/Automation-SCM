@@ -514,6 +514,7 @@
 import { ref, reactive, watch, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { useArea } from '@/composables/useArea';
+import { useAuth } from '@/composables/useAuth';
 import {
   X as XIcon,
   Search as SearchIcon,
@@ -529,6 +530,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close', 'created']);
+
+// Hanya Admin & SCM yang boleh menambah draft
+const { canEdit } = useAuth();
 
 const isSubmitting = ref(false);
 const errorMessage = ref('');
@@ -807,6 +811,7 @@ function closeModal() {
 }
 
 async function submitForm() {
+  if (!canEdit.value) return;
   if (!form.dealer_name) {
     errorMessage.value = 'Nama dealer wajib diisi.';
     return;

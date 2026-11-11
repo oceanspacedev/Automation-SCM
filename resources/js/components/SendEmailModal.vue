@@ -93,7 +93,7 @@
               {{ success ? 'Tutup' : 'Batal' }}
             </button>
             <button
-              v-if="!success"
+              v-if="canEdit && !success"
               type="button"
               @click="send"
               :disabled="loading || (!email && !whatsapp)"
@@ -112,6 +112,9 @@
 import { ref, watch, onMounted } from 'vue';
 import axios from 'axios';
 import { XIcon } from '@lucide/vue';
+import { useAuth } from '@/composables/useAuth';
+
+const { canEdit } = useAuth();
 
 const props = defineProps({
   modelValue: Boolean,
@@ -167,7 +170,8 @@ const fetchEmailAccounts = async () => {
 };
 
 onMounted(() => {
-  fetchEmailAccounts();
+  // Akun pengirim hanya dipakai untuk mengirim invoice
+  if (canEdit.value) fetchEmailAccounts();
 });
 
 // Reset state and prefill when modal opens
@@ -206,7 +210,7 @@ const close = () => {
 };
 
 const send = async () => {
-  if ((!email.value && !whatsapp.value) || loading.value || success.value) return;
+  if (!canEdit.value || (!email.value && !whatsapp.value) || loading.value || success.value) return;
 
   error.value = '';
   loading.value = true;

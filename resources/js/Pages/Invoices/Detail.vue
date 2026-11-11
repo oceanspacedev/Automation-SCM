@@ -88,7 +88,7 @@
 
         <!-- Kirim Button -->
         <button
-          v-if="!(invoice.email_sent_at && invoice.whatsapp_sent_at)"
+          v-if="canEdit && !(invoice.email_sent_at && invoice.whatsapp_sent_at)"
           @click="showEmailModal = true"
           :disabled="quickSending"
           class="h-8 px-2 sm:px-3 flex-1 sm:flex-initial bg-[#1D70F5] text-white hover:bg-blue-600 text-xs font-medium rounded-lg transition inline-flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shadow-2xs whitespace-nowrap"
@@ -318,10 +318,13 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/table';
+import { useAuth } from '@/composables/useAuth';
 
 const props = defineProps({
   id: [String, Number],
 });
+
+const { canEdit } = useAuth();
 
 const invoice = ref({});
 const loading = ref(true);
@@ -351,7 +354,7 @@ const onEmailSent = (payload) => {
 };
 
 const quickSend = async () => {
-  if (quickSending.value || (invoice.value.email_sent_at && invoice.value.whatsapp_sent_at)) return;
+  if (!canEdit.value || quickSending.value || (invoice.value.email_sent_at && invoice.value.whatsapp_sent_at)) return;
   quickSending.value = true;
   alertMessage.value = null;
 

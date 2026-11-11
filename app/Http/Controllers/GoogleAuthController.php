@@ -21,6 +21,10 @@ class GoogleAuthController extends Controller
      */
     public function redirect(Request $request): RedirectResponse
     {
+        if (! $request->user()?->canEdit()) {
+            return $this->onlyEditors();
+        }
+
         try {
             $url = $this->googleMailService->getAuthUrl();
 
@@ -35,6 +39,10 @@ class GoogleAuthController extends Controller
      */
     public function callback(Request $request): RedirectResponse
     {
+        if (! $request->user()?->canEdit()) {
+            return $this->onlyEditors();
+        }
+
         if ($request->has('error')) {
             $error = $request->input('error_description', $request->input('error'));
 
@@ -64,6 +72,15 @@ class GoogleAuthController extends Controller
         } catch (Exception $e) {
             return redirect('/invoices?google_error='.urlencode($e->getMessage()));
         }
+    }
+
+    /**
+     * Back to Invoices when the visitor is not signed in as Admin or SCM: the Google account sends every invoice email,
+     * so only they may connect it.
+     */
+    private function onlyEditors(): RedirectResponse
+    {
+        return redirect('/invoices?google_error='.urlencode('Hanya Admin dan SCM yang bisa menghubungkan akun Google.'));
     }
 
     /**

@@ -15,7 +15,7 @@
       </div>
 
       <!-- Tombol aksi; di layar kecil dua tombol sama lebar dengan label pendek -->
-      <div class="grid grid-cols-2 sm:flex sm:items-center gap-2">
+      <div class="grid sm:flex sm:items-center gap-2" :class="canEdit ? 'grid-cols-2' : 'grid-cols-1'">
         <button
           type="button"
           @click="downloadExport('/api/ar-contacts/export', { search: searchQuery })"
@@ -24,7 +24,7 @@
           <span class="sm:hidden">Export</span><span class="hidden sm:inline">Export Excel</span>
         </button>
         <button
-          v-if="freeAreas.length"
+          v-if="canEdit && freeAreas.length"
           type="button"
           @click="openCreateModal"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
@@ -73,6 +73,7 @@
             <div class="flex items-start justify-between gap-3">
               <p class="min-w-0 text-sm font-medium text-gray-900 break-words">{{ areaLabel(c.area) }}</p>
               <button
+                v-if="canEdit"
                 type="button"
                 @click="toggleStatus(c)"
                 class="inline-flex items-center gap-1.5 shrink-0 font-medium cursor-pointer"
@@ -82,10 +83,14 @@
                 <span class="w-1.5 h-1.5 rounded-full" :class="c.is_active ? 'bg-emerald-500' : 'bg-gray-400'"></span>
                 {{ c.is_active ? 'Aktif' : 'Nonaktif' }}
               </button>
+              <span v-else class="inline-flex items-center gap-1.5 shrink-0 font-medium" :class="c.is_active ? 'text-gray-900' : 'text-gray-500'">
+                <span class="w-1.5 h-1.5 rounded-full" :class="c.is_active ? 'bg-emerald-500' : 'bg-gray-400'"></span>
+                {{ c.is_active ? 'Aktif' : 'Nonaktif' }}
+              </span>
             </div>
             <div class="flex items-end justify-between gap-3">
               <p class="min-w-0 text-gray-500 break-words">{{ c.name }} · {{ formatPhone(c.whatsapp) }}</p>
-              <div class="flex items-center gap-1.5 shrink-0">
+              <div v-if="canEdit" class="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   @click="openEditModal(c)"
@@ -115,15 +120,15 @@
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Nama AR</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">No. WhatsApp</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
-              <th scope="col" class="py-2.5 px-3 text-center w-28">Aksi</th>
+              <th v-if="canEdit" scope="col" class="py-2.5 px-3 text-center w-28">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
             <tr v-if="isLoading" class="text-center">
-              <td colspan="6" class="py-10 text-gray-500">Memuat data...</td>
+              <td :colspan="canEdit ? 6 : 5" class="py-10 text-gray-500">Memuat data...</td>
             </tr>
             <tr v-else-if="filteredContacts.length === 0" class="text-center">
-              <td colspan="6" class="py-10 text-gray-500">Tidak ada data AR.</td>
+              <td :colspan="canEdit ? 6 : 5" class="py-10 text-gray-500">Tidak ada data AR.</td>
             </tr>
             <tr v-else v-for="(c, index) in filteredContacts" :key="c.id" class="hover:bg-gray-50/70 text-gray-800">
               <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap text-gray-600">{{ index + 1 }}</td>
@@ -132,6 +137,7 @@
               <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">{{ formatPhone(c.whatsapp) }}</td>
               <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
                 <button
+                  v-if="canEdit"
                   type="button"
                   @click="toggleStatus(c)"
                   class="cursor-pointer text-xs font-medium transition hover:underline"
@@ -140,8 +146,11 @@
                 >
                   {{ c.is_active ? 'Aktif' : 'Nonaktif' }}
                 </button>
+                <span v-else class="text-xs font-medium" :class="c.is_active ? 'text-gray-900' : 'text-gray-500'">
+                  {{ c.is_active ? 'Aktif' : 'Nonaktif' }}
+                </span>
               </td>
-              <td class="py-2.5 px-3 text-center whitespace-nowrap">
+              <td v-if="canEdit" class="py-2.5 px-3 text-center whitespace-nowrap">
                 <div class="inline-flex items-center justify-center gap-1">
                   <button
                     type="button"
@@ -283,6 +292,7 @@ import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { notify } from '@/composables/useNotify';
 import { AREAS } from '@/composables/useArea';
+import { useAuth } from '@/composables/useAuth';
 import { useAutoRefresh } from '@/composables/useAutoRefresh';
 import { downloadExport } from '@/lib/download';
 import {
@@ -292,6 +302,8 @@ import {
   Pencil as PencilIcon,
   Trash2 as Trash2Icon,
 } from 'lucide-vue-next';
+
+const { canEdit } = useAuth();
 
 const contacts = ref([]);
 const isLoading = ref(false);
@@ -360,6 +372,7 @@ useAutoRefresh(async () => {
 });
 
 const openCreateModal = () => {
+  if (!canEdit.value) return;
   formData.id = null;
   formData.area = freeAreas.value[0]?.value || '';
   formData.name = '';
@@ -370,6 +383,7 @@ const openCreateModal = () => {
 };
 
 const openEditModal = (c) => {
+  if (!canEdit.value) return;
   formData.id = c.id;
   formData.area = c.area;
   formData.name = c.name;
@@ -380,6 +394,7 @@ const openEditModal = (c) => {
 };
 
 const submitForm = async () => {
+  if (!canEdit.value) return;
   isSaving.value = true;
   errorMessage.value = '';
   try {
@@ -404,6 +419,7 @@ const submitForm = async () => {
 };
 
 const toggleStatus = async (c) => {
+  if (!canEdit.value) return;
   try {
     const res = await axios.patch(`/api/ar-contacts/${c.id}/toggle-status`);
     c.is_active = res.data?.data?.is_active ?? !c.is_active;
@@ -413,6 +429,7 @@ const toggleStatus = async (c) => {
 };
 
 const executeDelete = async () => {
+  if (!canEdit.value) return;
   isDeleting.value = true;
   try {
     await axios.delete(`/api/ar-contacts/${contactToDelete.value.id}`);

@@ -213,7 +213,7 @@ sequenceDiagram
   | AR | Draft, Invoice, Riwayat Email, Riwayat Program |
   | Telemarketing | Form Program, Riwayat Program |
 
-  Admin bisa mengatur akses per menu untuk tiap user di **Master → User**. Halaman di luar akses pengguna tidak tampil di menu dan tidak bisa dibuka lewat URL (diarahkan ke Dashboard). **Dashboard** terbuka untuk semua pengguna, jadi tidak ada di daftar hak akses.
+  Admin bisa mengatur akses per menu untuk tiap user di **Master → User**. Halaman di luar akses pengguna tidak tampil di menu dan tidak bisa dibuka lewat URL (diarahkan ke Dashboard). **Dashboard** terbuka untuk semua pengguna, jadi tidak ada di daftar hak akses. Hanya Admin dan SCM yang bisa mengubah data di web; AR dan Telemarketing hanya melihat (profil sendiri tetap bisa diubah).
 - **Profil:** klik lingkaran inisial/foto di kanan atas → **Profil** untuk ganti foto, nama, email, WhatsApp, dan password. Menu yang sama berisi **Mode Gelap** dan **Keluar**.
 
 ---

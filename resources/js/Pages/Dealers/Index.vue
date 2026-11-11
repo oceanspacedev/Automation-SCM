@@ -19,9 +19,9 @@
       </div>
 
       <!-- Tombol aksi; di layar kecil tiga tombol sama lebar -->
-      <div class="grid grid-cols-3 sm:flex sm:items-center gap-2">
+      <div class="grid sm:flex sm:items-center gap-2" :class="canEdit ? 'grid-cols-3' : 'grid-cols-1'">
         <!-- Import: tiga jenis file, masing-masing dengan jendelanya sendiri -->
-        <div class="relative" ref="importMenuRef">
+        <div v-if="canEdit" class="relative" ref="importMenuRef">
           <button
             type="button"
             @click="showImportMenu = !showImportMenu"
@@ -52,6 +52,7 @@
           <span class="sm:hidden">Export</span><span class="hidden sm:inline">Export Excel</span>
         </button>
         <button
+          v-if="canEdit"
           type="button"
           @click="openCreateModal"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
@@ -146,6 +147,7 @@
               {{ formatCount(importStatus.resume?.from) }} dari {{ formatCount(importStatus.progress?.total) }} toko sudah tersimpan.
             </span>
             <button
+              v-if="canEdit"
               type="button"
               @click="resumeImport"
               :disabled="isResumingImport"
@@ -246,6 +248,7 @@
                 <p class="mt-0.5 text-gray-500 break-words">{{ d.region || '-' }} · NPWP {{ d.npwp_type || '-' }}</p>
               </div>
               <button
+                v-if="canEdit"
                 type="button"
                 @click="toggleDealerStatus(d)"
                 class="text-xs hover:underline cursor-pointer shrink-0"
@@ -253,6 +256,9 @@
               >
                 {{ d.is_active ? 'Aktif' : 'Nonaktif' }}
               </button>
+              <span v-else class="text-xs shrink-0" :class="d.is_active ? 'text-gray-700' : 'text-gray-400'">
+                {{ d.is_active ? 'Aktif' : 'Nonaktif' }}
+              </span>
             </div>
             <p class="text-gray-500 break-words">ID Realme {{ d.id_realme || '-' }}<template v-if="d.gs_name"> · {{ d.gs_name }}</template></p>
             <p class="text-gray-500 break-words">Email <template v-if="d.email">{{ emailParts(d.email)[0] }}<wbr>{{ emailParts(d.email)[1] }}</template><template v-else>belum ada</template></p>
@@ -265,7 +271,7 @@
               <p class="min-w-0 text-gray-500 break-words">
                 Telemarketing {{ d.telemarketing || '-' }}<template v-if="d.telemarketing_phone"> · {{ d.telemarketing_phone }}</template>
               </p>
-              <div class="flex items-center gap-1.5 shrink-0">
+              <div v-if="canEdit" class="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   @click="openEditModal(d)"
@@ -302,17 +308,17 @@
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Sales</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Agreement</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
-              <th scope="col" class="py-2.5 px-3 text-right">Aksi</th>
+              <th v-if="canEdit" scope="col" class="py-2.5 px-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <tr v-if="isLoading">
-              <td colspan="12" class="py-8 text-center text-gray-500">
+              <td :colspan="canEdit ? 12 : 11" class="py-8 text-center text-gray-500">
                 Memuat data...
               </td>
             </tr>
             <tr v-else-if="dealers.length === 0">
-              <td colspan="12" class="py-8 text-center text-gray-500">
+              <td :colspan="canEdit ? 12 : 11" class="py-8 text-center text-gray-500">
                 Tidak ada data dealer yang ditemukan.
               </td>
             </tr>
@@ -383,6 +389,7 @@
               <!-- 8. Status -->
               <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
                 <button
+                  v-if="canEdit"
                   type="button"
                   @click="toggleDealerStatus(d)"
                   class="text-xs hover:underline cursor-pointer"
@@ -390,10 +397,13 @@
                 >
                   {{ d.is_active ? 'Aktif' : 'Nonaktif' }}
                 </button>
+                <span v-else class="text-xs" :class="d.is_active ? 'text-gray-700' : 'text-gray-400'">
+                  {{ d.is_active ? 'Aktif' : 'Nonaktif' }}
+                </span>
               </td>
 
               <!-- 9. Aksi -->
-              <td class="py-2.5 px-3 text-right whitespace-nowrap">
+              <td v-if="canEdit" class="py-2.5 px-3 text-right whitespace-nowrap">
                 <div class="flex items-center justify-end gap-1">
                   <button
                     type="button"
@@ -718,6 +728,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { notify } from '@/composables/useNotify';
+import { useAuth } from '@/composables/useAuth';
 import AreaTabs from '@/components/AreaTabs.vue';
 import DealerImportModal from '@/components/DealerImportModal.vue';
 import DealerEmailImportModal from '@/components/DealerEmailImportModal.vue';
@@ -732,6 +743,8 @@ import {
   PencilIcon,
   Trash2Icon,
 } from 'lucide-vue-next';
+
+const { canEdit } = useAuth();
 
 const isImportModalOpen = ref(false);
 const isEmailImportOpen = ref(false);
@@ -748,6 +761,7 @@ const importMenuRef = ref(null);
 
 const openImport = (type) => {
   showImportMenu.value = false;
+  if (!canEdit.value) return;
   if (type === 'email') {
     isEmailImportOpen.value = true;
     return;
@@ -932,6 +946,7 @@ function openEditModal(d) {
 }
 
 async function submitForm() {
+  if (!canEdit.value) return;
   isSaving.value = true;
   try {
     if (isEditMode.value) {
@@ -949,6 +964,7 @@ async function submitForm() {
 }
 
 async function toggleDealerStatus(d) {
+  if (!canEdit.value) return;
   try {
     const res = await axios.patch(`/api/dealers/${d.id}/toggle-status`);
     if (res.data?.success) {
@@ -964,7 +980,7 @@ function confirmDelete(d) {
 }
 
 async function executeDelete() {
-  if (!dealerToDelete.value) return;
+  if (!canEdit.value || !dealerToDelete.value) return;
   isDeleting.value = true;
   try {
     const res = await axios.delete(`/api/dealers/${dealerToDelete.value.id}`);
@@ -1044,6 +1060,7 @@ async function fetchImportStatus() {
 }
 
 async function resumeImport() {
+  if (!canEdit.value) return;
   isResumingImport.value = true;
   try {
     const res = await axios.post('/api/dealers/import/resume');

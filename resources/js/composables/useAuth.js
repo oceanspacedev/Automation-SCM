@@ -1,5 +1,6 @@
 import { reactive, computed } from 'vue';
 import axios from 'axios';
+import { canEdit as canEditData } from '@/lib/access';
 
 const state = reactive({
   user: null,
@@ -66,6 +67,8 @@ export function useAuth() {
   return {
     state,
     user: computed(() => state.user),
+    // Hanya Admin & SCM yang boleh mengubah data; AR & Telemarketing hanya melihat
+    canEdit: computed(() => canEditData(state.user)),
     isAuthenticated: computed(() => !!state.user),
     isLoading: computed(() => state.loading),
     isInitialized: computed(() => state.initialized),

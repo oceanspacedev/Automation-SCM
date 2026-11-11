@@ -43,6 +43,7 @@
             class="absolute left-0 sm:left-auto sm:right-0 top-full mt-1.5 w-48 bg-white rounded-lg shadow-lg border border-gray-200 p-1 z-50 font-sans"
           >
             <button
+              v-if="canEdit"
               type="button"
               @click="handleTriggerSync"
               :disabled="isSyncing"
@@ -64,6 +65,7 @@
             </a>
 
             <button
+              v-if="canEdit"
               type="button"
               @click="openUrlModal"
               class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer"
@@ -83,6 +85,7 @@
             </button>
 
             <button
+              v-if="canEdit"
               type="button"
               @click="openPoImport"
               class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer"
@@ -315,7 +318,7 @@
         <p v-if="isLoading && items.length === 0" class="py-8 text-center text-xs text-gray-500">Memuat data program...</p>
         <div v-else-if="items.length === 0" class="py-8 px-4 space-y-1.5 text-center text-xs text-gray-500">
           <p class="font-medium text-gray-800">Belum ada data program yang tersimpan.</p>
-          <p>Klik tombol <strong>"Sinkronkan Sekarang"</strong> di atas untuk memuat data dari spreadsheet Anda.</p>
+          <p v-if="canEdit">Klik tombol <strong>"Sinkronkan Sekarang"</strong> di atas untuk memuat data dari spreadsheet Anda.</p>
         </div>
         <ul v-else class="divide-y divide-gray-100">
           <li v-for="row in items" :key="row.id" class="p-4 space-y-2 text-xs text-gray-700">
@@ -361,13 +364,22 @@
               <div class="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
-                  @click="testMatchSingleRow(row)"
+                  @click="viewRow(row)"
                   :disabled="reconcilingRowId === row.id"
                   class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer disabled:opacity-50"
                 >
                   {{ reconcilingRowId === row.id ? 'Menguji...' : 'Lihat' }}
                 </button>
                 <button
+                  v-if="!canEdit"
+                  type="button"
+                  @click="openHistoryModal(row)"
+                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
+                >
+                  Riwayat
+                </button>
+                <button
+                  v-if="canEdit"
                   type="button"
                   @click="openEditModal(row)"
                   class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
@@ -375,7 +387,7 @@
                   Edit
                 </button>
                 <button
-                  v-if="row.status_potong_purchase === 'BISA DI POTONG'"
+                  v-if="canEdit && row.status_potong_purchase === 'BISA DI POTONG'"
                   type="button"
                   @click="sendWaToTelemarketing(row)"
                   :disabled="sendingWaId === row.id"
@@ -483,7 +495,7 @@
               <th scope="col" class="py-2.5 px-3 text-center border-l border-b border-gray-200 bg-gray-50 sticky right-0 top-0 z-40 min-w-[195px] shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.08),0_1px_0_0_#e5e7eb]" style="right: 0px; top: 0px;">Aksi</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-gray-200 bg-white" @click="onGridClick">
+          <tbody class="divide-y divide-gray-200 bg-white" @click="canEdit && onGridClick($event)">
             <!-- Loading State -->
             <tr v-if="isLoading && items.length === 0">
               <td colspan="58" class="py-8 text-center text-gray-500">
@@ -499,7 +511,7 @@
               <td colspan="58" class="py-8 text-center text-gray-500">
                 <div class="max-w-md mx-auto space-y-1.5 text-center">
                   <p class="font-medium text-gray-800 text-xs">Belum ada data program yang tersimpan.</p>
-                  <p class="text-xs text-gray-500">
+                  <p v-if="canEdit" class="text-xs text-gray-500">
                     Klik tombol <strong>"Sinkronkan Sekarang"</strong> di atas untuk memuat data dari spreadsheet Anda.
                   </p>
                 </div>
@@ -512,7 +524,7 @@
               v-for="(row, idx) in items"
               :key="row.id"
               :data-row-index="idx"
-              @dblclick="onGridDblClick($event) || openEditModal(row)"
+              @dblclick="(canEdit && onGridDblClick($event)) || openEditModal(row)"
               class="group hover:bg-gray-50/70 text-gray-700 font-normal cursor-cell"
             >
               <!-- 1. No (Locked) -->
@@ -895,10 +907,10 @@
                 <div class="flex items-center justify-center gap-1.5">
                   <button
                     type="button"
-                    @click.stop="testMatchSingleRow(row)"
+                    @click.stop="viewRow(row)"
                     :disabled="reconcilingRowId === row.id"
                     class="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium transition cursor-pointer shadow-2xs disabled:opacity-50"
-                    title="Cek kecocokan data dengan Test Program"
+                    :title="canEdit ? 'Cek kecocokan data dengan Test Program' : 'Lihat data program ini'"
                   >
                     <RefreshCwIcon v-if="reconcilingRowId === row.id" class="w-3 h-3 animate-spin text-gray-400" />
                     <EyeIcon v-else class="w-3.5 h-3.5 text-gray-500" />
@@ -906,6 +918,18 @@
                   </button>
 
                   <button
+                    v-if="!canEdit"
+                    type="button"
+                    @click.stop="openHistoryModal(row)"
+                    class="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white hover:bg-gray-100 text-gray-800 text-xs font-medium transition cursor-pointer shadow-2xs"
+                    title="Riwayat pencocokan baris ini"
+                  >
+                    <HistoryIcon class="w-3.5 h-3.5 text-gray-600" />
+                    <span>Riwayat</span>
+                  </button>
+
+                  <button
+                    v-if="canEdit"
                     type="button"
                     @click.stop="openEditModal(row)"
                     class="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white hover:bg-gray-100 text-gray-800 text-xs font-medium transition cursor-pointer shadow-2xs"
@@ -916,7 +940,7 @@
                   </button>
 
                   <button
-                    v-if="row.status_potong_purchase === 'BISA DI POTONG'"
+                    v-if="canEdit && row.status_potong_purchase === 'BISA DI POTONG'"
                     type="button"
                     @click.stop="sendWaToTelemarketing(row)"
                     :disabled="sendingWaId === row.id"
@@ -1066,6 +1090,7 @@
             <div class="px-4 sm:px-6 py-3.5 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-xs shrink-0">
               <div class="flex items-center gap-2">
                 <button
+                  v-if="canEdit"
                   type="button"
                   @click="testMatchSingleRow(testRow, true)"
                   :disabled="reconcilingRowId === testRow?.id"
@@ -1092,7 +1117,7 @@
                   Tutup
                 </button>
                 <button
-                  v-if="testRow?.status_potong_purchase === 'BISA DI POTONG'"
+                  v-if="canEdit && testRow?.status_potong_purchase === 'BISA DI POTONG'"
                   type="button"
                   @click="sendWaToTelemarketing(testRow)"
                   :disabled="sendingWaId === testRow?.id"
@@ -1208,6 +1233,7 @@ import AreaTabs from '@/components/AreaTabs.vue';
 import WhatsAppIcon from '@/components/WhatsAppIcon.vue';
 import TelemarketingSelectModal from '@/components/TelemarketingSelectModal.vue';
 import { useArea } from '@/composables/useArea';
+import { useAuth } from '@/composables/useAuth';
 import EditDataProgramModal from '@/components/EditDataProgramModal.vue';
 import { useSpreadsheetGrid } from '@/composables/useSpreadsheetGrid';
 import { useAutoRefresh, createRequestTracker, AUTO_REFRESH_SECONDS } from '@/composables/useAutoRefresh';
@@ -1230,6 +1256,7 @@ import {
   ArrowRight as ArrowRightIcon,
   Eye as EyeIcon,
   Pencil as PencilIcon,
+  History as HistoryIcon,
   Settings as SettingsIcon,
   Upload as UploadIcon,
 } from 'lucide-vue-next';
@@ -1240,6 +1267,7 @@ import DataProgramPoImportModal from '@/components/DataProgramPoImportModal.vue'
 
 // ===== AREA (Jabar/Jateng) =====
 const { area } = useArea();
+const { canEdit } = useAuth();
 
 // ===== LINK SPREADSHEET PER AREA =====
 const urlModal = reactive({
@@ -1252,6 +1280,7 @@ const urlModal = reactive({
 });
 
 const openUrlModal = async () => {
+  if (!canEdit.value) return;
   showSpreadsheetDropdown.value = false;
   urlModal.message = '';
   urlModal.isOpen = true;
@@ -1265,6 +1294,7 @@ const openUrlModal = async () => {
 };
 
 const saveUrlConfig = async () => {
+  if (!canEdit.value) return;
   urlModal.isSaving = true;
   urlModal.message = '';
   try {
@@ -1333,6 +1363,7 @@ const handleDataProgramSaved = (updatedRow) => {
 const gridContainer = ref(null);
 
 const saveCells = async (field, changes) => {
+  if (!canEdit.value) return;
   const previousValues = changes.map(({ row }) => row[field]);
   changes.forEach(({ row, value }) => { row[field] = value; });
 
@@ -1401,6 +1432,7 @@ const handleExportCsv = () => {
 const showPoImportModal = ref(false);
 
 const openPoImport = () => {
+  if (!canEdit.value) return;
   showSpreadsheetDropdown.value = false;
   showPoImportModal.value = true;
 };
@@ -1588,7 +1620,7 @@ useAutoRefresh(() => fetchData(pagination.current_page, { silent: true }), {
 });
 
 const triggerSync = async () => {
-  if (isSyncing.value) return;
+  if (!canEdit.value || isSyncing.value) return;
   isSyncing.value = true;
   syncMessage.value = '';
   syncError.value = false;
@@ -1704,6 +1736,7 @@ const testResultClass = (result) => {
 };
 
 const testMatchSingleRow = async (row, force = false) => {
+  if (!canEdit.value) return;
   reconcilingRowId.value = row.id;
   testRow.value = row;
   try {
@@ -1728,6 +1761,9 @@ const testMatchSingleRow = async (row, force = false) => {
   }
 };
 
+// Uji kecocokan menyimpan hasilnya, jadi pengguna yang hanya melihat membuka rincian baris saja
+const viewRow = (row) => (canEdit.value ? testMatchSingleRow(row) : openEditModal(row));
+
 // Modal state for choosing Telemarketing recipient
 const telemarketingModal = reactive({
   isOpen: false,
@@ -1738,14 +1774,14 @@ const sendingWaId = ref(null);
 
 // Send WhatsApp notification to Telemarketing (opens contact selection modal)
 const sendWaToTelemarketing = (row) => {
-  if (!row) return;
+  if (!canEdit.value || !row) return;
   telemarketingModal.target = row;
   telemarketingModal.isOpen = true;
 };
 
 // Handle confirmed send from TelemarketingSelectModal
 const handleConfirmSendTelemarketing = async ({ phone, telemarketing_name, target }) => {
-  if (!target) return;
+  if (!canEdit.value || !target) return;
   isSendingTelemarketing.value = true;
   sendingWaId.value = target.id;
 

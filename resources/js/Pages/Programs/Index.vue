@@ -19,7 +19,7 @@
       </div>
 
       <!-- Tombol aksi; di layar kecil tiga tombol sama lebar dengan label pendek -->
-      <div class="grid grid-cols-3 sm:flex sm:items-center gap-2">
+      <div class="grid sm:flex sm:items-center gap-2" :class="canEdit ? 'grid-cols-3' : 'grid-cols-1'">
         <input
           ref="importInput"
           type="file"
@@ -28,6 +28,7 @@
           @change="handleImportFile"
         />
         <button
+          v-if="canEdit"
           type="button"
           @click="importInput?.click()"
           :disabled="isImporting"
@@ -46,6 +47,7 @@
           <span class="sm:hidden">Export</span><span class="hidden sm:inline">Export Excel</span>
         </button>
         <button
+          v-if="canEdit"
           type="button"
           @click="openCreateModal"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
@@ -123,6 +125,7 @@
             <div class="flex items-start justify-between gap-3">
               <p class="min-w-0 text-sm font-medium text-gray-900 break-words">{{ p.code || '-' }} · {{ p.name }}</p>
               <button
+                v-if="canEdit"
                 type="button"
                 @click="toggleStatus(p)"
                 :disabled="p._isToggling"
@@ -132,10 +135,18 @@
                 <span class="w-1.5 h-1.5 rounded-full" :class="p.is_active ? 'bg-emerald-600' : 'bg-gray-400'"></span>
                 <span>{{ p.is_active ? 'Aktif' : 'Nonaktif' }}</span>
               </button>
+              <span
+                v-else
+                class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium shrink-0"
+                :class="p.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600 border border-gray-300'"
+              >
+                <span class="w-1.5 h-1.5 rounded-full" :class="p.is_active ? 'bg-emerald-600' : 'bg-gray-400'"></span>
+                <span>{{ p.is_active ? 'Aktif' : 'Nonaktif' }}</span>
+              </span>
             </div>
             <div class="flex items-center justify-between gap-3">
               <p class="min-w-0 text-gray-500 break-words">{{ p.period || '-' }}</p>
-              <div class="flex items-center gap-1.5 shrink-0">
+              <div v-if="canEdit" class="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
                   @click="openEditModal(p)"
@@ -165,17 +176,17 @@
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">NAMA PROGRAM</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">PERIODE</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
-              <th scope="col" class="py-2.5 px-3 text-right">Aksi</th>
+              <th v-if="canEdit" scope="col" class="py-2.5 px-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <tr v-if="isLoading">
-              <td colspan="5" class="py-8 text-center text-gray-500">
+              <td :colspan="canEdit ? 5 : 4" class="py-8 text-center text-gray-500">
                 Memuat data...
               </td>
             </tr>
             <tr v-else-if="programs.length === 0">
-              <td colspan="5" class="py-8 text-center text-gray-500">
+              <td :colspan="canEdit ? 5 : 4" class="py-8 text-center text-gray-500">
                 Tidak ada data master program yang ditemukan.
               </td>
             </tr>
@@ -197,6 +208,7 @@
               </td>
               <td class="py-2 px-3 text-center border-r border-gray-200 whitespace-nowrap">
                 <button
+                  v-if="canEdit"
                   type="button"
                   @click="toggleStatus(p)"
                   :disabled="p._isToggling"
@@ -206,8 +218,16 @@
                   <span class="w-1.5 h-1.5 rounded-full" :class="p.is_active ? 'bg-emerald-600' : 'bg-gray-400'"></span>
                   <span>{{ p.is_active ? 'Aktif' : 'Nonaktif' }}</span>
                 </button>
+                <span
+                  v-else
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium"
+                  :class="p.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600 border border-gray-300'"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full" :class="p.is_active ? 'bg-emerald-600' : 'bg-gray-400'"></span>
+                  <span>{{ p.is_active ? 'Aktif' : 'Nonaktif' }}</span>
+                </span>
               </td>
-              <td class="py-2 px-3 text-right whitespace-nowrap">
+              <td v-if="canEdit" class="py-2 px-3 text-right whitespace-nowrap">
                 <div class="inline-flex items-center gap-1">
                   <button
                     type="button"
@@ -407,6 +427,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { notify } from '@/composables/useNotify';
+import { useAuth } from '@/composables/useAuth';
 import { downloadExport } from '@/lib/download';
 import BrandTabs from '@/components/BrandTabs.vue';
 import { useBrands } from '@/composables/useBrands';
@@ -422,6 +443,7 @@ import {
 } from 'lucide-vue-next';
 
 const { brand } = useBrands();
+const { canEdit } = useAuth();
 
 const programs = ref([]);
 const totalRows = ref(0);
@@ -533,7 +555,7 @@ const openEditModal = (p) => {
 };
 
 const submitForm = async () => {
-  if (!formData.name.trim()) return;
+  if (!canEdit.value || !formData.name.trim()) return;
 
   isSaving.value = true;
   notice.value = null;
@@ -556,7 +578,7 @@ const submitForm = async () => {
 const handleImportFile = async (event) => {
   const file = event.target.files?.[0];
   event.target.value = '';
-  if (!file) return;
+  if (!canEdit.value || !file) return;
 
   isImporting.value = true;
   notice.value = null;
@@ -574,6 +596,7 @@ const handleImportFile = async (event) => {
 };
 
 const toggleStatus = async (p) => {
+  if (!canEdit.value) return;
   p._isToggling = true;
   try {
     const res = await axios.patch(`/api/programs/${p.id}/toggle-status`);
@@ -592,7 +615,7 @@ const confirmDelete = (p) => {
 };
 
 const executeDelete = async () => {
-  if (!programToDelete.value) return;
+  if (!canEdit.value || !programToDelete.value) return;
 
   isDeleting.value = true;
   try {

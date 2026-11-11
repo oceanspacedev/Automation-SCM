@@ -19,7 +19,7 @@
       </div>
 
       <!-- Tombol aksi; di layar kecil dua tombol sama lebar dengan label pendek -->
-      <div class="grid grid-cols-2 sm:flex sm:items-center gap-2">
+      <div class="grid sm:flex sm:items-center gap-2" :class="canEdit ? 'grid-cols-2' : 'grid-cols-1'">
         <button
           type="button"
           @click="downloadExport('/api/regions/export', { search: searchQuery })"
@@ -28,6 +28,7 @@
           <span class="sm:hidden">Export</span><span class="hidden sm:inline">Export Excel</span>
         </button>
         <button
+          v-if="canEdit"
           type="button"
           @click="openCreateModal"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
@@ -59,7 +60,7 @@
       <div class="md:hidden">
         <p v-if="isLoading" class="py-8 text-center text-xs text-gray-500">Memuat data...</p>
         <p v-else-if="filteredRegions.length === 0" class="py-8 px-4 text-center text-xs text-gray-500">
-          Belum ada region untuk {{ area.label }}. Klik "Tambah Region" untuk menambahkan.
+          Belum ada region untuk {{ area.label }}.<template v-if="canEdit"> Klik "Tambah Region" untuk menambahkan.</template>
         </p>
         <ul v-else class="divide-y divide-gray-100">
           <li v-for="r in filteredRegions" :key="r.id" class="p-4 space-y-2 text-xs text-gray-700">
@@ -67,6 +68,7 @@
               <p class="min-w-0 text-sm font-medium text-gray-900 break-words">{{ r.name }}</p>
               <div class="flex items-center gap-1.5 shrink-0">
                 <button
+                  v-if="canEdit"
                   type="button"
                   @click="toggleStatus(r)"
                   class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer"
@@ -75,7 +77,16 @@
                   <span class="w-1.5 h-1.5 rounded-full" :class="r.is_active ? 'bg-emerald-600' : 'bg-gray-400'"></span>
                   <span>{{ r.is_active ? 'Aktif' : 'Nonaktif' }}</span>
                 </button>
+                <span
+                  v-else
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium"
+                  :class="r.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600 border border-gray-300'"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full" :class="r.is_active ? 'bg-emerald-600' : 'bg-gray-400'"></span>
+                  <span>{{ r.is_active ? 'Aktif' : 'Nonaktif' }}</span>
+                </span>
                 <button
+                  v-if="canEdit"
                   type="button"
                   @click="openEditModal(r)"
                   class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
@@ -83,6 +94,7 @@
                   Edit
                 </button>
                 <button
+                  v-if="canEdit"
                   type="button"
                   @click="regionToDelete = r"
                   class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer"
@@ -102,16 +114,16 @@
               <th scope="col" class="py-2.5 px-3 text-center w-12 border-r border-gray-200">No</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">REGION</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
-              <th scope="col" class="py-2.5 px-3 text-right">Aksi</th>
+              <th v-if="canEdit" scope="col" class="py-2.5 px-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <tr v-if="isLoading">
-              <td colspan="4" class="py-8 text-center text-gray-500">Memuat data...</td>
+              <td :colspan="canEdit ? 4 : 3" class="py-8 text-center text-gray-500">Memuat data...</td>
             </tr>
             <tr v-else-if="filteredRegions.length === 0">
-              <td colspan="4" class="py-8 text-center text-gray-500">
-                Belum ada region untuk {{ area.label }}. Klik "Tambah Region" untuk menambahkan.
+              <td :colspan="canEdit ? 4 : 3" class="py-8 text-center text-gray-500">
+                Belum ada region untuk {{ area.label }}.<template v-if="canEdit"> Klik "Tambah Region" untuk menambahkan.</template>
               </td>
             </tr>
             <tr v-else v-for="(r, index) in filteredRegions" :key="r.id" class="hover:bg-gray-50/80 transition">
@@ -119,6 +131,7 @@
               <td class="py-2 px-3 font-medium text-gray-900 border-r border-gray-200 whitespace-nowrap">{{ r.name }}</td>
               <td class="py-2 px-3 text-center border-r border-gray-200 whitespace-nowrap">
                 <button
+                  v-if="canEdit"
                   type="button"
                   @click="toggleStatus(r)"
                   class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer"
@@ -127,8 +140,16 @@
                   <span class="w-1.5 h-1.5 rounded-full" :class="r.is_active ? 'bg-emerald-600' : 'bg-gray-400'"></span>
                   <span>{{ r.is_active ? 'Aktif' : 'Nonaktif' }}</span>
                 </button>
+                <span
+                  v-else
+                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium"
+                  :class="r.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-600 border border-gray-300'"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full" :class="r.is_active ? 'bg-emerald-600' : 'bg-gray-400'"></span>
+                  <span>{{ r.is_active ? 'Aktif' : 'Nonaktif' }}</span>
+                </span>
               </td>
-              <td class="py-2 px-3 text-right whitespace-nowrap">
+              <td v-if="canEdit" class="py-2 px-3 text-right whitespace-nowrap">
                 <div class="inline-flex items-center gap-1">
                   <button
                     type="button"
@@ -247,6 +268,7 @@ import axios from 'axios';
 import { notify } from '@/composables/useNotify';
 import AreaTabs from '@/components/AreaTabs.vue';
 import { useArea } from '@/composables/useArea';
+import { useAuth } from '@/composables/useAuth';
 import { useAutoRefresh } from '@/composables/useAutoRefresh';
 import { downloadExport } from '@/lib/download';
 import {
@@ -258,6 +280,7 @@ import {
 } from 'lucide-vue-next';
 
 const { area } = useArea();
+const { canEdit } = useAuth();
 
 const regions = ref([]);
 const isLoading = ref(false);
@@ -297,6 +320,7 @@ useAutoRefresh(() => fetchRegions({ silent: true }), {
 });
 
 const openCreateModal = () => {
+  if (!canEdit.value) return;
   formData.id = null;
   formData.name = '';
   formData.is_active = true;
@@ -305,6 +329,7 @@ const openCreateModal = () => {
 };
 
 const openEditModal = (r) => {
+  if (!canEdit.value) return;
   formData.id = r.id;
   formData.name = r.name;
   formData.is_active = r.is_active !== false;
@@ -313,6 +338,7 @@ const openEditModal = (r) => {
 };
 
 const submitForm = async () => {
+  if (!canEdit.value) return;
   isSaving.value = true;
   errorMessage.value = '';
   try {
@@ -332,6 +358,7 @@ const submitForm = async () => {
 };
 
 const toggleStatus = async (r) => {
+  if (!canEdit.value) return;
   try {
     const res = await axios.patch(`/api/regions/${r.id}/toggle-status`);
     r.is_active = res.data?.data?.is_active ?? !r.is_active;
@@ -341,6 +368,7 @@ const toggleStatus = async (r) => {
 };
 
 const executeDelete = async () => {
+  if (!canEdit.value) return;
   isDeleting.value = true;
   try {
     await axios.delete(`/api/regions/${regionToDelete.value.id}`);

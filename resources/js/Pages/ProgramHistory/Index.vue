@@ -19,7 +19,7 @@
       </div>
 
       <!-- Action Buttons (Filament style); di layar kecil dua tombol sama lebar dengan label pendek -->
-      <div class="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2">
+      <div class="grid sm:flex sm:flex-wrap sm:items-center gap-2" :class="canEdit ? 'grid-cols-2' : 'grid-cols-1'">
         <button
           type="button"
           @click="fetchLogs(1)"
@@ -32,6 +32,7 @@
         </button>
 
         <button
+          v-if="canEdit"
           type="button"
           @click="handleTriggerBatchReconcile"
           :disabled="isReconciling"
@@ -174,7 +175,7 @@
       <div class="md:hidden">
         <div v-if="loading && logs.length === 0" class="py-8 text-center text-xs text-gray-500">Memuat data riwayat program...</div>
         <div v-else-if="logs.length === 0" class="py-8 px-4 text-center text-xs text-gray-500">
-          Belum ada data riwayat yang tersimpan. Silakan klik tombol <strong>Cocokkan</strong> di atas.
+          Belum ada data riwayat yang tersimpan.<template v-if="canEdit"> Silakan klik tombol <strong>Cocokkan</strong> di atas.</template>
         </div>
         <ul v-else class="divide-y divide-gray-100">
           <li v-for="row in logs" :key="row.id" class="p-4 space-y-2 text-xs text-gray-700">
@@ -292,7 +293,7 @@
             <!-- Empty State -->
             <tr v-else-if="logs.length === 0">
               <td colspan="12" class="py-8 text-center text-gray-500">
-                Belum ada data riwayat yang tersimpan. Silakan klik tombol <strong>Cocokkan Test Program</strong> di atas.
+                Belum ada data riwayat yang tersimpan.<template v-if="canEdit"> Silakan klik tombol <strong>Cocokkan Test Program</strong> di atas.</template>
               </td>
             </tr>
 
@@ -629,6 +630,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { confirmAction } from '@/composables/useNotify';
+import { useAuth } from '@/composables/useAuth';
 import AreaTabs from '@/components/AreaTabs.vue';
 import {
   Search as SearchIcon,
@@ -646,6 +648,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 import { useAutoRefresh, createRequestTracker, AUTO_REFRESH_SECONDS } from '@/composables/useAutoRefresh';
+
+const { canEdit } = useAuth();
 
 const logs = ref([]);
 const loading = ref(false);
@@ -763,6 +767,7 @@ const openDetailModal = (row) => {
 };
 
 const handleTriggerBatchReconcile = async () => {
+  if (!canEdit.value) return;
   if (!(await confirmAction({ title: 'Jalankan pencocokan?', message: 'Data Program akan dicocokkan dengan Form Program sekarang.', confirmText: 'Ya, Jalankan' }))) {
     return;
   }

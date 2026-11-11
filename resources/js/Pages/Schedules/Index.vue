@@ -55,8 +55,9 @@
           role="switch"
           :aria-checked="forms[item.key].is_active"
           :aria-label="forms[item.key].is_active ? 'Nonaktifkan jadwal' : 'Aktifkan jadwal'"
+          :disabled="!canEdit"
           @click="forms[item.key].is_active = !forms[item.key].is_active"
-          class="shrink-0 inline-flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer"
+          class="shrink-0 inline-flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer disabled:cursor-default"
         >
           <span :class="[switchTrackClass, forms[item.key].is_active ? 'bg-gray-900 dark:bg-white' : 'bg-gray-300 dark:bg-slate-700']">
             <span :class="[switchKnobClass, forms[item.key].is_active ? 'translate-x-4' : 'translate-x-0']"></span>
@@ -75,10 +76,11 @@
                 v-for="mode in modes"
                 :key="mode.value"
                 type="button"
+                :disabled="!canEdit"
                 @click="forms[item.key].mode = mode.value"
                 :class="[
-                  'h-7 px-3 rounded-md font-medium transition cursor-pointer',
-                  forms[item.key].mode === mode.value ? 'bg-white text-gray-900 shadow-2xs border border-gray-200' : 'text-gray-500 hover:text-gray-900'
+                  'h-7 px-3 rounded-md font-medium transition cursor-pointer disabled:cursor-default',
+                  forms[item.key].mode === mode.value ? 'bg-white text-gray-900 shadow-2xs border border-gray-200' : ['text-gray-500', canEdit && 'hover:text-gray-900']
                 ]"
               >
                 {{ mode.label }}
@@ -89,6 +91,7 @@
               v-if="forms[item.key].mode === 'interval'"
               :id="`interval-${item.key}`"
               v-model.number="forms[item.key].interval_minutes"
+              :disabled="!canEdit"
               aria-label="Interval"
               :class="[selectClass, 'w-full sm:w-52 px-3']"
             >
@@ -99,16 +102,17 @@
               <span
                 v-for="time in forms[item.key].times"
                 :key="time"
-                class="inline-flex items-center gap-1 h-8 pl-3 pr-1 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-900 tabular-nums"
+                class="inline-flex items-center gap-1 h-8 pl-3 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-900 tabular-nums"
+                :class="canEdit ? 'pr-1' : 'pr-3'"
               >
                 {{ time }}
-                <button type="button" @click="removeTime(item.key, time)" class="p-1 text-gray-400 hover:text-gray-700 cursor-pointer" :title="`Hapus jam ${time}`">
+                <button v-if="canEdit" type="button" @click="removeTime(item.key, time)" class="p-1 text-gray-400 hover:text-gray-700 cursor-pointer" :title="`Hapus jam ${time}`">
                   <XIcon class="w-3 h-3" />
                 </button>
               </span>
 
               <!-- Tambah jam (24 jam) -->
-              <span class="inline-flex items-center gap-1">
+              <span v-if="canEdit" class="inline-flex items-center gap-1">
                 <select :id="`hour-${item.key}`" v-model="newTimes[item.key].hour" aria-label="Jam" :class="[selectClass, 'w-16 px-2']">
                   <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
                 </select>
@@ -119,7 +123,7 @@
                 <button type="button" @click="addTime(item.key)" :class="smallButtonClass">Tambah</button>
               </span>
             </div>
-            <p v-if="forms[item.key].mode === 'times' && !forms[item.key].times.length" class="text-[11px] text-gray-500">Tambahkan minimal satu jam.</p>
+            <p v-if="canEdit && forms[item.key].mode === 'times' && !forms[item.key].times.length" class="text-[11px] text-gray-500">Tambahkan minimal satu jam.</p>
           </div>
         </div>
 
@@ -131,13 +135,14 @@
                 v-for="day in weekDays"
                 :key="day.value"
                 type="button"
+                :disabled="!canEdit"
                 @click="toggleDay(item.key, day.value)"
                 :aria-pressed="isDayOn(item.key, day.value)"
                 :class="[
-                  'h-8 sm:w-11 rounded-lg border text-xs font-medium transition cursor-pointer',
+                  'h-8 sm:w-11 rounded-lg border text-xs font-medium transition cursor-pointer disabled:cursor-default',
                   isDayOn(item.key, day.value)
                     ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                    : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                    : ['border-gray-300 bg-white text-gray-600', canEdit && 'hover:bg-gray-50']
                 ]"
               >
                 {{ day.label }}
@@ -155,6 +160,7 @@
               <select
                 :id="`reminder-days-${item.key}`"
                 v-model.number="forms[item.key].reminder_every_days"
+                :disabled="!canEdit"
                 aria-label="Jarak pengingat"
                 :class="[selectClass, 'w-full sm:w-52 px-3']"
               >
@@ -164,6 +170,7 @@
                 v-if="forms[item.key].reminder_every_days"
                 :id="`reminder-max-${item.key}`"
                 v-model.number="forms[item.key].reminder_max"
+                :disabled="!canEdit"
                 aria-label="Jumlah pengingat"
                 :class="[selectClass, 'w-full sm:w-40 px-3']"
               >
@@ -191,7 +198,7 @@
           </div>
         </dl>
         <div class="flex flex-col items-stretch sm:items-end gap-1.5 shrink-0">
-          <div class="flex items-center gap-2">
+          <div v-if="canEdit" class="flex items-center gap-2">
             <button type="button" @click="runNow(item.key)" :disabled="!!busy[item.key]" :class="buttonClass">
               {{ busy[item.key] === 'run' ? 'Menjalankan...' : 'Jalankan sekarang' }}
             </button>
@@ -210,10 +217,13 @@
 import { ref, reactive, onMounted } from 'vue';
 import axios from 'axios';
 import { confirmAction } from '@/composables/useNotify';
+import { useAuth } from '@/composables/useAuth';
 import { AlertTriangle as AlertTriangleIcon, ChevronRight as ChevronRightIcon, X as XIcon } from 'lucide-vue-next';
 
+const { canEdit } = useAuth();
+
 const buttonClass = 'h-9 px-3.5 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap disabled:opacity-50';
-const selectClass = 'h-9 rounded-lg border border-gray-300 bg-white text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-900 cursor-pointer';
+const selectClass = 'h-9 rounded-lg border border-gray-300 bg-white text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-900 cursor-pointer disabled:cursor-default';
 const rowClass = 'px-5 sm:px-6 py-4 grid gap-2 sm:grid-cols-[120px_minmax(0,1fr)] sm:gap-6';
 const rowLabelClass = 'text-xs font-medium text-gray-700 sm:pt-2';
 const switchTrackClass = 'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors';
@@ -361,6 +371,7 @@ const errorText = (err, fallback) => {
 };
 
 async function save(key) {
+  if (!canEdit.value) return;
   busy[key] = 'save';
   messages[key] = null;
   try {
@@ -377,6 +388,7 @@ async function save(key) {
 }
 
 async function runNow(key) {
+  if (!canEdit.value) return;
   // Yang dijalankan adalah pengaturan yang sudah disimpan
   if (!(await confirmAction({ title: 'Jalankan sekarang?', message: RUN_CONFIRMATIONS[key] || 'Tugas ini akan dijalankan sekarang.', confirmText: 'Ya, Jalankan' }))) return;
 

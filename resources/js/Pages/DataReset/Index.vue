@@ -216,6 +216,7 @@ import axios from 'axios';
 import { ChevronRight as ChevronRightIcon } from 'lucide-vue-next';
 import { AREAS } from '@/composables/useArea';
 import { brandName, useBrands } from '@/composables/useBrands';
+import { useAuth } from '@/composables/useAuth';
 
 const rowClass = 'px-5 sm:px-6 py-4 grid gap-2 sm:grid-cols-[120px_minmax(0,1fr)] sm:gap-6';
 const rowLabelClass = 'text-xs font-medium text-gray-700 sm:pt-2';
@@ -238,6 +239,7 @@ const DATASET_NOTES = {
 const areaOptions = [{ value: 'all', label: 'Semua area' }, ...AREAS.map((a) => ({ value: a.value, label: a.label }))];
 
 const { brands, loadBrands } = useBrands();
+const { canEdit } = useAuth();
 
 const datasets = ref({
   drafts: 'Draft',
@@ -333,6 +335,7 @@ function closePasswordForm() {
 }
 
 async function savePassword() {
+  if (!canEdit.value) return;
   isSavingPassword.value = true;
   passwordFormError.value = '';
   try {
@@ -351,7 +354,7 @@ async function savePassword() {
 }
 
 async function resetData() {
-  if (!password.value || !effectiveSelection.value.length || isResetting.value) return;
+  if (!canEdit.value || !password.value || !effectiveSelection.value.length || isResetting.value) return;
 
   isResetting.value = true;
   passwordError.value = '';

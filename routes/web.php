@@ -21,6 +21,7 @@ use App\Http\Controllers\ProgramSubmissionController;
 use App\Http\Controllers\RegionController;
 use App\Http\Controllers\TeamContactController;
 use App\Http\Controllers\UserController;
+use App\Http\Middleware\EnsureUserCanEdit;
 use App\Http\Middleware\SetAreaContext;
 use App\Http\Middleware\SetBrandContext;
 use Illuminate\Support\Facades\Route;
@@ -64,7 +65,8 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
     Route::post('/webhooks/data-program', [DataProgramController::class, 'webhook']);
 
     // ===================== BUTUH LOGIN =====================
-    Route::middleware('auth')->group(function () {
+    // Hanya Admin & SCM yang bisa mengubah data; AR & Telemarketing hanya melihat (kecuali profil sendiri)
+    Route::middleware(['auth', EnsureUserCanEdit::class])->group(function () {
         // Master Jadwal Otomatis (cron)
         Route::get('/automation-schedules', [AutomationScheduleController::class, 'index']);
         Route::put('/automation-schedules/{key}', [AutomationScheduleController::class, 'update']);
@@ -147,11 +149,13 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         Route::delete('/dealers/{id}', [DealerController::class, 'destroy']);
         Route::patch('/dealers/{id}/toggle-status', [DealerController::class, 'toggleStatus']);
 
-        // Profil akun yang sedang login
-        Route::put('/profile', [ProfileController::class, 'update']);
-        Route::post('/profile/photo', [ProfileController::class, 'updatePhoto']);
-        Route::delete('/profile/photo', [ProfileController::class, 'destroyPhoto']);
-        Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
+        // Profil akun yang sedang login (semua peran boleh mengubah profilnya sendiri)
+        Route::withoutMiddleware(EnsureUserCanEdit::class)->group(function () {
+            Route::put('/profile', [ProfileController::class, 'update']);
+            Route::post('/profile/photo', [ProfileController::class, 'updatePhoto']);
+            Route::delete('/profile/photo', [ProfileController::class, 'destroyPhoto']);
+            Route::put('/profile/password', [ProfileController::class, 'updatePassword']);
+        });
 
         // Google OAuth Status & Disconnect
         Route::get('/google/status', [GoogleAuthController::class, 'status']);

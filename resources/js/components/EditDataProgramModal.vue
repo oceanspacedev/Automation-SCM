@@ -20,7 +20,7 @@
           <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-white shrink-0">
             <div class="min-w-0">
               <div class="flex items-center gap-2">
-                <h3 class="text-sm font-semibold text-gray-900 truncate">Edit Data Program</h3>
+                <h3 class="text-sm font-semibold text-gray-900 truncate">{{ canEdit ? 'Edit Data Program' : 'Data Program' }}</h3>
                 <span class="text-xs text-gray-400 font-mono">#{{ dataProgram?.id }}</span>
                 <span v-if="dataProgram?.row_hash" class="text-[11px] text-gray-400 font-mono hidden sm:inline">
                   ({{ dataProgram.row_hash }})
@@ -74,7 +74,7 @@
           <form @submit.prevent="handleSubmit" id="editDataProgramForm" class="p-6 overflow-y-auto flex-1 space-y-4">
 
             <!-- TAB 1: DEALER & PROGRAM -->
-            <div v-show="activeTab === 'dealer'" class="space-y-4">
+            <fieldset v-show="activeTab === 'dealer'" :disabled="!canEdit" class="min-w-0 space-y-4">
               <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                 <div>
                   <label class="block font-medium text-gray-700 mb-1">Nama Dealer / Toko</label>
@@ -201,13 +201,14 @@
                   />
                 </div>
               </div>
-            </div>
+            </fieldset>
 
             <!-- TAB 2: FINANSIAL & PAJAK -->
-            <div v-show="activeTab === 'financial'" class="space-y-4">
+            <fieldset v-show="activeTab === 'financial'" :disabled="!canEdit" class="min-w-0 space-y-4">
               <div class="flex items-center justify-between pb-1 border-b border-gray-100">
                 <span class="text-xs font-medium text-gray-700">Rincian Finansial & Pajak</span>
                 <button
+                  v-if="canEdit"
                   type="button"
                   @click="autoCalculateFinancials"
                   class="px-2.5 py-1 rounded border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs transition cursor-pointer"
@@ -378,10 +379,10 @@
                   />
                 </div>
               </div>
-            </div>
+            </fieldset>
 
             <!-- TAB 3: ADMINISTRASI & TRANSAKSI -->
-            <div v-show="activeTab === 'admin'" class="space-y-4">
+            <fieldset v-show="activeTab === 'admin'" :disabled="!canEdit" class="min-w-0 space-y-4">
               <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                 <div>
                   <label class="block font-medium text-gray-700 mb-1">No. PO</label>
@@ -557,10 +558,10 @@
                   />
                 </div>
               </div>
-            </div>
+            </fieldset>
 
             <!-- TAB 4: DOKUMEN & MATCHING -->
-            <div v-show="activeTab === 'docs'" class="space-y-4">
+            <fieldset v-show="activeTab === 'docs'" :disabled="!canEdit" class="min-w-0 space-y-4">
               <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
                 <div>
                   <label class="block font-medium text-gray-700 mb-1">Cek Dokumen</label>
@@ -654,10 +655,10 @@
                   />
                 </div>
               </div>
-            </div>
+            </fieldset>
 
             <!-- TAB 5: REKENING & CATATAN -->
-            <div v-show="activeTab === 'bank'" class="space-y-4">
+            <fieldset v-show="activeTab === 'bank'" :disabled="!canEdit" class="min-w-0 space-y-4">
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                 <div>
                   <label class="block font-medium text-gray-700 mb-1">Nama Bank</label>
@@ -699,14 +700,14 @@
                   class="w-full p-3 rounded-lg border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-white transition leading-relaxed"
                 ></textarea>
               </div>
-            </div>
+            </fieldset>
 
           </form>
 
           <!-- Modal Footer (Clean & Rapi) -->
           <div class="px-6 py-3.5 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
             <!-- Left: Checkbox (Tanpa Icon Warna) -->
-            <label class="inline-flex items-center gap-2 cursor-pointer select-none text-xs text-gray-700">
+            <label v-if="canEdit" class="inline-flex items-center gap-2 cursor-pointer select-none text-xs text-gray-700">
               <input
                 v-model="pushToSheet"
                 type="checkbox"
@@ -716,17 +717,18 @@
             </label>
 
             <!-- Right: Action Buttons (Minimal & Profesional) -->
-            <div class="flex items-center justify-end gap-2">
+            <div class="flex items-center justify-end gap-2 sm:ml-auto">
               <button
                 type="button"
                 @click="handleClose"
                 :disabled="isSubmitting"
                 class="px-4 h-8.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium transition cursor-pointer disabled:opacity-50"
               >
-                Batal
+                {{ canEdit ? 'Batal' : 'Tutup' }}
               </button>
 
               <button
+                v-if="canEdit"
                 type="submit"
                 form="editDataProgramForm"
                 :disabled="isSubmitting"
@@ -747,6 +749,7 @@
 <script setup>
 import { ref, reactive, watch } from 'vue';
 import axios from 'axios';
+import { useAuth } from '@/composables/useAuth';
 import {
   X as XIcon,
   RefreshCw as RefreshCwIcon,
@@ -764,6 +767,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['close', 'saved']);
+
+// Selain Admin & SCM, modal ini hanya untuk melihat: isian dikunci, tanpa tombol simpan
+const { canEdit } = useAuth();
 
 const activeTab = ref('dealer');
 const isSubmitting = ref(false);
@@ -964,7 +970,7 @@ const handleClose = () => {
 };
 
 const handleSubmit = async () => {
-  if (!props.dataProgram?.id) return;
+  if (!canEdit.value || !props.dataProgram?.id) return;
 
   isSubmitting.value = true;
   errorMessage.value = '';
@@ -995,3 +1001,10 @@ const handleSubmit = async () => {
   }
 };
 </script>
+
+<style scoped>
+/* Hanya lihat: contoh isian disembunyikan supaya tidak terbaca sebagai data */
+fieldset:disabled ::placeholder {
+  color: transparent;
+}
+</style>

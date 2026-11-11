@@ -186,4 +186,13 @@ class User extends Authenticatable
     {
         return in_array($this->role, ['admin', 'scm'], true);
     }
+
+    /**
+     * Whether the user may change data on the web (add, edit, delete, import, send, generate):
+     * only active Admin and SCM. AR and Telemarketing only view. A user without a role counts as SCM.
+     */
+    public function canEdit(): bool
+    {
+        return $this->is_active !== false && in_array($this->role ?? 'scm', ['admin', 'scm'], true);
+    }
 }
