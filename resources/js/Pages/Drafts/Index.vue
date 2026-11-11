@@ -743,7 +743,7 @@ const toggleSelectAll = (e) => {
 
 const regionOptions = [
   'BIG BANDUNG',
-  'BIG KARAWANG',
+  'BIG KCPS',
   'BIG TASIK',
   'BIG CIREBON',
   'JABODETABEK',

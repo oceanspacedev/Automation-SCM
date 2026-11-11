@@ -18,7 +18,8 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 class DealerImportService
 {
     /**
-     * Big Area → area. Stores without a Big Area fall back to the DP in "Reffnote".
+     * Big Area → area. Stores without a Big Area fall back to the DP in "Reffnote". A merged Big Area (BIG KARAWANG,
+     * BIG CPS, BIG CISUKA) is read as its new name first, see Region::RENAMED.
      *
      * @var array<string, Area>
      */
@@ -26,8 +27,7 @@ class DealerImportService
         'BIG BANDUNG' => Area::Jabar,
         'BIG TASIK' => Area::Jabar,
         'BIG CIREBON' => Area::Jabar,
-        'BIG CPS' => Area::Jabar,
-        'BIG CISUKA' => Area::Jabar,
+        'BIG KCPS' => Area::Jabar,
         'BIG SEMARANG' => Area::Jateng,
         'BIG SOLO' => Area::Jateng,
         'BIG PURWOKERTO' => Area::Jateng,
@@ -139,7 +139,7 @@ class DealerImportService
                 $normalized++;
             }
 
-            $bigArea = $values['region'] !== null ? strtoupper($values['region']) : null;
+            $bigArea = $values['region'] !== null ? Region::currentName(strtoupper($values['region'])) : null;
             $area = self::BIG_AREA_TO_AREA[$bigArea] ?? self::REFFNOTE_TO_AREA[strtoupper((string) $values['reffnote'])] ?? null;
             if ($area === null) {
                 $skipped[] = $this->skippedRow($rowNumber, $values, 'Big Area & Reffnote kosong / tidak dikenal', $row);
@@ -207,6 +207,18 @@ class DealerImportService
                 if ($created->wasRecentlyCreated) {
                     $regionsCreated[] = Area::from($area)->label().': '.$region;
                 }
+            }
+
+            // Region yang sudah digabung (mis. BIG CPS → BIG KCPS): toko yang belum ada di file ikut pindah, region lamanya dinonaktifkan
+            foreach (Region::RENAMED as $oldName => $newName) {
+                Dealer::withoutGlobalScopes()->where('region', $oldName)->update(['region' => $newName]);
+            }
+            foreach (Region::withoutGlobalScopes()->whereIn('name', array_keys(Region::RENAMED))->where('is_active', true)->get() as $oldRegion) {
+                $newRegion = Region::withoutGlobalScopes()->updateOrCreate(['area' => $oldRegion->area, 'name' => Region::RENAMED[$oldRegion->name]], ['is_active' => true]);
+                if ($newRegion->wasRecentlyCreated) {
+                    $regionsCreated[] = Area::from($oldRegion->area)->label().': '.$newRegion->name;
+                }
+                $oldRegion->update(['is_active' => false]);
             }
         });
 

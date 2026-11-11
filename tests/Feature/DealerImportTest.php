@@ -97,6 +97,40 @@ class DealerImportTest extends TestCase
         $this->assertTrue(Region::withoutGlobalScopes()->where(['area' => 'jateng', 'name' => 'BIG SOLO'])->exists());
     }
 
+    public function test_import_moves_big_karawang_and_big_cps_to_big_kcps(): void
+    {
+        foreach (['BIG KARAWANG', 'BIG CPS', 'BIG CISUKA', 'BIG BANDUNG'] as $name) {
+            Region::withoutGlobalScopes()->firstOrCreate(['area' => 'jabar', 'name' => $name], ['is_active' => true]);
+        }
+        Dealer::create(['area' => 'jabar', 'kode_bt' => 'BT70001', 'dealer_name' => 'TOKO KARAWANG LAMA', 'region' => 'BIG KARAWANG']);
+        Dealer::create(['area' => 'jabar', 'kode_bt' => 'BT70002', 'dealer_name' => 'TOKO CPS', 'region' => 'BIG CPS']);
+        Dealer::create(['area' => 'jabar', 'kode_bt' => 'BT70003', 'dealer_name' => 'TOKO BANDUNG', 'region' => 'BIG BANDUNG']);
+        Dealer::create(['area' => 'jabar', 'kode_bt' => 'BT70006', 'dealer_name' => 'TOKO CISUKA LAMA', 'region' => 'BIG CISUKA']);
+
+        $file = $this->makeMasterFile([
+            $this->row('BT70002', 'TOKO CPS', 'BIG KCPS'),
+            $this->row('BT70004', 'TOKO FILE LAMA', 'Big Cps'),
+            $this->row('BT70005', 'TOKO KARAWANG BARU', 'BIG KARAWANG', '-'),
+            $this->row('BT70007', 'TOKO CISUKA BARU', 'BIG CISUKA', '-'),
+        ]);
+
+        $this->post('/api/dealers/import', ['file' => new UploadedFile($file, 'Master Customer CV TOP Big KCPS.xlsx', null, null, true)], ['Accept' => 'application/json'])
+            ->assertAccepted()
+            ->assertJsonPath('status.state', 'done');
+
+        // Dari file (nama baru maupun lama) dan toko lama yang tidak ada di file: semuanya BIG KCPS di Jawa Barat
+        foreach (['BT70001', 'BT70002', 'BT70004', 'BT70005', 'BT70006', 'BT70007'] as $kodeBt) {
+            $this->assertDatabaseHas('dealers', ['kode_bt' => $kodeBt, 'area' => 'jabar', 'region' => 'BIG KCPS']);
+        }
+        $this->assertDatabaseHas('dealers', ['kode_bt' => 'BT70003', 'region' => 'BIG BANDUNG']);
+
+        $this->assertDatabaseHas('regions', ['area' => 'jabar', 'name' => 'BIG KCPS', 'is_active' => true]);
+        foreach (['BIG KARAWANG', 'BIG CPS', 'BIG CISUKA'] as $oldName) {
+            $this->assertDatabaseHas('regions', ['name' => $oldName, 'is_active' => false]);
+        }
+        $this->assertDatabaseHas('regions', ['name' => 'BIG BANDUNG', 'is_active' => true]);
+    }
+
     public function test_master_dealer_can_be_imported_from_the_web_without_removing_other_dealers(): void
     {
         Dealer::create(['area' => 'jabar', 'kode_bt' => 'BT99999', 'dealer_name' => 'DEALER LAMA']);

@@ -7,6 +7,7 @@ use App\Models\DataProgram;
 use App\Models\Dealer;
 use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
+use App\Models\Region;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -73,9 +74,26 @@ class ProgramReconciliationService
     }
 
     /**
-     * Normalize region string for comparison (e.g. "BIG KARAWANG 2" -> "KARAWANG").
+     * Normalize region string for comparison (e.g. "BIG TASIK 2" -> "TASIK"). A merged region compares as its new
+     * name, so "BIG KARAWANG", "BIG CPS" and "BIG CISUKA" all match "BIG KCPS" (see Region::RENAMED).
      */
     public function normalizeRegion(?string $region): string
+    {
+        $norm = $this->stripRegionWords($region);
+
+        foreach (Region::RENAMED as $oldName => $newName) {
+            if ($norm !== '' && $norm === $this->stripRegionWords($oldName)) {
+                return $this->stripRegionWords($newName);
+            }
+        }
+
+        return $norm;
+    }
+
+    /**
+     * A region name without "BIG", "AREA", "REGION", digits and separators (e.g. "BIG KARAWANG 2" -> "KARAWANG").
+     */
+    private function stripRegionWords(?string $region): string
     {
         if (empty($region)) {
             return '';

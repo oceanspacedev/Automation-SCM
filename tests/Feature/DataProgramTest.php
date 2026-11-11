@@ -530,6 +530,18 @@ class DataProgramTest extends TestCase
         $this->assertNull($dp->fresh()->cn);
     }
 
+    public function test_big_kcps_matches_the_regions_it_replaced(): void
+    {
+        $service = app(ProgramReconciliationService::class);
+
+        $this->assertTrue($service->isRegionMatch('BIG KCPS', 'BIG KARAWANG 1'));
+        $this->assertTrue($service->isRegionMatch('BIG KARAWANG', 'BIG KCPS'));
+        $this->assertTrue($service->isRegionMatch('BIG KCPS', null, 'BIG CPS'));
+        $this->assertTrue($service->isRegionMatch('BIG KCPS', 'BIG CISUKA'));
+        $this->assertFalse($service->isRegionMatch('BIG KCPS', 'BIG BANDUNG'));
+        $this->assertFalse($service->isRegionMatch('BIG KARAWANG', 'BIG TASIK'));
+    }
+
     public function test_reconciliation_fails_when_kode_bt_differs(): void
     {
         $dp = DataProgram::create([

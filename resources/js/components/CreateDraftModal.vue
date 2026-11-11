@@ -544,7 +544,7 @@ const customerOptions = ref([]);
 
 const regionOptions = [
   'BIG BANDUNG',
-  'BIG KARAWANG',
+  'BIG KCPS',
   'BIG TASIK',
   'BIG CIREBON',
   'JABODETABEK',

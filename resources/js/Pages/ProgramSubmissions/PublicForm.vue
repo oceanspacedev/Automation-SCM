@@ -885,7 +885,7 @@ loadBrands();
 
 const regionOptions = ref(area.value.value === 'jabar' ? [
   'BIG BANDUNG',
-  'BIG KARAWANG',
+  'BIG KCPS',
   'BIG TASIK',
   'BIG CIREBON',
 ] : []);
