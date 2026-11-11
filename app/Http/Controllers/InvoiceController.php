@@ -582,6 +582,7 @@ class InvoiceController extends Controller
             'success' => $sentIds !== [],
             'message' => implode(' ', $message),
             'sent' => count($sentIds),
+            'sent_ids' => $sentIds,
             'failed' => $invoices->count() - count($sentIds),
             'whatsapp_files' => $whatsApp['files'],
         ], $sentIds !== [] ? 200 : 422);

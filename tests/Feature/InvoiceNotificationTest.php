@@ -341,6 +341,33 @@ class InvoiceNotificationTest extends TestCase
         }
     }
 
+    public function test_resend_whatsapp_names_only_the_invoices_whose_region_went_out(): void
+    {
+        Mail::fake();
+        Storage::fake('public');
+        config(['services.wag.token' => 'test-token', 'services.wag.public_url' => 'https://cdn.example.com']);
+        Http::preventStrayRequests();
+        Http::fake(['*/api/v1/messages' => fn ($request) => $request['recipient']['value'] === '6281111111111'
+            ? Http::response(['data' => ['id' => 'waghub-msg-1', 'provider_message_id' => 'prov-1']], 201)
+            : Http::response(['message' => 'Provider sedang gangguan'], 503)]);
+        Dealer::create(['kode_bt' => 'BT07238', 'dealer_name' => '6003 MOBILE', 'telemarketing' => 'Tele Bandung', 'telemarketing_phone' => '081111111111']);
+        Dealer::create(['kode_bt' => 'BT07184', 'dealer_name' => '888 CELL', 'telemarketing' => 'Tele Cirebon', 'telemarketing_phone' => '082222222222']);
+        $bandung = $this->regionInvoice('BANDUNG', 'BT07238', '6003 MOBILE', 'CN-RES-005', 'mobile6003@example.com');
+        $cirebon = $this->regionInvoice('CIREBON', 'BT07184', '888 CELL', 'CN-RES-006', 'cell888@example.com');
+        $firstSentAt = now()->subHour()->startOfSecond();
+        foreach ([$bandung, $cirebon] as $invoice) {
+            $invoice->update(['status' => 'sent', 'email_sent_at' => $firstSentAt, 'whatsapp_sent_at' => $firstSentAt]);
+        }
+
+        $this->postJson('/api/invoices/resend-whatsapp', ['ids' => [$bandung->id, $cirebon->id]])
+            ->assertOk()
+            ->assertJson(['success' => true, 'sent' => 1, 'sent_ids' => [$bandung->id], 'failed' => 1])
+            ->assertJsonPath('message', fn (string $message) => str_contains($message, 'WhatsApp Region CIREBON gagal'));
+
+        $this->assertTrue($bandung->refresh()->whatsapp_sent_at->greaterThan($firstSentAt));
+        $this->assertTrue($cirebon->refresh()->whatsapp_sent_at->equalTo($firstSentAt));
+    }
+
     public function test_resend_whatsapp_leaves_an_unsent_invoice_to_the_normal_send(): void
     {
         $this->fakeInvoiceChannels();

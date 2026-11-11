@@ -724,9 +724,11 @@ const executeResendWhatsApp = async (ids) => {
 
   try {
     const res = await axios.post('/api/invoices/resend-whatsapp', { ids });
-    alertSuccess.value = true;
+    const sentIds = res.data.sent_ids || [];
+    // Region yang gagal tetap tercentang supaya bisa dikirim ulang lagi tanpa mengulang region yang sudah masuk
+    alertSuccess.value = res.data.failed === 0;
     alertMessage.value = res.data.message;
-    resendIds.value = resendIds.value.filter(id => !ids.includes(id));
+    resendIds.value = resendIds.value.filter(id => !sentIds.includes(id));
     fetchInvoices(pagination.current_page);
   } catch (err) {
     alertSuccess.value = false;
