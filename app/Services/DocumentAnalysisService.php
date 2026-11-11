@@ -258,13 +258,10 @@ class DocumentAnalysisService
      */
     public function inspectAgreement(string $url): ?array
     {
-        $fileId = preg_match('/(?:id=|\/d\/)([a-zA-Z0-9_-]{20,})/', $url, $matches) ? $matches[1] : sha1(trim($url));
-        $cacheKey = "agreement_inspection:{$fileId}";
-        // Hasil lama dibaca ulang bila belum ada nama di cap, atau bila agreement belum dicek digabung dengan dokumen lain
-        if (is_array($cached = Cache::get($cacheKey)) && array_key_exists('stamp_name', $cached)
-            && (array_key_exists('has_other_document', $cached) || ! $cached['is_agreement'])) {
+        if (($cached = $this->cachedAgreementInspection($url)) !== null) {
             return $cached;
         }
+        $cacheKey = $this->agreementCacheKey($url);
 
         $config = $this->getConfig();
         if (empty($config['api_key'])) {
@@ -321,6 +318,28 @@ class DocumentAnalysisService
         }
 
         return null;
+    }
+
+    /**
+     * What the AI already said about an agreement file, or null when it still has to be read (never read, or read before
+     * the stamp name or merged files were checked).
+     *
+     * @return array{is_agreement: bool, has_other_document?: bool, name_filled: bool, has_signature: bool, has_stamp: bool, dealer_name: ?string, stamp_name: ?string, note: string}|null
+     */
+    public function cachedAgreementInspection(string $url): ?array
+    {
+        $cached = Cache::get($this->agreementCacheKey($url));
+
+        // Hasil lama dibaca ulang bila belum ada nama di cap, atau bila agreement belum dicek digabung dengan dokumen lain
+        return is_array($cached) && array_key_exists('stamp_name', $cached)
+            && (array_key_exists('has_other_document', $cached) || ! $cached['is_agreement']) ? $cached : null;
+    }
+
+    private function agreementCacheKey(string $url): string
+    {
+        $fileId = preg_match('/(?:id=|\/d\/)([a-zA-Z0-9_-]{20,})/', $url, $matches) ? $matches[1] : sha1(trim($url));
+
+        return "agreement_inspection:{$fileId}";
     }
 
     /**

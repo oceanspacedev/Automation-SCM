@@ -10,10 +10,12 @@ use App\Models\User;
 use App\Services\DealerAgreementImportService;
 use App\Services\DealerImportService;
 use App\Services\DocumentAnalysisService;
+use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Concurrency;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -363,6 +365,69 @@ class DealerAgreementTest extends TestCase
         $this->assertSame(51, ImportDealerFile::status()['result']['filled']);
         $this->assertSame(51, Dealer::query()->whereNotNull('agreement_url')->count());
         $this->assertSame([], Storage::disk('local')->allFiles('dealer-import'));
+    }
+
+    public function test_an_agreement_import_that_stops_keeps_the_stores_done_and_continues_from_there(): void
+    {
+        Storage::fake('local');
+        Queue::fake();
+        $rows = [];
+        $inspections = [];
+        foreach (range(1, 51) as $number) {
+            $id = sprintf('lengkap_toko_%03d_00000', $number);
+            $this->dealer(['kode_bt' => sprintf('BT%05d', $number), 'id_realme' => sprintf('DLAA%04d', $number)]);
+            $rows[] = [sprintf('BT%05d', $number), "https://drive.google.com/open?id={$id}"];
+            $inspections[$id] = $this->inspection();
+        }
+        $this->fakeDriveAndAi($inspections);
+        Http::fake(function () {
+            $this->travel(1)->minutes();
+        });
+        Storage::disk('local')->put('dealer-import/besar.xlsx', file_get_contents($this->dataProgramFile($rows)));
+
+        // 50 toko pertama selesai, lalu job lanjutan untuk sisanya mati sebelum jalan
+        app()->call([new ImportDealerFile('dealer-import/besar.xlsx', false, 'agreements'), 'handle']);
+        $stopped = Queue::pushed(ImportDealerFile::class)->first();
+        $stopped->failed(new Exception('proses import mati.'));
+
+        $this->assertSame('failed', ImportDealerFile::status()['state']);
+        $this->assertSame(['links' => 'dealer-import/besar.links.json', 'from' => 50], ImportDealerFile::status()['resume']);
+        $this->assertSame(50, Dealer::query()->whereNotNull('agreement_url')->count());
+        $this->assertTrue(ImportDealerFile::canResume());
+
+        // Dilanjutkan dari halaman Master Dealer: mulai dari toko ke-51, tanpa membaca file lagi
+        $this->actingAs(User::factory()->create(['role' => 'admin']))
+            ->postJson('/api/dealers/import/resume')
+            ->assertAccepted()
+            ->assertJsonPath('status.state', 'queued');
+        $resumed = Queue::pushed(ImportDealerFile::class)->last();
+        $this->assertSame(50, $resumed->offset);
+
+        // Job lama yang baru dinyatakan gagal belakangan tidak mengubah import yang sudah dilanjutkan
+        $stopped->failed(new Exception('proses import mati.'));
+        $this->assertSame('queued', ImportDealerFile::status()['state']);
+
+        app()->call([$resumed, 'handle']);
+
+        $this->assertSame('done', ImportDealerFile::status()['state']);
+        $this->assertSame(51, ImportDealerFile::status()['result']['filled']);
+        $this->assertSame(51, Dealer::query()->whereNotNull('agreement_url')->count());
+        $this->assertSame([], Storage::disk('local')->allFiles('dealer-import'));
+        $this->assertFalse(ImportDealerFile::canResume());
+    }
+
+    public function test_documents_the_ai_already_read_are_decided_without_starting_a_process(): void
+    {
+        $dealer = $this->dealer();
+        $this->fakeDriveAndAi([]);
+        Cache::forever('agreement_inspection:lengkap_toko_a_000000', $this->inspection());
+        Concurrency::shouldReceive('run')->never();
+
+        $counts = app(DealerAgreementImportService::class)->importLinks(['BT07777' => ['https://drive.google.com/open?id=lengkap_toko_a_000000']]);
+
+        $this->assertSame(1, $counts['filled']);
+        $this->assertSame('https://drive.google.com/open?id=lengkap_toko_a_000000', $dealer->fresh()->agreement_url);
+        Http::assertNothingSent();
     }
 
     public function test_agreement_import_progress_moves_after_every_batch_of_documents(): void

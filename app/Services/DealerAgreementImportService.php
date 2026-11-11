@@ -174,7 +174,7 @@ class DealerAgreementImportService
 
     /**
      * Each store's newest acceptable agreement: links are read from the newest, several at a time in parallel,
-     * until one is acceptable.
+     * until one is acceptable. Documents the AI already read are decided straight away, without starting a process.
      *
      * @param  array<string, list<string>>  $candidates  kode BT => links, newest first
      * @param  array<string, string>  $storeNames  kode BT => store name in Master Dealer
@@ -196,8 +196,37 @@ class DealerAgreementImportService
                 unset($candidates[$kodeBt]);
             }
 
+            $decide = function (array $inspections) use ($urls, $storeNames, &$accepted, &$candidates): void {
+                foreach (array_intersect($urls, array_keys($inspections)) as $kodeBt => $url) {
+                    $inspection = $inspections[$url];
+
+                    if ($inspection !== null && ! $this->analysis->isAcceptableAgreement($inspection, $storeNames[$kodeBt])) {
+                        continue; // coba link yang lebih lama di putaran berikutnya
+                    }
+
+                    $accepted[$kodeBt] = $inspection === null ? false : $url;
+                    unset($candidates[$kodeBt]);
+                }
+            };
+
+            $roundUrls = array_values(array_unique(array_filter($urls)));
+            $known = [];
+            foreach ($roundUrls as $url) {
+                if (($inspection = $this->analysis->cachedAgreementInspection($url)) !== null) {
+                    $known[$url] = $inspection;
+                }
+            }
+            if ($known !== []) {
+                $checked += count($known);
+                $decide($known);
+
+                if ($onProgress) {
+                    $onProgress(count($accepted), $total, $checked);
+                }
+            }
+
             // Toko diputuskan per kelompok dokumen, supaya progresnya bergerak sepanjang putaran
-            foreach (array_chunk(array_values(array_unique(array_filter($urls))), $parallel) as $chunk) {
+            foreach (array_chunk(array_values(array_diff($roundUrls, array_keys($known))), $parallel) as $chunk) {
                 // Satu closure per baris: closure dikirim ke proses lain lewat kodenya, dan dua closure di satu baris tertukar.
                 // Hasilnya dikirim balik sebagai base64, karena teks berisi "..." (mis. nama di cap) rusak di perjalanan.
                 $tasks = [];
@@ -210,17 +239,7 @@ class DealerAgreementImportService
                     $inspections[$url] = json_decode(base64_decode($results[$index]), true);
                 }
                 $checked += count($chunk);
-
-                foreach (array_intersect($urls, $chunk) as $kodeBt => $url) {
-                    $inspection = $inspections[$url];
-
-                    if ($inspection !== null && ! $this->analysis->isAcceptableAgreement($inspection, $storeNames[$kodeBt])) {
-                        continue; // coba link yang lebih lama di putaran berikutnya
-                    }
-
-                    $accepted[$kodeBt] = $inspection === null ? false : $url;
-                    unset($candidates[$kodeBt]);
-                }
+                $decide($inspections);
 
                 if ($onProgress) {
                     $onProgress(count($accepted), $total, $checked);

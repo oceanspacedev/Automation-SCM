@@ -5,256 +5,244 @@
     <title>INVOICE - {{ $invoice->invoice_number }}</title>
     <style>
         @page {
-            margin: 30px 35px 25px 35px;
+            margin: 48px 48px 26px 48px;
             size: a4 portrait;
         }
         body {
             font-family: Arial, Helvetica, sans-serif;
-            font-size: 10.5px;
+            font-size: 11.5px;
             color: #000;
-            line-height: 1.3;
+            line-height: 1.38;
             margin: 0;
             padding: 0;
         }
-        .header-dealer {
-            margin-bottom: 4px;
+        table {
+            border-collapse: collapse;
+        }
+        td,
+        th {
+            padding: 0;
+            vertical-align: top;
         }
         .dealer-title {
             font-weight: bold;
-            font-size: 11px;
+            font-size: 13.5px;
             text-transform: uppercase;
+            margin-bottom: 2px;
         }
-        .header-divider {
-            border: 0;
-            border-top: 1.5px solid #000;
-            margin: 6px 0 16px 0;
+        .dealer-line {
+            font-size: 12px;
+            margin-bottom: 1px;
         }
         .doc-title {
             text-align: center;
             font-weight: bold;
-            font-size: 18px;
-            letter-spacing: 1px;
-            margin-bottom: 16px;
+            font-size: 27px;
+            margin: 14px 0 14px 0;
         }
         .meta-table {
             width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 10px;
         }
-        .meta-table td {
-            vertical-align: top;
-            padding: 0;
+        .bill-to div {
+            margin-bottom: 1px;
         }
-        .info-right-table {
-            border-collapse: collapse;
-            float: right;
+        .info-table {
+            width: 262px;
+            margin-left: auto;
         }
-        .info-right-table td {
-            padding: 2px 0;
-            font-size: 10.5px;
+        .info-table td {
+            padding: 1px 0 2px 0;
+            border-bottom: 1px solid #ddd;
         }
         .items-table {
             width: 100%;
-            border-collapse: collapse;
-            border: 1px solid #000;
-            margin-top: 10px;
+            margin-top: 18px;
+            border: 1px solid #444;
         }
         .items-table th {
-            border: 1px solid #000;
+            border: 1px solid #444;
+            border-bottom: 2px solid #444;
             padding: 5px 6px;
             font-weight: bold;
-            font-size: 10.5px;
-            background: #fff;
+            text-align: center;
         }
         .items-table td {
-            border: 1px solid #000;
-            padding: 8px 6px;
-            font-size: 10.5px;
-            vertical-align: top;
+            border-left: 1px solid #444;
+            border-right: 1px solid #444;
+            padding: 6px 6px;
+            height: 108px;
         }
         .text-right {
             text-align: right;
         }
-        .text-center {
-            text-align: center;
-        }
         .ket-block {
             margin-top: 6px;
-            margin-bottom: 6px;
-            font-size: 10.5px;
+            line-height: 1.25;
         }
         .summary-table {
-            width: 310px;
-            margin-left: auto;
-            border-collapse: collapse;
-            margin-top: 6px;
-            margin-bottom: 6px;
+            width: 352px;
+            margin: 18px 7px 0 auto;
         }
         .summary-table td {
-            padding: 2px 4px;
-            font-size: 10.5px;
+            padding: 2px 0 4px 0;
         }
         .sum-label {
-            text-align: left;
-            width: 60%;
+            font-weight: bold;
         }
-        .sum-val {
+        .terbilang {
+            font-style: italic;
+            margin-top: 18px;
+        }
+        .transfer {
+            margin-top: 34px;
+        }
+        .transfer-title {
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .transfer-table td {
+            padding: 1px 0 3px 0;
+        }
+        .signature {
+            margin-top: 32px;
             text-align: right;
-            width: 40%;
-        }
-        .sum-bold td {
             font-weight: bold;
-        }
-        .terbilang-bar {
-            font-style: italic;
-            font-size: 10px;
-            margin: 10px 0 12px 0;
-            clear: both;
-        }
-        .terbilang-label {
-            font-weight: bold;
-            font-style: italic;
-        }
-        .note-box {
-            font-size: 9.5px;
-            line-height: 1.5;
-            margin-top: 8px;
-            width: 68%;
-            float: left;
-        }
-        .signature-container {
-            float: right;
-            width: 200px;
-            text-align: center;
-            margin-top: 16px;
-        }
-        .sign-title {
-            font-weight: bold;
-            font-size: 10.5px;
+            color: #333;
         }
         .sign-space {
-            height: 60px;
+            height: 72px;
         }
-        .sign-name {
-            font-size: 10px;
-        }
-        .clearfix {
-            clear: both;
+        .footer-note {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            font-size: 9px;
+            line-height: 1.5;
         }
     </style>
 </head>
 <body>
+    @php
+        $rupiah = fn ($value) => 'Rp  '.number_format((float) $value, 0, ',', '.');
+        $period = $invoice->program_period ?? '-';
+    @endphp
 
-    <!-- Header Dealer -->
-    <div class="header-dealer">
-        <div class="dealer-title">{{ $invoice->dealer_name ?? '-' }} ({{ $invoice->dealer_code ?? '-' }})</div>
-        <div>{{ $invoice->address ?? '-' }}</div>
-        <div>NPWP: {{ $invoice->npwp ?? '-' }}</div>
+    <!-- Catatan di kaki halaman -->
+    <div class="footer-note">
+        <div style="font-weight: bold;">NOTE :</div>
+        <div>Saldo program dapat digunakan maksimal 30 hari sejak tanggal terbit.</div>
     </div>
 
-    <hr class="header-divider">
+    <!-- Header Dealer -->
+    <div class="dealer-title">{{ $invoice->dealer_name ?? '-' }} ({{ $invoice->dealer_code ?? '-' }})</div>
+    <div class="dealer-line">{{ $invoice->address ?? '-' }}</div>
+    <div class="dealer-line">NPWP: {{ $invoice->npwp ?? '-' }}</div>
 
-    <!-- Title -->
     <div class="doc-title">INVOICE</div>
 
-    <!-- Metadata Section -->
+    <!-- Bill to & nomor invoice -->
     <table class="meta-table">
         <tr>
-            <td style="width: 55%;">
-                <div>Bill to:</div>
-                <div style="font-weight: bold; margin-top: 3px;">{{ $invoice->customer_name ?? '-' }}</div>
-                <div style="margin-top: 2px;">{!! nl2br(e($invoice->customer_address ?: ($invoice->draft?->address ?: ''))) !!}</div>
+            <td class="bill-to" style="width: 58%;">
+                <div style="font-weight: bold;">Bill to:</div>
+                <div style="font-weight: bold;">{{ $invoice->customer_name ?? '-' }}</div>
+                <div>{!! nl2br(e($invoice->customer_address ?: ($invoice->draft?->address ?: ''))) !!}</div>
                 <div>{{ $invoice->customer_npwp ?: '' }}</div>
             </td>
-            <td style="width: 45%;">
-                <table class="info-right-table">
+            <td style="width: 42%;">
+                <table class="info-table">
                     <tr>
-                        <td style="text-align: left; padding-right: 4px; white-space: nowrap;">Nomor Invoice</td>
-                        <td style="text-align: center; width: 14px; white-space: nowrap;">:</td>
-                        <td style="text-align: left; padding-left: 4px; min-width: 95px; white-space: nowrap;">{{ $invoice->invoice_number }}</td>
+                        <td style="font-weight: bold;">Nomor Invoice :</td>
+                        <td class="text-right">{{ $invoice->invoice_number }}</td>
                     </tr>
                     <tr>
-                        <td style="text-align: left; padding-right: 4px; white-space: nowrap;">Tanggal Invoice</td>
-                        <td style="text-align: center; width: 14px; white-space: nowrap;">:</td>
-                        <td style="text-align: left; padding-left: 4px; white-space: nowrap;">{{ $invoice->invoice_date ?? date('d/m/Y') }}</td>
+                        <td style="font-weight: bold;">Tanggal Invoice :</td>
+                        <td class="text-right">{{ $invoice->invoice_date ?? date('d/m/Y') }}</td>
                     </tr>
                 </table>
             </td>
         </tr>
     </table>
 
-    <!-- Items Table -->
+    <!-- Item -->
     <table class="items-table">
         <thead>
             <tr>
-                <th style="width: 18%; text-align: center;">No Kode</th>
-                <th style="width: 58%; text-align: center;">Deskripsi</th>
-                <th style="width: 24%; text-align: center;">Total</th>
+                <th style="width: 30%;">No Kode</th>
+                <th style="width: 45%;">Deskripsi</th>
+                <th style="width: 25%;">Total</th>
             </tr>
         </thead>
         <tbody>
             <tr>
                 <td>1. {{ $invoice->item_code ?? '-' }}</td>
                 <td>{{ $invoice->item_name ?? '-' }}</td>
-                <td class="text-right">Rp {{ number_format($invoice->dpp, 0, '.', ',') }}</td>
+                <td class="text-right">{{ $rupiah($invoice->dpp) }}</td>
             </tr>
         </tbody>
     </table>
 
-    <!-- Ket & Periode (outside table) -->
     <div class="ket-block">
         <div><strong>Ket :</strong> {{ $invoice->program_name ?? '-' }}</div>
-        <div>{{ \Illuminate\Support\Str::startsWith($invoice->program_period ?? '', 'Periode') ? $invoice->program_period : 'Periode ' . ($invoice->program_period ?? '-') }}</div>
+        <div>{{ \Illuminate\Support\Str::startsWith($period, 'Periode') ? $period : 'Periode '.$period }}</div>
     </div>
 
-    <!-- Summary Breakdown -->
+    <!-- Ringkasan -->
     <table class="summary-table">
         <tr>
             <td class="sum-label">DPP :</td>
-            <td class="sum-val">Rp {{ number_format($invoice->dpp, 0, '.', ',') }}</td>
+            <td class="text-right">{{ $rupiah($invoice->dpp) }}</td>
         </tr>
         <tr>
             <td class="sum-label">DPP LAIN :</td>
-            <td class="sum-val">Rp {{ number_format($invoice->dpp_lain, 0, '.', ',') }}</td>
+            <td class="text-right">{{ $rupiah($invoice->dpp_lain) }}</td>
         </tr>
         <tr>
-            <td class="sum-label">PPN :</td>
-            <td class="sum-val">Rp {{ number_format($invoice->ppn, 0, '.', ',') }}</td>
+            <td class="sum-label">PPN 12% :</td>
+            <td class="text-right">{{ $rupiah($invoice->ppn) }}</td>
         </tr>
         <tr>
-            <td class="sum-label"><strong>Jumlah (DPP+PPN) :</strong></td>
-            <td class="sum-val"><strong>Rp {{ number_format($invoice->dpp + $invoice->ppn, 0, '.', ',') }}</strong></td>
+            <td class="sum-label">Jumlah (DPP+PPN 12%) :</td>
+            <td class="text-right">{{ $rupiah($invoice->dpp + $invoice->ppn) }}</td>
         </tr>
         <tr>
             <td class="sum-label">PPH :</td>
-            <td class="sum-val">Rp {{ number_format($invoice->pph, 0, '.', ',') }}</td>
+            <td class="text-right">{{ $rupiah($invoice->pph) }}</td>
         </tr>
         <tr>
             <td class="sum-label">Net Pay :</td>
-            <td class="sum-val"><strong>Rp {{ number_format($invoice->netpay, 0, '.', ',') }}</strong></td>
+            <td class="text-right" style="font-weight: bold;">{{ $rupiah($invoice->netpay) }}</td>
         </tr>
     </table>
 
-    <!-- Terbilang -->
-    <div class="terbilang-bar">
-        <span class="terbilang-label">Terbilang :</span>
-        <span>{{ lcfirst($invoice->terbilang) }}</span>
+    <div class="terbilang">
+        <strong>Terbilang :</strong> {{ \Illuminate\Support\Str::lower($invoice->terbilang) }}
     </div>
 
-    <!-- Notes & Signature -->
-    <div style="width: 100%;">
-        <div class="note-box">
-            <div style="font-weight: bold; margin-bottom: 3px;">NOTE :</div>
-            <div>Mohon segera ttd dan stampel maksimal 30 hari sejak tanggal terbit.</div>
-            <div>Untuk Dealer PKP, mohon bantu terbitkan Faktur Pajak sesuai tanggal berjalan apabila sudah lewat dari tanggal 5</div>
-        </div>
+    <!-- Rekening tujuan transfer (diisi dealer) -->
+    <div class="transfer">
+        <div class="transfer-title">Mohon lakukan transfer ke rekening bank berikut:</div>
+        <table class="transfer-table">
+            <tr>
+                <td style="width: 160px;">Nama Pemilik Rekening</td>
+                <td>:</td>
+            </tr>
+            <tr>
+                <td>Nama Bank</td>
+                <td>:</td>
+            </tr>
+            <tr>
+                <td>Nomor Rekening</td>
+                <td>:</td>
+            </tr>
+        </table>
+    </div>
 
-        <div class="signature-container">
-            <div class="sign-title">HORMAT KAMI,</div>
-            <div class="sign-space"></div>
-            <div class="sign-name">( <span style="text-decoration: underline;">Nama Jelas</span> )</div>
-        </div>
-        <div class="clearfix"></div>
+    <div class="signature">
+        <div>HORMAT KAMI,</div>
+        <div class="sign-space"></div>
+        <div>{{ $invoice->dealer_name ?? '-' }}</div>
     </div>
 
 </body>

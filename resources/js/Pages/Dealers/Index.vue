@@ -81,7 +81,7 @@
       :class="{
         'border-gray-200 bg-white': isImportActive,
         'border-emerald-200 bg-emerald-50/60': importStatus.state === 'done',
-        'border-red-200 bg-red-50/60': importStatus.state === 'failed',
+        'border-red-200 bg-red-50/60': importStatus.state === 'failed' || isImportStalled,
       }"
     >
       <div class="min-w-0 space-y-1.5">
@@ -138,8 +138,22 @@
         </template>
 
         <template v-else>
-          <p class="font-medium text-red-700">Import {{ importStatus.file_name }} gagal.</p>
-          <p class="text-gray-700">{{ importStatus.message }}</p>
+          <p class="font-medium text-red-700">Import {{ importStatus.file_name }} {{ isImportStalled ? 'berhenti' : 'gagal' }}.</p>
+          <p v-if="importStatus.message" class="text-gray-700">{{ importStatus.message }}</p>
+          <!-- Toko yang sudah selesai tetap tersimpan; lanjutkan dari situ tanpa unggah ulang -->
+          <div v-if="canResumeImport" class="flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-0.5">
+            <span class="text-gray-700 tabular-nums">
+              {{ formatCount(importStatus.resume?.from) }} dari {{ formatCount(importStatus.progress?.total) }} toko sudah tersimpan.
+            </span>
+            <button
+              type="button"
+              @click="resumeImport"
+              :disabled="isResumingImport"
+              class="h-7 px-3 rounded-md bg-gray-900 hover:bg-gray-800 text-white text-xs font-medium transition cursor-pointer disabled:opacity-50"
+            >
+              Lanjutkan
+            </button>
+          </div>
         </template>
       </div>
       <button v-if="!isImportActive" type="button" @click="dismissImportStatus" class="text-gray-400 hover:text-gray-600 cursor-pointer shrink-0" title="Tutup">
@@ -968,10 +982,15 @@ async function executeDelete() {
 // Import di background: status dicek berkala selama masih menunggu / berjalan
 const DISMISSED_IMPORT_KEY = 'dealer-import-dismissed';
 const importStatus = ref(null);
+// Import agreement yang gagal / berhenti di tengah bisa dilanjutkan dari kelompok toko terakhir yang tersimpan
+const canResumeImport = ref(false);
+const isResumingImport = ref(false);
 const dismissedImportAt = ref(readDismissedImport());
 let importPollTimer = null;
 
-const isImportActive = computed(() => ['queued', 'running'].includes(importStatus.value?.state));
+// Masih tercatat berjalan, tapi lama tidak ada kabar (mis. proses mati): dianggap berhenti
+const isImportStalled = computed(() => ['queued', 'running'].includes(importStatus.value?.state) && canResumeImport.value);
+const isImportActive = computed(() => ['queued', 'running'].includes(importStatus.value?.state) && !canResumeImport.value);
 const isImportStatusVisible = computed(() => importStatus.value && (isImportActive.value || importStatus.value.queued_at !== dismissedImportAt.value));
 const importProgressPercent = computed(() => {
   const progress = importStatus.value?.progress;
@@ -1000,9 +1019,10 @@ function dismissImportStatus() {
   }
 }
 
-function applyImportStatus(status) {
+function applyImportStatus(status, canResume = false) {
   const wasActive = isImportActive.value;
   importStatus.value = status || null;
+  canResumeImport.value = Boolean(canResume);
 
   clearTimeout(importPollTimer);
   if (isImportActive.value) {
@@ -1017,9 +1037,22 @@ function applyImportStatus(status) {
 async function fetchImportStatus() {
   try {
     const res = await axios.get('/api/dealers/import/status');
-    applyImportStatus(res.data.status);
+    applyImportStatus(res.data.status, res.data.can_resume);
   } catch {
     if (isImportActive.value) importPollTimer = setTimeout(fetchImportStatus, 10000);
+  }
+}
+
+async function resumeImport() {
+  isResumingImport.value = true;
+  try {
+    const res = await axios.post('/api/dealers/import/resume');
+    applyImportStatus(res.data.status, res.data.can_resume);
+  } catch (e) {
+    notify.error(e.response?.data?.message || e.message, { title: 'Import tidak bisa dilanjutkan' });
+    fetchImportStatus();
+  } finally {
+    isResumingImport.value = false;
   }
 }
 

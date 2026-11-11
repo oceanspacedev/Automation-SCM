@@ -57,7 +57,24 @@ class DealerController extends Controller
      */
     public function importStatus(): JsonResponse
     {
-        return response()->json(['success' => true, 'status' => ImportDealerFile::status()]);
+        return response()->json(['success' => true, 'status' => ImportDealerFile::status(), 'can_resume' => ImportDealerFile::canResume()]);
+    }
+
+    /**
+     * Continue an agreement import that failed or stopped, from its last saved batch of stores.
+     */
+    public function resumeImport(): JsonResponse
+    {
+        if (! ImportDealerFile::resume()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ada import agreement yang bisa dilanjutkan.',
+                'status' => ImportDealerFile::status(),
+                'can_resume' => false,
+            ], 409);
+        }
+
+        return response()->json(['success' => true, 'status' => ImportDealerFile::status(), 'can_resume' => false], 202);
     }
 
     /**
