@@ -40,16 +40,6 @@
       <!-- Tombol aksi; di layar kecil dua tombol sama lebar dengan label pendek -->
       <div class="grid grid-cols-2 sm:flex sm:items-center gap-2">
         <button
-          v-if="resendIds.length > 0"
-          @click="askResendWhatsApp(resendIds)"
-          :disabled="resending"
-          :class="headerButtonClass"
-          :title="`Kirim ulang ${resendIds.length} invoice terpilih ke WhatsApp telemarketing`"
-        >
-          {{ resending ? 'Mengirim...' : `Kirim ulang WA (${resendIds.length})` }}
-        </button>
-
-        <button
           v-if="selectedIds.length > 0"
           @click="askSendBatch"
           :disabled="sendingBatch"
@@ -220,13 +210,14 @@
               v-for="inv in invoices"
               :key="inv.id"
               class="p-4 flex gap-3 text-xs text-gray-700"
-              :class="isSelected(inv) && 'bg-gray-50'"
+              :class="selectedIds.includes(inv.id) && 'bg-gray-50'"
             >
               <input
                 type="checkbox"
-                :checked="isSelected(inv)"
-                @change="toggleSelect(inv)"
-                class="mt-0.5 rounded border-gray-300 text-gray-900 focus:ring-0 w-4 h-4 cursor-pointer shrink-0"
+                :value="inv.id"
+                v-model="selectedIds"
+                :disabled="isAlreadySent(inv)"
+                class="mt-0.5 rounded border-gray-300 text-gray-900 focus:ring-0 w-4 h-4 cursor-pointer disabled:opacity-30 shrink-0"
               />
               <div class="flex-1 min-w-0 space-y-2">
                 <div class="flex items-start justify-between gap-3">
@@ -262,15 +253,12 @@
                     >
                       PDF
                     </a>
-                    <button
+                    <span
                       v-if="isAlreadySent(inv)"
-                      type="button"
-                      @click="askResendWhatsApp([inv.id], inv)"
-                      :disabled="resending"
-                      class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer disabled:opacity-50"
+                      class="h-8 px-2.5 inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 text-gray-400 font-medium select-none"
                     >
-                      Kirim ulang WA
-                    </button>
+                      Terkirim
+                    </span>
                     <button
                       v-else
                       type="button"
@@ -359,16 +347,17 @@
               v-else
               v-for="inv in invoices"
               :key="inv.id"
-              :class="[isSelected(inv) ? 'bg-gray-50' : 'hover:bg-gray-50/70', 'text-gray-700 font-normal transition']"
+              :class="[selectedIds.includes(inv.id) ? 'bg-gray-50' : 'hover:bg-gray-50/70', 'text-gray-700 font-normal transition']"
             >
               <!-- Checkbox Selection -->
               <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
                 <input
                   type="checkbox"
-                  :checked="isSelected(inv)"
-                  @change="toggleSelect(inv)"
-                  class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer"
-                  :title="isAlreadySent(inv) ? 'Pilih untuk kirim ulang WA' : 'Pilih invoice ini'"
+                  :value="inv.id"
+                  v-model="selectedIds"
+                  :disabled="isAlreadySent(inv)"
+                  class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer disabled:opacity-30"
+                  :title="isAlreadySent(inv) ? 'Sudah dikirim' : 'Pilih invoice ini'"
                 />
               </td>
 
@@ -448,16 +437,13 @@
                   </a>
 
                   <!-- 3. Kirim / Sent Action -->
-                  <button
+                  <span
                     v-if="isAlreadySent(inv)"
-                    type="button"
-                    @click="askResendWhatsApp([inv.id], inv)"
-                    :disabled="resending"
-                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
-                    title="Kirim ulang WA ke telemarketing"
+                    class="h-7 w-7.5 inline-flex items-center justify-center bg-gray-50 text-gray-400 select-none"
+                    title="Invoice ini sudah terkirim"
                   >
-                    <RotateCcwIcon class="w-3.5 h-3.5 text-gray-600" />
-                  </button>
+                    <CheckCircleIcon class="w-3.5 h-3.5 text-gray-400" />
+                  </span>
                   <button
                     v-else
                     type="button"
@@ -551,7 +537,6 @@ import {
   FileText as FileTextIcon,
   MailCheck as MailCheckIcon,
   CheckCircle as CheckCircleIcon,
-  RotateCcw as RotateCcwIcon,
   AlertCircle as AlertCircleIcon,
   ChevronRight as ChevronRightIcon,
   ChevronDown as ChevronDownIcon,
@@ -583,9 +568,6 @@ const sendingId = ref(null);
 const sendingAll = ref(false);
 const sendingBatch = ref(false);
 const selectedIds = ref([]);
-// Invoice terkirim yang dicentang untuk dikirim ulang WA-nya
-const resendIds = ref([]);
-const resending = ref(false);
 const alertMessage = ref(null);
 const alertSuccess = ref(true);
 const isFilterOpen = ref(false);
@@ -681,60 +663,6 @@ const toggleSelectAll = (e) => {
   } else {
     const selectableIdSet = new Set(selectableInvoices.value.map(i => i.id));
     selectedIds.value = selectedIds.value.filter(id => !selectableIdSet.has(id));
-  }
-};
-
-const isSelected = (inv) => selectedIds.value.includes(inv.id) || resendIds.value.includes(inv.id);
-
-// Centang invoice belum terkirim untuk Kirim, invoice terkirim untuk Kirim ulang WA
-const toggleSelect = (inv) => {
-  if (isSelected(inv)) {
-    selectedIds.value = selectedIds.value.filter(id => id !== inv.id);
-    resendIds.value = resendIds.value.filter(id => id !== inv.id);
-  } else if (isAlreadySent(inv)) {
-    resendIds.value = [...resendIds.value, inv.id];
-  } else {
-    selectedIds.value = [...selectedIds.value, inv.id];
-  }
-};
-
-const askResendWhatsApp = (ids, inv = null) => {
-  if (ids.length === 0 || resending.value) return;
-  confirmState.title = 'Kirim Ulang WhatsApp';
-  confirmState.message = inv
-    ? `Kirim ulang invoice ${inv.invoice_number} ke WhatsApp telemarketing? Email ke dealer tidak dikirim ulang.`
-    : `Kirim ulang ${ids.length} invoice ke WhatsApp telemarketing, satu ZIP per region? Email ke dealer tidak dikirim ulang.`;
-  confirmState.confirmText = 'Ya, Kirim Ulang';
-  confirmState.showSenderSelect = false;
-  confirmState.action = async () => {
-    confirmState.loading = true;
-    try {
-      await executeResendWhatsApp([...ids]);
-      confirmState.show = false;
-    } finally {
-      confirmState.loading = false;
-    }
-  };
-  confirmState.show = true;
-};
-
-const executeResendWhatsApp = async (ids) => {
-  resending.value = true;
-  alertMessage.value = null;
-
-  try {
-    const res = await axios.post('/api/invoices/resend-whatsapp', { ids });
-    const sentIds = res.data.sent_ids || [];
-    // Region yang gagal tetap tercentang supaya bisa dikirim ulang lagi tanpa mengulang region yang sudah masuk
-    alertSuccess.value = res.data.failed === 0;
-    alertMessage.value = res.data.message;
-    resendIds.value = resendIds.value.filter(id => !sentIds.includes(id));
-    fetchInvoices(pagination.current_page);
-  } catch (err) {
-    alertSuccess.value = false;
-    alertMessage.value = err.response?.data?.message || 'Gagal mengirim ulang WhatsApp.';
-  } finally {
-    resending.value = false;
   }
 };
 
@@ -956,7 +884,7 @@ const fetchInvoices = async (page = 1, { silent = false } = {}) => {
 
 // Daftar invoice dimuat ulang otomatis; berhenti selama modal terbuka atau pengiriman berjalan
 useAutoRefresh(() => fetchInvoices(pagination.current_page, { silent: true }), {
-  isPaused: () => loading.value || showEmailModal.value || confirmState.show || sendingAll.value || sendingBatch.value || resending.value || sendingId.value !== null,
+  isPaused: () => loading.value || showEmailModal.value || confirmState.show || sendingAll.value || sendingBatch.value || sendingId.value !== null,
 });
 
 const resetFilters = () => {

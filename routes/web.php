@@ -180,7 +180,6 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         Route::post('/invoices/generate/{draftId}', [InvoiceController::class, 'generate']);
         Route::post('/invoices/quick-send-all', [InvoiceController::class, 'quickSendAll']);
         Route::post('/invoices/send-batch', [InvoiceController::class, 'sendBatch']);
-        Route::post('/invoices/resend-whatsapp', [InvoiceController::class, 'resendWhatsApp']);
         Route::post('/invoices/{id}/send', [InvoiceController::class, 'sendEmail']);
         Route::post('/invoices/{id}/send-email', [InvoiceController::class, 'sendEmail']);
         Route::post('/invoices/{id}/quick-send-email', [InvoiceController::class, 'quickSendEmail']);
