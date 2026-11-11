@@ -308,6 +308,74 @@ class InvoiceNotificationTest extends TestCase
         $this->assertNull($invoice->refresh()->whatsapp_sent_at);
     }
 
+    public function test_resend_whatsapp_sends_the_region_zip_of_sent_invoices_to_telemarketing_again_without_email(): void
+    {
+        $this->fakeInvoiceChannels();
+        Dealer::create(['kode_bt' => 'BT07184', 'dealer_name' => '888 CELL', 'telemarketing' => 'Tele Cirebon', 'telemarketing_phone' => '082222222222']);
+        Dealer::create(['kode_bt' => 'BT06910', 'dealer_name' => 'A1 CELL', 'telemarketing' => 'Tele Cirebon', 'telemarketing_phone' => '082222222222']);
+        $firstSentAt = now()->subHour();
+        $invoices = [
+            $this->regionInvoice('CIREBON', 'BT07184', '888 CELL', 'CN-RES-001', 'cell888@example.com'),
+            $this->regionInvoice('CIREBON', 'BT06910', 'A1 CELL', 'CN-RES-002', 'a1cell@example.com'),
+        ];
+        foreach ($invoices as $invoice) {
+            $invoice->update(['status' => 'sent', 'email_sent_at' => $firstSentAt, 'whatsapp_sent_at' => $firstSentAt]);
+        }
+
+        $this->postJson('/api/invoices/resend-whatsapp', ['ids' => [$invoices[0]->id, $invoices[1]->id]])
+            ->assertOk()
+            ->assertJson(['success' => true, 'sent' => 2, 'failed' => 0]);
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request) => $request['recipient']['value'] === '6282222222222'
+            && $request['message']['attachment']['filename'] === 'Invoice Region CIREBON.zip'
+            && str_contains($request['message']['text'], 'CN-RES-001')
+            && str_contains($request['message']['text'], 'CN-RES-002'));
+        Mail::assertNothingSent();
+
+        foreach ($invoices as $invoice) {
+            $invoice->refresh();
+            $this->assertSame('sent', $invoice->status);
+            $this->assertTrue($invoice->whatsapp_sent_at->greaterThan($firstSentAt));
+            $this->assertDatabaseHas('whatsapp_logs', ['invoice_id' => $invoice->id, 'recipient_phone' => '6282222222222', 'status' => 'sent']);
+        }
+    }
+
+    public function test_resend_whatsapp_leaves_an_unsent_invoice_to_the_normal_send(): void
+    {
+        $this->fakeInvoiceChannels();
+        Dealer::create(['kode_bt' => 'BT07238', 'dealer_name' => '6003 MOBILE', 'telemarketing' => 'Tele Bandung', 'telemarketing_phone' => '081111111111']);
+        $invoice = $this->regionInvoice('BANDUNG', 'BT07238', '6003 MOBILE', 'CN-RES-003', 'mobile6003@example.com');
+
+        $this->postJson('/api/invoices/resend-whatsapp', ['ids' => [$invoice->id]])
+            ->assertStatus(422)
+            ->assertJson(['success' => false]);
+
+        Http::assertNothingSent();
+        $this->assertNull($invoice->refresh()->whatsapp_sent_at);
+        $this->assertSame('generated', $invoice->status);
+    }
+
+    public function test_resend_whatsapp_keeps_the_first_send_time_when_the_gateway_fails(): void
+    {
+        Storage::fake('public');
+        config(['services.wag.token' => 'test-token', 'services.wag.public_url' => 'https://cdn.example.com']);
+        Http::preventStrayRequests();
+        Http::fake(['*/api/v1/messages' => Http::response(['message' => 'Provider sedang gangguan'], 503)]);
+        Dealer::create(['kode_bt' => 'BT07238', 'dealer_name' => '6003 MOBILE', 'telemarketing' => 'Tele Bandung', 'telemarketing_phone' => '081111111111']);
+        $invoice = $this->regionInvoice('BANDUNG', 'BT07238', '6003 MOBILE', 'CN-RES-004', 'mobile6003@example.com');
+        $firstSentAt = now()->subHour()->startOfSecond();
+        $invoice->update(['status' => 'sent', 'email_sent_at' => $firstSentAt, 'whatsapp_sent_at' => $firstSentAt]);
+
+        $this->postJson('/api/invoices/resend-whatsapp', ['ids' => [$invoice->id]])
+            ->assertStatus(422)
+            ->assertJson(['success' => false, 'sent' => 0, 'failed' => 1])
+            ->assertJsonPath('message', fn (string $message) => str_contains($message, 'WhatsApp Region BANDUNG gagal'));
+
+        $this->assertTrue($invoice->refresh()->whatsapp_sent_at->equalTo($firstSentAt));
+        $this->assertDatabaseHas('whatsapp_logs', ['invoice_id' => $invoice->id, 'recipient_phone' => '6281111111111', 'status' => 'failed']);
+    }
+
     /**
      * Fake the mailer, the public disk and the WhatsApp gateway (no other outgoing request allowed).
      */

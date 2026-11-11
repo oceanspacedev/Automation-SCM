@@ -547,6 +547,47 @@ class InvoiceController extends Controller
     }
 
     /**
+     * WhatsApp the selected sent invoices to telemarketing again, one ZIP per region as on the first send, e.g. when the
+     * first WhatsApp did not arrive. The dealer email is not sent again.
+     */
+    public function resendWhatsApp(Request $request, InvoiceRegionSender $regionSender): JsonResponse
+    {
+        $ids = $request->input('ids', []);
+        if (empty($ids) || ! is_array($ids)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pilih setidaknya satu invoice untuk dikirim ulang.',
+            ], 422);
+        }
+
+        $invoices = Invoice::with('draft')->whereIn('id', $ids)->where('status', 'sent')->orderBy('id')->get();
+
+        if ($invoices->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kirim ulang WhatsApp hanya untuk invoice yang sudah terkirim.',
+            ], 422);
+        }
+
+        $whatsApp = $regionSender->send($invoices);
+        $sentIds = array_keys($whatsApp['sent']);
+
+        foreach ($invoices->whereIn('id', $sentIds) as $invoice) {
+            $invoice->update(['whatsapp_sent_at' => now()]);
+        }
+
+        $message = ['Kirim ulang WhatsApp: '.count($sentIds)." dari {$invoices->count()} invoice terkirim.", ...$this->whatsAppSummary($whatsApp)];
+
+        return response()->json([
+            'success' => $sentIds !== [],
+            'message' => implode(' ', $message),
+            'sent' => count($sentIds),
+            'failed' => $invoices->count() - count($sentIds),
+            'whatsapp_files' => $whatsApp['files'],
+        ], $sentIds !== [] ? 200 : 422);
+    }
+
+    /**
      * Invoices not sent yet (no email or no WhatsApp sent so far), in the order they were generated.
      *
      * @return Builder<Invoice>
@@ -595,20 +636,13 @@ class InvoiceController extends Controller
             $invoice->update([...$updates[$invoice->id], 'status' => 'sent']);
         }
 
-        $files = collect($whatsApp['files']);
         $emailed = count(array_filter($updates, fn (array $update) => isset($update['email_sent_at'])));
 
         $message = array_filter([
             'Pengiriman selesai: '.count($updates)." dari {$invoices->count()} invoice terkirim.",
             $emailed > 0 ? "Email ke dealer: {$emailed} terkirim." : null,
             $emailFailed ? 'Email gagal: '.$this->invoiceNumberList($emailFailed).'.' : null,
-            $files->where('success', true)->isNotEmpty()
-                ? 'WhatsApp ke telemarketing: '.$files->where('success', true)->map(fn (array $file) => "Region {$file['region']} ({$file['count']} invoice, 1 PDF)")->implode(', ').'.'
-                : null,
-            ...$files->where('success', false)->map(fn (array $file) => "WhatsApp Region {$file['region']} gagal: {$file['message']}")->all(),
-            $whatsApp['without_phone']
-                ? 'Nomor WA telemarketing belum ada di Master Dealer untuk invoice: '.$this->invoiceNumberList($whatsApp['without_phone']).'.'
-                : null,
+            ...$this->whatsAppSummary($whatsApp),
         ]);
 
         return response()->json([
@@ -618,6 +652,28 @@ class InvoiceController extends Controller
             'failed' => $invoices->count() - count($updates),
             'whatsapp_files' => $whatsApp['files'],
         ], $updates !== [] ? 200 : 422);
+    }
+
+    /**
+     * The WhatsApp part of a send result: the regions sent, the regions that failed, and the invoices whose store has no
+     * telemarketing number.
+     *
+     * @param  array{sent: array<int, string>, files: list<array{region: string, phone: string, count: int, success: bool, message: string}>, without_phone: list<string>}  $whatsApp
+     * @return list<string>
+     */
+    private function whatsAppSummary(array $whatsApp): array
+    {
+        $files = collect($whatsApp['files']);
+
+        return array_values(array_filter([
+            $files->where('success', true)->isNotEmpty()
+                ? 'WhatsApp ke telemarketing: '.$files->where('success', true)->map(fn (array $file) => "Region {$file['region']} ({$file['count']} invoice, 1 ZIP)")->implode(', ').'.'
+                : null,
+            ...$files->where('success', false)->map(fn (array $file) => "WhatsApp Region {$file['region']} gagal: {$file['message']}")->all(),
+            $whatsApp['without_phone']
+                ? 'Nomor WA telemarketing belum ada di Master Dealer untuk invoice: '.$this->invoiceNumberList($whatsApp['without_phone']).'.'
+                : null,
+        ]));
     }
 
     /**
