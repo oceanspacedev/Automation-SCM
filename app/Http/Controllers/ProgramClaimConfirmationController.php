@@ -7,6 +7,7 @@ use App\Models\ProgramApprovalLog;
 use App\Models\ProgramSubmission;
 use App\Models\TeamContact;
 use App\Services\DataProgramSyncService;
+use App\Services\ProgramApprovalFlow;
 use App\Services\ProgramReconciliationService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
@@ -15,6 +16,34 @@ use Illuminate\View\View;
 
 class ProgramClaimConfirmationController extends Controller
 {
+    /**
+     * What each Data Program link may do: telemarketing records the dealer's choice (cut, transfer or postpone), AR
+     * cuts (or postpones the cut), the SCM team confirms a transfer, the tax team saves the tax check.
+     *
+     * @var array<string, list<string>>
+     */
+    private const ROLE_ACTIONS = [
+        'telemarketing' => ['setuju', 'setuju_transfer', 'tunda'],
+        'ar' => ['potong', 'tunda'],
+        'scm' => ['transfer'],
+        'pajak' => ['cek_pajak'],
+    ];
+
+    /**
+     * The approval stages (ProgramApprovalFlow) in which each action may run: the dealer's choice only before the claim
+     * is settled, the cut only while AR is waiting, the transfer only while SCM is waiting, the tax check once settled.
+     *
+     * @var array<string, list<string>>
+     */
+    private const ACTION_STAGES = [
+        'setuju' => ['waiting_telemarketing', 'waiting_approval', 'postponed', 'approved', 'awaiting_transfer'],
+        'setuju_transfer' => ['waiting_telemarketing', 'waiting_approval', 'postponed', 'approved', 'awaiting_transfer'],
+        'tunda' => ['waiting_telemarketing', 'waiting_approval', 'postponed', 'approved', 'awaiting_transfer'],
+        'potong' => ['approved'],
+        'transfer' => ['awaiting_transfer'],
+        'cek_pajak' => ['cut', 'tax_checked'],
+    ];
+
     public function __construct(
         protected WhatsAppService $waService,
         protected DataProgramSyncService $dpSyncService,
@@ -144,12 +173,14 @@ class ProgramClaimConfirmationController extends Controller
 
         $dp = DataProgram::findOrFail($id);
 
-        $role = $request->query('role') ?? $request->input('role');
+        // Peran hanya dari tautan yang ditandatangani; tautan lama tanpa peran ditebak dari status (AR atau telemarketing)
+        $role = $request->query('role');
         if (! $role) {
-            $role = ($dp->status_potong_ar === 'DEALER SETUJU (PROSES AR)' || $request->query('action') === 'potong' || $request->input('action') === 'potong')
+            $role = ($dp->status_potong_ar === 'DEALER SETUJU (PROSES AR)' || $request->query('action') === 'potong')
                 ? 'ar'
                 : 'telemarketing';
         }
+        $stage = app(ProgramApprovalFlow::class)->stage($dp);
 
         // Handle POST submission from interactive confirmation page
         if ($request->isMethod('post')) {
@@ -157,15 +188,75 @@ class ProgramClaimConfirmationController extends Controller
             $arNotification = null;
             $taxNotification = null;
             $scmNotification = null;
+            $scmTransferNotification = null;
 
-            // Link Tim Pajak hanya untuk mengisi cek pajak, dan cek pajak hanya lewat link Tim Pajak
-            if (($role === 'pajak') !== ($action === 'cek_pajak')) {
+            // Tiap tautan hanya untuk aksi perannya (potong / transfer dipilih telemarketing, transfer dikonfirmasi SCM)
+            if (! in_array($action, self::ROLE_ACTIONS[$role] ?? [], true)) {
                 abort(403, 'Aksi ini tidak tersedia untuk tautan ini.');
             }
 
-            if ($action === 'setuju') {
+            // Tautan lama tidak boleh memproses klaim yang sudah selesai atau dialihkan (mis. dipotong sekaligus ditransfer)
+            if (! in_array($stage, self::ACTION_STAGES[$action], true)) {
+                abort(409, 'Klaim ini sudah diproses atau dialihkan, jadi aksi ini tidak bisa dijalankan lagi.');
+            }
+
+            if ($action === 'setuju_transfer') {
+                // Dealer memilih ditransfer: rekening diisi telemarketing, lalu diteruskan ke Tim SCM (tanpa AR)
+                $validated = $request->validate([
+                    'bank' => ['required', 'string', 'max:100', 'regex:/[\pL\pN]/u'],
+                    'norek' => ['required', 'string', 'max:100', 'regex:/^[\d\s.\-]+$/', function (string $attribute, mixed $value, \Closure $fail) {
+                        if (strlen(preg_replace('/\D/', '', (string) $value)) < 5) {
+                            $fail('No. rekening minimal 5 angka.');
+                        }
+                    }],
+                    'namrek' => ['required', 'string', 'max:255', 'regex:/[\pL\pN]/u'],
+                ], [
+                    'bank.required' => 'Nama bank wajib diisi.',
+                    'bank.regex' => 'Nama bank wajib diisi.',
+                    'norek.required' => 'No. rekening wajib diisi.',
+                    'norek.regex' => 'No. rekening hanya boleh berisi angka.',
+                    'namrek.required' => 'Nama pemilik rekening wajib diisi.',
+                    'namrek.regex' => 'Nama pemilik rekening wajib diisi.',
+                ]);
+
+                $dp->update([
+                    'status_potong_ar' => DataProgram::TRANSFER_APPROVED,
+                    'tf_status' => 'TF',
+                    'bank' => trim($validated['bank']),
+                    'norek' => trim($validated['norek']),
+                    'namrek' => trim($validated['namrek']),
+                ]);
+                ProgramApprovalLog::record($dp, ProgramApprovalLog::TRANSFER_APPROVED, actor: $this->linkActor($role),
+                    note: "Transfer ke {$dp->bank} {$dp->norek} a.n. {$dp->namrek}");
+
+                $this->pushDpToSpreadsheet($dp);
+
+                // Estafet Otomatis: Tim SCM mentransfer ke rekening dealer
+                $scmTransferNotification = $this->notifyScmTransfer($dp);
+            } elseif ($action === 'transfer') {
+                $validated = $request->validate([
+                    'no_pembayaran' => ['required', 'string', 'max:255'],
+                ], [
+                    'no_pembayaran.required' => 'No. referensi transfer wajib diisi sebelum menyelesaikan transfer.',
+                    'no_pembayaran.max' => 'No. referensi transfer maksimal 255 karakter.',
+                ]);
+
+                $dp->update([
+                    'status_potong_purchase' => DataProgram::DONE_TRANSFER,
+                    'status_potong_ar' => DataProgram::DONE_TRANSFER,
+                    'tgl_potong_tf' => date('n/j/Y'),
+                    'no_pembayaran' => trim($validated['no_pembayaran']),
+                ]);
+                ProgramApprovalLog::record($dp, ProgramApprovalLog::TRANSFERRED, actor: $this->linkActor($role), note: "No. Referensi: {$dp->no_pembayaran}");
+
+                $this->pushDpToSpreadsheet($dp);
+
+                // Estafet Otomatis: Tim Pajak mengecek PPh klaim yang sudah ditransfer
+                $taxNotification = $this->notifyTaxTeam($dp);
+            } elseif ($action === 'setuju') {
                 $dp->update([
                     'status_potong_ar' => 'DEALER SETUJU (PROSES AR)',
+                    'tf_status' => 'POTONG',
                 ]);
                 ProgramApprovalLog::record($dp, ProgramApprovalLog::APPROVED, actor: $this->linkActor($role));
 
@@ -254,6 +345,7 @@ class ProgramClaimConfirmationController extends Controller
                 'arNotification' => $arNotification,
                 'taxNotification' => $taxNotification,
                 'scmNotification' => $scmNotification,
+                'scmTransferNotification' => $scmTransferNotification,
             ]);
         }
 
@@ -261,6 +353,7 @@ class ProgramClaimConfirmationController extends Controller
         return view('data_programs.confirm', [
             'dp' => $dp,
             'role' => $role,
+            'stage' => $stage,
             'documents' => $this->documentsOf($dp),
         ]);
     }
@@ -317,6 +410,30 @@ class ProgramClaimConfirmationController extends Controller
     }
 
     /**
+     * After the dealer chose a bank transfer, ask the SCM team to transfer the claim; a failed WhatsApp is recorded and
+     * can be sent again from Riwayat Approval.
+     *
+     * @return array{success: bool, message: string}
+     */
+    protected function notifyScmTransfer(DataProgram $dp): array
+    {
+        try {
+            $result = $this->waService->sendDataProgramTransferRequestToScm($dp);
+        } catch (\Throwable $e) {
+            $result = ['success' => false, 'message' => $e->getMessage()];
+        }
+
+        if (! $result['success']) {
+            Log::warning("Gagal kirim WA permintaan transfer ke SCM untuk DataProgram ID {$dp->id}: {$result['message']}");
+        }
+
+        ProgramApprovalLog::record($dp, ProgramApprovalLog::SCM_TRANSFER_NOTIFIED, $result['success'],
+            actor: ProgramApprovalLog::AUTOMATIC, recipient: ProgramApprovalLog::teamRecipient($dp, TeamContact::SCM), note: $result['message']);
+
+        return $result;
+    }
+
+    /**
      * After the tax team saves their check, send its result to the area's SCM team; a failed WhatsApp is recorded and
      * can be sent again from Riwayat Approval.
      *
@@ -358,6 +475,10 @@ class ProgramClaimConfirmationController extends Controller
                 'status_potong_ar' => $dp->status_potong_ar,
                 'tgl_potong_tf' => $dp->tgl_potong_tf,
                 'no_pembayaran' => $dp->no_pembayaran,
+                'tf_status' => $dp->tf_status,
+                'bank' => $dp->bank,
+                'norek' => $dp->norek,
+                'namrek' => $dp->namrek,
                 'cek_dokumen' => $dp->cek_dokumen,
                 'keterangan' => $dp->keterangan,
                 'cn' => $dp->cn,

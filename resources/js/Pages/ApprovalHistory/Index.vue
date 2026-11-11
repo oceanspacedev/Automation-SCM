@@ -266,8 +266,10 @@ const detailLoading = ref(false);
 const sendingWa = ref(false);
 const waMessage = ref(null);
 
-// WA yang bisa dikirim (ulang) dari Detail: ke Tim Pajak selama belum dicek, lalu hasilnya ke Tim SCM bila belum terkirim
+// WA yang bisa dikirim (ulang) dari Detail: permintaan transfer ke Tim SCM, ke Tim Pajak selama belum dicek, lalu
+// hasilnya ke Tim SCM bila belum terkirim
 const resendAction = computed(() => {
+  if (detail.value?.stage === 'awaiting_transfer') return { endpoint: 'send-wa-scm-transfer', label: 'Kirim WA transfer ke Tim SCM' };
   if (detail.value?.stage === 'cut') return { endpoint: 'send-wa-tax', label: 'Kirim WA ke Tim Pajak' };
   const scmStep = detail.value?.steps?.find((step) => step.key === 'scm');
   if (detail.value?.stage === 'tax_checked' && scmStep && scmStep.state !== 'done') return { endpoint: 'send-wa-scm', label: 'Kirim hasil ke WA Tim SCM' };
@@ -313,6 +315,8 @@ const STEP_SHORT_LABELS = {
   approval: 'Dealer setuju',
   ar: 'Dikirim ke AR',
   cut: 'Dipotong AR',
+  scm_transfer: 'Dikirim ke SCM',
+  transferred: 'Ditransfer SCM',
   tax: 'Dikirim ke Pajak',
   tax_check: 'Dicek Pajak',
   scm: 'Hasil ke SCM',
@@ -355,6 +359,7 @@ const stageBadgeClass = (value) => ({
   waiting_approval: 'bg-amber-50 text-amber-700 ring-amber-200 dark:ring-amber-500/30',
   postponed: 'bg-orange-50 text-orange-700 ring-orange-200 dark:bg-orange-500/15 dark:text-orange-300 dark:ring-orange-500/30',
   approved: 'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-500/30',
+  awaiting_transfer: 'bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-500/30',
   cut: 'bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-500/30',
   tax_checked: 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:ring-emerald-500/30',
 }[value] || 'bg-gray-50 text-gray-600 ring-gray-200 dark:ring-slate-700');

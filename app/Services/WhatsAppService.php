@@ -1053,6 +1053,30 @@ class WhatsAppService
     }
 
     /**
+     * Ask the SCM team (Master Tim Pajak & SCM) to transfer a claim the dealer takes by bank transfer instead of a cut,
+     * with the dealer's account and a link to confirm the transfer.
+     *
+     * @return array{success: bool, message: string, provider_id: ?string}
+     */
+    public function sendDataProgramTransferRequestToScm(DataProgram $dp, ?string $overridePhone = null): array
+    {
+        $baseUrl = $this->resolveBaseUrl();
+        if (! empty($baseUrl)) {
+            URL::forceRootUrl($baseUrl);
+        }
+
+        $confirmUrl = URL::temporarySignedRoute(
+            'data-programs.confirm',
+            now()->addDays(self::CONFIRM_LINK_DAYS),
+            ['id' => $dp->id, 'role' => 'scm']
+        );
+
+        return $this->sendToTeam($dp, TeamContact::SCM, 'Tim SCM', $overridePhone, "DP-SCM-TRANSFER-{$dp->id}",
+            fn (?string $name) => $this->buildDataProgramTransferRequestMessage($dp, $confirmUrl, $name),
+            "Permintaan transfer {$dp->dealer_name}");
+    }
+
+    /**
      * Send the result of the tax check of a cut claim (Cek Pajak, Selisih, Note PPh) to the SCM team
      * (Master Tim Pajak & SCM).
      *
@@ -1196,11 +1220,12 @@ class WhatsAppService
     {
         $rupiah = fn ($amount) => 'Rp '.number_format((float) ($amount ?? 0), 0, ',', '.');
         $npwp = trim(($dp->npwp ?: '').' '.($dp->nama_npwp ? "({$dp->nama_npwp})" : ''));
+        $transfer = $dp->isTransfer();
 
         $lines = [
-            '*CEK PAJAK KLAIM SUDAH DIPOTONG (DATA PROGRAM)*',
+            $transfer ? '*CEK PAJAK KLAIM SUDAH DITRANSFER (DATA PROGRAM)*' : '*CEK PAJAK KLAIM SUDAH DIPOTONG (DATA PROGRAM)*',
             '',
-            'Halo '.($taxTeamName ?: 'Tim Pajak').', klaim program berikut sudah DIPOTONG oleh AR. Mohon cek PPh-nya, lalu isi Cek Pajak, Selisih, dan Note PPh lewat tautan di bawah:',
+            'Halo '.($taxTeamName ?: 'Tim Pajak').', klaim program berikut sudah '.($transfer ? 'DITRANSFER oleh Tim SCM' : 'DIPOTONG oleh AR').'. Mohon cek PPh-nya, lalu isi Cek Pajak, Selisih, dan Note PPh lewat tautan di bawah:',
             '',
             '*Kode BT / ID Real:* '.($dp->kode_bt ?: '-'),
             '*Dealer:* '.($dp->dealer_name ?: '-'),
@@ -1212,7 +1237,7 @@ class WhatsAppService
             '*PPN:* '.$rupiah($dp->ppn),
             '*PPh:* '.$rupiah($dp->nilai_pph),
             '*Net Pay:* '.$rupiah($dp->net_pay),
-            '*Tgl Potong / No. Pembayaran:* '.($dp->tgl_potong_tf ?: '-').' / '.($dp->no_pembayaran ?: '-'),
+            ($transfer ? '*Tgl Transfer / No. Referensi:* ' : '*Tgl Potong / No. Pembayaran:* ').($dp->tgl_potong_tf ?: '-').' / '.($dp->no_pembayaran ?: '-'),
             '',
             '👉 *[ KLIK: ISI CEK PAJAK ]*',
             $confirmUrl,
@@ -1230,18 +1255,19 @@ class WhatsAppService
     public function buildDataProgramScmMessage(DataProgram $dp, ?string $scmTeamName = null): string
     {
         $rupiah = fn ($amount) => 'Rp '.number_format((float) ($amount ?? 0), 0, ',', '.');
+        $transfer = $dp->isTransfer();
 
         $lines = [
             '*HASIL CEK PAJAK KLAIM (DATA PROGRAM)*',
             '',
-            'Halo '.($scmTeamName ?: 'Tim SCM').', Tim Pajak sudah mengecek PPh klaim yang sudah dipotong AR berikut:',
+            'Halo '.($scmTeamName ?: 'Tim SCM').', Tim Pajak sudah mengecek PPh klaim yang sudah '.($transfer ? 'ditransfer' : 'dipotong AR').' berikut:',
             '',
             '*Kode BT / ID Real:* '.($dp->kode_bt ?: '-'),
             '*Dealer:* '.($dp->dealer_name ?: '-'),
             '*Region:* '.($dp->region ?: ($dp->big_region ?: '-')),
             '*Program:* '.($dp->program_name ?: ($dp->program ?: '-')),
             '*Net Pay:* '.$rupiah($dp->net_pay),
-            '*Tgl Potong / No. Pembayaran:* '.($dp->tgl_potong_tf ?: '-').' / '.($dp->no_pembayaran ?: '-'),
+            ($transfer ? '*Tgl Transfer / No. Referensi:* ' : '*Tgl Potong / No. Pembayaran:* ').($dp->tgl_potong_tf ?: '-').' / '.($dp->no_pembayaran ?: '-'),
             '*PPh:* '.$rupiah($dp->nilai_pph),
             '',
             '*Cek Pajak:* '.($dp->cek_pajak_tarif ?: '-'),
@@ -1249,6 +1275,38 @@ class WhatsAppService
             '*Note PPh:* '.($dp->note_pph ?: '-'),
             '*Dicek:* '.($dp->tax_checked_at?->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i')).' WIB',
             '',
+            '_Pesan otomatis dari Sistem SCM_',
+        ];
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Build the WhatsApp asking the SCM team to transfer a claim to the dealer's bank account, then confirm it.
+     */
+    public function buildDataProgramTransferRequestMessage(DataProgram $dp, string $confirmUrl, ?string $scmTeamName = null): string
+    {
+        $rupiah = fn ($amount) => 'Rp '.number_format((float) ($amount ?? 0), 0, ',', '.');
+
+        $lines = [
+            '*PERMINTAAN TRANSFER KLAIM (DATA PROGRAM)*',
+            '',
+            'Halo '.($scmTeamName ?: 'Tim SCM').', dealer setuju saldo insentif klaim berikut DITRANSFER (tidak dipotong dari order). Mohon transfer ke rekening dealer, lalu konfirmasi lewat tautan di bawah:',
+            '',
+            '*Kode BT / ID Real:* '.($dp->kode_bt ?: '-'),
+            '*Dealer:* '.($dp->dealer_name ?: '-'),
+            '*Region:* '.($dp->region ?: ($dp->big_region ?: '-')),
+            '*Program:* '.($dp->program_name ?: ($dp->program ?: '-')),
+            '*Sales:* '.($dp->sales_person ?: '-'),
+            '*Nominal Transfer (Net Pay):* '.$rupiah($dp->net_pay),
+            '*Bank:* '.($dp->bank ?: '-'),
+            '*No. Rekening:* '.($dp->norek ?: '-'),
+            '*Atas Nama:* '.($dp->namrek ?: '-'),
+            '',
+            '👉 *[ KLIK: KONFIRMASI SUDAH DITRANSFER ]*',
+            $confirmUrl,
+            '',
+            '_(Tautan ini aktif selama '.self::CONFIRM_LINK_DAYS.' hari)_',
             '_Pesan otomatis dari Sistem SCM_',
         ];
 
@@ -1291,8 +1349,8 @@ class WhatsAppService
             "*Status Dokumen:* {$cekDokumen}",
             '*Status Purchase:* BISA DI POTONG',
             '',
-            'Silakan hubungi dealer dan tawarkan potongan saldo insentif ini pada invoice order mereka.',
-            'Buka tautan di bawah ini untuk mengonfirmasi kesediaan dealer (Iya / Tidak):',
+            'Silakan hubungi dealer dan tawarkan potongan saldo insentif ini pada invoice order mereka, atau transfer ke rekening dealer.',
+            'Buka tautan di bawah ini untuk mengonfirmasi keputusan dealer (Potong / Transfer / Tunda):',
             '',
             '👉 *[ KLIK: KONFIRMASI KEPUTUSAN DEALER ]*',
             $confirmUrl,

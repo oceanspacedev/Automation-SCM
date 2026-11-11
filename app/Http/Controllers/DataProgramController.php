@@ -875,6 +875,40 @@ class DataProgramController extends Controller
     }
 
     /**
+     * Ask the SCM team (again) to transfer a claim the dealer takes by bank transfer, e.g. when the automatic WhatsApp
+     * failed.
+     */
+    public function sendWaToScmTransfer(Request $request, int $id, ProgramApprovalFlow $flow): JsonResponse
+    {
+        $dp = DataProgram::findOrFail($id);
+        $phone = $request->input('phone');
+
+        if ($flow->stage($dp) !== 'awaiting_transfer') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Baris ini tidak sedang menunggu transfer Tim SCM.',
+            ], 422);
+        }
+
+        if (blank($dp->bank) || blank($dp->norek) || blank($dp->namrek)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Rekening dealer (bank, no. rekening, atas nama) belum diisi.',
+            ], 422);
+        }
+
+        $result = $this->waService->sendDataProgramTransferRequestToScm($dp, $phone);
+        ProgramApprovalLog::record($dp, ProgramApprovalLog::SCM_TRANSFER_NOTIFIED, $result['success'],
+            actor: $request->user()?->email, recipient: ProgramApprovalLog::teamRecipient($dp, TeamContact::SCM, $phone), note: $result['message']);
+
+        return response()->json([
+            'success' => $result['success'],
+            'message' => $result['message'],
+            'provider_id' => $result['provider_id'] ?? null,
+        ], $result['success'] ? 200 : 422);
+    }
+
+    /**
      * Ask the tax team (again) to check the PPh of a row AR has cut, e.g. when the automatic WhatsApp failed or the row
      * was cut before the tax check existed.
      */
@@ -886,7 +920,7 @@ class DataProgramController extends Controller
         if (! in_array($flow->stage($dp), ['cut', 'tax_checked'], true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Baris ini belum dipotong AR, jadi belum perlu dicek Tim Pajak.',
+                'message' => 'Baris ini belum dipotong AR atau ditransfer SCM, jadi belum perlu dicek Tim Pajak.',
             ], 422);
         }
 

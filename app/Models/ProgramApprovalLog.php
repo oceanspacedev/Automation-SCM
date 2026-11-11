@@ -15,6 +15,7 @@ use Throwable;
  * One step of the approval flow of a Data Program row: WhatsApp to telemarketing (and reminders while the dealer has
  * not approved), the dealer's approval or postponement (through the telemarketing's link), WhatsApp to AR, the cut by
  * AR, WhatsApp to the tax team and their tax check (through their link), then the result's WhatsApp to the SCM team.
+ * A claim paid by transfer goes to the SCM team instead of AR: WhatsApp to SCM, then the transfer (through their link).
  */
 class ProgramApprovalLog extends Model
 {
@@ -39,6 +40,12 @@ class ProgramApprovalLog extends Model
 
     public const SCM_NOTIFIED = 'scm_notified';
 
+    public const TRANSFER_APPROVED = 'transfer_approved';
+
+    public const SCM_TRANSFER_NOTIFIED = 'scm_transfer_notified';
+
+    public const TRANSFERRED = 'transferred';
+
     /**
      * Who acted through a WhatsApp confirmation link, by the link's role.
      *
@@ -48,6 +55,7 @@ class ProgramApprovalLog extends Model
         'telemarketing' => 'Telemarketing (link WA)',
         'ar' => 'AR (link WA)',
         'pajak' => 'Tim Pajak (link WA)',
+        'scm' => 'Tim SCM (link WA)',
     ];
 
     public const AUTOMATIC = 'Otomatis';

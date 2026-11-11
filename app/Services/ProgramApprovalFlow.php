@@ -9,9 +9,10 @@ use Illuminate\Support\Collection;
 
 /**
  * Where a Data Program row is in the approval flow: cut-ready → WhatsApp to telemarketing → dealer approves (or
- * postpones) → WhatsApp to AR → cut by AR → WhatsApp to the tax team → tax check → result to SCM. The stage comes from the row's
- * status columns, so rows that went through the flow before it was recorded (or were changed in the spreadsheet) still
- * show; the recorded steps add when and who.
+ * postpones) → WhatsApp to AR → cut by AR → WhatsApp to the tax team → tax check → result to SCM. A claim the dealer
+ * takes by bank transfer goes to the SCM team instead of AR: WhatsApp to SCM → transferred by SCM → the tax team as
+ * usual. The stage comes from the row's status columns, so rows that went through the flow before it was recorded (or
+ * were changed in the spreadsheet) still show; the recorded steps add when and who.
  */
 class ProgramApprovalFlow
 {
@@ -23,6 +24,7 @@ class ProgramApprovalFlow
         'waiting_approval' => 'Menunggu dealer',
         'postponed' => 'Ditunda dealer',
         'approved' => 'Menunggu AR',
+        'awaiting_transfer' => 'Menunggu transfer SCM',
         'cut' => 'Menunggu Tim Pajak',
         'tax_checked' => 'Selesai',
     ];
@@ -36,22 +38,36 @@ class ProgramApprovalFlow
     private const POSTPONED = 'PENDING DEALER';
 
     /**
-     * AR statuses of a row that was cut: "DONE" from the AR link, "SUDAH POTONG" from the spreadsheet.
+     * Purchase statuses of a settled row: cut, or transferred by the SCM team.
      *
      * @var list<string>
      */
-    private const CUT_BY_AR = ['DONE', 'SUDAH POTONG'];
+    private const SETTLED = [self::CUT, DataProgram::DONE_TRANSFER];
 
     /**
-     * Rows that entered the flow: ready to be cut, already cut, sent to telemarketing, or answered by the dealer.
+     * AR statuses of a settled row: "DONE" from the AR link, "SUDAH POTONG" from the spreadsheet, or transferred.
+     *
+     * @var list<string>
+     */
+    private const SETTLED_BY_AR = ['DONE', 'SUDAH POTONG', DataProgram::DONE_TRANSFER];
+
+    /**
+     * AR statuses of a row the dealer answered (cut, transfer or postponed) but that isn't settled yet.
+     *
+     * @var list<string>
+     */
+    private const ANSWERED = [self::APPROVED, DataProgram::TRANSFER_APPROVED, self::POSTPONED];
+
+    /**
+     * Rows that entered the flow: ready to be cut, already settled, sent to telemarketing, or answered by the dealer.
      *
      * @param  Builder<DataProgram>  $query
      * @return Builder<DataProgram>
      */
     public function inFlow(Builder $query): Builder
     {
-        return $query->where(fn (Builder $q) => $q->whereIn('status_potong_purchase', [self::READY, self::CUT])
-            ->orWhereIn('status_potong_ar', [self::APPROVED, self::POSTPONED, ...self::CUT_BY_AR])
+        return $query->where(fn (Builder $q) => $q->whereIn('status_potong_purchase', [self::READY, ...self::SETTLED])
+            ->orWhereIn('status_potong_ar', [...self::ANSWERED, ...self::SETTLED_BY_AR])
             ->orWhereNotNull('telemarketing_notified_at'));
     }
 
@@ -63,10 +79,10 @@ class ProgramApprovalFlow
      */
     public function whereStage(Builder $query, string $stage): Builder
     {
-        $notCut = fn (Builder $q) => $q->where(fn (Builder $q) => $q->whereNull('status_potong_purchase')->orWhere('status_potong_purchase', '!=', self::CUT))
-            ->where(fn (Builder $q) => $q->whereNull('status_potong_ar')->orWhereNotIn('status_potong_ar', self::CUT_BY_AR));
-        $unanswered = fn (Builder $q) => $notCut($q)->where(fn (Builder $q) => $q->whereNull('status_potong_ar')->orWhereNotIn('status_potong_ar', [self::APPROVED, self::POSTPONED]));
-        $cut = fn (Builder $q) => $q->where(fn (Builder $q) => $q->where('status_potong_purchase', self::CUT)->orWhereIn('status_potong_ar', self::CUT_BY_AR));
+        $notCut = fn (Builder $q) => $q->where(fn (Builder $q) => $q->whereNull('status_potong_purchase')->orWhereNotIn('status_potong_purchase', self::SETTLED))
+            ->where(fn (Builder $q) => $q->whereNull('status_potong_ar')->orWhereNotIn('status_potong_ar', self::SETTLED_BY_AR));
+        $unanswered = fn (Builder $q) => $notCut($q)->where(fn (Builder $q) => $q->whereNull('status_potong_ar')->orWhereNotIn('status_potong_ar', self::ANSWERED));
+        $cut = fn (Builder $q) => $q->where(fn (Builder $q) => $q->whereIn('status_potong_purchase', self::SETTLED)->orWhereIn('status_potong_ar', self::SETTLED_BY_AR));
         $taxChecked = fn (Builder $q) => $q->whereNotNull('tax_checked_at')
             ->orWhere(fn (Builder $q) => $q->whereNotNull('cek_pajak_tarif')->whereNotIn('cek_pajak_tarif', ['', '-']));
 
@@ -74,6 +90,7 @@ class ProgramApprovalFlow
             'tax_checked' => $cut($query)->where($taxChecked),
             'cut' => $cut($query)->whereNot($taxChecked),
             'approved' => $notCut($query->where('status_potong_ar', self::APPROVED)),
+            'awaiting_transfer' => $notCut($query->where('status_potong_ar', DataProgram::TRANSFER_APPROVED)),
             'postponed' => $notCut($query->where('status_potong_ar', self::POSTPONED)),
             'waiting_approval' => $unanswered($query->whereNotNull('telemarketing_notified_at')),
             'waiting_telemarketing' => $unanswered($query->where('status_potong_purchase', self::READY)->whereNull('telemarketing_notified_at')),
@@ -86,8 +103,9 @@ class ProgramApprovalFlow
         $ar = strtoupper(trim((string) $row->status_potong_ar));
 
         return match (true) {
-            strtoupper(trim((string) $row->status_potong_purchase)) === self::CUT || in_array($ar, self::CUT_BY_AR, true) => $this->taxChecked($row) ? 'tax_checked' : 'cut',
+            in_array(strtoupper(trim((string) $row->status_potong_purchase)), self::SETTLED, true) || in_array($ar, self::SETTLED_BY_AR, true) => $this->taxChecked($row) ? 'tax_checked' : 'cut',
             $ar === self::APPROVED => 'approved',
+            $ar === DataProgram::TRANSFER_APPROVED => 'awaiting_transfer',
             $ar === self::POSTPONED => 'postponed',
             $row->telemarketing_notified_at !== null => 'waiting_approval',
             default => 'waiting_telemarketing',
@@ -105,8 +123,9 @@ class ProgramApprovalFlow
     /**
      * The eight steps of the row, each done, current, waiting, failed (a WhatsApp that didn't go out) or postponed,
      * with the person in charge: the row's telemarketing for the WhatsApp to telemarketing and the dealer's answer
-     * (given through the telemarketing's link), the area's AR for the WhatsApp to AR and the cut, the area's tax
-     * team for the WhatsApp to the tax team and the tax check, and the area's SCM team for the result's WhatsApp.
+     * (given through the telemarketing's link), the area's AR for the WhatsApp to AR and the cut (the SCM team for the
+     * WhatsApp and the transfer of a transfer claim), the tax team for the WhatsApp to the tax team and the tax check,
+     * and the SCM team for the result's WhatsApp.
      *
      * @param  Collection<int, ProgramApprovalLog>  $logs  the row's recorded steps
      * @param  string|null  $arName  the AR of the row's area in Master AR (null: the default AR number)
@@ -119,7 +138,7 @@ class ProgramApprovalFlow
         $stage = $this->stage($row);
         $isCut = in_array($stage, ['cut', 'tax_checked'], true);
         $taxChecked = $stage === 'tax_checked';
-        $answered = $isCut || in_array($stage, ['approved', 'postponed'], true);
+        $answered = $isCut || in_array($stage, ['approved', 'awaiting_transfer', 'postponed'], true);
         $latest = fn (string $event, ?bool $success = null) => $logs
             ->filter(fn (ProgramApprovalLog $log) => $log->event === $event && ($success === null || $log->success === $success))
             ->sortByDesc('id')
@@ -127,10 +146,7 @@ class ProgramApprovalFlow
 
         $telemarketing = $latest(ProgramApprovalLog::TELEMARKETING_NOTIFIED, true);
         $telemarketingFailed = $latest(ProgramApprovalLog::TELEMARKETING_NOTIFIED);
-        $answer = $logs->filter(fn (ProgramApprovalLog $log) => in_array($log->event, [ProgramApprovalLog::APPROVED, ProgramApprovalLog::POSTPONED], true))->sortByDesc('id')->first();
-        $ar = $latest(ProgramApprovalLog::AR_NOTIFIED, true);
-        $arAttempt = $latest(ProgramApprovalLog::AR_NOTIFIED);
-        $cut = $latest(ProgramApprovalLog::CUT);
+        $answer = $logs->filter(fn (ProgramApprovalLog $log) => in_array($log->event, [ProgramApprovalLog::APPROVED, ProgramApprovalLog::TRANSFER_APPROVED, ProgramApprovalLog::POSTPONED], true))->sortByDesc('id')->first();
         $tax = $latest(ProgramApprovalLog::TAX_NOTIFIED, true);
         $taxAttempt = $latest(ProgramApprovalLog::TAX_NOTIFIED);
         $taxCheck = $latest(ProgramApprovalLog::TAX_CHECKED);
@@ -152,19 +168,13 @@ class ProgramApprovalFlow
                 at: $telemarketing?->created_at?->toIso8601String() ?? $row->telemarketing_notified_at?->toIso8601String(),
                 failed: $telemarketing === null && $row->telemarketing_notified_at === null && ! $answered && $telemarketingFailed?->success === false,
                 person: $telemarketingName, role: 'Telemarketing'),
-            $this->step('approval', $stage === 'postponed' ? 'Ditunda dealer' : 'Persetujuan dealer', $isCut || $stage === 'approved',
+            $this->step('approval', $stage === 'postponed' ? 'Ditunda dealer' : 'Persetujuan dealer', $isCut || in_array($stage, ['approved', 'awaiting_transfer'], true),
                 log: $answer, postponed: $stage === 'postponed', person: $telemarketingName, role: 'Telemarketing',
                 note: $row->telemarketing_reminder_count > 0 ? "{$row->telemarketing_reminder_count} pengingat terkirim ke telemarketing" : null),
-            // WA ke AR terkirim otomatis saat dealer setuju; baris lama tanpa catatan dianggap sudah terkirim
-            $this->step('ar', 'Notifikasi WhatsApp ke AR', $ar !== null || $isCut || ($stage === 'approved' && $arAttempt === null),
-                log: $ar ?? ($arAttempt?->success === false ? $arAttempt : null),
-                failed: $ar === null && $stage === 'approved' && $arAttempt?->success === false,
-                person: $arName, role: 'AR'),
-            $this->step('cut', 'Dipotong oleh AR', $isCut, log: $cut,
-                note: $cut?->note ?? ($row->no_pembayaran ? "No. Pembayaran: {$row->no_pembayaran}" : null),
-                at: $cut?->created_at?->toIso8601String(), date: $cut ? null : ($row->tgl_potong_tf ?: null),
-                person: $arName, role: 'AR'),
-            // WA ke Tim Pajak terkirim otomatis saat AR memotong; bisa dikirim ulang dari Riwayat Approval
+            ...($row->isTransfer()
+                ? $this->transferSteps($row, $latest, $stage, $isCut, $scmName)
+                : $this->cutSteps($row, $latest, $stage, $isCut, $arName)),
+            // WA ke Tim Pajak terkirim otomatis saat AR memotong / SCM mentransfer; bisa dikirim ulang dari Riwayat Approval
             $this->step('tax', 'Notifikasi WhatsApp ke Tim Pajak', $tax !== null || $row->tax_notified_at !== null || $taxChecked,
                 log: $tax ?? ($taxAttempt?->success === false ? $taxAttempt : null),
                 at: $tax?->created_at?->toIso8601String() ?? $row->tax_notified_at?->toIso8601String(),
@@ -194,6 +204,57 @@ class ProgramApprovalFlow
         }
 
         return $steps;
+    }
+
+    /**
+     * The AR steps of a claim cut from the dealer's orders: the WhatsApp to the area's AR and the cut.
+     *
+     * @param  \Closure(string, ?bool=): ?ProgramApprovalLog  $latest
+     * @return list<array<string, mixed>>
+     */
+    private function cutSteps(DataProgram $row, \Closure $latest, string $stage, bool $isCut, string $arName): array
+    {
+        $ar = $latest(ProgramApprovalLog::AR_NOTIFIED, true);
+        $arAttempt = $latest(ProgramApprovalLog::AR_NOTIFIED);
+        $cut = $latest(ProgramApprovalLog::CUT);
+
+        return [
+            // WA ke AR terkirim otomatis saat dealer setuju; baris lama tanpa catatan dianggap sudah terkirim
+            $this->step('ar', 'Notifikasi WhatsApp ke AR', $ar !== null || $isCut || ($stage === 'approved' && $arAttempt === null),
+                log: $ar ?? ($arAttempt?->success === false ? $arAttempt : null),
+                failed: $ar === null && $stage === 'approved' && $arAttempt?->success === false,
+                person: $arName, role: 'AR'),
+            $this->step('cut', 'Dipotong oleh AR', $isCut, log: $cut,
+                note: $cut?->note ?? ($row->no_pembayaran ? "No. Pembayaran: {$row->no_pembayaran}" : null),
+                at: $cut?->created_at?->toIso8601String(), date: $cut ? null : ($row->tgl_potong_tf ?: null),
+                person: $arName, role: 'AR'),
+        ];
+    }
+
+    /**
+     * The SCM steps of a claim paid by transfer, in place of AR: the WhatsApp asking the SCM team to transfer, and the
+     * transfer.
+     *
+     * @param  \Closure(string, ?bool=): ?ProgramApprovalLog  $latest
+     * @return list<array<string, mixed>>
+     */
+    private function transferSteps(DataProgram $row, \Closure $latest, string $stage, bool $isCut, string $scmName): array
+    {
+        $request = $latest(ProgramApprovalLog::SCM_TRANSFER_NOTIFIED, true);
+        $requestAttempt = $latest(ProgramApprovalLog::SCM_TRANSFER_NOTIFIED);
+        $transferred = $latest(ProgramApprovalLog::TRANSFERRED);
+
+        return [
+            // Status transfer yang diisi manual belum mengabari SCM: langkah ini menunggu sampai WA-nya terkirim
+            $this->step('scm_transfer', 'Notifikasi WhatsApp ke Tim SCM (transfer)', $request !== null || $isCut,
+                log: $request ?? ($requestAttempt?->success === false ? $requestAttempt : null),
+                failed: $request === null && $stage === 'awaiting_transfer' && $requestAttempt?->success === false,
+                person: $scmName, role: 'SCM'),
+            $this->step('transferred', 'Ditransfer oleh Tim SCM', $isCut, log: $transferred,
+                note: $transferred?->note ?? ($row->no_pembayaran ? "No. Referensi: {$row->no_pembayaran}" : null),
+                at: $transferred?->created_at?->toIso8601String(), date: $transferred ? null : ($row->tgl_potong_tf ?: null),
+                person: $scmName, role: 'SCM'),
+        ];
     }
 
     /**

@@ -220,6 +220,7 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         Route::post('/data-program/{id}/send-wa-ar', [DataProgramController::class, 'sendWaToAr']);
         Route::post('/data-program/{id}/send-wa-tax', [DataProgramController::class, 'sendWaToTax']);
         Route::post('/data-program/{id}/send-wa-scm', [DataProgramController::class, 'sendWaToScm']);
+        Route::post('/data-program/{id}/send-wa-scm-transfer', [DataProgramController::class, 'sendWaToScmTransfer']);
         Route::get('/data-program/reconcile-stats', [DataProgramController::class, 'reconcileStats']);
         Route::get('/data-program/reconciliation-logs', [DataProgramController::class, 'reconciliationLogs']);
         Route::get('/data-program/approval-history', [ProgramApprovalController::class, 'index']);

@@ -157,6 +157,134 @@ class ProgramApprovalHistoryTest extends TestCase
             ->assertJsonPath('data.timeline.6.recipient', 'TIM SCM JABAR 081300000008');
     }
 
+    public function test_a_claim_the_dealer_takes_by_transfer_goes_to_scm_and_then_the_tax_team_without_ar(): void
+    {
+        ArContact::factory()->create(['area' => 'jabar', 'name' => 'SITI AMINAH', 'whatsapp' => '081300000002']);
+        $this->postJson('/api/team-contacts', ['team' => 'tax', 'name' => 'TIM PAJAK JABAR', 'whatsapp' => '081300000009'], self::HEADERS)->assertCreated();
+        $this->postJson('/api/team-contacts', ['team' => 'scm', 'name' => 'TIM SCM JABAR', 'whatsapp' => '081300000008'], self::HEADERS)->assertCreated();
+        $row = $this->dataProgram(['nilai_pph' => 15000, 'telemarketing_notified_at' => now()]);
+        $link = fn (string $role) => URL::temporarySignedRoute('data-programs.confirm', now()->addDay(), ['id' => $row->id, 'role' => $role]);
+
+        // Telemarketing memilih transfer dan mengisi rekening dealer
+        $this->get($link('telemarketing'))->assertOk()->assertSee('Dealer setuju ditransfer (kirim ke SCM)');
+        $this->confirm($row, 'telemarketing', ['action' => 'setuju_transfer', 'bank' => 'BCA', 'norek' => '', 'namrek' => 'CV SINAR MAKMUR'])
+            ->assertSessionHasErrors('norek');
+        $this->confirm($row, 'telemarketing', ['action' => 'setuju_transfer', 'bank' => 'BCA', 'norek' => '1234567890', 'namrek' => 'CV SINAR MAKMUR'])
+            ->assertOk()
+            ->assertSee('Dealer setuju ditransfer')
+            ->assertSee('WhatsApp terkirim ke Tim SCM');
+
+        // WA ke Tim SCM berisi rekening & link konfirmasi transfer; AR tidak dikirimi
+        Http::assertSent(fn (Request $request) => ($request['recipient']['value'] ?? null) === '6281300000008'
+            && str_contains($request['message']['text'], 'PERMINTAAN TRANSFER KLAIM')
+            && str_contains($request['message']['text'], '*No. Rekening:* 1234567890')
+            && str_contains($request['message']['text'], 'role=scm'));
+        Http::assertNotSent(fn (Request $request) => ($request['recipient']['value'] ?? null) === '6281300000002');
+
+        $row->refresh();
+        $this->assertSame([DataProgram::TRANSFER_APPROVED, 'TF', 'BCA', '1234567890', 'CV SINAR MAKMUR'], [$row->status_potong_ar, $row->tf_status, $row->bank, $row->norek, $row->namrek]);
+        $this->history(['stage' => 'awaiting_transfer'])
+            ->assertJsonPath('data.0.stage_label', 'Menunggu transfer SCM')
+            ->assertJsonPath('data.0.steps.*.key', ['ready', 'telemarketing', 'approval', 'scm_transfer', 'transferred', 'tax', 'tax_check', 'scm'])
+            ->assertJsonPath('data.0.steps.*.state', ['done', 'done', 'done', 'done', 'current', 'waiting', 'waiting', 'waiting'])
+            ->assertJsonPath('data.0.steps.4.person', 'TIM SCM JABAR');
+
+        // Hanya link Tim SCM yang bisa mengonfirmasi transfer
+        $this->confirm($row, 'telemarketing', ['action' => 'transfer', 'no_pembayaran' => 'TRF-1'])->assertForbidden();
+        $this->confirm($row, 'scm', ['action' => 'setuju'])->assertForbidden();
+        $this->get($link('scm'))->assertOk()->assertSee('Konfirmasi transfer klaim')->assertSee('1234567890');
+
+        // SCM mentransfer; WA ke Tim Pajak terkirim otomatis
+        $this->confirm($row, 'scm', ['action' => 'transfer', 'no_pembayaran' => 'TRF/2026/11/0001'])
+            ->assertOk()
+            ->assertSee('Transfer selesai dicatat')
+            ->assertSee('WhatsApp terkirim ke Tim Pajak');
+        Http::assertSent(fn (Request $request) => ($request['recipient']['value'] ?? null) === '6281300000009'
+            && str_contains($request['message']['text'], 'CEK PAJAK KLAIM SUDAH DITRANSFER')
+            && str_contains($request['message']['text'], '*Tgl Transfer / No. Referensi:*'));
+
+        $row->refresh();
+        $this->assertSame([DataProgram::DONE_TRANSFER, DataProgram::DONE_TRANSFER, 'TRF/2026/11/0001'], [$row->status_potong_purchase, $row->status_potong_ar, $row->no_pembayaran]);
+        $this->get($link('pajak'))->assertOk()->assertSee('Cek pajak klaim yang sudah ditransfer');
+
+        // Tim Pajak cek, hasilnya tetap ke Tim SCM
+        $this->confirm($row, 'pajak', ['action' => 'cek_pajak', 'cek_pajak_tarif' => '15.000'])->assertOk();
+        Http::assertSent(fn (Request $request) => ($request['recipient']['value'] ?? null) === '6281300000008'
+            && str_contains($request['message']['text'], 'HASIL CEK PAJAK KLAIM')
+            && str_contains($request['message']['text'], 'klaim yang sudah ditransfer berikut'));
+
+        $this->getJson("/api/data-program/{$row->id}/approval-history", self::HEADERS)
+            ->assertOk()
+            ->assertJsonPath('data.stage', 'tax_checked')
+            ->assertJsonPath('data.steps.*.state', ['done', 'done', 'done', 'done', 'done', 'done', 'done', 'done'])
+            ->assertJsonPath('data.steps.4.note', 'No. Referensi: TRF/2026/11/0001')
+            ->assertJsonPath('data.timeline.*.event', ['transfer_approved', 'scm_transfer_notified', 'transferred', 'tax_notified', 'tax_checked', 'scm_notified'])
+            ->assertJsonPath('data.timeline.2.actor', 'Tim SCM (link WA)');
+    }
+
+    public function test_old_links_cannot_settle_a_claim_twice_or_switch_it_to_the_other_path(): void
+    {
+        ArContact::factory()->create(['area' => 'jabar', 'name' => 'SITI AMINAH', 'whatsapp' => '081300000002']);
+        $this->postJson('/api/team-contacts', ['team' => 'scm', 'name' => 'TIM SCM JABAR', 'whatsapp' => '081300000008'], self::HEADERS)->assertCreated();
+        $row = $this->dataProgram(['telemarketing_notified_at' => now()]);
+        $link = fn (string $role) => URL::temporarySignedRoute('data-programs.confirm', now()->addDay(), ['id' => $row->id, 'role' => $role]);
+        $account = ['bank' => 'BCA', 'norek' => '1234567890', 'namrek' => 'CV SINAR MAKMUR'];
+
+        // Potong atau transfer dipilih telemarketing, bukan AR; rekening tanpa angka/huruf ditolak
+        $this->confirm($row, 'ar', ['action' => 'setuju_transfer'] + $account)->assertForbidden();
+        $this->confirm($row, 'telemarketing', ['action' => 'setuju_transfer', 'bank' => '-', 'norek' => '-', 'namrek' => '-'])
+            ->assertSessionHasErrors(['bank', 'norek', 'namrek']);
+
+        // Sudah dipilih transfer: link AR tidak bisa memotong lagi
+        $this->confirm($row, 'telemarketing', ['action' => 'setuju_transfer'] + $account)->assertOk();
+        $this->confirm($row, 'ar', ['action' => 'potong', 'no_pembayaran' => 'PAY-1'])->assertStatus(409);
+        $this->get($link('ar'))->assertOk()->assertSee('dialihkan ke transfer')->assertDontSee('Iya, sudah dipotong');
+
+        // Sudah ditransfer: link telemarketing & SCM tidak bisa memproses ulang
+        $this->confirm($row, 'scm', ['action' => 'transfer', 'no_pembayaran' => 'TRF-1'])->assertOk();
+        $this->confirm($row, 'telemarketing', ['action' => 'setuju'])->assertStatus(409);
+        $this->confirm($row, 'telemarketing', ['action' => 'setuju_transfer'] + $account)->assertStatus(409);
+        $this->confirm($row, 'scm', ['action' => 'transfer', 'no_pembayaran' => 'TRF-2'])->assertStatus(409);
+        $this->get($link('telemarketing'))->assertOk()->assertSee('sudah ditransfer')->assertDontSee('Dealer setuju ditransfer (kirim ke SCM)');
+
+        $row->refresh();
+        $this->assertSame([DataProgram::DONE_TRANSFER, DataProgram::DONE_TRANSFER, 'TRF-1'], [$row->status_potong_purchase, $row->status_potong_ar, $row->no_pembayaran]);
+        Http::assertNotSent(fn (Request $request) => ($request['recipient']['value'] ?? null) === '6281300000002');
+    }
+
+    public function test_a_transfer_request_the_scm_team_did_not_get_can_be_sent_again_and_old_transferred_rows_show_their_stage(): void
+    {
+        $row = $this->dataProgram(['telemarketing_notified_at' => now()]);
+
+        // Belum ada Tim SCM di Master: WA transfer gagal, langkahnya merah
+        $this->confirm($row, 'telemarketing', ['action' => 'setuju_transfer', 'bank' => 'BRI', 'norek' => '0011-22-3344', 'namrek' => 'SINAR MAKMUR'])
+            ->assertOk()
+            ->assertSee('WhatsApp ke Tim SCM gagal terkirim');
+        $this->history()->assertJsonPath('data.0.steps.3.state', 'failed');
+        $this->postJson("/api/data-program/{$row->id}/send-wa-tax", [], self::HEADERS)->assertStatus(422);
+
+        $this->postJson('/api/team-contacts', ['team' => 'scm', 'name' => 'TIM SCM JABAR', 'whatsapp' => '081300000008'], self::HEADERS)->assertCreated();
+        $this->postJson("/api/data-program/{$row->id}/send-wa-scm-transfer", [], self::HEADERS)->assertOk();
+        $this->history()->assertJsonPath('data.0.steps.3.state', 'done')->assertJsonPath('data.0.steps.4.state', 'current');
+
+        // Baris lama dari spreadsheet yang sudah DONE TRANSFER: menunggu Tim Pajak, dengan langkah SCM (bukan AR)
+        $old = $this->dataProgram(['status_potong_purchase' => DataProgram::DONE_TRANSFER, 'status_potong_ar' => DataProgram::DONE_TRANSFER, 'tgl_potong_tf' => '10/1/2026'], 'row_9');
+        $this->getJson("/api/data-program/{$old->id}/approval-history", self::HEADERS)
+            ->assertJsonPath('data.stage', 'cut')
+            ->assertJsonPath('data.steps.*.key', ['ready', 'telemarketing', 'approval', 'scm_transfer', 'transferred', 'tax', 'tax_check', 'scm'])
+            ->assertJsonPath('data.steps.4.state', 'done');
+        $this->postJson("/api/data-program/{$old->id}/send-wa-scm-transfer", [], self::HEADERS)->assertStatus(422);
+
+        // Status transfer diisi manual tanpa rekening: SCM belum dikabari, dan WA-nya tidak dikirim sebelum rekening diisi
+        $manual = $this->dataProgram(['status_potong_ar' => DataProgram::TRANSFER_APPROVED], 'row_10');
+        $this->getJson("/api/data-program/{$manual->id}/approval-history", self::HEADERS)
+            ->assertJsonPath('data.stage', 'awaiting_transfer')
+            ->assertJsonPath('data.steps.3.state', 'current');
+        $this->postJson("/api/data-program/{$manual->id}/send-wa-scm-transfer", [], self::HEADERS)
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Rekening dealer (bank, no. rekening, atas nama) belum diisi.');
+    }
+
     public function test_the_confirmation_page_opens_the_uploaded_cn_agreement_and_faktur(): void
     {
         $row = $this->dataProgram([
@@ -249,7 +377,7 @@ class ProgramApprovalHistoryTest extends TestCase
         $this->dataProgram(['area' => 'jateng'], 'dp_7');
 
         // Jumlah per tahap selalu sama dengan "Semua"
-        $this->history()->assertJsonPath('counts', ['all' => 7, 'waiting_telemarketing' => 1, 'waiting_approval' => 1, 'postponed' => 1, 'approved' => 1, 'cut' => 2, 'tax_checked' => 1]);
+        $this->history()->assertJsonPath('counts', ['all' => 7, 'waiting_telemarketing' => 1, 'waiting_approval' => 1, 'postponed' => 1, 'approved' => 1, 'awaiting_transfer' => 0, 'cut' => 2, 'tax_checked' => 1]);
 
         // Baris lama yang sudah disetujui: WA ke AR dianggap sudah terkirim saat itu, tinggal menunggu AR memotong
         $this->history(['stage' => 'approved'])

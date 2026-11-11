@@ -69,9 +69,10 @@ class DashboardController extends Controller
         foreach ($dataProgramCounts as $count) {
             $key = $row($count->area, $count->region);
             $status = strtoupper(trim((string) $count->status_potong_purchase));
+            // Klaim yang sudah ditransfer SCM dihitung selesai bersama yang sudah dipotong
             $bucket = match (true) {
                 $status === 'BISA DI POTONG' => 'bisa_potong',
-                str_starts_with($status, 'SUDAH POTONG') => 'sudah_potong',
+                str_starts_with($status, 'SUDAH POTONG'), $status === DataProgram::DONE_TRANSFER => 'sudah_potong',
                 default => 'belum_potong',
             };
 

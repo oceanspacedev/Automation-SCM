@@ -13,6 +13,17 @@ class DataProgram extends Model
 {
     use BelongsToArea, BelongsToBrand;
 
+    /**
+     * AR status after the dealer agreed (through telemarketing) to be paid by bank transfer instead of a cut: the SCM
+     * team transfers, then the tax team checks, without AR.
+     */
+    public const TRANSFER_APPROVED = 'DEALER SETUJU (PROSES TRANSFER)';
+
+    /**
+     * Purchase & AR status of a claim the SCM team has transferred to the dealer.
+     */
+    public const DONE_TRANSFER = 'DONE TRANSFER';
+
     protected $guarded = ['id'];
 
     protected function casts(): array
@@ -56,6 +67,27 @@ class DataProgram extends Model
     public function draft(): BelongsTo
     {
         return $this->belongsTo(Draft::class, 'draft_id')->withoutGlobalScopes(['area', 'brand']);
+    }
+
+    /**
+     * Whether the claim is paid by bank transfer (through the SCM team) rather than cut from the dealer's orders: the
+     * statuses tell once the dealer chose, before that the T/F column ("TF").
+     */
+    public function isTransfer(): bool
+    {
+        $purchase = strtoupper(trim((string) $this->status_potong_purchase));
+        $ar = strtoupper(trim((string) $this->status_potong_ar));
+
+        // Yang sudah selesai menang: ditransfer, lalu dipotong; baru pilihan yang masih berjalan
+        if (in_array(self::DONE_TRANSFER, [$purchase, $ar], true)) {
+            return true;
+        }
+
+        if ($purchase === 'SUDAH POTONG' || in_array($ar, ['DEALER SETUJU (PROSES AR)', 'DONE', 'SUDAH POTONG'], true)) {
+            return false;
+        }
+
+        return $ar === self::TRANSFER_APPROVED || strtoupper(trim((string) $this->tf_status)) === 'TF';
     }
 
     /**

@@ -582,6 +582,7 @@
                     <option value="BISA DI POTONG">BISA DI POTONG</option>
                     <option value="BELUM BISA POTONG">BELUM BISA POTONG</option>
                     <option value="SUDAH POTONG">SUDAH POTONG</option>
+                    <option value="DONE TRANSFER">DONE TRANSFER</option>
                     <option value="PENDING">PENDING</option>
                   </select>
                 </div>
@@ -594,7 +595,12 @@
                   >
                     <option value="">- Pilih Status AR -</option>
                     <option value="BELUM POTONG">BELUM POTONG</option>
+                    <option value="DEALER SETUJU (PROSES AR)">DEALER SETUJU (PROSES AR)</option>
+                    <option value="DEALER SETUJU (PROSES TRANSFER)">DEALER SETUJU (PROSES TRANSFER)</option>
+                    <option value="PENDING DEALER">PENDING DEALER</option>
+                    <option value="DONE">DONE</option>
                     <option value="SUDAH POTONG">SUDAH POTONG</option>
+                    <option value="DONE TRANSFER">DONE TRANSFER</option>
                   </select>
                 </div>
 
