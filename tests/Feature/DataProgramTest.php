@@ -776,6 +776,89 @@ class DataProgramTest extends TestCase
         $this->assertNull($dp->fresh()->cek_fp);
     }
 
+    public function test_a_match_replaces_documents_left_by_the_same_stores_other_submission(): void
+    {
+        $doc = fn (string $name) => "https://drive.google.com/open?id={$name}";
+
+        // Pengajuan Grace yang lain (invoice 3.190.258): dokumennya sempat tertinggal di baris Data Program ini
+        ProgramSubmission::create([
+            'row_hash' => 'hash_grace_other',
+            'dealer_name' => 'CV. GRACE MANDIRI UTAMA',
+            'id_real' => 'BT05875',
+            'program_name' => 'PROGRAM SEPTEMBER 2026',
+            'region' => 'BIG BANDUNG',
+            'net_pay' => 3190258,
+            'credit_note_url' => $doc('cn_3190258'),
+            'agreement_url' => $doc('agr_3190258'),
+            'tax_invoice_url' => $doc('fp_3190258'),
+            'no_faktur' => '04002600000001',
+        ]);
+        $dp = DataProgram::create([
+            'row_hash' => 'hash_grace_dp',
+            'dealer_name' => 'CV. GRACE MANDIRI UTAMA',
+            'kode_bt' => 'BT05875',
+            'program_name' => 'PROGRAM BUNDLING R16 PRO 5G HARRY POTTER & T500 SEPT 2026',
+            'region' => 'BIG BANDUNG',
+            'wajib_pajak' => 'BADAN',
+            'net_pay' => 1178378,
+            'cn' => $doc('cn_3190258'),
+            'agrement' => $doc('agr_3190258'),
+            'cek_fp' => $doc('fp_3190258'),
+            'no_faktur_pajak' => '04002600000001',
+        ]);
+        $matched = ProgramSubmission::create([
+            'row_hash' => 'hash_grace_172',
+            'dealer_name' => 'CV. GRACE MANDIRI UTAMA',
+            'id_real' => 'BT05875',
+            'program_name' => 'PROGRAM BUNDLING R16 PRO 5G HARRY POTTER & T500 SEPT 2026',
+            'region' => 'BIG BANDUNG',
+            'net_pay' => 1178378,
+            'credit_note_url' => $doc('cn_1178378'),
+            'agreement_url' => $doc('agr_1178378'),
+            'tax_invoice_url' => $doc('fp_1178378'),
+            'no_faktur' => '04002600000172',
+        ]);
+
+        $result = app(ProgramReconciliationService::class)->reconcileSingle($dp, $matched);
+
+        $this->assertSame('BISA DI POTONG', $result['status']);
+        $dp->refresh();
+        $this->assertSame($doc('cn_1178378'), $dp->cn);
+        $this->assertSame($doc('agr_1178378'), $dp->agrement);
+        $this->assertSame($doc('fp_1178378'), $dp->cek_fp);
+        $this->assertSame('04002600000172', $dp->no_faktur_pajak);
+    }
+
+    public function test_a_match_keeps_a_document_link_entered_by_hand(): void
+    {
+        $manualCn = 'https://drive.google.com/open?id=cn_diisi_manual';
+        $dp = DataProgram::create([
+            'row_hash' => 'hash_manual_dp',
+            'dealer_name' => 'LIBRA CELL TALUN',
+            'kode_bt' => 'BT01111',
+            'program_name' => 'Program Sell Out C11',
+            'region' => 'BIG CIREBON 1',
+            'wajib_pajak' => 'ORANG PRIBADI',
+            'net_pay' => 500000,
+            'cn' => $manualCn,
+        ]);
+        $sub = ProgramSubmission::create([
+            'row_hash' => 'hash_manual_sub',
+            'dealer_name' => 'LIBRA CELL TALUN',
+            'id_real' => 'BT01111',
+            'program_name' => 'Program Sell Out C11',
+            'region' => 'BIG CIREBON 1',
+            'net_pay' => 500000,
+            'credit_note_url' => 'https://drive.google.com/open?id=cn_dari_form',
+            'agreement_url' => 'https://drive.google.com/open?id=agr_dari_form',
+        ]);
+
+        app(ProgramReconciliationService::class)->reconcileSingle($dp, $sub);
+
+        $this->assertSame($manualCn, $dp->fresh()->cn);
+        $this->assertSame('https://drive.google.com/open?id=agr_dari_form', $dp->fresh()->agrement);
+    }
+
     public function test_pkp_badan_cannot_be_cut_without_faktur(): void
     {
         $dp = DataProgram::create([

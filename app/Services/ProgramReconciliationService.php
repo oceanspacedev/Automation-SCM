@@ -156,6 +156,18 @@ class ProgramReconciliationService
     }
 
     /**
+     * Whether a document link is one of another Form Program submission's documents (CN, Agreement or Faktur Pajak),
+     * e.g. left on a Data Program row by an earlier match with the same store's other program.
+     */
+    private function isDocumentOfAnotherSubmission(string $url, ProgramSubmission $submission): bool
+    {
+        return ProgramSubmission::withoutGlobalScopes()
+            ->whereKeyNot($submission->getKey())
+            ->where(fn ($query) => $query->where('credit_note_url', $url)->orWhere('agreement_url', $url)->orWhere('tax_invoice_url', $url))
+            ->exists();
+    }
+
+    /**
      * The Data Program row of a Form Program submission (same area, store and program) by the matching rules;
      * without one, the first row of the area whose kode BT equals the submission's ID REALME.
      */
@@ -609,31 +621,39 @@ class ProgramReconciliationService
             $actualAgr = $actualFaktur;
         }
 
-        $hasCn = ! empty($actualCn) || $this->isValidUrl($dataProgram->cn);
-        $hasAgr = ! empty($actualAgr) || $this->isValidUrl($dataProgram->agrement);
-        $hasFaktur = ! empty($actualFaktur) || $this->isValidUrl($dataProgram->cek_fp) || (! empty($dataProgram->no_faktur_pajak) && $dataProgram->no_faktur_pajak !== '-');
-
-        // 2. Transfer Google Drive URLs & Tax Invoice to DataProgram (if empty, '-' or forced)
+        // 2. Transfer Google Drive URLs & Tax Invoice to DataProgram: when empty, '-', forced, or still the document of
+        // another Form Program submission (e.g. the same store's other program matched earlier)
         $transferred = [
             'cn' => false,
             'agrement' => false,
             'cek_fp' => false,
         ];
+        $fromOtherSubmission = [];
 
-        if ($actualCn && ($force || empty($dataProgram->cn) || $dataProgram->cn === '-')) {
-            $dataProgram->cn = $actualCn;
-            $transferred['cn'] = true;
+        foreach (['cn' => $actualCn, 'agrement' => $actualAgr, 'cek_fp' => $actualFaktur] as $column => $document) {
+            $current = trim((string) $dataProgram->{$column});
+            $isEmpty = $current === '' || $current === '-';
+            if (! $isEmpty && $current !== $document && $this->isDocumentOfAnotherSubmission($current, $submission)) {
+                $fromOtherSubmission[] = $column;
+            }
+
+            if ($document && ($force || $isEmpty || in_array($column, $fromOtherSubmission, true))) {
+                $dataProgram->{$column} = $document;
+                $transferred[$column] = true;
+            } elseif (in_array($column, $fromOtherSubmission, true)) {
+                // Pengajuan yang cocok tidak punya dokumen ini: dokumen pengajuan lain tidak boleh ikut terbawa
+                $dataProgram->{$column} = null;
+            }
         }
 
-        if ($actualAgr && ($force || empty($dataProgram->agrement) || $dataProgram->agrement === '-')) {
-            $dataProgram->agrement = $actualAgr;
-            $transferred['agrement'] = true;
+        // Faktur Pajak lama milik pengajuan lain: nomornya juga, jadi diganti nomor dari pengajuan yang cocok (di bawah)
+        if (in_array('cek_fp', $fromOtherSubmission, true)) {
+            $dataProgram->no_faktur_pajak = null;
         }
 
-        if ($actualFaktur && ($force || empty($dataProgram->cek_fp) || $dataProgram->cek_fp === '-')) {
-            $dataProgram->cek_fp = $actualFaktur;
-            $transferred['cek_fp'] = true;
-        }
+        $hasCn = ! empty($actualCn) || $this->isValidUrl($dataProgram->cn);
+        $hasAgr = ! empty($actualAgr) || $this->isValidUrl($dataProgram->agrement);
+        $hasFaktur = ! empty($actualFaktur) || $this->isValidUrl($dataProgram->cek_fp) || (! empty($dataProgram->no_faktur_pajak) && $dataProgram->no_faktur_pajak !== '-');
 
         if (! empty($submission->no_faktur) && ($force || empty($dataProgram->no_faktur_pajak) || $dataProgram->no_faktur_pajak === '-')) {
             $dataProgram->no_faktur_pajak = trim((string) $submission->no_faktur);
