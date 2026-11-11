@@ -8,7 +8,6 @@ use App\Models\DataProgram;
 use App\Models\Dealer;
 use App\Models\Draft;
 use App\Models\MasterProgram;
-use Carbon\Carbon;
 use Closure;
 use Exception;
 use Illuminate\Support\Facades\Cache;
@@ -402,16 +401,15 @@ class DataProgramSyncService
 
         $this->resolveProgramFromMaster($draft);
 
-        $inputDateStr = $draft->invoice_date ?: date('Y-m-d');
-        $daysPending = 0;
-        try {
-            $inputDate = Carbon::parse($inputDateStr);
-            $daysPending = max(0, (int) $inputDate->diffInDays(now()));
-        } catch (\Throwable $e) {
-            $daysPending = 0;
-        }
+        $dp = DataProgram::where('draft_id', $draft->id)
+            ->orWhere('row_hash', $rowHash)
+            ->first();
 
-        $keteranganAging = $daysPending > 30 ? 'LEBIH DARI 30 HARI' : 'KURANG DARI 30 HARI';
+        // Tanggal draft masuk = Tgl Share CN (Lama Pending dihitung dari sini); Tgl Input diisi saat import No PO/SJ.
+        // Tgl Share CN yang sudah ada (mis. diubah manual) tidak ditimpa saat draft dikirim ulang.
+        $shareCnDateStr = filled($dp?->tgl_share_cn) ? $dp->tgl_share_cn : ($draft->invoice_date ?: date('Y-m-d'));
+        $daysPending = DataProgram::daysSince($shareCnDateStr) ?? 0;
+        $keteranganAging = DataProgram::agingKeterangan($daysPending);
 
         $attributes = [
             'draft_id' => $draft->id,
@@ -431,7 +429,7 @@ class DataProgramSyncService
             'ppn' => (float) ($draft->ppn ?: 0),
             'nilai_pph' => (float) ($draft->pph ?: 0),
             'net_pay' => (float) ($draft->netpay ?: 0),
-            'tgl_input' => $inputDateStr,
+            'tgl_share_cn' => $shareCnDateStr,
             'lama_pending' => (string) $daysPending,
             'keterangan' => $keteranganAging,
             'noted' => $draft->ref_note,
@@ -447,10 +445,6 @@ class DataProgramSyncService
                 $attributes[$column] = $dealer->{$column};
             }
         }
-
-        $dp = DataProgram::where('draft_id', $draft->id)
-            ->orWhere('row_hash', $rowHash)
-            ->first();
 
         if ($dp) {
             $dp->update($attributes);
@@ -729,6 +723,8 @@ class DataProgramSyncService
                 'nilai_pph' => $dp->nilai_pph,
                 'net_pay' => $dp->net_pay,
                 'tgl_input' => $dp->tgl_input,
+                'tgl_share_cn' => $dp->tgl_share_cn,
+                'lama_pending' => $dp->lama_pending,
                 'keterangan' => $dp->keterangan,
                 'cek_dokumen' => $dp->cek_dokumen,
                 'status_potong_purchase' => $dp->status_potong_purchase,

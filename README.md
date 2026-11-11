@@ -110,6 +110,7 @@ flowchart TD
 
 - Setiap invoice yang terbit menjadi satu baris Data Program. Baris ini membawa kode program, periode, NPWP, nominal, telemarketing, dan sales dari **Master Dealer** toko tersebut.
 - Status awal: **Cek Dokumen = BELUM MATCH TEST**, **Status Potong Purchase = BELUM BISA POTONG**.
+- **Tgl Share CN** = tanggal baris masuk dari draft; **Lama Pending** dan keterangan aging (lebih/kurang dari 30 hari) dihitung dari tanggal ini. **Tgl Input** = hari **No PO/SJ** diisi (lewat Import No PO/SJ atau langsung di tabel).
 - Kolom **No PO**, **No PO/SJ**, dan **No SJ** bisa diisi langsung di tabel seperti spreadsheet:
   - pilih sel, klik dua kali, atau langsung ketik
   - **Enter** menyimpan
@@ -448,7 +449,7 @@ Catatan:
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_BUCKET`, `AWS_ENDPOINT`, `AWS_URL`, `AWS_USE_PATH_STYLE_ENDPOINT` | Object storage S3 untuk dokumen Form Program. |
 | `DATA_PROGRAM_SPREADSHEET_URL`, `DATA_PROGRAM_WEBAPP_URL` | Spreadsheet & Apps Script Web App Data Program Jawa Barat (opsional). |
 | `PROGRAM_SUBMISSION_SPREADSHEET_URL`, `GOOGLE_SHEET_WEBAPP_URL` | Spreadsheet & Apps Script Web App Form Program Jawa Barat (opsional). |
-| `ENABLE_AUTO_SYNC_SCHEDULE` | `true` untuk menyalakan sinkron Data Program terjadwal di lingkungan `local`. |
+| `ENABLE_AUTO_SYNC_SCHEDULE` | `true` untuk menyalakan sinkron Data Program terjadwal dari Google Spreadsheet (setiap menit, di semua lingkungan). Bawaan mati, karena Data Program sudah dikelola di aplikasi. |
 | `ENABLE_AUTO_AI_SCHEDULE` | `true` untuk menyalakan analisis AI terjadwal di lingkungan `local`. |
 | `AUTO_MATCH_SEND_WA` | `false` mematikan WA ke telemarketing dari cron `program:notify-telemarketing`, apa pun pengaturan di Master Jadwal Otomatis (bawaan `true`). |
 
@@ -471,7 +472,7 @@ Jangan pernah commit nilai rahasia (`*_KEY`, `*_SECRET`, `*_TOKEN`, password) ke
 | `php artisan program:auto-match [--limit=200]` | Cocokkan Data Program dengan Form Program (tanpa WA). |
 | `php artisan program:notify-telemarketing [--limit=200]` | WA ke telemarketing untuk baris yang BISA DI POTONG dan belum pernah dikirimi, lalu pengingat untuk baris yang belum disetujui dealer (sesuai pengaturan **Pengingat** di Master Jadwal Otomatis). |
 
-Di luar lingkungan `local`, `data-program:sync` dan `program:auto-analyze-ai` dijadwalkan **setiap menit**. `program:auto-match` juga jalan **setiap menit**, di semua lingkungan, begitu pula `queue:work --stop-when-empty` yang menjalankan antrean (mis. import Master Dealer dari web) lalu berhenti. `program:notify-telemarketing` mengikuti **Master → Jadwal Otomatis**: aktif/nonaktif, pada jam tertentu (WIB, bawaan 09:00 dan 14:00) atau setiap 5 menit sampai 6 jam, di hari yang dipilih. Di halaman itu juga ada tombol **Jalankan sekarang** dan hasil jalan terakhir.
+`data-program:sync` dijadwalkan **setiap menit** hanya bila `ENABLE_AUTO_SYNC_SCHEDULE=true`. Di luar lingkungan `local`, `program:auto-analyze-ai` dijadwalkan **setiap menit**. `program:auto-match` juga jalan **setiap menit**, di semua lingkungan, begitu pula `queue:work --stop-when-empty` yang menjalankan antrean (mis. import Master Dealer dari web) lalu berhenti. `program:notify-telemarketing` mengikuti **Master → Jadwal Otomatis**: aktif/nonaktif, pada jam tertentu (WIB, bawaan 09:00 dan 14:00) atau setiap 5 menit sampai 6 jam, di hari yang dipilih. Di halaman itu juga ada tombol **Jalankan sekarang** dan hasil jalan terakhir.
 
 Semua jadwal di atas hanya jalan bila **scheduler Laravel** berjalan. `php artisan serve` dan `queue:work` saja tidak cukup.
 
@@ -494,7 +495,7 @@ Scheduler mencatat detak setiap menit. Bila detak terakhir lebih dari 2 menit la
 4. `php artisan storage:link` (sekali saja)
 5. `php artisan config:cache && php artisan route:cache && php artisan view:cache`
 6. Pastikan `storage/` dan `bootstrap/cache/` bisa ditulis web server.
-7. Pasang cron scheduler (lihat di atas). Wajib untuk import Master Dealer dari web (dijalankan antrean lewat scheduler), sinkron spreadsheet, dan analisis AI otomatis.
+7. Pasang cron scheduler (lihat di atas). Wajib untuk import Master Dealer dari web (dijalankan antrean lewat scheduler), sinkron spreadsheet (bila dinyalakan), dan analisis AI otomatis.
 
 **Agar import Master Dealer di background jalan di server:**
 
@@ -505,7 +506,7 @@ Scheduler mencatat detak setiap menit. Bila detak terakhir lebih dari 2 menit la
 - Opsional: queue worker tetap (mis. Supervisor `php artisan queue:work --tries=1 --timeout=3600`) supaya import mulai seketika, bukan menunggu menit berikutnya. Setelah deploy kode baru, jalankan `php artisan queue:restart`.
 - AI router harus aktif (sama dengan cek CN/Faktur). Import agreement pertama di server mengecek semua dokumen (±800 toko, link lama ikut dicek bila perlu), jadi bisa 15–30 menit dan memakai kuota AI; import berikutnya hanya mengecek dokumen baru (dan agreement yang dicek sebelum ada pengecekan file gabungan, sekali).
 
-> **Peringatan sinkron spreadsheet.** Sinkron penuh `data-program:sync` menganggap Google Spreadsheet sebagai sumber utama dan **menghapus baris Data Program yang tidak ada di sheet**, termasuk baris yang dibuat dari invoice di web. Kalau data sudah dikelola penuh di web, jangan nyalakan scheduler sinkron (atau matikan jadwalnya di `routes/console.php`).
+> **Peringatan sinkron spreadsheet.** Sinkron penuh `data-program:sync` menganggap Google Spreadsheet sebagai sumber utama dan **menghapus baris Data Program yang tidak ada di sheet**, termasuk baris yang dibuat dari invoice di web. Karena itu jadwalnya mati kecuali `ENABLE_AUTO_SYNC_SCHEDULE=true`; kalau data sudah dikelola penuh di web, biarkan mati.
 
 ---
 

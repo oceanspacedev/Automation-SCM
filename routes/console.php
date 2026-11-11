@@ -23,8 +23,9 @@ Artisan::command('data-program:sync {--limit=0}', function (DataProgramSyncServi
     }
 })->purpose('Sinkronisasi data master Data Program (56 kolom) dari Google Spreadsheet');
 
-// Nonaktifkan auto-sync Data Program terjadwal di lingkungan local agar tidak bentrok lock database
-if (! app()->environment('local') || env('ENABLE_AUTO_SYNC_SCHEDULE', false)) {
+// Sinkron Data Program dari Google Spreadsheet hanya bila dinyalakan (ENABLE_AUTO_SYNC_SCHEDULE=true): sheet menimpa isi
+// Data Program, termasuk tanggal & nomor yang sudah dikelola di aplikasi
+if (config('services.data_program.auto_sync')) {
     Schedule::command('data-program:sync')
         ->everyMinute()
         ->withoutOverlapping()

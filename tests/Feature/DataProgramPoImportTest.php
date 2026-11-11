@@ -67,6 +67,34 @@ class DataProgramPoImportTest extends TestCase
             && collect($request['rows'])->pluck('no_transaksi')->all() === ['2604260001']);
     }
 
+    public function test_a_row_gets_the_import_day_as_its_tgl_input_when_its_no_po_sj_comes_in(): void
+    {
+        $this->travelTo('2026-11-11 10:00:00');
+        $newNumber = $this->dataProgram('jateng', 'BT05165', 'PROGRAM PEAKSEASON SEPTEMBER 2026', ['tgl_share_cn' => '2026-10-15']);
+        $sameNumber = $this->dataProgram('jateng', 'BT05166', 'PROGRAM PEAKSEASON SEPTEMBER 2026', ['no_po_sj' => '2610000001', 'tgl_input' => '2026-11-01']);
+        $onlyTransaksi = $this->dataProgram('jateng', 'BT05167', 'PROGRAM PEAKSEASON SEPTEMBER 2026');
+        $numberWithoutDate = $this->dataProgram('jateng', 'BT05168', 'PROGRAM PEAKSEASON SEPTEMBER 2026', ['no_po_sj' => '2610000002', 'tgl_share_cn' => '2026-10-15']);
+        $otherNumber = $this->dataProgram('jateng', 'BT05169', 'PROGRAM PEAKSEASON SEPTEMBER 2026', ['no_po_sj' => '2610000003', 'tgl_input' => '2026-11-01']);
+
+        $this->postJson('/api/data-program/import-po', ['file' => $this->excel([
+            ['Kode BT', 'NAMA PROGRAM', 'NO PO/SJ', 'No. Trs'],
+            ['BT05165', 'PROGRAM PEAKSEASON SEPTEMBER 2026', 2610000373, null],
+            // No PO/SJ yang sama tidak mengubah Tgl Input, walau No. Trs-nya baru
+            ['BT05166', 'PROGRAM PEAKSEASON SEPTEMBER 2026', 2610000001, 2606260001],
+            ['BT05167', 'PROGRAM PEAKSEASON SEPTEMBER 2026', null, 2606260002],
+            // Nomor yang sama tapi Tgl Input masih kosong (mis. tanggalnya sudah dipindah ke Tgl Share CN): diisi hari ini
+            ['BT05168', 'PROGRAM PEAKSEASON SEPTEMBER 2026', 2610000002, null],
+            // Nomor yang diganti: Tgl Input ikut jadi hari ini
+            ['BT05169', 'PROGRAM PEAKSEASON SEPTEMBER 2026', 2610000999, null],
+        ])], ['X-Area' => 'jateng'])->assertOk()->assertJsonPath('data.updated', 5)->assertJsonPath('data.replaced', 1);
+
+        $this->assertSame(['2026-11-11', '2026-10-15'], [$newNumber->fresh()->tgl_input, $newNumber->fresh()->tgl_share_cn]);
+        $this->assertSame('2026-11-01', $sameNumber->fresh()->tgl_input);
+        $this->assertNull($onlyTransaksi->fresh()->tgl_input);
+        $this->assertSame(['2026-11-11', '2026-10-15'], [$numberWithoutDate->fresh()->tgl_input, $numberWithoutDate->fresh()->tgl_share_cn]);
+        $this->assertSame(['2610000999', '2026-11-11'], [$otherNumber->fresh()->no_po_sj, $otherNumber->fresh()->tgl_input]);
+    }
+
     public function test_import_into_an_area_without_a_spreadsheet_only_saves_the_numbers_in_the_app(): void
     {
         Http::preventStrayRequests();

@@ -344,7 +344,7 @@ class DataProgramTest extends TestCase
             'no_po' => 'PO-2026-999',
             'no_sj' => 'SJ-2026-888',
             'tgl_sj' => '2026-03-20',
-            'tgl_input' => '2026-03-01',
+            'tgl_share_cn' => '2026-03-01',
             'bank' => 'BCA',
             'norek' => '1234567890',
             'namrek' => 'CV MAJU SEJAHTERA',
@@ -425,10 +425,59 @@ class DataProgramTest extends TestCase
             && array_column($request['rows'], 'row_index') === [5, 6]
             && array_column($request['rows'], 'no_po') === ['2502200306', '2502200307']);
 
-        // Mengisi Tgl Input saja menghitung ulang Lama Pending tanpa menimpa Keterangan yang ditulis manual
-        $this->putJson("/api/data-program/{$second->id}", ['tgl_input' => '2026-03-01', 'push_to_sheet' => false])->assertOk();
+        // Mengisi Tgl Share CN saja menghitung ulang Lama Pending tanpa menimpa Keterangan yang ditulis manual
+        $this->putJson("/api/data-program/{$second->id}", ['tgl_share_cn' => '2026-03-01', 'push_to_sheet' => false])->assertOk();
         $this->assertSame('Menunggu dealer', $second->fresh()->keterangan);
         $this->assertGreaterThan(30, (int) $second->fresh()->lama_pending);
+    }
+
+    public function test_filling_no_po_sj_in_the_table_sets_tgl_input_to_that_day(): void
+    {
+        Http::fake(['script.google.com/macros/s/*' => Http::response(['success' => true, 'updated_count' => 1])]);
+        $this->travelTo('2026-11-11 10:00:00');
+        $dp = DataProgram::create(['row_hash' => 'row_5', 'dealer_name' => 'ZONZON CELL', 'tgl_share_cn' => '2026-10-15']);
+
+        $this->putJson('/api/data-program/bulk', ['field' => 'no_po_sj', 'rows' => [['id' => $dp->id, 'value' => '2610000373']]])->assertOk();
+        $this->assertSame(['2026-11-11', '2026-10-15'], [$dp->fresh()->tgl_input, $dp->fresh()->tgl_share_cn]);
+
+        // Mengosongkan No PO/SJ tidak mengubah Tgl Input
+        $this->travelTo('2026-11-12 10:00:00');
+        $this->putJson('/api/data-program/bulk', ['field' => 'no_po_sj', 'rows' => [['id' => $dp->id, 'value' => null]]])->assertOk();
+        $this->assertSame('2026-11-11', $dp->fresh()->tgl_input);
+    }
+
+    public function test_editing_a_row_fills_tgl_input_for_a_new_no_po_sj_and_counts_pending_from_a_day_first_share_cn_date(): void
+    {
+        $this->travelTo('2026-11-11 10:00:00');
+        $dp = DataProgram::create(['row_hash' => 'row_5', 'dealer_name' => 'ZONZON CELL']);
+
+        // Modal Edit mengirim Tgl Input kosong: No PO/SJ baru membuat Tgl Input = hari ini
+        $this->putJson("/api/data-program/{$dp->id}", ['no_po_sj' => '2610000373', 'tgl_input' => '', 'tgl_share_cn' => '05/10/2026', 'push_to_sheet' => false])->assertOk();
+
+        $dp->refresh();
+        $this->assertSame('2026-11-11', $dp->tgl_input);
+        // 05/10/2026 = 5 Oktober (hari dulu), jadi 37 hari
+        $this->assertSame(['37', 'LEBIH DARI 30 HARI'], [$dp->lama_pending, $dp->keterangan]);
+
+        // Tanggal yang diisi sendiri bersama nomor baru tetap dipakai
+        $this->putJson("/api/data-program/{$dp->id}", ['no_po_sj' => '2610000999', 'tgl_input' => '2026-11-05', 'push_to_sheet' => false])->assertOk();
+        $this->assertSame('2026-11-05', $dp->fresh()->tgl_input);
+    }
+
+    public function test_existing_rows_move_their_draft_date_from_tgl_input_to_tgl_share_cn(): void
+    {
+        $fromDraft = DataProgram::create(['row_hash' => 'draft_1', 'dealer_name' => 'ZONZON CELL', 'tgl_input' => '2026-10-15']);
+        $emptyShareCn = DataProgram::create(['row_hash' => 'row_6', 'dealer_name' => 'MJ CELL CIAMIS', 'tgl_input' => '15/10/2026', 'tgl_share_cn' => '']);
+        $bothDates = DataProgram::create(['row_hash' => 'row_7', 'dealer_name' => 'PASIFIC', 'tgl_input' => '2026-11-01', 'tgl_share_cn' => '2026-10-15']);
+        $noDate = DataProgram::create(['row_hash' => 'row_8', 'dealer_name' => 'D4 CELL']);
+
+        (require database_path('migrations/2026_11_11_100838_move_data_program_input_date_to_share_cn_date.php'))->up();
+
+        $this->assertSame([null, '2026-10-15'], [$fromDraft->fresh()->tgl_input, $fromDraft->fresh()->tgl_share_cn]);
+        $this->assertSame([null, '15/10/2026'], [$emptyShareCn->fresh()->tgl_input, $emptyShareCn->fresh()->tgl_share_cn]);
+        // Baris yang sudah punya Tgl Share CN tidak diubah
+        $this->assertSame(['2026-11-01', '2026-10-15'], [$bothDates->fresh()->tgl_input, $bothDates->fresh()->tgl_share_cn]);
+        $this->assertSame([null, null], [$noDate->fresh()->tgl_input, $noDate->fresh()->tgl_share_cn]);
     }
 
     public function test_bulk_update_only_accepts_po_and_sj_columns(): void

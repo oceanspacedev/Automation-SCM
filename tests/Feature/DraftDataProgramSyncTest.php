@@ -163,7 +163,9 @@ class DraftDataProgramSyncTest extends TestCase
         $this->assertEquals('BADAN', $dp->wajib_pajak);
         $this->assertEquals('BADAN', $dp->trf_pph);
         $this->assertEquals(10000000, $dp->incentive);
-        $this->assertEquals('2026-03-15', $dp->tgl_input);
+        // Tanggal draft masuk menjadi Tgl Share CN; Tgl Input menunggu import No PO/SJ
+        $this->assertEquals('2026-03-15', $dp->tgl_share_cn);
+        $this->assertNull($dp->tgl_input);
         $this->assertEquals('Catatan khusus draft', $dp->noted);
         $this->assertContains($dp->keterangan, ['LEBIH DARI 30 HARI', 'KURANG DARI 30 HARI']);
         $this->assertNull($dp->cn); // CN di Data Program berasal dari matching Form Program
@@ -282,6 +284,34 @@ class DraftDataProgramSyncTest extends TestCase
         $freshDp = DataProgram::where('draft_id', $draft->id)->first();
         $this->assertEquals('PROGRAM REVISI', $freshDp->program_name);
         $this->assertEquals(3500000, $freshDp->incentive);
+    }
+
+    public function test_pushing_a_draft_again_keeps_its_tgl_share_cn_and_tgl_input(): void
+    {
+        Http::fake();
+        $this->travelTo('2026-11-11 10:00:00');
+
+        $draft = Draft::create([
+            'cn_number' => 'CN-DP-010',
+            'dealer_name' => 'TOKO MAKMUR',
+            'dealer_code' => 'DLR099',
+            'support_amount' => 3000000,
+            'program_name' => 'PROGRAM AWAL',
+            'invoice_date' => '01/10/2026',
+            'status' => 'invoiced',
+        ]);
+
+        $this->postJson("/api/drafts/{$draft->id}/push-to-data-program")->assertOk();
+        $dp = DataProgram::where('draft_id', $draft->id)->first();
+        // Tanggal draft "01/10/2026" (hari dulu) = 1 Oktober: 41 hari
+        $this->assertSame(['01/10/2026', null, '41', 'LEBIH DARI 30 HARI'], [$dp->tgl_share_cn, $dp->tgl_input, $dp->lama_pending, $dp->keterangan]);
+
+        // Tgl Share CN diubah manual & Tgl Input dari import No PO/SJ: dikirim ulang, keduanya tetap
+        $dp->update(['tgl_share_cn' => '2026-10-20', 'tgl_input' => '2026-11-05']);
+        $this->postJson("/api/drafts/{$draft->id}/push-to-data-program")->assertOk();
+
+        $dp->refresh();
+        $this->assertSame(['2026-10-20', '2026-11-05', '22'], [$dp->tgl_share_cn, $dp->tgl_input, $dp->lama_pending]);
     }
 
     public function test_batch_invoice_generation_auto_syncs_drafts_to_data_program(): void

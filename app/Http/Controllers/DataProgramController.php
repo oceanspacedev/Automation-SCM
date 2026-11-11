@@ -12,7 +12,6 @@ use App\Services\DataProgramSyncService;
 use App\Services\ProgramApprovalFlow;
 use App\Services\ProgramReconciliationService;
 use App\Services\WhatsAppService;
-use Carbon\Carbon;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -609,6 +608,8 @@ class DataProgramController extends Controller
         unset($validated['push_to_sheet']);
 
         $dp->fill($this->withAging($dp, $validated));
+        // No PO/SJ yang baru diisi di modal: Tgl Input = hari ini, kecuali tanggalnya diisi sendiri
+        $dp->stampInputDate();
         $dp->save();
 
         $sheetPushResult = null;
@@ -647,7 +648,14 @@ class DataProgramController extends Controller
         $dataPrograms = DataProgram::whereIn('id', array_column($validated['rows'], 'id'))->get()->keyBy('id');
 
         foreach ($validated['rows'] as $row) {
-            $dataPrograms->get($row['id'])?->fill([$validated['field'] => $row['value'] ?? null])->save();
+            $dp = $dataPrograms->get($row['id'])?->fill([$validated['field'] => $row['value'] ?? null]);
+
+            // Tgl Input = hari No PO/SJ diisi (sama seperti import No PO/SJ)
+            if ($validated['field'] === 'no_po_sj') {
+                $dp?->stampInputDate(whenMissing: true);
+            }
+
+            $dp?->save();
         }
 
         $sheetPushResults = [];
@@ -780,21 +788,16 @@ class DataProgramController extends Controller
     }
 
     /**
-     * Recalculate Lama Pending and the aging Keterangan when Tgl Input is filled in.
-     * A Keterangan written by hand (not an aging text) is kept.
+     * Recalculate Lama Pending and the aging Keterangan when Tgl Share CN is filled in (pending counts from the day the
+     * CN was shared). A Keterangan written by hand (not an aging text) is kept.
      *
      * @param  array<string, mixed>  $attributes
      * @return array<string, mixed>
      */
     private function withAging(DataProgram $dp, array $attributes): array
     {
-        if (empty($attributes['tgl_input'])) {
-            return $attributes;
-        }
-
-        try {
-            $days = max(0, (int) Carbon::parse($attributes['tgl_input'])->diffInDays(now()));
-        } catch (\Throwable) {
+        $days = DataProgram::daysSince($attributes['tgl_share_cn'] ?? null);
+        if ($days === null) {
             return $attributes;
         }
 
@@ -804,7 +807,7 @@ class DataProgramController extends Controller
 
         $keterangan = array_key_exists('keterangan', $attributes) ? $attributes['keterangan'] : $dp->keterangan;
         if (empty($keterangan) || in_array($keterangan, ['LEBIH DARI 30 HARI', 'KURANG DARI 30 HARI'], true)) {
-            $attributes['keterangan'] = $days > 30 ? 'LEBIH DARI 30 HARI' : 'KURANG DARI 30 HARI';
+            $attributes['keterangan'] = DataProgram::agingKeterangan($days);
         }
 
         return $attributes;

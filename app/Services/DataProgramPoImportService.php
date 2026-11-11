@@ -11,8 +11,9 @@ use RuntimeException;
 
 /**
  * Fills No PO/SJ and No Transaksi of Data Program rows from an Excel file (columns Kode BT, Nama Program, No PO/SJ,
- * No. Trs), matching each row by Kode BT + Nama Program in every area of the current brand. The changed rows are then
- * sent to the area's Google Spreadsheet, so the next sync from the spreadsheet keeps them.
+ * No. Trs), matching each row by Kode BT + Nama Program in every area of the current brand. A row whose No PO/SJ is
+ * filled or changed, or that has a No PO/SJ but no Tgl Input yet, gets the import day as its Tgl Input. The changed
+ * rows are then sent to the area's Google Spreadsheet, so the next sync from the spreadsheet keeps them.
  */
 class DataProgramPoImportService
 {
@@ -88,6 +89,11 @@ class DataProgramPoImportService
 
             foreach ($matches as $dp) {
                 $dp->fill($fileRow['values']);
+                $replacesNumber = collect(array_keys($fileRow['values']))
+                    ->contains(fn (string $field) => $dp->isDirty($field) && filled($dp->getOriginal($field)));
+
+                // Tgl Input = hari No PO/SJ masuk; nomor yang sama juga mengisi Tgl Input yang masih kosong
+                $dp->stampInputDate(whenMissing: isset($fileRow['values']['no_po_sj']));
 
                 if (! $dp->isDirty()) {
                     $unchanged++;
@@ -95,7 +101,7 @@ class DataProgramPoImportService
                     continue;
                 }
 
-                if (collect($dp->getDirty())->keys()->contains(fn (string $field) => filled($dp->getOriginal($field)))) {
+                if ($replacesNumber) {
                     $replaced++;
                 }
 

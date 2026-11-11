@@ -418,7 +418,6 @@
                   <input
                     v-model="form.tgl_input"
                     type="date"
-                    @change="handleTglInputChange"
                     class="w-full h-8.5 px-3 rounded-lg border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-white transition cursor-pointer"
                   />
                 </div>
@@ -451,6 +450,7 @@
                     v-model="form.tgl_share_cn"
                     type="text"
                     placeholder="YYYY-MM-DD"
+                    @change="handleTglShareCnChange"
                     class="w-full h-8.5 px-3 rounded-lg border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-white transition"
                   />
                 </div>
@@ -927,19 +927,29 @@ const autoCalculateFinancials = () => {
   }
 };
 
-// Auto update lama pending dan aging keterangan jika tgl_input diganti
-const handleTglInputChange = () => {
-  if (!form.tgl_input) return;
-  try {
-    const inputDate = new Date(form.tgl_input);
-    const today = new Date();
-    const diffTime = today.getTime() - inputDate.getTime();
-    const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
-    form.lama_pending = String(diffDays);
-    form.keterangan = diffDays > 30 ? 'LEBIH DARI 30 HARI' : 'KURANG DARI 30 HARI';
-  } catch (e) {
-    // ignore
+// Tanggal "2026-10-15" atau "15/10/2026" (hari dulu, seperti di spreadsheet); null bila bukan tanggal
+const parseShareCnDate = (value) => {
+  const text = String(value || '').trim();
+  let match = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  let [year, month, day] = match ? [match[1], match[2], match[3]] : [];
+  if (!match) {
+    match = text.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/);
+    if (!match) return null;
+    [day, month, year] = [match[1], match[2], match[3]];
   }
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  return date.getDate() === Number(day) && date.getMonth() === Number(month) - 1 ? date : null;
+};
+
+// Lama pending dihitung dari Tgl Share CN: diperbarui bersama keterangan aging saat tanggalnya diganti
+const handleTglShareCnChange = () => {
+  const shareCnDate = parseShareCnDate(form.tgl_share_cn);
+  if (!shareCnDate) return;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diffDays = Math.max(0, Math.round((today.getTime() - shareCnDate.getTime()) / (1000 * 60 * 60 * 24)));
+  form.lama_pending = String(diffDays);
+  form.keterangan = diffDays > 30 ? 'LEBIH DARI 30 HARI' : 'KURANG DARI 30 HARI';
 };
 
 const handleClose = () => {

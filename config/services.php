@@ -49,6 +49,12 @@ return [
         'url' => env('PROGRAM_FORM_URL', 'https://scm-customer.oceanspace.co.id'),
     ],
 
+    // Sinkron terjadwal Data Program dari Google Spreadsheet (tiap menit, sheet dianggap sumber utama): mati kecuali
+    // ENABLE_AUTO_SYNC_SCHEDULE=true, karena Data Program sudah dikelola di aplikasi
+    'data_program' => [
+        'auto_sync' => (bool) env('ENABLE_AUTO_SYNC_SCHEDULE', false),
+    ],
+
     // WA ke telemarketing (program:notify-telemarketing): jamnya diatur di Master Jadwal Otomatis;
     // AUTO_MATCH_SEND_WA=false mematikan WhatsApp ke telemarketing apa pun pengaturan di master
     'auto_match' => [
