@@ -672,9 +672,51 @@ PROMPT;
     }
 
     /**
+     * A dealer name read from a Credit Note, or null when there is none: empty, "-", or one of the Bill To companies
+     * (e.g. "CV. TOP SELULAR" after "Attention"), which the Credit Note is addressed to and is never the dealer.
+     */
+    public function dealerNameOrNull(?string $name): ?string
+    {
+        $name = trim((string) $name);
+        $normalized = $this->normalizeCompanyName($name);
+
+        if ($normalized === '') {
+            return null;
+        }
+
+        foreach (CustomerLookupService::billToNames() as $billTo) {
+            $billToNormalized = $this->normalizeCompanyName($billTo);
+            if ($normalized === $billToNormalized || str_contains($billToNormalized, $normalized) || str_contains($normalized, $billToNormalized)) {
+                return null;
+            }
+        }
+
+        return $name;
+    }
+
+    /**
+     * A company name without legal forms (PT, CV, UD), punctuation and extra spaces, e.g. "CV. TOP SELULAR" → "TOP SELULAR".
+     */
+    private function normalizeCompanyName(string $name): string
+    {
+        $clean = strtoupper(preg_replace('/[^A-Za-z0-9]+/', ' ', $name));
+        $clean = preg_replace('/\b(PT|CV|UD|PD|TB)\b/', ' ', $clean);
+
+        return trim(preg_replace('/\s+/', ' ', $clean));
+    }
+
+    /**
      * Extract dealer name from Credit Note text or filename.
      */
     public function extractDealerNameFromCn(array $cnInfo): ?string
+    {
+        return $this->dealerNameOrNull($this->readDealerNameFromCn($cnInfo));
+    }
+
+    /**
+     * The dealer name a Credit Note's text or filename gives, before the Bill To companies are ruled out.
+     */
+    private function readDealerNameFromCn(array $cnInfo): ?string
     {
         if (empty($cnInfo['has_file'])) {
             return null;
@@ -708,6 +750,9 @@ PROMPT;
             $clean = preg_replace('/^(?:CN|CREDIT[\s_\-]*NOTE|NOTA[\s_\-]*KREDIT|INVOICE|INV)[\s_\-]+/i', '', $nameWithoutExt);
             $clean = preg_replace('/[\s_\-]+(?:CN|CREDIT[\s_\-]*NOTE|NOTA[\s_\-]*KREDIT|INVOICE|INV)$/i', '', $clean);
             $clean = trim(str_replace(['_', '-'], ' ', $clean));
+
+            // Kata yang memuat angka (nomor CN/invoice seperti "1794383404" atau "INVOICE209GRACE") bukan bagian nama toko
+            $clean = implode(' ', array_filter(explode(' ', $clean), fn (string $word) => $word !== '' && ! preg_match('/\d/', $word)));
 
             // If filename contains program segment (e.g. "OCCEAN SPACE PROGRAM DSA..."), extract dealer part
             if (preg_match('/^(.*?)(?:\s+)(PROGRAM\b.*)$/i', $clean, $pm)) {
@@ -1609,12 +1654,9 @@ PROMPT;
                 : 'Dokumen Credit Note lengkap untuk dealer Non PKP dan siap diproses potong.';
         }
 
-        $extractedDealerName = null;
-        if (! empty($parsed['dealer_name']) && trim((string) $parsed['dealer_name']) !== '-' && trim((string) $parsed['dealer_name']) !== '') {
-            $extractedDealerName = trim((string) $parsed['dealer_name']);
-        } else {
-            $extractedDealerName = $this->extractDealerNameFromCn($this->extractFileContentInfo($filesOrUrls['cn'] ?? null));
-        }
+        // Nama dari AI dulu; bila kosong atau ternyata nama perusahaan penerima tagihan (mis. CV TOP SELULAR), baca dari teks/nama file
+        $extractedDealerName = $this->dealerNameOrNull($parsed['dealer_name'] ?? null)
+            ?? $this->extractDealerNameFromCn($this->extractFileContentInfo($filesOrUrls['cn'] ?? null));
 
         $extractedCnProgram = null;
         if (! empty($parsed['cn_program_name']) && trim((string) $parsed['cn_program_name']) !== '-' && trim((string) $parsed['cn_program_name']) !== '') {
@@ -2043,7 +2085,9 @@ Ketentuan Penentuan Output:
      * "status_potong_purchase": "BELUM BISA POTONG"
      * "keterangan": "Catatan: Nama program di form ('[Nama Program di Form]') berbeda dengan lembar CN ('[Nama Program di Lembar CN]'). Harap upload ulang dokumen yang sesuai."
    - Validasi Nama Dealer:
-     * Selalu ekstrak nama dealer yang tertera pada lembar Credit Note ke field "dealer_name". Contoh: "NEWCO CELL", "CV TOP SELULAR", dsb.
+     * Selalu ekstrak nama dealer yang tertera pada lembar Credit Note ke field "dealer_name". Contoh: "NEWCO CELL", "CV GRACE MANDIRI UTAMA", dsb.
+     * Dealer adalah pihak yang MENERBITKAN Credit Note / Invoice: nama di kop/judul paling atas, nama pemilik rekening ("A/n ..."), atau nama di tanda tangan / stempel.
+     * CV TOP SELULAR, PT MEDIA SELULER INDONESIA, dan PT RETAIL INDONESIA SELALU MAJU adalah distributor yang DITAGIH (biasanya tertulis setelah "Attention", "Kepada", "Bill To", atau "Ditujukan kepada"). Nama-nama itu BUKAN dealer: JANGAN PERNAH mengisi "dealer_name" dengan nama tersebut.
      * Pengecualian: Jika nama dealer di form diisi "-", ini berarti customer meminta sistem membaca nama dealer otomatis dari dokumen CN. Dalam kondisi ini, JANGAN tandai sebagai invalid, dan isi field "dealer_name" dengan nama dealer yang tertera di dokumen CN.
      * TOLERANSI TYPO / BEDA DIKIT (SANGAT PENTING):
        - Jika nama dealer di formulir dan dokumen intinya SAMA meski ada sedikit perbedaan ketik / typo kecil (contoh: "NEWCOO CELL" vs "NEWCO CELL" yang cuma kurang/lebih huruf O, "NEWCO CELLULAR" vs "NEWCO CELL", selisih 1-2 huruf, spasi, atau singkatan PT/CV/CELL), MAKA WAJIB DIANGGAP SAMA & VALID! JANGAN anggap mismatch dan JANGAN tandai slot CN sebagai invalid!

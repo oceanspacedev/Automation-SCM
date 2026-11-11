@@ -92,6 +92,17 @@ class CustomerLookupService
     ];
 
     /**
+     * Names of the standard Bill To companies (CV TOP SELULAR and the others): the party a dealer's Credit Note or
+     * invoice is addressed to, never the dealer itself.
+     *
+     * @return list<string>
+     */
+    public static function billToNames(): array
+    {
+        return array_values(array_unique(array_column(self::$billToOptions, 'name')));
+    }
+
+    /**
      * Get all available standard Bill To options.
      */
     public static function getBillToOptions(): array

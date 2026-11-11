@@ -1443,6 +1443,63 @@ class ProgramSubmissionTest extends TestCase
         $this->assertEquals('BELUM BISA POTONG', $response->json('data.status_potong_purchase'));
     }
 
+    public function test_the_bill_to_company_on_an_invoice_is_never_read_as_the_dealer(): void
+    {
+        $service = app(DocumentAnalysisService::class);
+
+        foreach (['CV. TOP SELULAR', 'TOP SELULAR', 'cv top selular', 'PT MEDIA SELULER INDONESIA', 'PT RETAIL INDONESIA SELALU MAJU', '-', ''] as $notADealer) {
+            $this->assertNull($service->dealerNameOrNull($notADealer), $notADealer);
+        }
+        $this->assertSame('CV. Grace Mandiri Utama', $service->dealerNameOrNull(' CV. Grace Mandiri Utama '));
+        $this->assertSame('NEWCO CELL', $service->dealerNameOrNull('NEWCO CELL'));
+    }
+
+    public function test_pre_validate_does_not_flag_the_dealer_when_the_ai_reads_the_bill_to_company(): void
+    {
+        Storage::fake('public');
+
+        // Invoice dari dealer untuk "Attention: CV. TOP SELULAR": AI keliru mengambil penerima tagihan sebagai dealer
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [[
+                    'message' => [
+                        'content' => json_encode([
+                            'dealer_name' => 'CV. TOP SELULAR',
+                            'dealer_mismatch' => true,
+                            'cn_program_name' => null,
+                            'cn_program_mismatch' => false,
+                            'is_complete' => false,
+                            'cek_dokumen' => 'NAMA DEALER TIDAK SESUAI (CN)',
+                            'status_potong_purchase' => 'BELUM BISA POTONG',
+                            'keterangan' => "Nama dealer di formulir ('CV. GRACE MANDIRI UTAMA') berbeda dengan dokumen Credit Note ('CV. TOP SELULAR').",
+                            'net_pay' => 3190258,
+                            'doc_validation' => [
+                                'cn' => ['status' => 'invalid', 'actual_type' => 'cn', 'message' => "Nama dealer di dokumen ('CV. TOP SELULAR') berbeda dengan Form ('CV. GRACE MANDIRI UTAMA')."],
+                                'faktur' => ['status' => 'empty', 'actual_type' => 'none', 'message' => 'Faktur Pajak tidak diunggah'],
+                            ],
+                        ]),
+                    ],
+                ]],
+            ], 200),
+        ]);
+
+        $response = $this->post('/api/program-submissions/pre-validate', [
+            'program_name' => 'PROGRAM SEPTEMBER 2026',
+            'region' => 'BIG BANDUNG',
+            'id_real' => 'DLDC6074',
+            'dealer_name' => 'CV. GRACE MANDIRI UTAMA',
+            'sales_name' => 'SANDY ARJAYAN',
+            'credit_note_file' => UploadedFile::fake()->create('CN_1794383404_INVOICE209GRACE.pdf', 50, 'application/pdf'),
+        ], ['Accept' => 'application/json']);
+
+        $response->assertOk()->assertJsonPath('success', true);
+        // Nama file "CN_1794383404_INVOICE209GRACE.pdf" juga tidak dibaca sebagai nama toko
+        $this->assertFalse($response->json('data.dealer_mismatch'));
+        $this->assertNull($response->json('data.dealer_name'));
+        $this->assertSame('valid', $response->json('data.doc_validation.cn.status'));
+        $this->assertStringNotContainsString('DEALER', (string) $response->json('data.cek_dokumen'));
+    }
+
     public function test_can_submit_public_program_form(): void
     {
         Storage::fake('public');
