@@ -7,13 +7,15 @@ use App\Models\Dealer;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use RuntimeException;
 
 /**
- * Fills No PO/SJ and No Transaksi of Data Program rows from an Excel file (columns Kode BT, Nama Program, No PO/SJ,
- * No. Trs), matching each row by Kode BT + Nama Program in every area of the current brand. A row whose No PO/SJ is
- * filled or changed, or that has a No PO/SJ but no Tgl Input yet, gets the import day as its Tgl Input. The changed
- * rows are then sent to the area's Google Spreadsheet, so the next sync from the spreadsheet keeps them.
+ * Fills No PO/SJ, No Transaksi and Tgl Input of Data Program rows from an Excel file (columns Kode BT, Nama Program,
+ * No PO/SJ, No. Trs, and optionally Tanggal Input / Tanggal PO), matching each row by Kode BT + Nama Program in every
+ * area of the current brand. The file's date becomes the row's Tgl Input; without one, a row whose No PO/SJ is filled
+ * or changed, or that has a No PO/SJ but no Tgl Input yet, gets the import day. The changed rows are then sent to the
+ * area's Google Spreadsheet, so the next sync from the spreadsheet keeps them.
  */
 class DataProgramPoImportService
 {
@@ -27,6 +29,7 @@ class DataProgramPoImportService
         'program_name' => ['nama program', 'program name', 'nama_program', 'program'],
         'no_po_sj' => ['no po/sj', 'no po sj', 'nomor po/sj', 'no_po_sj', 'po/sj'],
         'no_transaksi' => ['no trs', 'no transaksi', 'nomor transaksi', 'no_transaksi', 'no trx', 'trs'],
+        'tgl_input' => ['tanggal input', 'tgl input', 'tgl_input', 'tanggal po', 'tgl po'],
     ];
 
     /** Rows sent to the spreadsheet per request, as in the Data Program table's bulk edit. */
@@ -67,6 +70,7 @@ class DataProgramPoImportService
                     'no_po_sj' => isset($columns['no_po_sj']) ? $this->cellText($row[$columns['no_po_sj']] ?? null) : null,
                     'no_transaksi' => isset($columns['no_transaksi']) ? $this->cellText($row[$columns['no_transaksi']] ?? null) : null,
                 ], fn (?string $value) => $value !== null),
+                'tgl_input' => isset($columns['tgl_input']) ? $this->cellDate($row[$columns['tgl_input']] ?? null) : null,
             ];
         }
 
@@ -92,8 +96,11 @@ class DataProgramPoImportService
                 $replacesNumber = collect(array_keys($fileRow['values']))
                     ->contains(fn (string $field) => $dp->isDirty($field) && filled($dp->getOriginal($field)));
 
-                // Tgl Input = hari No PO/SJ masuk; nomor yang sama juga mengisi Tgl Input yang masih kosong
+                // Tgl Input = tanggal di file; tanpa tanggal: hari No PO/SJ masuk, dan nomor yang sama juga mengisi Tgl Input yang masih kosong
                 $dp->stampInputDate(whenMissing: isset($fileRow['values']['no_po_sj']));
+                if ($fileRow['tgl_input'] !== null) {
+                    $dp->tgl_input = $fileRow['tgl_input'];
+                }
 
                 if (! $dp->isDirty()) {
                     $unchanged++;
@@ -191,6 +198,28 @@ class DataProgramPoImportService
         $text = trim((string) $value);
 
         return $text === '' || $text === '-' ? null : $text;
+    }
+
+    /**
+     * A date cell as "2026-04-13": an Excel date (serial number), or text written "13/04/2026", "13-04-2026" (day first,
+     * as in the spreadsheet) or "2026-04-13". Null for an empty cell or text that is no date.
+     */
+    private function cellDate(mixed $value): ?string
+    {
+        if (is_numeric($value) && (float) $value >= 1 && (float) $value < 2958466) {
+            return ExcelDate::excelToDateTimeObject((float) $value)->format('Y-m-d');
+        }
+
+        $text = trim((string) $value);
+        if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})/', $text, $m)) {
+            [$year, $month, $day] = [(int) $m[1], (int) $m[2], (int) $m[3]];
+        } elseif (preg_match('#^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})#', $text, $m)) {
+            [$day, $month, $year] = [(int) $m[1], (int) $m[2], (int) $m[3]];
+        } else {
+            return null;
+        }
+
+        return checkdate($month, $day, $year) ? sprintf('%04d-%02d-%02d', $year, $month, $day) : null;
     }
 
     /**

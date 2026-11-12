@@ -110,12 +110,12 @@ flowchart TD
 
 - Setiap invoice yang terbit menjadi satu baris Data Program. Baris ini membawa kode program, periode, NPWP, nominal, telemarketing, dan sales dari **Master Dealer** toko tersebut.
 - Status awal: **Cek Dokumen = BELUM MATCH TEST**, **Status Potong Purchase = BELUM BISA POTONG**.
-- **Tgl Share CN** = tanggal baris masuk dari draft; **Lama Pending** dan keterangan aging (lebih/kurang dari 30 hari) dihitung dari tanggal ini. **Tgl Input** = hari **No PO/SJ** diisi (lewat Import No PO/SJ atau langsung di tabel).
+- **Tgl Share CN** = tanggal baris masuk dari draft; **Lama Pending** dan keterangan aging (lebih/kurang dari 30 hari) dihitung dari tanggal ini. **Tgl Input** = tanggal dari kolom Tanggal Input file Import No PO/SJ; tanpa tanggal itu, hari **No PO/SJ** diisi (lewat Import No PO/SJ atau langsung di tabel).
 - Kolom **No PO**, **No PO/SJ**, **No Transaksi**, dan **No SJ** bisa diisi langsung di tabel seperti spreadsheet:
   - pilih sel, klik dua kali, atau langsung ketik
   - **Enter** menyimpan
   - tarik kotak kecil di pojok sel ke bawah untuk mengisi baris berikutnya (angka bertambah otomatis; tahan **Ctrl** untuk menyalin apa adanya)
-- **Import No PO/SJ** (menu **Spreadsheet**): isi **No PO/SJ** dan **No Transaksi** sekaligus dari file Excel berkolom Kode BT, Nama Program, No PO/SJ, dan No. Trs.
+- **Import No PO/SJ** (menu **Spreadsheet**): isi **No PO/SJ**, **No Transaksi**, dan **Tgl Input** sekaligus dari file Excel berkolom Kode BT, Nama Program, No PO/SJ, No. Trs, dan **Tanggal Input** (boleh bernama Tanggal PO; tanggal Excel atau teks seperti 13/04/2026). Kolom tanggal boleh tidak ada.
   - Baris dicocokkan dari **Kode BT + Nama Program** di semua area brand ini. "BTO…" sama dengan "BT0…"; spasi dan tanda baca nama program diabaikan.
   - Sel kosong tidak menghapus nomor yang sudah ada; nomor yang berbeda diganti isi file.
   - Hasil import menampilkan jumlah baris yang diperbarui, yang sudah sama, dan daftar baris yang tidak ditemukan.
@@ -241,7 +241,7 @@ sequenceDiagram
 - **Lihat**: hasil uji kecocokan per baris (Data Program vs Form Program), **Uji Ulang**, **Riwayat**, **Kirim ke WA Telemarketing**.
 - **Edit**: ubah semua kolom baris.
 - No PO / No PO/SJ / No Transaksi / No SJ: isi langsung di tabel seperti spreadsheet.
-- **Spreadsheet → Import No PO/SJ**: isi No PO/SJ dan No Transaksi dari Excel (dicocokkan dari Kode BT + Nama Program).
+- **Spreadsheet → Import No PO/SJ**: isi No PO/SJ, No Transaksi, dan Tgl Input dari Excel (dicocokkan dari Kode BT + Nama Program).
 
 ### Riwayat
 - **Riwayat Program**: log pencocokan (Sesuai, Dokumen Kurang, Selisih, Belum Ada Form) dengan nominal dan dokumen.

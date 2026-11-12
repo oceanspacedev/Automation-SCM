@@ -39,7 +39,7 @@
           </button>
         </div>
 
-        <p class="text-gray-500">Kolom: Kode BT, Nama Program, No PO/SJ, No. Trs</p>
+        <p class="text-gray-500">Kolom: Kode BT, Nama Program, No PO/SJ, No. Trs, Tanggal Input</p>
 
         <p v-if="errorMessage" class="text-rose-600">{{ errorMessage }}</p>
       </div>

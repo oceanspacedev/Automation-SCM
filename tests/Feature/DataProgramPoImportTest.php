@@ -95,6 +95,28 @@ class DataProgramPoImportTest extends TestCase
         $this->assertSame(['2610000999', '2026-11-11'], [$otherNumber->fresh()->no_po_sj, $otherNumber->fresh()->tgl_input]);
     }
 
+    public function test_the_tanggal_input_column_of_the_file_becomes_tgl_input(): void
+    {
+        $this->travelTo('2026-11-12 10:00:00');
+        $excelDate = $this->dataProgram('jateng', 'BT03914', 'PROGRAM PEAKSEASON SEPTEMBER 2026');
+        $textDate = $this->dataProgram('jateng', 'BT03927', 'PROGRAM PEAKSEASON SEPTEMBER 2026', ['no_po_sj' => '2604000290', 'tgl_input' => '2026-11-01']);
+        $noDate = $this->dataProgram('jateng', 'BT03857', 'PROGRAM PEAKSEASON SEPTEMBER 2026');
+
+        $this->postJson('/api/data-program/import-po', ['file' => $this->excel([
+            ['Kode BT', 'NAMA PROGRAM', 'NO PO/SJ', 'No. Trs', 'Tanggal PO'],
+            // Tanggal Excel (13/04/2026) untuk nomor baru
+            ['BT03914', 'PROGRAM PEAKSEASON SEPTEMBER 2026', 2604000094, null, 46125],
+            // Tanggal teks hari dulu untuk nomor yang sama: Tgl Input lama diganti tanggal di file
+            ['BT03927', 'PROGRAM PEAKSEASON SEPTEMBER 2026', 2604000290, 2604260789, '22/04/2026'],
+            // Tanpa tanggal: tetap hari import
+            ['BT03857', 'PROGRAM PEAKSEASON SEPTEMBER 2026', 2606000089, null, null],
+        ])], ['X-Area' => 'jateng'])->assertOk()->assertJsonPath('data.updated', 3);
+
+        $this->assertSame(['2604000094', '2026-04-13'], [$excelDate->fresh()->no_po_sj, $excelDate->fresh()->tgl_input]);
+        $this->assertSame(['2604260789', '2026-04-22'], [$textDate->fresh()->no_transaksi, $textDate->fresh()->tgl_input]);
+        $this->assertSame('2026-11-12', $noDate->fresh()->tgl_input);
+    }
+
     public function test_import_into_an_area_without_a_spreadsheet_only_saves_the_numbers_in_the_app(): void
     {
         Http::preventStrayRequests();
