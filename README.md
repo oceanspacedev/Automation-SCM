@@ -116,6 +116,7 @@ flowchart TD
   - **Enter** menyimpan
   - tarik kotak kecil di pojok sel ke bawah untuk mengisi baris berikutnya (angka bertambah otomatis; tahan **Ctrl** untuk menyalin apa adanya)
 - **Import No PO/SJ** (menu **Spreadsheet**): isi **No PO/SJ**, **No Transaksi**, dan **Tgl Input** sekaligus dari file Excel berkolom Kode BT, Nama Program, No PO/SJ, No. Trs, dan **Tanggal Input** (boleh bernama Tanggal PO; tanggal Excel atau teks seperti 13/04/2026). Kolom tanggal boleh tidak ada.
+  - **Download template** di jendela import: file Excel dengan kolom di atas (plus Nama Dealer sebagai keterangan), sudah berisi baris Data Program area itu yang belum punya No PO/SJ dengan Kode BT dan Nama Program persis seperti di Data Program. Tinggal isi No PO/SJ, No. Trs, dan Tanggal Input, lalu import.
   - Baris dicocokkan dari **Kode BT + Nama Program** di semua area brand ini. "BTO…" sama dengan "BT0…"; spasi dan tanda baca nama program diabaikan.
   - Sel kosong tidak menghapus nomor yang sudah ada; nomor yang berbeda diganti isi file.
   - Hasil import menampilkan jumlah baris yang diperbarui, yang sudah sama, dan daftar baris yang tidak ditemukan.

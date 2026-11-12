@@ -218,6 +218,7 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         Route::post('/data-program/url', [DataProgramController::class, 'saveUrl']);
         Route::get('/data-program/export', [DataProgramController::class, 'export']);
         Route::post('/data-program/import-po', [DataProgramController::class, 'importPo']);
+        Route::get('/data-program/import-po/template', [DataProgramController::class, 'importPoTemplate']);
         Route::post('/data-program/reconcile', [DataProgramController::class, 'reconcile']);
         Route::post('/data-program/{id}/reconcile', [DataProgramController::class, 'reconcileRow']);
         Route::post('/data-program/{id}/send-wa-telemarketing', [DataProgramController::class, 'sendWaToTelemarketing']);

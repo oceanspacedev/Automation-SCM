@@ -7,10 +7,12 @@ use App\Models\ProgramApprovalLog;
 use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
 use App\Models\TeamContact;
+use App\Services\AreaContext;
 use App\Services\DataProgramPoImportService;
 use App\Services\DataProgramSyncService;
 use App\Services\ProgramApprovalFlow;
 use App\Services\ProgramReconciliationService;
+use App\Services\SpreadsheetExport;
 use App\Services\WhatsAppService;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -678,6 +680,30 @@ class DataProgramController extends Controller
             'data' => $dataPrograms->values(),
             'sheet_push' => $sheetPushResults,
         ]);
+    }
+
+    /**
+     * Excel template for Import No PO/SJ with the columns the import reads, listing the area's Data Program rows that
+     * have no No PO/SJ yet (Kode BT, dealer and program exactly as in Data Program), so only the numbers and dates are
+     * left to fill.
+     */
+    public function importPoTemplate(SpreadsheetExport $export, AreaContext $areaContext): StreamedResponse
+    {
+        $area = $areaContext->resolve();
+
+        $rows = DataProgram::query()
+            ->where(fn ($query) => $query->whereNull('no_po_sj')->orWhere('no_po_sj', '')->orWhere('no_po_sj', '-'))
+            ->orderBy('dealer_name')
+            ->orderBy('program_name')
+            ->lazy()
+            ->map(fn (DataProgram $dp) => [$dp->kode_bt, $dp->dealer_name, $dp->program_name]);
+
+        return $export->download(
+            'template_import_no_po_sj_'.$area->value.'.xlsx',
+            'Import No PO SJ',
+            ['Kode BT', 'Nama Dealer', 'Nama Program', 'No PO/SJ', 'No. Trs', 'Tanggal Input'],
+            $rows
+        );
     }
 
     /**

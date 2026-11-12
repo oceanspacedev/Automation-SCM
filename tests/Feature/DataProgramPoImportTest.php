@@ -11,6 +11,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
@@ -115,6 +116,35 @@ class DataProgramPoImportTest extends TestCase
         $this->assertSame(['2604000094', '2026-04-13'], [$excelDate->fresh()->no_po_sj, $excelDate->fresh()->tgl_input]);
         $this->assertSame(['2604260789', '2026-04-22'], [$textDate->fresh()->no_transaksi, $textDate->fresh()->tgl_input]);
         $this->assertSame('2026-11-12', $noDate->fresh()->tgl_input);
+    }
+
+    public function test_the_downloaded_template_lists_rows_without_no_po_sj_and_imports_back_as_filled(): void
+    {
+        $this->travelTo('2026-11-12 10:00:00');
+        $waiting = $this->dataProgram('jateng', 'BT05165', 'PROGRAM PEAKSEASON SEPTEMBER 2026');
+        $this->dataProgram('jateng', 'BT05166', 'PROGRAM PEAKSEASON SEPTEMBER 2026', ['no_po_sj' => '2610000001']);
+        $this->dataProgram('jabar', 'BT04232', 'PROGRAM PEAK SEASON MARET 2026');
+
+        $response = $this->get('/api/data-program/import-po/template?area=jateng&brand=realme')->assertOk()->assertDownload('template_import_no_po_sj_jateng.xlsx');
+        $path = tempnam(sys_get_temp_dir(), 'po_template').'.xlsx';
+        file_put_contents($path, $response->streamedContent());
+        $sheet = IOFactory::load($path)->getActiveSheet();
+
+        // Kolom sama dengan yang dibaca import; hanya baris area ini yang belum punya No PO/SJ
+        $this->assertSame([
+            ['Kode BT', 'Nama Dealer', 'Nama Program', 'No PO/SJ', 'No. Trs', 'Tanggal Input'],
+            ['BT05165', 'TOKO BT05165', 'PROGRAM PEAKSEASON SEPTEMBER 2026', null, null, null],
+        ], $sheet->toArray(null, false, false, false));
+
+        // Template yang diisi langsung bisa diimport
+        $sheet->setCellValue('D2', '2610000373')->setCellValue('F2', '13/04/2026');
+        (new Xlsx($sheet->getParent()))->save($path);
+        $this->postJson('/api/data-program/import-po', ['file' => new UploadedFile($path, 'template_import_no_po_sj_jateng.xlsx', null, null, true)], ['X-Area' => 'jateng'])
+            ->assertOk()
+            ->assertJsonPath('data.updated', 1)
+            ->assertJsonPath('data.not_found', []);
+
+        $this->assertSame(['2610000373', '2026-04-13'], [$waiting->fresh()->no_po_sj, $waiting->fresh()->tgl_input]);
     }
 
     public function test_import_into_an_area_without_a_spreadsheet_only_saves_the_numbers_in_the_app(): void

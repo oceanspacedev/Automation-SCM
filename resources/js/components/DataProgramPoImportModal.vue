@@ -39,7 +39,13 @@
           </button>
         </div>
 
-        <p class="text-gray-500">Kolom: Kode BT, Nama Program, No PO/SJ, No. Trs, Tanggal Input</p>
+        <div class="flex items-start justify-between gap-3">
+          <p class="text-gray-500">Kolom: Kode BT, Nama Program, No PO/SJ, No. Trs, Tanggal Input</p>
+          <a :href="templateUrl" download class="shrink-0 inline-flex items-center gap-1 text-gray-700 hover:text-gray-950 underline">
+            <DownloadIcon class="w-3.5 h-3.5" />
+            Download template
+          </a>
+        </div>
 
         <p v-if="errorMessage" class="text-rose-600">{{ errorMessage }}</p>
       </div>
@@ -133,7 +139,10 @@ import { ref, computed } from 'vue';
 import axios from 'axios';
 import { notify } from '@/composables/useNotify';
 import { useAuth } from '@/composables/useAuth';
+import { useArea } from '@/composables/useArea';
+import { useBrands } from '@/composables/useBrands';
 import {
+  Download as DownloadIcon,
   X as XIcon,
   UploadCloud as UploadCloudIcon,
   FileSpreadsheet as FileSpreadsheetIcon,
@@ -149,6 +158,11 @@ defineProps({
 const emit = defineEmits(['close', 'imported']);
 
 const { canEdit } = useAuth();
+const { area } = useArea();
+const { brand } = useBrands();
+
+// Template berisi baris Data Program area & brand ini yang belum punya No PO/SJ
+const templateUrl = computed(() => `/api/data-program/import-po/template?area=${area.value.value}&brand=${brand.value.slug}`);
 
 const fileInput = ref(null);
 const selectedFile = ref(null);
