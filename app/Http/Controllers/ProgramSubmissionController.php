@@ -1157,6 +1157,36 @@ class ProgramSubmissionController extends Controller
     }
 
     /**
+     * For a Credit Note that has no program name (e.g. an invoice for "MARKETING SERVICE FEE"): the program of the store's
+     * Data Program row with the same amounts, when that is not the program chosen on the form. Null when the Credit Note
+     * names its program, when a row with these amounts is the chosen program, or when no row has these amounts.
+     *
+     * @param  array{program_name: string, id_real: string, dealer_name: string}  $formData
+     * @param  array{cn_program_name?: ?string, financial?: array<string, mixed>}  $inspection
+     */
+    private function dataProgramOfAmounts(Request $request, array $formData, array $inspection): ?string
+    {
+        if (filled($inspection['cn_program_name'] ?? null) || trim($formData['program_name']) === '') {
+            return null;
+        }
+
+        $rows = app(ProgramReconciliationService::class)->dataProgramsWithAmounts(
+            $this->areaContext->resolve(),
+            app(BrandContext::class)->resolve(),
+            [$formData['id_real'], $request->input('kode_bt')],
+            $formData['dealer_name'],
+            $inspection['financial'] ?? [],
+        );
+
+        $programs = $rows->pluck('program_name')->filter()->unique()->values();
+        if ($programs->isEmpty() || $programs->contains(fn (string $program) => $this->aiService->isProgramNameMatching($formData['program_name'], $program))) {
+            return null;
+        }
+
+        return $programs->first();
+    }
+
+    /**
      * Pre-validate uploaded files with AI before final form submission.
      */
     public function preValidateForm(Request $request): JsonResponse
@@ -1180,6 +1210,8 @@ class ProgramSubmissionController extends Controller
 
         try {
             $inspection = $this->aiService->inspectDocumentFiles($formData, $files);
+            $inspection['dp_program_name'] = $this->dataProgramOfAmounts($request, $formData, $inspection);
+            $inspection['dp_program_mismatch'] = $inspection['dp_program_name'] !== null;
 
             return response()->json([
                 'success' => true,
@@ -1335,6 +1367,20 @@ class ProgramSubmissionController extends Controller
                 'success' => false,
                 'message' => "Nama program yang diajukan ('{$formData['program_name']}') tidak sesuai dengan nama program pada dokumen Credit Note ('{$extractedCnProgram}'). Harap sesuaikan dokumen Credit Note atau program yang dipilih.",
                 'error_type' => 'CN_PROGRAM_MISMATCH',
+                'doc_validation' => $inspection['doc_validation'] ?? [],
+                'cek_dokumen' => $inspection['cek_dokumen'] ?? '',
+            ], 422);
+        }
+
+        // Credit Note tanpa nama program: program diambil dari Data Program yang nominalnya sama
+        if ($dataProgramName = $this->dataProgramOfAmounts($request, $formData, $inspection)) {
+            $netPay = 'Rp '.number_format((float) ($inspection['financial']['net_pay'] ?? 0), 0, ',', '.');
+
+            return response()->json([
+                'success' => false,
+                'message' => "Nominal di Credit Note (Net Pay {$netPay}) tercatat di Data Program untuk program '{$dataProgramName}', bukan '{$formData['program_name']}'. Pilih program yang sesuai, lalu kirim lagi.",
+                'error_type' => 'DP_PROGRAM_MISMATCH',
+                'dp_program_name' => $dataProgramName,
                 'doc_validation' => $inspection['doc_validation'] ?? [],
                 'cek_dokumen' => $inspection['cek_dokumen'] ?? '',
             ], 422);

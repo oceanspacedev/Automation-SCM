@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Console\Commands\AutoAnalyzeProgramAiCommand;
+use App\Models\DataProgram;
 use App\Models\Dealer;
 use App\Models\ProgramSubmission;
 use App\Models\User;
@@ -1452,6 +1453,130 @@ class ProgramSubmissionTest extends TestCase
         }
         $this->assertSame('CV. Grace Mandiri Utama', $service->dealerNameOrNull(' CV. Grace Mandiri Utama '));
         $this->assertSame('NEWCO CELL', $service->dealerNameOrNull('NEWCO CELL'));
+    }
+
+    /**
+     * The AI reading an invoice without a program name ("MARKETING SERVICE FEE") from CV. GRACE MANDIRI UTAMA.
+     */
+    private function fakeInvoiceWithoutProgram(?string $cnProgramName = null): void
+    {
+        Http::fake([
+            '*/chat/completions' => Http::response(['choices' => [['message' => ['content' => json_encode([
+                'dealer_name' => 'CV. GRACE MANDIRI UTAMA',
+                'dealer_mismatch' => false,
+                'cn_program_name' => $cnProgramName,
+                'cn_program_mismatch' => false,
+                'is_complete' => true,
+                'cek_dokumen' => 'LENGKAP',
+                'status_potong_purchase' => 'BISA DI POTONG',
+                'keterangan' => 'Dokumen lengkap.',
+                'dpp' => 2926842,
+                'dpp_lain' => 2682939,
+                'ppn' => 321953,
+                'nilai_pph' => 58537,
+                'net_pay' => 3190258,
+                'doc_validation' => ['cn' => ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'OK']],
+            ])]]]], 200),
+        ]);
+    }
+
+    /**
+     * The Data Program row of CV. GRACE MANDIRI UTAMA whose amounts are the invoice's.
+     */
+    private function graceDataProgram(string $programName, float $netPay = 3190258): DataProgram
+    {
+        return DataProgram::create([
+            'row_hash' => 'hash_grace_'.Str::random(6),
+            'dealer_name' => 'CV. GRACE MANDIRI UTAMA',
+            'kode_bt' => 'BT05875',
+            'id_gs' => 'DLDC6074',
+            'program_name' => $programName,
+            'region' => 'BIG BANDUNG',
+            'dpp' => 2926842,
+            'dpp_lain' => 2682939,
+            'ppn' => 321953,
+            'nilai_pph' => 58537,
+            'net_pay' => $netPay,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function graceForm(string $programName): array
+    {
+        return [
+            'program_name' => $programName,
+            'region' => 'BIG BANDUNG',
+            'id_real' => 'DLDC6074',
+            'dealer_name' => 'CV. GRACE MANDIRI UTAMA',
+            'sales_name' => 'SANDY ARJAYAN',
+            'credit_note_file' => UploadedFile::fake()->create('CN_1794383404_INVOICE209GRACE.pdf', 50, 'application/pdf'),
+        ];
+    }
+
+    public function test_a_cn_without_a_program_name_must_be_sent_for_the_program_of_its_amounts_in_data_program(): void
+    {
+        Storage::fake('public');
+        $this->fakeInvoiceWithoutProgram();
+        $this->graceDataProgram('PROGRAM BUNDLING R16 PRO 5G HARRY POTTER & T500 SEPT 2026');
+
+        $this->post('/api/program-submissions/pre-validate', $this->graceForm('PROGRAM SEPTEMBER 2026'), ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('data.dp_program_mismatch', true)
+            ->assertJsonPath('data.dp_program_name', 'PROGRAM BUNDLING R16 PRO 5G HARRY POTTER & T500 SEPT 2026');
+
+        $this->post('/api/program-submissions/submit-form', [
+            ...$this->graceForm('PROGRAM SEPTEMBER 2026'),
+            'email' => 'gracemandiriutama@example.com',
+            'agreement_file' => UploadedFile::fake()->create('AGR_GRACE.pdf', 50, 'application/pdf'),
+        ], ['Accept' => 'application/json'])
+            ->assertStatus(422)
+            ->assertJsonPath('error_type', 'DP_PROGRAM_MISMATCH')
+            ->assertJsonPath('dp_program_name', 'PROGRAM BUNDLING R16 PRO 5G HARRY POTTER & T500 SEPT 2026');
+
+        $this->assertSame(0, ProgramSubmission::count());
+    }
+
+    public function test_a_cn_without_a_program_name_passes_for_the_program_of_its_amounts_or_amounts_not_in_data_program(): void
+    {
+        Storage::fake('public');
+        $this->fakeInvoiceWithoutProgram();
+        $this->graceDataProgram('PROGRAM BUNDLING R16 PRO 5G HARRY POTTER & T500 SEPT 2026');
+        $this->graceDataProgram('PROGRAM SEPTEMBER 2026', 1178378);
+
+        // Program yang dipilih memang program untuk nominal ini
+        $this->post('/api/program-submissions/pre-validate', $this->graceForm('PROGRAM BUNDLING R16 PRO 5G HARRY POTTER & T500 SEPT 2026'), ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('data.dp_program_mismatch', false);
+
+        // Nominal ini belum ada di Data Program toko lain: tidak ada yang bisa dibandingkan
+        DataProgram::query()->update(['kode_bt' => 'BT99999', 'id_gs' => 'DLZZ0001']);
+        $this->post('/api/program-submissions/pre-validate', $this->graceForm('PROGRAM SEPTEMBER 2026'), ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('data.dp_program_mismatch', false);
+    }
+
+    public function test_a_cn_that_names_its_program_keeps_the_existing_check(): void
+    {
+        Storage::fake('public');
+        $this->fakeInvoiceWithoutProgram('PROGRAM SEPTEMBER 2026');
+        $this->graceDataProgram('PROGRAM BUNDLING R16 PRO 5G HARRY POTTER & T500 SEPT 2026');
+
+        $this->post('/api/program-submissions/pre-validate', $this->graceForm('PROGRAM SEPTEMBER 2026'), ['Accept' => 'application/json'])
+            ->assertOk()
+            ->assertJsonPath('data.cn_program_name', 'PROGRAM SEPTEMBER 2026')
+            ->assertJsonPath('data.cn_program_mismatch', false)
+            ->assertJsonPath('data.dp_program_mismatch', false);
+    }
+
+    public function test_marketing_service_fee_is_not_a_program_name(): void
+    {
+        $service = app(DocumentAnalysisService::class);
+
+        $this->assertNull($service->programNameOrNull('MARKETING SERVICE FEE'));
+        $this->assertNull($service->programNameOrNull(' - '));
+        $this->assertSame('PROGRAM SEPTEMBER 2026', $service->programNameOrNull('PROGRAM SEPTEMBER 2026'));
     }
 
     public function test_pre_validate_does_not_flag_the_dealer_when_the_ai_reads_the_bill_to_company(): void

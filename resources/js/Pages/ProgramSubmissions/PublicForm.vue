@@ -729,10 +729,10 @@
               <div class="min-w-0 flex-1">
                 <p class="text-sm text-gray-900">{{ row.label }}</p>
 
-                <dl v-if="!row.ok && row.isComparison" class="mt-1.5 grid grid-cols-[64px_1fr] gap-x-3 gap-y-1 text-xs">
-                  <dt class="text-gray-500">Formulir</dt>
+                <dl v-if="!row.ok && row.isComparison" class="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                  <dt class="text-gray-500 whitespace-nowrap">Formulir</dt>
                   <dd class="text-gray-700 break-words">{{ row.formValue || '—' }}</dd>
-                  <dt class="text-gray-500">Dokumen</dt>
+                  <dt class="text-gray-500 whitespace-nowrap">{{ row.sourceLabel || 'Dokumen' }}</dt>
                   <dd class="text-gray-900 font-medium break-words">{{ row.docValue || '—' }}</dd>
                 </dl>
                 <p v-else-if="!row.ok && row.message" class="mt-1 text-xs text-gray-600">{{ row.message }}</p>
@@ -744,7 +744,7 @@
                 @click="row.apply"
                 class="shrink-0 text-xs text-gray-700 hover:text-gray-950 underline cursor-pointer"
               >
-                Pakai dari dokumen
+                {{ row.applyLabel || 'Pakai dari dokumen' }}
               </button>
             </li>
           </ul>
@@ -1023,6 +1023,9 @@ const aiAnalysis = reactive({
   dealerMismatch: false,
   extractedCnProgramName: '',
   cnProgramMismatch: false,
+  // CN tanpa nama program: program di Data Program yang nominalnya sama, bila berbeda dengan pilihan formulir
+  dpProgramName: '',
+  dpProgramMismatch: false,
   errorMsg: '',
 });
 
@@ -1039,6 +1042,13 @@ function applyProgramFromCn() {
   if (aiAnalysis.extractedCnProgramName) {
     handleProgramChange(aiAnalysis.extractedCnProgramName);
     aiAnalysis.cnProgramMismatch = false;
+  }
+}
+
+function applyProgramFromDataProgram() {
+  if (aiAnalysis.dpProgramName) {
+    handleProgramChange(aiAnalysis.dpProgramName);
+    aiAnalysis.dpProgramMismatch = false;
   }
 }
 
@@ -1075,6 +1085,21 @@ const analysisRows = computed(() => {
   }
   compare('cn_program', 'cn', 'Program di Credit Note', form.program_name, aiAnalysis.extractedCnProgramName, aiAnalysis.cnProgramMismatch,
     defaultProgramsList.value.includes(aiAnalysis.extractedCnProgramName) ? applyProgramFromCn : null);
+
+  if (aiAnalysis.dpProgramMismatch) {
+    rows.push({
+      key: 'dp_program',
+      doc: 'cn',
+      label: 'Program sesuai nominal di Data Program',
+      formValue: form.program_name,
+      docValue: aiAnalysis.dpProgramName,
+      sourceLabel: 'Data Program',
+      ok: false,
+      isComparison: true,
+      apply: defaultProgramsList.value.includes(aiAnalysis.dpProgramName) ? applyProgramFromDataProgram : null,
+      applyLabel: 'Pakai dari Data Program',
+    });
+  }
 
   for (const { docKey, slot, label } of DOCUMENT_SLOTS) {
     if (!filePreviews[slot] || !aiAnalysis.docValidation?.[docKey]) continue;
@@ -1125,6 +1150,8 @@ function clearDocumentAnalysis(docKey) {
     aiAnalysis.extractedCnProgramName = '';
     aiAnalysis.dealerMismatch = false;
     aiAnalysis.cnProgramMismatch = false;
+    aiAnalysis.dpProgramName = '';
+    aiAnalysis.dpProgramMismatch = false;
   }
 }
 
@@ -1573,6 +1600,8 @@ async function handleSubmit() {
       aiAnalysis.dealerMismatch = !!preValResult.dealer_mismatch;
       aiAnalysis.extractedCnProgramName = preValResult.cn_program_name || '';
       aiAnalysis.cnProgramMismatch = !!preValResult.cn_program_mismatch;
+      aiAnalysis.dpProgramName = preValResult.dp_program_name || '';
+      aiAnalysis.dpProgramMismatch = !!preValResult.dp_program_mismatch;
 
       // Auto-adopt dealer name if user entered '-'
       if (preValResult.dealer_name && (!form.dealer_name.trim() || form.dealer_name.trim() === '-')) {

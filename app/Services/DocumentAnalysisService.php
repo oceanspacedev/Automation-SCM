@@ -912,6 +912,29 @@ PROMPT;
     }
 
     /**
+     * Words of a Credit Note line that only describes the kind of payment, not a program.
+     *
+     * @var list<string>
+     */
+    private const GENERIC_CN_DESCRIPTION_WORDS = ['MARKETING', 'SERVICE', 'SERVICES', 'FEE', 'JASA', 'BIAYA', 'PROMOSI', 'PROMOTION', 'INSENTIF', 'INCENTIVE', 'SUPPORT', 'KOMISI', 'COMMISSION'];
+
+    /**
+     * A program name read from a Credit Note, or null when it has none: empty, "-", or only a generic description such as
+     * "MARKETING SERVICE FEE" (an invoice template without the program name).
+     */
+    public function programNameOrNull(?string $name): ?string
+    {
+        $name = trim((string) $name);
+        $words = array_filter(explode(' ', strtoupper(preg_replace('/[^A-Za-z0-9]+/', ' ', $name))));
+
+        if ($words === [] || array_diff($words, self::GENERIC_CN_DESCRIPTION_WORDS) === []) {
+            return null;
+        }
+
+        return $name;
+    }
+
+    /**
      * Extract program name from Agreement or CN document text/filename.
      */
     public function extractProgramNameFromDoc(array $docInfo): ?string
@@ -1264,7 +1287,7 @@ PROMPT;
 
         $extractedDealerName = $this->extractDealerNameFromCn($infos['cn']);
         $dealerMismatch = false;
-        $extractedCnProgram = $this->extractProgramNameFromDoc($infos['cn']);
+        $extractedCnProgram = $this->programNameOrNull($this->extractProgramNameFromDoc($infos['cn']));
         $cnProgramMismatch = false;
 
         $inputDealer = trim((string) ($formData['dealer_name'] ?? ''));
@@ -1658,12 +1681,8 @@ PROMPT;
         $extractedDealerName = $this->dealerNameOrNull($parsed['dealer_name'] ?? null)
             ?? $this->extractDealerNameFromCn($this->extractFileContentInfo($filesOrUrls['cn'] ?? null));
 
-        $extractedCnProgram = null;
-        if (! empty($parsed['cn_program_name']) && trim((string) $parsed['cn_program_name']) !== '-' && trim((string) $parsed['cn_program_name']) !== '') {
-            $extractedCnProgram = trim((string) $parsed['cn_program_name']);
-        } else {
-            $extractedCnProgram = $this->extractProgramNameFromDoc($this->extractFileContentInfo($filesOrUrls['cn'] ?? null));
-        }
+        $extractedCnProgram = $this->programNameOrNull($parsed['cn_program_name'] ?? null)
+            ?? $this->programNameOrNull($this->extractProgramNameFromDoc($this->extractFileContentInfo($filesOrUrls['cn'] ?? null)));
 
         $dealerMismatch = false;
         $cnProgramMismatch = false;
@@ -2084,6 +2103,8 @@ Ketentuan Penentuan Output:
      * "cek_dokumen": "DOKUMEN TIDAK SESUAI (CN)"
      * "status_potong_purchase": "BELUM BISA POTONG"
      * "keterangan": "Catatan: Nama program di form ('[Nama Program di Form]') berbeda dengan lembar CN ('[Nama Program di Lembar CN]'). Harap upload ulang dokumen yang sesuai."
+   - Jika lembar CN / Invoice TIDAK mencantumkan nama program (hanya deskripsi umum seperti "MARKETING SERVICE FEE"):
+     * "cn_program_name": null dan "cn_program_mismatch": false. JANGAN tandai slot CN invalid karena nama program; sistem mencocokkan programnya lewat nominal di Data Program.
    - Validasi Nama Dealer:
      * Selalu ekstrak nama dealer yang tertera pada lembar Credit Note ke field "dealer_name". Contoh: "NEWCO CELL", "CV GRACE MANDIRI UTAMA", dsb.
      * Dealer adalah pihak yang MENERBITKAN Credit Note / Invoice: nama di kop/judul paling atas, nama pemilik rekening ("A/n ..."), atau nama di tanda tangan / stempel.

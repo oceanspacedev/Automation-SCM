@@ -168,6 +168,55 @@ class ProgramReconciliationService
     }
 
     /**
+     * Data Program rows of a store whose amounts are those of a Credit Note: the Net Pay matches, and so does every other
+     * amount (DPP, DPP Lain, PPN, Nilai PPh) that both the Credit Note and the row have. Incentive is left out: a Credit
+     * Note seldom prints it, so it is often worked out from the DPP. The store is found by its codes (ID REALME / kode BT
+     * against the row's kode BT or ID GS), or by dealer name when neither side has a code.
+     *
+     * @param  list<?string>  $storeCodes
+     * @param  array{incentive?: ?float, dpp?: ?float, dpp_lain?: ?float, ppn?: ?float, nilai_pph?: ?float, net_pay?: ?float}  $amounts
+     * @return Collection<int, DataProgram>
+     */
+    public function dataProgramsWithAmounts(Area $area, string $brand, array $storeCodes, ?string $dealerName, array $amounts): Collection
+    {
+        $netPay = (float) ($amounts['net_pay'] ?? 0);
+        if ($netPay <= 0) {
+            return collect();
+        }
+
+        $dealerNorm = $this->normalizeDealerName($dealerName);
+
+        return DataProgram::query()
+            ->where('area', $area->value)
+            ->where('brand', $brand)
+            ->whereBetween('net_pay', [$netPay - self::FINANCIAL_TOLERANCE, $netPay + self::FINANCIAL_TOLERANCE])
+            ->get()
+            ->filter(function (DataProgram $dataProgram) use ($storeCodes, $dealerNorm, $amounts) {
+                $codeMatches = array_map(fn (?string $code) => $this->isBtMatch($code, $dataProgram->kode_bt, $dataProgram->id_gs), $storeCodes);
+                if (in_array(false, $codeMatches, true) && ! in_array(true, $codeMatches, true)) {
+                    return false;
+                }
+                if (! in_array(true, $codeMatches, true)) {
+                    $rowDealer = $this->normalizeDealerName($dataProgram->dealer_name);
+                    if ($dealerNorm === '' || $rowDealer === '' || (! str_contains($rowDealer, $dealerNorm) && ! str_contains($dealerNorm, $rowDealer))) {
+                        return false;
+                    }
+                }
+
+                foreach (['dpp', 'dpp_lain', 'ppn', 'nilai_pph'] as $field) {
+                    $documentAmount = (float) ($amounts[$field] ?? 0);
+                    $rowAmount = (float) ($dataProgram->{$field} ?? 0);
+                    if ($documentAmount > 0 && $rowAmount > 0 && abs($documentAmount - $rowAmount) > self::FINANCIAL_TOLERANCE) {
+                        return false;
+                    }
+                }
+
+                return true;
+            })
+            ->values();
+    }
+
+    /**
      * The Data Program row of a Form Program submission (same area, store and program) by the matching rules;
      * without one, the first row of the area whose kode BT equals the submission's ID REALME.
      */

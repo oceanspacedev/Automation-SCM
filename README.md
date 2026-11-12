@@ -141,6 +141,7 @@ Formulir publik tanpa login:
    - **Faktur Pajak**: **wajib untuk toko PKP**, tidak wajib untuk Non-PKP. Status PKP diambil dari **Jenis NPWP di Master Dealer** dan ditampilkan di formulir.
 4. Saat **Kirim**, dokumen dianalisis AI. AI membaca nama dealer, program, DPP, PPN, PPh, dan Net Pay di CN, lalu memeriksa kelengkapan dan dokumen yang tertukar.
    - Kalau ada masalah (dokumen kurang, nama dealer/program berbeda, file tertukar), hasilnya ditampilkan di kartu **Hasil Pemeriksaan Dokumen** dan formulir belum terkirim.
+   - **CN tanpa nama program** (mis. invoice "MARKETING SERVICE FEE"): nominalnya (Net Pay, plus DPP, DPP Lain, PPN, Nilai PPh yang tertera) dicocokkan dengan **Data Program** toko itu. Kalau baris dengan nominal itu programnya beda dengan Nama Program yang dipilih, formulir tidak bisa dikirim dan program dari Data Program ditampilkan (bisa langsung dipakai). Nama dealer dibaca dari penerbit invoice (kop atas, nama rekening), bukan dari CV TOP SELULAR yang ditagih.
    - Kalau AI tidak tersedia, sistem memakai **model cadangan** lalu **pembacaan cadangan tanpa AI**.
 5. Dokumen disimpan di object storage S3 (`AWS_*`). Pengajuan masuk ke menu **Form Program** di area yang sama.
 
