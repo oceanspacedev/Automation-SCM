@@ -111,7 +111,7 @@ flowchart TD
 - Setiap invoice yang terbit menjadi satu baris Data Program. Baris ini membawa kode program, periode, NPWP, nominal, telemarketing, dan sales dari **Master Dealer** toko tersebut.
 - Status awal: **Cek Dokumen = BELUM MATCH TEST**, **Status Potong Purchase = BELUM BISA POTONG**.
 - **Tgl Share CN** = tanggal baris masuk dari draft; **Lama Pending** dan keterangan aging (lebih/kurang dari 30 hari) dihitung dari tanggal ini. **Tgl Input** = hari **No PO/SJ** diisi (lewat Import No PO/SJ atau langsung di tabel).
-- Kolom **No PO**, **No PO/SJ**, dan **No SJ** bisa diisi langsung di tabel seperti spreadsheet:
+- Kolom **No PO**, **No PO/SJ**, **No Transaksi**, dan **No SJ** bisa diisi langsung di tabel seperti spreadsheet:
   - pilih sel, klik dua kali, atau langsung ketik
   - **Enter** menyimpan
   - tarik kotak kecil di pojok sel ke bawah untuk mengisi baris berikutnya (angka bertambah otomatis; tahan **Ctrl** untuk menyalin apa adanya)
@@ -240,7 +240,7 @@ sequenceDiagram
 ### Data Program
 - **Lihat**: hasil uji kecocokan per baris (Data Program vs Form Program), **Uji Ulang**, **Riwayat**, **Kirim ke WA Telemarketing**.
 - **Edit**: ubah semua kolom baris.
-- No PO / No PO/SJ / No SJ: isi langsung di tabel seperti spreadsheet.
+- No PO / No PO/SJ / No Transaksi / No SJ: isi langsung di tabel seperti spreadsheet.
 - **Spreadsheet → Import No PO/SJ**: isi No PO/SJ dan No Transaksi dari Excel (dicocokkan dari Kode BT + Nama Program).
 
 ### Riwayat

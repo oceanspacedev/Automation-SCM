@@ -665,7 +665,7 @@
               </td>
 
               <!-- 29. No Transaksi -->
-              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800">
+              <td data-field="no_transaksi" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-800">
                 {{ row.no_transaksi || '-' }}
               </td>
 
@@ -1359,7 +1359,7 @@ const handleDataProgramSaved = (updatedRow) => {
   }, 4000);
 };
 
-// Kolom No PO, No PO/SJ & No SJ diisi langsung di tabel seperti spreadsheet: klik dua kali untuk mengisi, tarik fill handle ke bawah
+// Kolom No PO, No PO/SJ, No Transaksi & No SJ diisi langsung di tabel seperti spreadsheet: klik dua kali untuk mengisi, tarik fill handle ke bawah
 const gridContainer = ref(null);
 
 const saveCells = async (field, changes) => {

@@ -431,6 +431,19 @@ class DataProgramTest extends TestCase
         $this->assertGreaterThan(30, (int) $second->fresh()->lama_pending);
     }
 
+    public function test_no_transaksi_can_be_filled_in_the_table_like_no_po(): void
+    {
+        Http::fake(['script.google.com/macros/s/*' => Http::response(['success' => true, 'updated_count' => 1])]);
+        $dp = DataProgram::create(['row_hash' => 'row_5', 'dealer_name' => 'CV OLIVIA']);
+
+        $this->putJson('/api/data-program/bulk', ['field' => 'no_transaksi', 'rows' => [['id' => $dp->id, 'value' => 'TRS-2611-0042']]])
+            ->assertOk()
+            ->assertJsonPath('data.0.no_transaksi', 'TRS-2611-0042');
+
+        $this->assertSame('TRS-2611-0042', $dp->fresh()->no_transaksi);
+        Http::assertSent(fn ($request) => $request['action'] === 'update_rows' && $request['rows'][0]['no_transaksi'] === 'TRS-2611-0042');
+    }
+
     public function test_filling_no_po_sj_in_the_table_sets_tgl_input_to_that_day(): void
     {
         Http::fake(['script.google.com/macros/s/*' => Http::response(['success' => true, 'updated_count' => 1])]);
