@@ -42,38 +42,7 @@
             v-if="showSpreadsheetDropdown"
             class="absolute left-0 sm:left-auto sm:right-0 top-full mt-1.5 w-48 bg-white rounded-lg shadow-lg border border-gray-200 p-1 z-50 font-sans"
           >
-            <button
-              v-if="canEdit"
-              type="button"
-              @click="handleTriggerSync"
-              :disabled="isSyncing"
-              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCwIcon :class="['w-3.5 h-3.5 text-gray-500 shrink-0', isSyncing && 'animate-spin text-emerald-600']" />
-              <span>{{ isSyncing ? 'Menyinkronkan...' : 'Sinkronkan Sekarang' }}</span>
-            </button>
-
-            <a
-              :href="googleSheetUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              @click="showSpreadsheetDropdown = false"
-              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer"
-            >
-              <ExternalLinkIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
-              <span>Buka Spreadsheet</span>
-            </a>
-
-            <button
-              v-if="canEdit"
-              type="button"
-              @click="openUrlModal"
-              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer"
-            >
-              <SettingsIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-              <span>Atur Link Spreadsheet</span>
-            </button>
-
+            <!-- Sinkronkan Sekarang, Buka Spreadsheet & Atur Link Spreadsheet disembunyikan; isi tabel dikelola dari aplikasi -->
             <button
               type="button"
               @click="handleExportCsv"
@@ -318,7 +287,6 @@
         <p v-if="isLoading && items.length === 0" class="py-8 text-center text-xs text-gray-500">Memuat data program...</p>
         <div v-else-if="items.length === 0" class="py-8 px-4 space-y-1.5 text-center text-xs text-gray-500">
           <p class="font-medium text-gray-800">Belum ada data program yang tersimpan.</p>
-          <p v-if="canEdit">Klik tombol <strong>"Sinkronkan Sekarang"</strong> di atas untuk memuat data dari spreadsheet Anda.</p>
         </div>
         <ul v-else class="divide-y divide-gray-100">
           <li v-for="row in items" :key="row.id" class="p-4 space-y-2 text-xs text-gray-700">
@@ -511,9 +479,6 @@
               <td colspan="58" class="py-8 text-center text-gray-500">
                 <div class="max-w-md mx-auto space-y-1.5 text-center">
                   <p class="font-medium text-gray-800 text-xs">Belum ada data program yang tersimpan.</p>
-                  <p v-if="canEdit" class="text-xs text-gray-500">
-                    Klik tombol <strong>"Sinkronkan Sekarang"</strong> di atas untuk memuat data dari spreadsheet Anda.
-                  </p>
                 </div>
               </td>
             </tr>

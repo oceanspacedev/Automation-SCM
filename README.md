@@ -121,7 +121,7 @@ flowchart TD
   - Hasil import menampilkan jumlah baris yang diperbarui, yang sudah sama, dan daftar baris yang tidak ditemukan.
   - Baris yang berubah langsung dikirim ke Google Spreadsheet area masing-masing, supaya tidak tertimpa kosong saat sinkron berikutnya. Area yang belum terhubung ke spreadsheet hanya menyimpan nomornya di aplikasi, dan hal itu disebut di hasil import.
 - Kolom lain diubah lewat tombol **Edit**.
-- **Integrasi Google Spreadsheet** (opsional, per area): menu **Spreadsheet** untuk sinkron dari sheet atau mengirim perubahan ke sheet lewat Google Apps Script Web App. Baca [peringatan sinkron](#deploy-ke-production) sebelum memakai sinkron otomatis.
+- **Integrasi Google Spreadsheet** (opsional, per area): perubahan dikirim ke sheet lewat Google Apps Script Web App (`DATA_PROGRAM_SPREADSHEET_URL`, `DATA_PROGRAM_WEBAPP_URL`). Menu **Spreadsheet** di Data Program hanya berisi **Export CSV** dan **Import No PO/SJ**; Sinkronkan Sekarang, Buka Spreadsheet, dan Atur Link Spreadsheet disembunyikan. Baca [peringatan sinkron](#deploy-ke-production) sebelum memakai sinkron otomatis.
 
 ### 4. Form Program (pengajuan sales)
 
@@ -569,7 +569,7 @@ vendor/bin/pint --dirty
 | WA tidak terkirim | Cek `WAG_URL` dan `WAG_TOKEN`, serta nomor tujuan (format 08… / 628…). |
 | WA invoice gagal: *URL lampiran harus dapat diakses publik* | WA Gateway tidak bisa mengambil file dari alamat lokal. Biasanya file otomatis diunggah ke link publik sementara; bila tetap gagal, host sementara itu tidak bisa dijangkau dari komputer server. Isi `WAG_PUBLIC_URL` dengan domain atau tunnel yang bisa diakses dari internet. |
 | WA ke Tim Pajak / Tim SCM gagal: *nomor belum diisi* | Tambahkan (atau aktifkan) anggota tim itu di **Master → Tim Pajak & SCM**, lalu kirim ulang lewat **Riwayat Approval → Detail**. |
-| No PO/SJ hasil import hilang lagi | Baris belum terkirim ke Google Spreadsheet, lalu tertimpa saat sinkron dari sheet. Atur link Apps Script area itu di **Data Program → Spreadsheet → Atur Link Spreadsheet**, lalu import ulang. |
+| No PO/SJ hasil import hilang lagi | Baris belum terkirim ke Google Spreadsheet, lalu tertimpa saat sinkron dari sheet. Atur link Apps Script area itu (`DATA_PROGRAM_WEBAPP_URL` untuk Jawa Barat), lalu import ulang. |
 | Jadwal Otomatis tidak pernah jalan / muncul peringatan *Scheduler belum berjalan* | Scheduler Laravel mati. Jalankan `php artisan schedule:work` (lokal) atau pasang cron `php artisan schedule:run` (server). Lihat [Perintah Artisan & Scheduler](#perintah-artisan--scheduler). |
 | Email invoice gagal | Hubungkan ulang Google Workspace dari halaman Invoice, atau cek `MAIL_*`. |
 | Data Program tidak cocok padahal datanya sama | Pastikan area, region, nama dealer, nama program, dan nominal sama; ID REALME di form harus kode BT atau ID GS toko yang sama. Lihat detail di **Data Program → Lihat**. |
