@@ -15,9 +15,6 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
         <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Data Program {{ area.label }}</h1>
-        <p class="text-xs text-gray-500 mt-0.5">
-          Sinkronisasi master data program (56 kolom) {{ area.label }} langsung dari Google Spreadsheet.
-        </p>
       </div>
 
       <!-- Menu Spreadsheet: sinkron, buka, atur link, export -->
@@ -90,27 +87,12 @@
 
     <!-- Filament Table Card -->
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      <!-- Toolbar (Search & Filter like Filament); di layar kecil cari di baris sendiri, Auto-Refresh & filter di bawahnya -->
-      <div class="p-3 sm:px-4 sm:py-3.5 border-b border-gray-100 grid grid-cols-[1fr_auto] items-center sm:flex sm:flex-row justify-between gap-3">
-        <!-- Left: Auto-Refresh & status -->
-        <div class="flex items-center gap-3 text-xs text-gray-500">
-          <label class="inline-flex items-center gap-1.5 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              v-model="autoRefresh"
-              class="rounded border-gray-300 text-gray-900 focus:ring-0 w-3.5 h-3.5 cursor-pointer"
-            />
-            <span class="text-xs text-gray-600">Auto-Refresh ({{ AUTO_REFRESH_SECONDS }}s)</span>
-          </label>
-          <span v-if="lastUpdatedText" class="text-xs text-gray-400 hidden sm:inline">
-            &bull; Update: {{ lastUpdatedText }}
-          </span>
-        </div>
-
-        <!-- Right: Search Box & Filter Popover -->
+      <!-- Toolbar (Search & Filter like Filament); daftar tetap diperbarui otomatis tanpa kontrol yang tampil -->
+      <div class="p-3 sm:px-4 sm:py-3.5 border-b border-gray-100 grid grid-cols-[1fr_auto] items-center sm:flex sm:flex-row sm:justify-end gap-3">
+        <!-- Search Box & Filter Popover -->
         <div class="contents sm:flex items-center gap-2 sm:self-auto sm:w-auto">
           <!-- Search box with Magnifying glass -->
-          <div class="relative flex-1 sm:w-72 col-span-2 order-first sm:order-none">
+          <div class="relative flex-1 sm:w-72">
             <SearchIcon class="w-4 h-4 text-gray-400 absolute left-3 top-2.5 pointer-events-none" />
             <input
               v-model="filters.search"
@@ -1210,7 +1192,7 @@ import { useArea } from '@/composables/useArea';
 import { useAuth } from '@/composables/useAuth';
 import EditDataProgramModal from '@/components/EditDataProgramModal.vue';
 import { useSpreadsheetGrid } from '@/composables/useSpreadsheetGrid';
-import { useAutoRefresh, createRequestTracker, AUTO_REFRESH_SECONDS } from '@/composables/useAutoRefresh';
+import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
 import {
   Search as SearchIcon,
   RefreshCw as RefreshCwIcon,
@@ -1304,8 +1286,6 @@ const isSyncing = ref(false);
 const isExporting = ref(false);
 const syncMessage = ref('');
 const syncError = ref(false);
-const autoRefresh = ref(true);
-const lastUpdatedText = ref('');
 
 // Modal Edit Data Program
 const editModal = reactive({
@@ -1529,11 +1509,6 @@ const resetFilters = () => {
   fetchData(1);
 };
 
-const updateLastTimestamp = () => {
-  const now = new Date();
-  lastUpdatedText.value = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-};
-
 const startDataRequest = createRequestTracker();
 
 const fetchData = async (page = 1, { silent = false } = {}) => {
@@ -1560,7 +1535,6 @@ const fetchData = async (page = 1, { silent = false } = {}) => {
       filterOptions.status_purchase = res.data.filter_options.status_purchase || [];
       filterOptions.status_ar = res.data.filter_options.status_ar || [];
     }
-    updateLastTimestamp();
   } catch (err) {
     console.error('Error fetching Data Program:', err);
   } finally {
@@ -1586,7 +1560,7 @@ const onPageInputBlur = (e) => {
 
 // Auto-Refresh: berhenti selama sel tabel dipilih/diisi, modal terbuka, atau proses (sinkron, uji ulang, kirim WA) berjalan
 useAutoRefresh(() => fetchData(pagination.current_page, { silent: true }), {
-  isPaused: () => !autoRefresh.value || isLoading.value || isSyncing.value
+  isPaused: () => isLoading.value || isSyncing.value
     || reconcilingRowId.value !== null || isSendingTelemarketing.value || sendingWaId.value !== null
     || activeCell.value !== null || cellEditor.open || fillBox.value !== null
     || editModal.isOpen || urlModal.isOpen || telemarketingModal.isOpen || showPoImportModal.value

@@ -222,7 +222,7 @@ sequenceDiagram
 
 ## Panduan Per Menu
 
-**Data baru muncul sendiri.** Halaman daftar (Draft, Invoice, Form Program, Data Program, Riwayat, Dashboard, dan daftar Master) memuat ulang datanya setiap **15 detik** selama tab terbuka, dan langsung saat tab dibuka lagi, tanpa reload halaman. Halaman, filter, pencarian, dan centang tetap. Muat ulang ditunda selama ada modal terbuka, sel tabel sedang dipilih/diisi, atau proses (kirim, generate, import, sinkron) sedang berjalan. Di Data Program dan Riwayat Program bisa dimatikan lewat centang **Auto-Refresh**.
+**Data baru muncul sendiri.** Halaman daftar (Draft, Invoice, Form Program, Data Program, Riwayat, Dashboard, dan daftar Master) memuat ulang datanya setiap **15 detik** selama tab terbuka, dan langsung saat tab dibuka lagi, tanpa reload halaman. Halaman, filter, pencarian, dan centang tetap. Muat ulang ditunda selama ada modal terbuka, sel tabel sedang dipilih/diisi, atau proses (kirim, generate, import, sinkron) sedang berjalan. Di Riwayat Program bisa dimatikan lewat centang **Auto-Refresh**; di Data Program selalu aktif (centangnya disembunyikan).
 
 ### Draft
 - Tab area, **Generate Semua / Import / Tambah Manual**, filter wilayah & program, pencarian.
