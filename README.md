@@ -236,7 +236,7 @@ sequenceDiagram
 
 ### Form Program (admin)
 - Daftar pengajuan per area. **Lihat** membuka *Detail Finansial & Pajak* (Incentive, DPP, PPN, PPh, Net Pay, dll.) dan tombol **Analisis AI Ulang**.
-- Menu **Aksi**: buka formulir publik area ini, buka spreadsheet, atur integrasi sheet, refresh data.
+- Tombol **Buka Form Input**: buka formulir publik area ini (Buka Spreadsheet, Integrasi Sheet, dan Refresh Data disembunyikan; daftar tetap diperbarui otomatis).
 
 ### Data Program
 - **Lihat**: hasil uji kecocokan per baris (Data Program vs Form Program), **Uji Ulang**, **Riwayat**, **Kirim ke WA Telemarketing**.

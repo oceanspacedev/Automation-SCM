@@ -20,63 +20,15 @@
         </p>
       </div>
 
-      <!-- Action Dropdown -->
-      <div class="relative shrink-0" ref="dropdownRef">
-        <button
-          type="button"
-          @click="isDropdownOpen = !isDropdownOpen"
-          class="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer"
-        >
-          <span>Aksi</span>
-          <ChevronDownIcon class="w-3 h-3 text-gray-400 transition-transform duration-150" :class="{ 'rotate-180': isDropdownOpen }" />
-        </button>
-
-        <!-- Dropdown Menu -->
-        <div
-          v-if="isDropdownOpen"
-          class="absolute right-0 mt-1.5 w-52 rounded-xl border border-gray-200 bg-white shadow-lg z-50 py-1 overflow-hidden"
-        >
-          <a
-            :href="publicFormUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            @click="isDropdownOpen = false"
-            class="block px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer"
-          >
-            Buka Form Input
-          </a>
-
-          <a
-            :href="googleSheetUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            @click="isDropdownOpen = false"
-            class="block px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer"
-          >
-            Buka Spreadsheet
-          </a>
-
-          <button
-            v-if="canEdit"
-            type="button"
-            @click="openConfigModal(); isDropdownOpen = false"
-            class="w-full text-left px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer"
-          >
-            Integrasi Sheet
-          </button>
-
-          <div class="h-px bg-gray-100 mx-3 my-1"></div>
-
-          <button
-            type="button"
-            @click="fetchSubmissions(); isDropdownOpen = false"
-            :disabled="isLoading"
-            class="w-full text-left px-3.5 py-2.5 text-xs text-gray-700 hover:bg-gray-50 transition cursor-pointer disabled:opacity-50"
-          >
-            {{ isLoading ? 'Memuat...' : 'Refresh Data' }}
-          </button>
-        </div>
-      </div>
+      <!-- Buka Spreadsheet, Integrasi Sheet & Refresh Data disembunyikan; tinggal tautan ke formulir publik -->
+      <a
+        :href="publicFormUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="shrink-0 h-9 px-3.5 inline-flex items-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition"
+      >
+        Buka Form Input
+      </a>
     </div>
 
     <!-- Table Card -->
@@ -601,7 +553,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import axios from 'axios';
 import { notify } from '@/composables/useNotify';
 import AreaTabs from '@/components/AreaTabs.vue';
@@ -631,16 +583,6 @@ const { canEdit } = useAuth();
 const isDefaultArea = area.value.value === DEFAULT_AREA;
 // Form publik per brand & area: /form/realme/jabar, /form/realme/jateng (link lama /form/jabar diarahkan ke Realme)
 const publicFormUrl = `/form/${brand.value.slug}/${area.value.value}`;
-
-// ===== DROPDOWN =====
-const isDropdownOpen = ref(false);
-const dropdownRef = ref(null);
-
-function handleOutsideClick(event) {
-  if (dropdownRef.value && !dropdownRef.value.contains(event.target)) {
-    isDropdownOpen.value = false;
-  }
-}
 
 // ===== FINANCIAL COLUMNS & MODAL =====
 const showFinancialColumns = ref(false);
@@ -753,11 +695,6 @@ const pagination = reactive({
 onMounted(() => {
   fetchSubmissions();
   loadSheetUrl();
-  document.addEventListener('click', handleOutsideClick);
-});
-
-onUnmounted(() => {
-  document.removeEventListener('click', handleOutsideClick);
 });
 
 // Pengajuan baru dari form publik muncul sendiri; berhenti selama modal terbuka
