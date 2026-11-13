@@ -247,9 +247,14 @@ class ProgramClaimConfirmationController extends Controller
             } elseif ($action === 'transfer') {
                 $validated = $request->validate([
                     'no_pembayaran' => ['required', 'string', 'max:255'],
+                    'bukti_transfer' => [Rule::requiredIf(! $this->reconciliationService->isValidUrl($dp->program_2)), 'nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:15360'],
                 ], [
                     'no_pembayaran.required' => 'No. referensi transfer wajib diisi sebelum menyelesaikan transfer.',
                     'no_pembayaran.max' => 'No. referensi transfer maksimal 255 karakter.',
+                    'bukti_transfer.required' => 'Bukti transfer wajib diunggah sebelum menyelesaikan transfer.',
+                    'bukti_transfer.mimes' => 'Bukti transfer harus berupa PDF atau gambar (JPG, PNG, WEBP).',
+                    'bukti_transfer.max' => 'Ukuran file bukti transfer maksimal 15 MB.',
+                    'bukti_transfer.uploaded' => 'File bukti transfer gagal diunggah. Coba lagi.',
                 ]);
 
                 $dp->update([
@@ -257,6 +262,10 @@ class ProgramClaimConfirmationController extends Controller
                     'status_potong_ar' => DataProgram::DONE_TRANSFER,
                     'tgl_potong_tf' => date('n/j/Y'),
                     'no_pembayaran' => trim($validated['no_pembayaran']),
+                    // Bukti transfer masuk ke kolom Program 2
+                    'program_2' => $request->hasFile('bukti_transfer')
+                        ? app(ProgramDocumentStorage::class)->store($request->file('bukti_transfer'), 'BUKTI_TF', (string) $dp->dealer_name, (string) ($dp->program_name ?: $dp->program))
+                        : $dp->program_2,
                 ]);
                 ProgramApprovalLog::record($dp, ProgramApprovalLog::TRANSFERRED, actor: $this->linkActor($role), note: "No. Referensi: {$dp->no_pembayaran}");
 
@@ -383,8 +392,11 @@ class ProgramClaimConfirmationController extends Controller
             ['label' => 'CN', 'url' => $link($dp->cn), 'note' => 'Belum ada'],
             ['label' => 'Agreement', 'url' => $link($dp->agrement), 'note' => 'Belum ada'],
             ['label' => 'Faktur Pajak', 'url' => $link($dp->cek_fp), 'note' => $this->reconciliationService->isPkp($dp) ? 'Belum ada' : 'Tidak wajib'],
-            // KTP / NPWP pemilik rekening hanya untuk klaim yang ditransfer
-            ...($dp->isTransfer() ? [['label' => 'KTP / NPWP', 'url' => $link($dp->cek_evidance), 'note' => 'Belum ada']] : []),
+            // KTP / NPWP pemilik rekening dan bukti transfer dari Tim SCM hanya untuk klaim yang ditransfer
+            ...($dp->isTransfer() ? [
+                ['label' => 'KTP / NPWP', 'url' => $link($dp->cek_evidance), 'note' => 'Belum ada'],
+                ['label' => 'Bukti transfer', 'url' => $link($dp->program_2), 'note' => 'Belum ada'],
+            ] : []),
         ];
     }
 

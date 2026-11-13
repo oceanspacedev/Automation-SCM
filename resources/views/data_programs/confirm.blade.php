@@ -261,7 +261,8 @@
                 }
             </script>
         @elseif($role === 'scm')
-            @php($showTransferForm = $errors->has('no_pembayaran') || old('no_pembayaran'))
+            @php($showTransferForm = $errors->hasAny(['no_pembayaran', 'bukti_transfer']) || old('no_pembayaran'))
+            @php($hasTransferProof = filter_var(trim((string) $dp->program_2), FILTER_VALIDATE_URL) !== false)
 
             <!-- Langkah 1: konfirmasi -->
             <div id="scm-actions" class="{{ $showTransferForm ? 'hidden' : '' }}">
@@ -283,6 +284,19 @@
                            {{ $showTransferForm ? 'required' : '' }}
                            class="{{ $inputClass }} {{ $errors->has('no_pembayaran') ? 'border-red-400' : 'border-gray-200' }}">
                     @error('no_pembayaran')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
+                    <label for="bukti_transfer" class="block text-xs font-medium text-gray-700 mb-2">Bukti transfer</label>
+                    <input type="file" id="bukti_transfer" name="bukti_transfer" accept=".pdf,.jpg,.jpeg,.png,.webp"
+                           @unless($hasTransferProof) data-step-required {{ $showTransferForm ? 'required' : '' }} @endunless
+                           class="block w-full text-sm text-gray-700 file:mr-3 file:h-9 file:px-3 file:rounded-[10px] file:border-0 file:bg-gray-100 file:text-sm file:font-medium file:text-gray-800 hover:file:bg-gray-200 file:cursor-pointer">
+                    @if($hasTransferProof)
+                        <p class="mt-1 text-xs text-gray-500">Sudah ada. Unggah lagi untuk mengganti.</p>
+                    @endif
+                    @error('bukti_transfer')
                         <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                     @enderror
                 </div>

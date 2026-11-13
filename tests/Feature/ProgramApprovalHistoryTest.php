@@ -201,8 +201,10 @@ class ProgramApprovalHistoryTest extends TestCase
         $this->confirm($row, 'scm', ['action' => 'setuju'])->assertForbidden();
         $this->get($link('scm'))->assertOk()->assertSee('Konfirmasi transfer klaim')->assertSee('1234567890')->assertSee('KTP / NPWP')->assertSee($row->cek_evidance, false);
 
-        // SCM mentransfer; WA ke Tim Pajak terkirim otomatis
+        // SCM mentransfer dengan bukti transfer; WA ke Tim Pajak terkirim otomatis
         $this->confirm($row, 'scm', ['action' => 'transfer', 'no_pembayaran' => 'TRF/2026/11/0001'])
+            ->assertSessionHasErrors('bukti_transfer');
+        $this->confirm($row, 'scm', ['action' => 'transfer', 'no_pembayaran' => 'TRF/2026/11/0001', 'bukti_transfer' => UploadedFile::fake()->create('bukti-transfer.pdf', 30, 'application/pdf')])
             ->assertOk()
             ->assertSee('Transfer selesai dicatat')
             ->assertSee('WhatsApp terkirim ke Tim Pajak');
@@ -212,7 +214,9 @@ class ProgramApprovalHistoryTest extends TestCase
 
         $row->refresh();
         $this->assertSame([DataProgram::DONE_TRANSFER, DataProgram::DONE_TRANSFER, 'TRF/2026/11/0001'], [$row->status_potong_purchase, $row->status_potong_ar, $row->no_pembayaran]);
-        $this->get($link('pajak'))->assertOk()->assertSee('Cek pajak klaim yang sudah ditransfer');
+        // Bukti transfer masuk ke kolom Program 2 dan tampil di halaman Tim Pajak
+        $this->assertStringContainsString('/storage/program_documents/', (string) $row->program_2);
+        $this->get($link('pajak'))->assertOk()->assertSee('Cek pajak klaim yang sudah ditransfer')->assertSee('Bukti transfer')->assertSee($row->program_2, false);
 
         // Tim Pajak cek, hasilnya tetap ke Tim SCM
         $this->confirm($row, 'pajak', ['action' => 'cek_pajak', 'cek_pajak_tarif' => '15.000'])->assertOk();
@@ -250,7 +254,7 @@ class ProgramApprovalHistoryTest extends TestCase
         $this->get($link('ar'))->assertOk()->assertSee('dialihkan ke transfer')->assertDontSee('Iya, sudah dipotong');
 
         // Sudah ditransfer: link telemarketing & SCM tidak bisa memproses ulang
-        $this->confirm($row, 'scm', ['action' => 'transfer', 'no_pembayaran' => 'TRF-1'])->assertOk();
+        $this->confirm($row, 'scm', ['action' => 'transfer', 'no_pembayaran' => 'TRF-1', 'bukti_transfer' => UploadedFile::fake()->image('bukti-transfer.jpg')])->assertOk();
         $this->confirm($row, 'telemarketing', ['action' => 'setuju'])->assertStatus(409);
         $this->confirm($row, 'telemarketing', ['action' => 'setuju_transfer'] + $account)->assertStatus(409);
         $this->confirm($row, 'scm', ['action' => 'transfer', 'no_pembayaran' => 'TRF-2'])->assertStatus(409);

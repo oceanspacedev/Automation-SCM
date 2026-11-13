@@ -774,9 +774,18 @@
                 {{ row.nama_npwp || '-' }}
               </td>
 
-              <!-- 49. Program 2 -->
+              <!-- 49. Program 2 (berisi bukti transfer dari Tim SCM untuk klaim yang ditransfer) -->
               <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[180px] truncate text-gray-700" :title="row.program_2">
-                {{ row.program_2 || '-' }}
+                <a
+                  v-if="isValidUrl(row.program_2)"
+                  :href="row.program_2"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-gray-700 underline hover:text-gray-900"
+                >
+                  Bukti TF
+                </a>
+                <template v-else>{{ row.program_2 || '-' }}</template>
               </td>
 
               <!-- 50. CN -->
