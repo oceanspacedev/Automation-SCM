@@ -100,6 +100,21 @@ class DataProgramTest extends TestCase
         $this->assertEquals('LIBRA CELL TALUN', $res2->json('items.0.dealer_name'));
     }
 
+    public function test_can_filter_data_program_by_dealer(): void
+    {
+        foreach (['CV OLIVIA' => 2, 'LIBRA CELL TALUN' => 1] as $dealer => $rows) {
+            foreach (range(1, $rows) as $index) {
+                DataProgram::create(['row_hash' => "hash_{$dealer}_{$index}", 'dealer_name' => $dealer, 'program_name' => "Program {$index}"]);
+            }
+        }
+
+        $this->getJson('/api/data-program?dealer=CV OLIVIA')
+            ->assertOk()
+            ->assertJsonPath('pagination.total', 2)
+            ->assertJsonPath('items.*.dealer_name', ['CV OLIVIA', 'CV OLIVIA'])
+            ->assertJsonPath('filter_options.dealers', ['CV OLIVIA', 'LIBRA CELL TALUN']);
+    }
+
     public function test_amount_parser_correctly_handles_indonesian_formats(): void
     {
         $service = new DataProgramSyncService;

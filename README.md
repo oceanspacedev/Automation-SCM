@@ -241,6 +241,7 @@ sequenceDiagram
 ### Data Program
 - **Lihat**: hasil uji kecocokan per baris (Data Program vs Form Program), **Uji Ulang**, **Riwayat**, **Kirim ke WA Telemarketing**.
 - **Edit**: ubah semua kolom baris.
+- **Filter**: Region, Nama Program, **Dealer** (keduanya bisa dicari), Status Purchase, dan Status AR; ikut ke Export CSV.
 - No PO / No PO/SJ / No Transaksi / No SJ: isi langsung di tabel seperti spreadsheet.
 - **Spreadsheet → Import No PO/SJ**: isi No PO/SJ, No Transaksi, dan Tgl Input dari Excel (dicocokkan dari Kode BT + Nama Program).
 

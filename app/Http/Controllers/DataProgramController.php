@@ -76,6 +76,11 @@ class DataProgramController extends Controller
             });
         }
 
+        // 3b. Dealer Filter
+        if ($dealer = trim((string) $request->input('dealer'))) {
+            $query->where('dealer_name', $dealer);
+        }
+
         // 4. Status Potong Purchase Filter
         if ($statusPurchase = trim((string) $request->input('status_purchase'))) {
             $query->where('status_potong_purchase', $statusPurchase);
@@ -138,6 +143,12 @@ class DataProgramController extends Controller
             ->orderBy('program_name')
             ->pluck('program_name');
 
+        $dealerOptions = DataProgram::whereNotNull('dealer_name')
+            ->where('dealer_name', '!=', '')
+            ->distinct()
+            ->orderBy('dealer_name')
+            ->pluck('dealer_name');
+
         $statusPurchaseOptions = DataProgram::whereNotNull('status_potong_purchase')
             ->where('status_potong_purchase', '!=', '')
             ->distinct()
@@ -174,6 +185,7 @@ class DataProgramController extends Controller
             'filter_options' => [
                 'regions' => $regionOptions,
                 'programs' => $programOptions,
+                'dealers' => $dealerOptions,
                 'status_purchase' => $statusPurchaseOptions,
                 'status_ar' => $statusArOptions,
             ],
@@ -271,6 +283,14 @@ class DataProgramController extends Controller
             $query->where(function ($q) use ($region) {
                 $q->where('region', $region)->orWhere('big_region', $region);
             });
+        }
+
+        if ($program = trim((string) $request->input('program'))) {
+            $query->where(fn ($q) => $q->where('program', $program)->orWhere('program_name', $program));
+        }
+
+        if ($dealer = trim((string) $request->input('dealer'))) {
+            $query->where('dealer_name', $dealer);
         }
 
         if ($statusPurchase = trim((string) $request->input('status_purchase'))) {

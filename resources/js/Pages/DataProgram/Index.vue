@@ -152,87 +152,25 @@
                 </select>
               </div>
 
-              <!-- Program Filter -->
-              <div class="space-y-1" ref="programDropdownRef">
-                <label class="text-[11px] font-medium text-gray-700">Nama Program</label>
-                <div>
-                  <button
-                    type="button"
-                    @click="toggleProgramDropdown"
-                    class="h-8 w-full rounded-md border border-gray-200 bg-white px-2.5 text-xs flex items-center justify-between gap-2 hover:border-gray-300 focus:outline-none focus:ring-1 focus:ring-black transition cursor-pointer"
-                    :class="filters.program ? 'border-gray-900 text-gray-900 font-medium bg-gray-50/60' : 'text-gray-700'"
-                    :title="filters.program || 'Filter berdasarkan Nama Program'"
-                  >
-                    <span class="truncate text-left">{{ filters.program || 'Semua Program' }}</span>
-                    <div class="flex items-center gap-1 shrink-0">
-                      <span
-                        v-if="filters.program"
-                        @click.stop="clearProgramFilter"
-                        class="text-gray-400 hover:text-gray-700 p-0.5 rounded cursor-pointer"
-                        title="Hapus filter program"
-                      >
-                        <XIcon class="w-3 h-3" />
-                      </span>
-                      <ChevronDownIcon
-                        class="w-3.5 h-3.5 text-gray-400 transition-transform duration-150"
-                        :class="showProgramDropdown && 'rotate-180'"
-                      />
-                    </div>
-                  </button>
-
-                  <!-- Program List Inside Filter (In-flow to prevent overlap) -->
-                  <div
-                    v-if="showProgramDropdown"
-                    class="mt-1.5 w-full bg-white border border-gray-200 rounded-lg shadow-xs overflow-hidden text-xs"
-                  >
-                    <div class="p-2 border-b border-gray-100 bg-gray-50/70 flex items-center gap-2">
-                      <SearchIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                      <input
-                        ref="programSearchInput"
-                        v-model="programSearchQuery"
-                        type="text"
-                        placeholder="Cari program..."
-                        class="w-full bg-transparent border-none text-xs text-gray-900 placeholder-gray-400 focus:outline-none"
-                        @click.stop
-                        @keydown.esc="showProgramDropdown = false"
-                      />
-                      <button
-                        v-if="programSearchQuery"
-                        @click.stop="programSearchQuery = ''"
-                        type="button"
-                        class="text-gray-400 hover:text-gray-600 cursor-pointer"
-                      >
-                        <XIcon class="w-3 h-3" />
-                      </button>
-                    </div>
-                    <div class="max-h-48 overflow-y-auto py-1 divide-y divide-gray-50">
-                      <button
-                        type="button"
-                        @click="selectProgram('')"
-                        class="w-full text-left px-3 py-1.5 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer text-xs"
-                        :class="!filters.program ? 'bg-gray-50 font-medium text-gray-900' : 'text-gray-600'"
-                      >
-                        <span>Semua Program ({{ filterOptions.programs.length }})</span>
-                        <CheckIcon v-if="!filters.program" class="w-3.5 h-3.5 text-gray-900 shrink-0" />
-                      </button>
-                      <button
-                        v-for="prog in filteredProgramOptions"
-                        :key="prog"
-                        type="button"
-                        @click="selectProgram(prog)"
-                        class="w-full text-left px-3 py-1.5 flex items-center justify-between hover:bg-gray-50 transition cursor-pointer text-xs"
-                        :class="filters.program === prog ? 'bg-gray-50 font-semibold text-gray-900' : 'text-gray-700'"
-                      >
-                        <span class="truncate pr-2" :title="prog">{{ prog }}</span>
-                        <CheckIcon v-if="filters.program === prog" class="w-3.5 h-3.5 text-gray-900 shrink-0" />
-                      </button>
-                      <div v-if="filteredProgramOptions.length === 0" class="px-3 py-2 text-center text-gray-400 text-xs">
-                        Tidak ada program yang cocok
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <!-- Program & Dealer Filter (pilihan yang bisa dicari) -->
+              <SearchableFilterSelect
+                v-model="filters.program"
+                :options="filterOptions.programs"
+                label="Nama Program"
+                all-label="Semua Program"
+                search-placeholder="Cari program..."
+                empty-text="Tidak ada program yang cocok"
+                @change="fetchData(1)"
+              />
+              <SearchableFilterSelect
+                v-model="filters.dealer"
+                :options="filterOptions.dealers"
+                label="Dealer"
+                all-label="Semua Dealer"
+                search-placeholder="Cari dealer..."
+                empty-text="Tidak ada dealer yang cocok"
+                @change="fetchData(1)"
+              />
 
               <!-- Filter Status Purchase -->
               <div class="space-y-1">
@@ -1191,6 +1129,7 @@ import TelemarketingSelectModal from '@/components/TelemarketingSelectModal.vue'
 import { useArea } from '@/composables/useArea';
 import { useAuth } from '@/composables/useAuth';
 import EditDataProgramModal from '@/components/EditDataProgramModal.vue';
+import SearchableFilterSelect from '@/components/SearchableFilterSelect.vue';
 import { useSpreadsheetGrid } from '@/composables/useSpreadsheetGrid';
 import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
 import {
@@ -1199,7 +1138,6 @@ import {
   ExternalLink as ExternalLinkIcon,
   AlertCircle as AlertCircleIcon,
   CheckCircle as CheckCircleIcon,
-  Check as CheckIcon,
   FileSpreadsheet as FileSpreadsheetIcon,
   FileText as FileTextIcon,
   Download as DownloadIcon,
@@ -1396,6 +1334,7 @@ const filters = reactive({
   search: '',
   region: '',
   program: '',
+  dealer: '',
   status_purchase: '',
   status_ar: '',
 });
@@ -1403,51 +1342,10 @@ const filters = reactive({
 const filterOptions = reactive({
   regions: [],
   programs: [],
+  dealers: [],
   status_purchase: [],
   status_ar: [],
 });
-
-// Dropdown Nama Program state
-const showProgramDropdown = ref(false);
-const programDropdownRef = ref(null);
-const programSearchQuery = ref('');
-const programSearchInput = ref(null);
-
-const filteredProgramOptions = computed(() => {
-  if (!filterOptions.programs) return [];
-  if (!programSearchQuery.value) return filterOptions.programs;
-  const q = programSearchQuery.value.toLowerCase();
-  return filterOptions.programs.filter((p) => p && p.toLowerCase().includes(q));
-});
-
-const toggleProgramDropdown = async () => {
-  showProgramDropdown.value = !showProgramDropdown.value;
-  if (showProgramDropdown.value) {
-    programSearchQuery.value = '';
-    await nextTick();
-    if (programSearchInput.value) {
-      programSearchInput.value.focus();
-    }
-  }
-};
-
-const selectProgram = (prog) => {
-  filters.program = prog;
-  showProgramDropdown.value = false;
-  fetchData(1);
-};
-
-const clearProgramFilter = () => {
-  filters.program = '';
-  showProgramDropdown.value = false;
-  fetchData(1);
-};
-
-const handleClickOutsideProgramDropdown = (e) => {
-  if (programDropdownRef.value && !programDropdownRef.value.contains(e.target)) {
-    showProgramDropdown.value = false;
-  }
-};
 
 const isFilterOpen = ref(false);
 
@@ -1455,6 +1353,7 @@ const activeFilterCount = computed(() => {
   let count = 0;
   if (filters.region) count++;
   if (filters.program) count++;
+  if (filters.dealer) count++;
   if (filters.status_purchase) count++;
   if (filters.status_ar) count++;
   return count;
@@ -1504,6 +1403,7 @@ const resetFilters = () => {
   filters.search = '';
   filters.region = '';
   filters.program = '';
+  filters.dealer = '';
   filters.status_purchase = '';
   filters.status_ar = '';
   fetchData(1);
@@ -1521,6 +1421,7 @@ const fetchData = async (page = 1, { silent = false } = {}) => {
       search: filters.search || undefined,
       region: filters.region || undefined,
       program: filters.program || undefined,
+      dealer: filters.dealer || undefined,
       status_purchase: filters.status_purchase || undefined,
       status_ar: filters.status_ar || undefined,
     };
@@ -1532,6 +1433,7 @@ const fetchData = async (page = 1, { silent = false } = {}) => {
     if (res.data.filter_options) {
       filterOptions.regions = res.data.filter_options.regions || [];
       filterOptions.programs = res.data.filter_options.programs || [];
+      filterOptions.dealers = res.data.filter_options.dealers || [];
       filterOptions.status_purchase = res.data.filter_options.status_purchase || [];
       filterOptions.status_ar = res.data.filter_options.status_ar || [];
     }
@@ -1594,6 +1496,7 @@ const exportCsv = () => {
   if (filters.search) params.append('search', filters.search);
   if (filters.region) params.append('region', filters.region);
   if (filters.program) params.append('program', filters.program);
+  if (filters.dealer) params.append('dealer', filters.dealer);
   if (filters.status_purchase) params.append('status_purchase', filters.status_purchase);
   if (filters.status_ar) params.append('status_ar', filters.status_ar);
 
@@ -1763,11 +1666,9 @@ onMounted(async () => {
     // Keep default URL on error
   }
   document.addEventListener('click', handleClickOutsideSpreadsheetDropdown);
-  document.addEventListener('click', handleClickOutsideProgramDropdown);
 });
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutsideSpreadsheetDropdown);
-  document.removeEventListener('click', handleClickOutsideProgramDropdown);
 });
 </script>
