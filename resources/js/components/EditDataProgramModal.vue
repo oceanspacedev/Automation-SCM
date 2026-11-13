@@ -626,11 +626,11 @@
                 </div>
 
                 <div>
-                  <label class="block font-medium text-gray-700 mb-1">Program 2</label>
+                  <label class="block font-medium text-gray-700 mb-1">Bukti TF</label>
                   <input
                     v-model="form.program_2"
                     type="text"
-                    placeholder="Program 2..."
+                    placeholder="Link bukti transfer..."
                     class="w-full h-8.5 px-3 rounded-lg border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-white transition"
                   />
                 </div>

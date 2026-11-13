@@ -308,7 +308,7 @@ class DataProgramController extends Controller
             'STATUS POTONG BY PURCHASE', 'STATUS POTONG BY AR', 'TANGGAL POTONG/TF',
             'No. UID', 'NO. PEMBAYARAN', 'TGL INPUT BANK PPH', 'T/F',
             'TGL PROSES', 'TGL SJ', 'NO.SJ', 'INFO BANK', 'PENDING POTONGAN',
-            'NPWP', 'NAMA NPWP', 'PROGRAM 2', 'CN', 'AGREMENT', 'CEK FP',
+            'NPWP', 'NAMA NPWP', 'BUKTI TF', 'CN', 'AGREMENT', 'CEK FP',
             'CEK EVIDANCE', 'Noted', 'Norek', 'Namrek', 'Bank', 'BIG REGION',
         ];
 

@@ -364,10 +364,10 @@
               <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">No. SJ</th>
               <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Info Bank</th>
               <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Pending Potongan</th>
-              <!-- 47-49. NPWP & Program 2 -->
+              <!-- 47-49. NPWP & Bukti TF (kolom program_2) -->
               <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">NPWP</th>
               <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Nama NPWP</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Program 2</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Bukti TF</th>
               <!-- 50-53. Dokumen Lampiran -->
               <th scope="col" class="py-2.5 px-3 text-center border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">CN</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Agr</th>
@@ -694,7 +694,7 @@
                 {{ row.nama_npwp || '-' }}
               </td>
 
-              <!-- 49. Program 2 (berisi bukti transfer dari Tim SCM untuk klaim yang ditransfer) -->
+              <!-- 49. Bukti TF (kolom program_2: bukti transfer dari Tim SCM untuk klaim yang ditransfer) -->
               <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap max-w-[180px] truncate text-gray-700" :title="row.program_2">
                 <a
                   v-if="isValidUrl(row.program_2)"
