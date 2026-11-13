@@ -32,11 +32,13 @@ class ProgramApprovalHistoryTest extends TestCase
         parent::setUp();
 
         $this->actingAs(User::factory()->create(['role' => 'admin', 'email' => 'admin@contoh.test']));
+        // KTP / NPWP & bukti transfer disimpan di disk public palsu, tidak pernah ke S3 sungguhan
         Storage::fake('public');
         config([
             'services.wag.token' => 'fake_token',
             'services.wag.url' => 'https://waghub.mekayastudio.com',
             'services.auto_match.send_whatsapp' => true,
+            'filesystems.disks.s3.key' => null,
         ]);
 
         // WA ke AR bisa dibuat gagal; Google Spreadsheet dan lainnya selalu berhasil
