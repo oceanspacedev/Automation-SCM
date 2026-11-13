@@ -15,6 +15,10 @@
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
         }
+        /* Di laptop/desktop seluruh kartu sedikit diperkecil (ukuran Tailwind memakai rem); di HP tetap ukuran penuh */
+        @media (min-width: 640px) {
+            html { font-size: 14px; }
+        }
     </style>
 </head>
 {{--
