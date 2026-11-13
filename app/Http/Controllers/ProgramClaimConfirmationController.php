@@ -8,10 +8,12 @@ use App\Models\ProgramSubmission;
 use App\Models\TeamContact;
 use App\Services\DataProgramSyncService;
 use App\Services\ProgramApprovalFlow;
+use App\Services\ProgramDocumentStorage;
 use App\Services\ProgramReconciliationService;
 use App\Services\WhatsAppService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class ProgramClaimConfirmationController extends Controller
@@ -201,8 +203,9 @@ class ProgramClaimConfirmationController extends Controller
             }
 
             if ($action === 'setuju_transfer') {
-                // Dealer memilih ditransfer: rekening diisi telemarketing, lalu diteruskan ke Tim SCM (tanpa AR)
+                // Dealer memilih ditransfer: rekening & KTP/NPWP pemilik rekening diisi telemarketing, lalu diteruskan ke Tim SCM (tanpa AR)
                 $validated = $request->validate([
+                    'ktp_npwp' => [Rule::requiredIf(! $this->reconciliationService->isValidUrl($dp->cek_evidance)), 'nullable', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:15360'],
                     'bank' => ['required', 'string', 'max:100', 'regex:/[\pL\pN]/u'],
                     'norek' => ['required', 'string', 'max:100', 'regex:/^[\d\s.\-]+$/', function (string $attribute, mixed $value, \Closure $fail) {
                         if (strlen(preg_replace('/\D/', '', (string) $value)) < 5) {
@@ -217,6 +220,10 @@ class ProgramClaimConfirmationController extends Controller
                     'norek.regex' => 'No. rekening hanya boleh berisi angka.',
                     'namrek.required' => 'Nama pemilik rekening wajib diisi.',
                     'namrek.regex' => 'Nama pemilik rekening wajib diisi.',
+                    'ktp_npwp.required' => 'Foto KTP atau NPWP pemilik rekening wajib diunggah.',
+                    'ktp_npwp.mimes' => 'KTP / NPWP harus berupa PDF atau gambar (JPG, PNG, WEBP).',
+                    'ktp_npwp.max' => 'Ukuran file KTP / NPWP maksimal 15 MB.',
+                    'ktp_npwp.uploaded' => 'File KTP / NPWP gagal diunggah. Coba lagi.',
                 ]);
 
                 $dp->update([
@@ -225,6 +232,10 @@ class ProgramClaimConfirmationController extends Controller
                     'bank' => trim($validated['bank']),
                     'norek' => trim($validated['norek']),
                     'namrek' => trim($validated['namrek']),
+                    // KTP / NPWP masuk ke kolom Evid
+                    'cek_evidance' => $request->hasFile('ktp_npwp')
+                        ? app(ProgramDocumentStorage::class)->store($request->file('ktp_npwp'), 'KTP_NPWP', (string) $dp->dealer_name, (string) ($dp->program_name ?: $dp->program))
+                        : $dp->cek_evidance,
                 ]);
                 ProgramApprovalLog::record($dp, ProgramApprovalLog::TRANSFER_APPROVED, actor: $this->linkActor($role),
                     note: "Transfer ke {$dp->bank} {$dp->norek} a.n. {$dp->namrek}");
@@ -372,6 +383,8 @@ class ProgramClaimConfirmationController extends Controller
             ['label' => 'CN', 'url' => $link($dp->cn), 'note' => 'Belum ada'],
             ['label' => 'Agreement', 'url' => $link($dp->agrement), 'note' => 'Belum ada'],
             ['label' => 'Faktur Pajak', 'url' => $link($dp->cek_fp), 'note' => $this->reconciliationService->isPkp($dp) ? 'Belum ada' : 'Tidak wajib'],
+            // KTP / NPWP pemilik rekening hanya untuk klaim yang ditransfer
+            ...($dp->isTransfer() ? [['label' => 'KTP / NPWP', 'url' => $link($dp->cek_evidance), 'note' => 'Belum ada']] : []),
         ];
     }
 

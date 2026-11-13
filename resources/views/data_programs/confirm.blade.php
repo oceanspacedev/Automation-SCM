@@ -129,7 +129,7 @@
     @endif
 
     @if($canAct)
-    <form method="POST" action="{{ request()->fullUrl() }}">
+    <form method="POST" action="{{ request()->fullUrl() }}" enctype="multipart/form-data">
         @csrf
         <input type="hidden" name="role" value="{{ $role }}">
 
@@ -299,7 +299,8 @@
                 </div>
             </div>
         @else
-            @php($showAccountForm = $errors->hasAny(['bank', 'norek', 'namrek']) || old('norek'))
+            @php($showAccountForm = $errors->hasAny(['bank', 'norek', 'namrek', 'ktp_npwp']) || old('norek'))
+            @php($hasEvidence = filter_var(trim((string) $dp->cek_evidance), FILTER_VALIDATE_URL) !== false)
 
             <!-- Langkah 1: keputusan dealer -->
             <div id="telemarketing-actions" class="space-y-2 {{ $showAccountForm ? 'hidden' : '' }}">
@@ -335,6 +336,19 @@
                         @enderror
                     </div>
                 @endforeach
+
+                <div>
+                    <label for="ktp_npwp" class="block text-xs font-medium text-gray-700 mb-2">KTP / NPWP pemilik rekening</label>
+                    <input type="file" id="ktp_npwp" name="ktp_npwp" accept=".pdf,.jpg,.jpeg,.png,.webp"
+                           @unless($hasEvidence) data-step-required {{ $showAccountForm ? 'required' : '' }} @endunless
+                           class="block w-full text-sm text-gray-700 file:mr-3 file:h-9 file:px-3 file:rounded-[10px] file:border-0 file:bg-gray-100 file:text-sm file:font-medium file:text-gray-800 hover:file:bg-gray-200 file:cursor-pointer">
+                    @if($hasEvidence)
+                        <p class="mt-1 text-xs text-gray-500">Sudah ada. Unggah lagi untuk mengganti.</p>
+                    @endif
+                    @error('ktp_npwp')
+                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
 
                 <div class="grid grid-cols-2 gap-2">
                     <button type="button" onclick="toggleStep('telemarketing-actions', 'account-form', false)"

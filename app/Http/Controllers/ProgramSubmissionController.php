@@ -15,18 +15,17 @@ use App\Services\AreaContext;
 use App\Services\BrandContext;
 use App\Services\DataProgramSyncService;
 use App\Services\DocumentAnalysisService;
+use App\Services\ProgramDocumentStorage;
 use App\Services\ProgramReconciliationService;
 use App\Services\ProgramSubmissionService;
 use App\Services\WhatsAppService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -1112,32 +1111,6 @@ class ProgramSubmissionController extends Controller
     }
 
     /**
-     * Store an uploaded program document in SeaweedFS / S3 under "<dealer>/<program>", or on the public disk when S3 is
-     * not configured or the upload fails. The S3 disk does not throw: a failed upload returns false, which must not
-     * become a link to the bucket root.
-     */
-    private function storeProgramDocument(UploadedFile $file, string $prefix, string $s3Folder, bool $useS3): string
-    {
-        $filename = $prefix.'_'.time().'_'.preg_replace('/[^a-zA-Z0-9._-]/', '_', $file->getClientOriginalName());
-
-        if ($useS3) {
-            try {
-                $path = Storage::disk('s3')->putFileAs($s3Folder, $file, $filename);
-
-                if ($path !== false) {
-                    return Storage::disk('s3')->url($path);
-                }
-
-                Log::warning("Upload {$prefix} to S3 failed, fallback to local.");
-            } catch (\Throwable $e) {
-                Log::warning("Upload {$prefix} to S3 failed, fallback to local: ".$e->getMessage());
-            }
-        }
-
-        return url('storage/'.$file->store('program_documents', 'public'));
-    }
-
-    /**
      * PKP status of the selected store from its Jenis NPWP in Master Dealer (null when the store or its type is unknown).
      * The form sends the store's kode BT when it was picked from the list, since an ID Realme can be shared by several stores.
      */
@@ -1421,20 +1394,17 @@ class ProgramSubmissionController extends Controller
         }
 
         // 3. Documents are verified clean - store to SeaweedFS / S3 (Dealer / Program / File)
-        $safeDealer = preg_replace('/[\\\\\/:\*\?"<>\|]/', '_', trim($formData['dealer_name'])) ?: 'DEALER';
-        $safeProgram = preg_replace('/[\\\\\/:\*\?"<>\|]/', '_', trim($formData['program_name'])) ?: 'PROGRAM';
-        $s3Folder = "{$safeDealer}/{$safeProgram}";
-
-        $useS3 = ! empty(config('filesystems.disks.s3.key')) && ! empty(config('filesystems.disks.s3.bucket'));
+        $documents = app(ProgramDocumentStorage::class);
+        $store = fn (string $field, string $prefix) => $documents->store($request->file($field), $prefix, $formData['dealer_name'], $formData['program_name']);
 
         $cnUrl = $request->hasFile('credit_note_file')
-            ? $this->storeProgramDocument($request->file('credit_note_file'), 'CN', $s3Folder, $useS3)
+            ? $store('credit_note_file', 'CN')
             : $request->input('credit_note_url');
         $agrUrl = $request->hasFile('agreement_file')
-            ? $this->storeProgramDocument($request->file('agreement_file'), 'AGR', $s3Folder, $useS3)
+            ? $store('agreement_file', 'AGR')
             : ($request->input('agreement_url') ?: $masterAgreement);
         $taxUrl = $request->hasFile('tax_invoice_file')
-            ? $this->storeProgramDocument($request->file('tax_invoice_file'), 'FAKTUR', $s3Folder, $useS3)
+            ? $store('tax_invoice_file', 'FAKTUR')
             : $request->input('tax_invoice_url');
 
         $timestamp = date('d/m/Y H:i:s');

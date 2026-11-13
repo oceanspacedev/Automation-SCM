@@ -158,6 +158,8 @@ class ProgramApprovalController extends Controller
             'status_potong_ar' => $row->status_potong_ar,
             'stage' => $stage,
             'stage_label' => ProgramApprovalFlow::STAGES[$stage],
+            // Cara klaim diselesaikan: dipotong di order (AR) atau ditransfer (Tim SCM)
+            'settlement' => in_array($stage, ['cut', 'tax_checked'], true) ? ($row->isTransfer() ? 'Done transfer' : 'Sudah potong') : null,
             'steps' => $this->flow->steps($row, $row->approvalLogs, $arName, $teamNames['tax'], $teamNames['scm']),
         ];
     }

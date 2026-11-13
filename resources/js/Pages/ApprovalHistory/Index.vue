@@ -75,6 +75,7 @@
                   <span :class="['inline-flex items-center h-[18px] px-1.5 rounded-full text-[10px] font-medium ring-1 ring-inset', stageBadgeClass(row.stage)]">
                     {{ row.stage_label }}
                   </span>
+                  <span v-if="row.settlement" :class="settlementBadgeClass">{{ row.settlement }}</span>
                   <span class="text-[11px] font-medium text-gray-700 tabular-nums whitespace-nowrap">{{ formatRupiah(row.net_pay) }}</span>
                 </div>
               </div>
@@ -144,6 +145,7 @@
               <span :class="['inline-flex items-center h-[18px] px-1.5 rounded-full text-[10px] font-medium ring-1 ring-inset', stageBadgeClass(detail.stage)]">
                 {{ detail.stage_label }}
               </span>
+              <span v-if="detail.settlement" :class="settlementBadgeClass">{{ detail.settlement }}</span>
             </div>
             <p class="text-gray-500 mt-0.5">{{ rowMeta(detail) }}</p>
             <p v-if="detail.periode" class="text-gray-500">{{ detail.periode }}</p>
@@ -366,6 +368,9 @@ const stageBadgeClass = (value) => ({
   cut: 'bg-violet-50 text-violet-700 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-500/30',
   tax_checked: 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:ring-emerald-500/30',
 }[value] || 'bg-gray-50 text-gray-600 ring-gray-200 dark:ring-slate-700');
+
+// Sudah potong / Done transfer: netral, di samping status tahap
+const settlementBadgeClass = 'inline-flex items-center h-[18px] px-1.5 rounded-full text-[10px] font-medium ring-1 ring-inset bg-white text-gray-700 ring-gray-300 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-600';
 
 const startRowsRequest = createRequestTracker();
 
