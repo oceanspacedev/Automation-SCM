@@ -252,7 +252,7 @@ sequenceDiagram
 
 ### Dashboard
 - Menu pertama di navigasi dan halaman pertama setelah masuk, untuk semua pengguna.
-- Kartu: **Data Program**, **Form Program**, **Bisa Dipotong** (`BISA DI POTONG`), **Sudah Dipotong** (`SUDAH POTONG`), dan **Belum Bisa Dipotong** (status lainnya), dengan persentasenya dari Data Program.
+- Kartu: **Data Program**, **Form Program**, **Bisa Dipotong** (`BISA DI POTONG`), **Sudah Dipotong** (`SUDAH POTONG`), **Done Transfer** (`DONE TRANSFER`, klaim yang ditransfer Tim SCM, terpisah dari yang dipotong), dan **Belum Bisa Dipotong** (status lainnya), dengan persentasenya dari Data Program.
 - **Per region** (sesuai tulisan region di data), tiga tampilan yang pilihannya diingat browser:
   - **Bar**: Data Program per status potong, dan jumlah Form Program di kolom kanan.
   - **3D**: pie Data Program per region, tiap irisan berlabel jumlah & persennya. Paling banyak 8 irisan; region selebihnya digabung jadi **Lainnya**. Arahkan kursor ke irisan untuk rincian status potongnya (atau daftar region di Lainnya).

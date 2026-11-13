@@ -35,11 +35,11 @@
     <!-- Saat memuat ulang, tampilan lama tetap terlihat (redup) supaya tidak berkedip -->
     <div v-else class="viz space-y-4 transition-opacity" :class="loading && 'opacity-60'">
       <!-- Kartu ringkasan -->
-      <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
         <div
-          v-for="(card, index) in cards"
+          v-for="card in cards"
           :key="card.label"
-          :class="['rounded-xl border border-gray-200 bg-white shadow-xs p-4', index === 0 && 'col-span-2 lg:col-span-1']"
+          class="rounded-xl border border-gray-200 bg-white shadow-xs p-4"
         >
           <div class="flex items-center gap-1.5 text-xs text-gray-500">
             <span v-if="card.color" class="w-2.5 h-2.5 rounded-sm shrink-0" :style="{ background: card.color }"></span>
@@ -221,6 +221,7 @@ const PIE_MAX_SLICES = 8;
 // Tahap potong berurutan, jadi satu warna biru: makin maju makin kontras dengan latar (warna di <style>)
 const STATUSES = [
   { key: 'sudah_potong', label: 'Sudah dipotong', color: 'var(--stage-sudah)' },
+  { key: 'done_transfer', label: 'Done transfer', color: 'var(--stage-transfer)' },
   { key: 'bisa_potong', label: 'Bisa dipotong', color: 'var(--stage-bisa)' },
   { key: 'belum_potong', label: 'Belum bisa dipotong', color: 'var(--stage-belum)' },
 ];
@@ -373,9 +374,11 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* Biru bertingkat untuk tahap potong, sudah dicek kontrasnya terhadap kartu terang (#ffffff) dan gelap (#131D2F) */
+/* Biru bertingkat untuk tahap potong, sudah dicek kontrasnya terhadap kartu terang (#ffffff) dan gelap (#131D2F);
+   Done transfer (selesai lewat transfer, bukan dipotong) memakai toska supaya beda dari biru */
 .dashboard-viz {
   --stage-sudah: #104281;
+  --stage-transfer: #1baf7a;
   --stage-bisa: #2a78d6;
   --stage-belum: #86b6ef;
   --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
@@ -384,6 +387,7 @@ onMounted(() => {
 /* Mode gelap: tahap yang lebih maju lebih terang supaya tetap paling menonjol */
 .dashboard-viz:is(.dark *) {
   --stage-sudah: #9ec5f4;
+  --stage-transfer: #199e70;
   --stage-bisa: #3987e5;
   --stage-belum: #184f95;
 }

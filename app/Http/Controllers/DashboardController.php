@@ -41,13 +41,13 @@ class DashboardController extends Controller
 
     /**
      * Data Program rows and Form Program submissions per area & region, with the Data Program rows that can be cut
-     * (BISA DI POTONG), are already cut (SUDAH POTONG), or cannot be cut yet.
+     * (BISA DI POTONG), are already cut (SUDAH POTONG), were transferred instead (DONE TRANSFER), or cannot be cut yet.
      *
      * @param  Builder<DataProgram>  $dataPrograms
      * @param  Builder<ProgramSubmission>  $submissions
      * @return array{
-     *     totals: array{data_program: int, form_program: int, bisa_potong: int, sudah_potong: int, belum_potong: int},
-     *     regions: list<array{area: string, region: string, data_program: int, form_program: int, bisa_potong: int, sudah_potong: int, belum_potong: int}>
+     *     totals: array{data_program: int, form_program: int, bisa_potong: int, sudah_potong: int, done_transfer: int, belum_potong: int},
+     *     regions: list<array{area: string, region: string, data_program: int, form_program: int, bisa_potong: int, sudah_potong: int, done_transfer: int, belum_potong: int}>
      * }
      */
     private function programStats(Builder $dataPrograms, Builder $submissions): array
@@ -57,7 +57,7 @@ class DashboardController extends Controller
             $name = strtoupper(trim((string) $region));
             $name = $name === '' || $name === '-' ? 'TANPA REGION' : $name;
             $key = "{$area}|{$name}";
-            $regions[$key] ??= ['area' => Area::from($area)->label(), 'region' => $name, 'data_program' => 0, 'form_program' => 0, 'bisa_potong' => 0, 'sudah_potong' => 0, 'belum_potong' => 0];
+            $regions[$key] ??= ['area' => Area::from($area)->label(), 'region' => $name, 'data_program' => 0, 'form_program' => 0, 'bisa_potong' => 0, 'sudah_potong' => 0, 'done_transfer' => 0, 'belum_potong' => 0];
 
             return $key;
         };
@@ -69,10 +69,11 @@ class DashboardController extends Controller
         foreach ($dataProgramCounts as $count) {
             $key = $row($count->area, $count->region);
             $status = strtoupper(trim((string) $count->status_potong_purchase));
-            // Klaim yang sudah ditransfer SCM dihitung selesai bersama yang sudah dipotong
+            // Klaim yang sudah ditransfer SCM dihitung terpisah dari yang sudah dipotong
             $bucket = match (true) {
                 $status === 'BISA DI POTONG' => 'bisa_potong',
-                str_starts_with($status, 'SUDAH POTONG'), $status === DataProgram::DONE_TRANSFER => 'sudah_potong',
+                str_starts_with($status, 'SUDAH POTONG') => 'sudah_potong',
+                $status === DataProgram::DONE_TRANSFER => 'done_transfer',
                 default => 'belum_potong',
             };
 
@@ -93,6 +94,7 @@ class DashboardController extends Controller
                 'form_program' => $sum('form_program'),
                 'bisa_potong' => $sum('bisa_potong'),
                 'sudah_potong' => $sum('sudah_potong'),
+                'done_transfer' => $sum('done_transfer'),
                 'belum_potong' => $sum('belum_potong'),
             ],
             'regions' => $regions->all(),

@@ -22,6 +22,8 @@ class DashboardTest extends TestCase
         $dataProgram('jabar', 'BIG CIREBON', 'BISA DI POTONG', 'r1');
         $dataProgram('jabar', 'big cirebon ', 'BELUM BISA POTONG', 'r2');
         $dataProgram('jabar', 'BIG CIREBON', 'SUDAH POTONG', 'r3');
+        // Klaim yang ditransfer SCM dihitung terpisah dari yang dipotong
+        $dataProgram('jabar', 'BIG CIREBON', DataProgram::DONE_TRANSFER, 'r6');
         $dataProgram('jateng', 'SEMARANG 1', null, 'r4');
         $dataProgram('jateng', null, 'BISA DI POTONG', 'r5');
         ProgramSubmission::create(['area' => 'jabar', 'region' => 'BIG CIREBON', 'dealer_name' => 'TOKO', 'row_hash' => 's1']);
@@ -29,11 +31,11 @@ class DashboardTest extends TestCase
 
         $this->getJson('/api/dashboard')
             ->assertOk()
-            ->assertJsonPath('program.totals', ['data_program' => 5, 'form_program' => 2, 'bisa_potong' => 2, 'sudah_potong' => 1, 'belum_potong' => 2])
+            ->assertJsonPath('program.totals', ['data_program' => 6, 'form_program' => 2, 'bisa_potong' => 2, 'sudah_potong' => 1, 'done_transfer' => 1, 'belum_potong' => 2])
             ->assertJsonPath('program.regions', [
-                ['area' => 'Jawa Barat', 'region' => 'BIG CIREBON', 'data_program' => 3, 'form_program' => 1, 'bisa_potong' => 1, 'sudah_potong' => 1, 'belum_potong' => 1],
-                ['area' => 'Jawa Tengah', 'region' => 'SEMARANG 1', 'data_program' => 1, 'form_program' => 1, 'bisa_potong' => 0, 'sudah_potong' => 0, 'belum_potong' => 1],
-                ['area' => 'Jawa Tengah', 'region' => 'TANPA REGION', 'data_program' => 1, 'form_program' => 0, 'bisa_potong' => 1, 'sudah_potong' => 0, 'belum_potong' => 0],
+                ['area' => 'Jawa Barat', 'region' => 'BIG CIREBON', 'data_program' => 4, 'form_program' => 1, 'bisa_potong' => 1, 'sudah_potong' => 1, 'done_transfer' => 1, 'belum_potong' => 1],
+                ['area' => 'Jawa Tengah', 'region' => 'SEMARANG 1', 'data_program' => 1, 'form_program' => 1, 'bisa_potong' => 0, 'sudah_potong' => 0, 'done_transfer' => 0, 'belum_potong' => 1],
+                ['area' => 'Jawa Tengah', 'region' => 'TANPA REGION', 'data_program' => 1, 'form_program' => 0, 'bisa_potong' => 1, 'sudah_potong' => 0, 'done_transfer' => 0, 'belum_potong' => 0],
             ]);
 
         // One area only
