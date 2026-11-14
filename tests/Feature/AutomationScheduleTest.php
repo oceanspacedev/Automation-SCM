@@ -38,6 +38,7 @@ class AutomationScheduleTest extends TestCase
 
         $this->travelTo(Carbon::parse('2026-10-20 10:07'));
         $this->assertTrue($matching->isDue($this->app) && $matching->filtersPass($this->app));
+        $this->assertSame('scheduler-heartbeat', $events->first()->description);
         $this->assertFalse($whatsApp->filtersPass($this->app));
 
         // Bawaan: 09:00 dan 14:00 setiap hari
@@ -71,11 +72,27 @@ class AutomationScheduleTest extends TestCase
             ->assertJsonPath('scheduler_alive', true)
             ->assertJsonPath('scheduler_last_seen', $tickedAt);
 
+        $this->actingAs($admin)
+            ->getJson('/api/automation-schedules?status_only=true')
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertExactJson([
+                'success' => true,
+                'scheduler_alive' => true,
+                'scheduler_last_seen' => $tickedAt,
+            ]);
+
         $this->travel(1)->minutes();
         $this->actingAs($admin)
             ->getJson('/api/automation-schedules')
             ->assertJsonPath('scheduler_alive', false)
             ->assertJsonPath('scheduler_last_seen', $tickedAt);
+
+        $this->actingAs($admin)
+            ->getJson('/api/automation-schedules?status_only=true')
+            ->assertOk()
+            ->assertJsonPath('scheduler_alive', false)
+            ->assertJsonMissingPath('data');
     }
 
     public function test_admin_sets_run_times_and_invalid_times_are_rejected(): void

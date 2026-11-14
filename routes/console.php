@@ -23,6 +23,10 @@ Artisan::command('data-program:sync {--limit=0}', function (DataProgramSyncServi
     }
 })->purpose('Sinkronisasi data master Data Program (56 kolom) dari Google Spreadsheet');
 
+Schedule::call(fn () => AutomationSchedule::recordSchedulerHeartbeat())
+    ->name('scheduler-heartbeat')
+    ->everyMinute();
+
 // Sinkron Data Program dari Google Spreadsheet hanya bila dinyalakan (ENABLE_AUTO_SYNC_SCHEDULE=true): sheet menimpa isi
 // Data Program, termasuk tanggal & nomor yang sudah dikelola di aplikasi
 if (config('services.data_program.auto_sync')) {
@@ -39,11 +43,6 @@ if (! app()->environment('local') || env('ENABLE_AUTO_AI_SCHEDULE', false)) {
         ->withoutOverlapping()
         ->runInBackground();
 }
-
-// Detak scheduler: Master → Jadwal Otomatis memperingatkan bila detak ini berhenti (schedule:work / cron schedule:run mati).
-Schedule::call(fn () => AutomationSchedule::recordSchedulerHeartbeat())
-    ->name('scheduler-heartbeat')
-    ->everyMinute();
 
 // Cocokkan otomatis Data Program ↔ Form Program setiap menit (tanpa WhatsApp).
 Schedule::command('program:auto-match')

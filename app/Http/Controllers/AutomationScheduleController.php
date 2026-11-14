@@ -20,16 +20,26 @@ class AutomationScheduleController extends Controller
         AutomationSchedule::TELEMARKETING_WA => 'program:notify-telemarketing',
     ];
 
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $lastSeen = AutomationSchedule::schedulerLastSeen();
+        $status = [
+            'scheduler_alive' => (bool) $lastSeen?->isAfter(now()->subMinutes(2)),
+            'scheduler_last_seen' => $lastSeen?->toIso8601String(),
+        ];
+
+        if ($request->boolean('status_only')) {
+            return response()->json(['success' => true, ...$status])
+                ->header('Cache-Control', 'no-store');
+        }
+
         return response()->json([
             'success' => true,
             'data' => AutomationSchedule::query()->orderBy('id')->get(),
             'interval_choices' => AutomationSchedule::INTERVAL_CHOICES,
             'reminder_day_choices' => AutomationSchedule::REMINDER_DAY_CHOICES,
             'reminder_max_choices' => AutomationSchedule::REMINDER_MAX_CHOICES,
-            'scheduler_alive' => AutomationSchedule::schedulerIsAlive(),
-            'scheduler_last_seen' => AutomationSchedule::schedulerLastSeen()?->toIso8601String(),
+            ...$status,
         ]);
     }
 

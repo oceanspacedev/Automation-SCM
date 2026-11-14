@@ -14,18 +14,19 @@
     </div>
 
     <p v-if="isLoading" class="py-10 text-center text-xs text-gray-500">Memuat jadwal...</p>
+    <p v-if="scheduleLoadError" role="alert" class="text-xs text-red-600">{{ scheduleLoadError }}</p>
 
     <!-- Scheduler Laravel tidak berdetak: jadwal di bawah tidak akan dijalankan -->
     <section
-      v-if="!isLoading && !schedulerAlive"
+      v-if="!isLoading && (!schedulerAlive || schedulerCheckError)"
       role="status"
       class="max-w-3xl rounded-xl border border-gray-200 bg-white shadow-xs px-5 sm:px-6 py-4 flex items-start gap-3"
     >
       <AlertTriangleIcon class="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
       <div class="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div class="min-w-0 text-xs">
-          <p class="font-semibold text-gray-950">Scheduler belum berjalan, jadwal tidak akan jalan otomatis.</p>
-          <p class="mt-1 text-gray-600 leading-relaxed">
+          <p class="font-semibold text-gray-950">{{ schedulerCheckError || 'Detak scheduler belum terdeteksi dalam 2 menit terakhir.' }}</p>
+          <p v-if="!schedulerCheckError" class="mt-1 text-gray-600 leading-relaxed">
             Jalankan <code :class="codeClass">php artisan schedule:work</code> (lokal) atau pasang cron
             <code :class="codeClass">php artisan schedule:run</code> (server).
           </p>
@@ -214,7 +215,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import axios from 'axios';
 import { confirmAction } from '@/composables/useNotify';
 import { useAuth } from '@/composables/useAuth';
@@ -257,10 +258,14 @@ const intervalChoices = ref([5, 10, 15, 30, 60, 120, 180, 360]);
 const reminderDayChoices = ref([0, 1, 2, 3, 5, 7]);
 const reminderMaxChoices = ref([1, 2, 3, 5]);
 const isLoading = ref(false);
+const scheduleLoadError = ref('');
 // Dianggap hidup sampai server bilang sebaliknya, supaya peringatan tidak berkedip saat memuat
 const schedulerAlive = ref(true);
 const schedulerLastSeen = ref(null);
 const isCheckingScheduler = ref(false);
+const schedulerCheckError = ref('');
+let schedulerPollTimer;
+const schedulerCheckController = new AbortController();
 const forms = reactive({});
 const newTimes = reactive({});
 const busy = reactive({});
@@ -302,24 +307,35 @@ async function fetchSchedules() {
     if (res.data.reminder_max_choices) reminderMaxChoices.value = res.data.reminder_max_choices;
     applySchedulerStatus(res.data);
     schedules.value.forEach(fillForm);
+  } catch {
+    scheduleLoadError.value = 'Jadwal gagal dimuat. Muat ulang halaman.';
+    schedulerCheckError.value = 'Status scheduler gagal diperiksa. Coba periksa lagi.';
   } finally {
     isLoading.value = false;
   }
 }
 
 function applySchedulerStatus(data) {
+  schedulerCheckError.value = '';
   schedulerAlive.value = data.scheduler_alive !== false;
   schedulerLastSeen.value = data.scheduler_last_seen || null;
 }
 
 // Cek ulang status scheduler saja, tanpa menimpa isian form yang belum disimpan
 async function checkScheduler() {
+  if (isCheckingScheduler.value || isLoading.value) return;
   isCheckingScheduler.value = true;
   try {
-    const res = await axios.get('/api/automation-schedules');
+    const res = await axios.get('/api/automation-schedules', {
+      params: { status_only: true },
+      timeout: 10000,
+      signal: schedulerCheckController.signal,
+    });
     applySchedulerStatus(res.data);
-  } catch {
-    // Biarkan status terakhir yang tampil
+  } catch (error) {
+    if (!axios.isCancel(error)) {
+      schedulerCheckError.value = 'Status scheduler gagal diperiksa. Coba periksa lagi.';
+    }
   } finally {
     isCheckingScheduler.value = false;
   }
@@ -406,5 +422,19 @@ async function runNow(key) {
   }
 }
 
-onMounted(fetchSchedules);
+function checkVisibleScheduler() {
+  if (document.visibilityState === 'visible') checkScheduler();
+}
+
+onMounted(() => {
+  fetchSchedules();
+  schedulerPollTimer = window.setInterval(checkVisibleScheduler, 60000);
+  document.addEventListener('visibilitychange', checkVisibleScheduler);
+});
+
+onUnmounted(() => {
+  window.clearInterval(schedulerPollTimer);
+  document.removeEventListener('visibilitychange', checkVisibleScheduler);
+  schedulerCheckController.abort();
+});
 </script>
