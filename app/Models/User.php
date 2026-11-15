@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Storage;
 
 #[Fillable(['name', 'email', 'whatsapp', 'avatar_path', 'role', 'permissions', 'is_active', 'password'])]
 #[Hidden(['password', 'remember_token', 'avatar_path'])]
-#[Appends(['avatar_url'])]
+#[Appends(['avatar_url', 'effective_permissions'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -25,10 +25,34 @@ class User extends Authenticatable
      * Daftar seluruh permission yang tersedia di aplikasi (Dashboard terbuka untuk semua user, jadi tidak termasuk)
      */
     public const AVAILABLE_PERMISSIONS = [
+        'drafts_create' => 'Draft - Tambah',
+        'invoices_create' => 'Invoice - Tambah',
+        'data_program_create' => 'Data Program - Tambah',
+        'form_program_create' => 'Form Program - Tambah',
+        'master_program_create' => 'Master Program - Tambah',
+        'master_program_edit' => 'Master Program - Edit',
+        'master_program_delete' => 'Master Program - Hapus',
+        'master_dealer_create' => 'Master Dealer - Tambah',
+        'master_dealer_edit' => 'Master Dealer - Edit',
+        'master_dealer_delete' => 'Master Dealer - Hapus',
+        'master_customer_create' => 'Master Badan Usaha - Tambah',
+        'master_customer_edit' => 'Master Badan Usaha - Edit',
+        'master_customer_delete' => 'Master Badan Usaha - Hapus',
+        'master_user_create' => 'Master User - Tambah',
+        'master_user_edit' => 'Master User - Edit',
+        'master_user_delete' => 'Master User - Hapus',
         'drafts' => 'Draft',
         'invoices' => 'Invoice',
         'form_program' => 'Form Program',
         'data_program' => 'Data Program',
+        'drafts_edit' => 'Draft - Edit',
+        'drafts_delete' => 'Draft - Hapus',
+        'invoices_edit' => 'Invoice - Edit',
+        'invoices_delete' => 'Invoice - Hapus',
+        'data_program_edit' => 'Data Program - Edit',
+        'data_program_delete' => 'Data Program - Hapus',
+        'form_program_edit' => 'Form Program - Edit',
+        'form_program_delete' => 'Form Program - Hapus',
         'riwayat_program' => 'Riwayat Program & Approval',
         'email_logs' => 'Riwayat Email',
         'master_program' => 'Master Program',
@@ -113,8 +137,37 @@ class User extends Authenticatable
      */
     public static function getDefaultPermissionsForRole(string $role): array
     {
+        $configured = AppSetting::read('role_permissions_'.$role);
+        if ($configured !== null) {
+            return json_decode($configured, true, flags: JSON_THROW_ON_ERROR);
+        }
+
         return match ($role) {
             'admin', 'scm' => [
+                'drafts_create',
+                'invoices_create',
+                'data_program_create',
+                'form_program_create',
+                'master_program_create',
+                'master_program_edit',
+                'master_program_delete',
+                'master_dealer_create',
+                'master_dealer_edit',
+                'master_dealer_delete',
+                'master_customer_create',
+                'master_customer_edit',
+                'master_customer_delete',
+                'master_user_create',
+                'master_user_edit',
+                'master_user_delete',
+                'drafts_edit',
+                'drafts_delete',
+                'invoices_edit',
+                'invoices_delete',
+                'data_program_edit',
+                'data_program_delete',
+                'form_program_edit',
+                'form_program_delete',
                 'drafts',
                 'invoices',
                 'form_program',
@@ -146,17 +199,42 @@ class User extends Authenticatable
      */
     public function hasPermission(string $permission): bool
     {
-        if (! $this->is_active) {
+        if ($this->is_active === false) {
             return false;
         }
 
-        if (is_array($this->permissions) && count($this->permissions) > 0) {
+        if (AppSetting::read('role_permissions_'.($this->role ?? 'scm')) !== null) {
+            return in_array($permission, self::getDefaultPermissionsForRole($this->role ?? 'scm'), true);
+        }
+
+        if (is_array($this->permissions)) {
             return in_array($permission, $this->permissions, true);
         }
 
         $defaults = self::getDefaultPermissionsForRole($this->role ?? 'scm');
 
         return in_array($permission, $defaults, true);
+    }
+
+    /** @return Attribute<list<string>, never> */
+    protected function effectivePermissions(): Attribute
+    {
+        return Attribute::get(function (): array {
+            if ($this->is_active === false) {
+                return [];
+            }
+            $role = $this->role ?? 'scm';
+            if (AppSetting::read('role_permissions_'.$role) !== null) {
+                return self::getDefaultPermissionsForRole($role);
+            }
+
+            return $this->permissions ?? self::getDefaultPermissionsForRole($role);
+        });
+    }
+
+    public function canPerform(string $module, string $action): bool
+    {
+        return $this->hasPermission($module) && ($action === 'view' || $this->hasPermission($module.'_'.$action));
     }
 
     public function isAdmin(): bool

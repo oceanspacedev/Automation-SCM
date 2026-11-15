@@ -28,7 +28,7 @@
           @change="handleImportFile"
         />
         <button
-          v-if="canEdit"
+          v-if="canCreate && canEdit"
           type="button"
           @click="importInput?.click()"
           :disabled="isImporting"
@@ -47,7 +47,7 @@
           <span class="sm:hidden">Export</span><span class="hidden sm:inline">Export Excel</span>
         </button>
         <button
-          v-if="canEdit"
+          v-if="canCreate"
           type="button"
           @click="openCreateModal"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
@@ -146,15 +146,15 @@
             </div>
             <div class="flex items-center justify-between gap-3">
               <p class="min-w-0 text-gray-500 break-words">{{ p.period || '-' }}</p>
-              <div v-if="canEdit" class="flex items-center gap-1.5 shrink-0">
-                <button
+              <div v-if="canEdit || canDelete" class="flex items-center gap-1.5 shrink-0">
+                <button v-if="canEdit"
                   type="button"
                   @click="openEditModal(p)"
                   class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
                 >
                   Edit
                 </button>
-                <button
+                <button v-if="canDelete"
                   type="button"
                   @click="confirmDelete(p)"
                   class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer"
@@ -176,17 +176,17 @@
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">NAMA PROGRAM</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">PERIODE</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
-              <th v-if="canEdit" scope="col" class="py-2.5 px-3 text-right">Aksi</th>
+              <th v-if="canEdit || canDelete" scope="col" class="py-2.5 px-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <tr v-if="isLoading">
-              <td :colspan="canEdit ? 5 : 4" class="py-8 text-center text-gray-500">
+              <td :colspan="(canEdit || canDelete) ? 5 : 4" class="py-8 text-center text-gray-500">
                 Memuat data...
               </td>
             </tr>
             <tr v-else-if="programs.length === 0">
-              <td :colspan="canEdit ? 5 : 4" class="py-8 text-center text-gray-500">
+              <td :colspan="(canEdit || canDelete) ? 5 : 4" class="py-8 text-center text-gray-500">
                 Tidak ada data master program yang ditemukan.
               </td>
             </tr>
@@ -227,9 +227,9 @@
                   <span>{{ p.is_active ? 'Aktif' : 'Nonaktif' }}</span>
                 </span>
               </td>
-              <td v-if="canEdit" class="py-2 px-3 text-right whitespace-nowrap">
+              <td v-if="canEdit || canDelete" class="py-2 px-3 text-right whitespace-nowrap">
                 <div class="inline-flex items-center gap-1">
-                  <button
+                  <button v-if="canEdit"
                     type="button"
                     @click="openEditModal(p)"
                     class="h-7 w-7 inline-flex items-center justify-center rounded border border-gray-200 hover:bg-gray-100 text-gray-600 transition cursor-pointer"
@@ -237,7 +237,7 @@
                   >
                     <PencilIcon class="w-3.5 h-3.5" />
                   </button>
-                  <button
+                  <button v-if="canDelete"
                     type="button"
                     @click="confirmDelete(p)"
                     class="h-7 w-7 inline-flex items-center justify-center rounded border border-gray-200 hover:bg-red-50 text-red-600 hover:border-red-200 transition cursor-pointer"
@@ -402,14 +402,14 @@
           Hapus program <strong class="text-gray-900">{{ programToDelete.name }}</strong>?
         </p>
         <div class="flex items-center justify-end gap-2 pt-2">
-          <button
+          <button v-if="canDelete"
             type="button"
             @click="programToDelete = null"
             class="h-8 px-3 rounded-lg border border-gray-300 hover:bg-gray-50 text-xs font-medium text-gray-700 cursor-pointer"
           >
             Batal
           </button>
-          <button
+          <button v-if="canDelete"
             type="button"
             @click="executeDelete"
             :disabled="isDeleting"
@@ -443,7 +443,7 @@ import {
 } from 'lucide-vue-next';
 
 const { brand } = useBrands();
-const { canEdit } = useAuth();
+const { canEdit , canCreate, canDelete } = useAuth();
 
 const programs = ref([]);
 const totalRows = ref(0);
@@ -555,7 +555,7 @@ const openEditModal = (p) => {
 };
 
 const submitForm = async () => {
-  if (!canEdit.value || !formData.name.trim()) return;
+  if (!(isEditMode.value ? canEdit.value : canCreate.value) || !formData.name.trim()) return;
 
   isSaving.value = true;
   notice.value = null;
@@ -578,7 +578,7 @@ const submitForm = async () => {
 const handleImportFile = async (event) => {
   const file = event.target.files?.[0];
   event.target.value = '';
-  if (!canEdit.value || !file) return;
+  if (!(canCreate.value && canEdit.value) || !file) return;
 
   isImporting.value = true;
   notice.value = null;
@@ -615,7 +615,7 @@ const confirmDelete = (p) => {
 };
 
 const executeDelete = async () => {
-  if (!canEdit.value || !programToDelete.value) return;
+  if (!canDelete.value || !programToDelete.value) return;
 
   isDeleting.value = true;
   try {

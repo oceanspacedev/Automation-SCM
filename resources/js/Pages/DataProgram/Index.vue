@@ -282,7 +282,16 @@
                   class="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer disabled:opacity-50"
                 >
                   <WhatsAppIcon v-if="sendingWaId !== row.id" class="w-3.5 h-3.5 text-[#25D366]" />
-                  {{ sendingWaId === row.id ? 'Mengirim...' : 'WA' }}
+                  <span>WA</span>
+                </button>
+                <button
+                  v-if="canDelete"
+                  type="button"
+                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer"
+                  @click.stop="deleteRecord(row)"
+                  title="Hapus data ini"
+                >
+                  Hapus
                 </button>
               </div>
             </div>
@@ -845,6 +854,17 @@
                     <WhatsAppIcon v-else class="w-3.5 h-3.5 text-[#25D366]" />
                     <span>WA</span>
                   </button>
+
+                  <button
+                    v-if="canDelete"
+                    type="button"
+                    @click.stop="deleteRecord(row)"
+                    class="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white hover:bg-red-50 hover:border-red-200 text-red-600 text-xs font-medium transition cursor-pointer shadow-2xs"
+                    title="Hapus data ini"
+                  >
+                    <Trash2Icon class="w-3.5 h-3.5" />
+                    <span>Hapus</span>
+                  </button>
                 </div>
               </td>
             </tr>
@@ -1153,6 +1173,7 @@ import {
   History as HistoryIcon,
   Settings as SettingsIcon,
   Upload as UploadIcon,
+  Trash2 as Trash2Icon,
 } from 'lucide-vue-next';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import FilamentPagination from '@/components/ui/FilamentPagination.vue';
@@ -1161,7 +1182,16 @@ import DataProgramPoImportModal from '@/components/DataProgramPoImportModal.vue'
 
 // ===== AREA (Jabar/Jateng) =====
 const { area } = useArea();
-const { canEdit } = useAuth();
+const { canEdit, canDelete, canCreate } = useAuth();
+const deleteRecord = async (record) => {
+  if (!canDelete.value || !confirm('Hapus data ini? Tindakan ini tidak dapat dibatalkan.')) return;
+  try {
+    await axios.delete('/api/data-program/' + record.id);
+    await fetchData(1);
+  } catch (error) {
+    alert(error.response?.data?.message || 'Gagal menghapus data.');
+  }
+};
 
 // ===== LINK SPREADSHEET PER AREA =====
 const urlModal = reactive({

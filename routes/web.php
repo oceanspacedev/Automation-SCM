@@ -113,9 +113,11 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         // Master Tim Pajak & SCM (satu daftar untuk semua area)
         Route::get('/team-contacts', [TeamContactController::class, 'index']);
         Route::post('/team-contacts', [TeamContactController::class, 'store']);
-        Route::put('/team-contacts/{teamContact}', [TeamContactController::class, 'update']);
-        Route::delete('/team-contacts/{teamContact}', [TeamContactController::class, 'destroy']);
-        Route::patch('/team-contacts/{teamContact}/toggle-status', [TeamContactController::class, 'toggleStatus']);
+        Route::put('/team-contacts/{id}', [TeamContactController::class, 'update']);
+        Route::delete('/team-contacts/{id}', [TeamContactController::class, 'destroy']);
+        Route::patch('/team-contacts/{id}/toggle-status', [TeamContactController::class, 'toggleStatus']);
+
+        Route::put('/role-permissions', [UserController::class, 'updateRolePermissions']);
 
         // Master Users (butuh akses Master User; akun Admin hanya bisa diubah Admin)
         Route::get('/users', [UserController::class, 'index']);
@@ -160,6 +162,10 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         // Google OAuth Status & Disconnect
         Route::get('/google/status', [GoogleAuthController::class, 'status']);
         Route::post('/google/disconnect', [GoogleAuthController::class, 'disconnect']);
+
+        Route::delete('/invoices/{id}', [InvoiceController::class, 'destroy']);
+
+        Route::delete('/data-program/{id}', [DataProgramController::class, 'destroy']);
 
         // Dashboard
         Route::get('/dashboard', [DashboardController::class, 'index']);

@@ -41,6 +41,14 @@ class DataProgramController extends Controller
     /**
      * Get paginated list of Data Program records with stats and filter options.
      */
+    public function destroy(int $id): JsonResponse
+    {
+        $record = DataProgram::findOrFail($id);
+        $record->delete();
+
+        return response()->json(['success' => true, 'message' => 'Data berhasil dihapus.']);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $query = DataProgram::query();

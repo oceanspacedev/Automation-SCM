@@ -424,7 +424,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'imported']);
 
 // Hanya Admin & SCM yang boleh mengimport draft
-const { canEdit } = useAuth();
+const { canEdit, canCreate } = useAuth();
 
 const fileInput = ref(null);
 const selectedFile = ref(null);
@@ -518,7 +518,7 @@ const uploadErrorMessage = (err) =>
   'Gagal mengunggah file.';
 
 const loadPreview = async () => {
-  if (!canEdit.value || !selectedFile.value) return;
+  if ((!canEdit.value || !canCreate.value) || !selectedFile.value) return;
 
   uploading.value = true;
   uploadError.value = null;
@@ -535,7 +535,7 @@ const loadPreview = async () => {
 };
 
 const uploadFile = async () => {
-  if (!canEdit.value || !selectedFile.value) return;
+  if ((!canEdit.value || !canCreate.value) || !selectedFile.value) return;
 
   uploading.value = true;
   uploadError.value = null;

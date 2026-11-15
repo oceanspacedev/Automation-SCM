@@ -532,7 +532,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'created']);
 
 // Hanya Admin & SCM yang boleh menambah draft
-const { canEdit } = useAuth();
+const { canCreate } = useAuth();
 
 const isSubmitting = ref(false);
 const errorMessage = ref('');
@@ -811,7 +811,7 @@ function closeModal() {
 }
 
 async function submitForm() {
-  if (!canEdit.value) return;
+  if (!canCreate.value) return;
   if (!form.dealer_name) {
     errorMessage.value = 'Nama dealer wajib diisi.';
     return;

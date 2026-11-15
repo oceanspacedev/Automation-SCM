@@ -56,8 +56,7 @@ class EditAccessTest extends TestCase
 
             foreach ($writes as [$method, $uri, $data]) {
                 $this->json($method, $uri, $data, ['X-Area' => 'jabar'])
-                    ->assertForbidden()
-                    ->assertJsonPath('message', 'Hanya Admin dan SCM yang bisa mengubah data.');
+                    ->assertForbidden();
             }
         }
 

@@ -17,9 +17,9 @@
       </div>
 
       <!-- Tombol aksi; di layar kecil tiga tombol sama lebar dengan label pendek -->
-      <div v-if="canEdit" class="grid grid-cols-3 sm:flex sm:items-center gap-2">
+      <div v-if="canEdit || canCreate || canGenerate" class="grid grid-cols-3 sm:flex sm:items-center gap-2">
         <template v-if="selectedIds.length > 0">
-          <button
+          <button v-if="canGenerate"
             @click="askGenerateSelected"
             :disabled="generatingBatch || pushingBatch"
             :class="headerButtonClass"
@@ -28,7 +28,7 @@
             <span class="sm:hidden">{{ generatingBatch ? 'Proses...' : `Generate (${selectedIds.length})` }}</span>
             <span class="hidden sm:inline">{{ generatingBatch ? 'Menerbitkan...' : `Generate (${selectedIds.length}) Terpilih` }}</span>
           </button>
-          <button
+          <button v-if="canEdit"
             @click="askPushSelectedToDataProgram"
             :disabled="pushingBatch || generatingBatch"
             :class="headerButtonClass"
@@ -43,7 +43,7 @@
         </template>
 
         <button
-          v-else
+          v-else-if="canGenerate"
           @click="askGenerateAll"
           :disabled="generatingAll"
           :class="headerButtonClass"
@@ -53,11 +53,11 @@
           <span class="hidden sm:inline">{{ generatingAll ? 'Menerbitkan...' : 'Generate Semua Invoice' }}</span>
         </button>
 
-        <button @click="showImportModal = true" :class="headerButtonClass">
+        <button v-if="canCreate && canEdit" @click="showImportModal = true" :class="headerButtonClass">
           <span class="sm:hidden">Import</span><span class="hidden sm:inline">Import Excel</span>
         </button>
 
-        <button @click="showCreateModal = true" :class="headerButtonClass">
+        <button v-if="canCreate" @click="showCreateModal = true" :class="headerButtonClass">
           <span class="sm:hidden">Tambah</span><span class="hidden sm:inline">Tambah Manual</span>
         </button>
       </div>
@@ -296,7 +296,7 @@
                   </div>
                   <div class="flex items-center gap-1.5 shrink-0">
                     <button
-                      v-if="canEdit && draft.status === 'ready'"
+                      v-if="canGenerate && draft.status === 'ready'"
                       type="button"
                       @click="askGenerateSingle(draft)"
                       :disabled="generatingId === draft.id"
@@ -329,7 +329,9 @@
                       {{ pushingId === draft.id ? 'Mengirim...' : 'Data Program' }}
                     </button>
                     <button
-                      v-if="canEdit && draft.status !== 'invoiced'"
+                      v-if="canDelete"
+                      :disabled="draft.status === 'invoiced'"
+                      :title="draft.status === 'invoiced' ? 'Hapus invoice terkait terlebih dahulu' : 'Hapus draft ini'"
                       type="button"
                       @click="askDeleteDraft(draft)"
                       class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer"
@@ -514,7 +516,7 @@
 
                   <!-- 2. Generate Action (Ready) -->
                   <button
-                    v-if="canEdit && draft.status === 'ready'"
+                    v-if="canGenerate && draft.status === 'ready'"
                     type="button"
                     @click="askGenerateSingle(draft)"
                     :disabled="generatingId === draft.id"
@@ -561,11 +563,12 @@
 
                   <!-- 6. Delete Action (Draft not yet invoiced) -->
                   <button
-                    v-if="canEdit && draft.status !== 'invoiced'"
+                    v-if="canDelete"
+                    :disabled="draft.status === 'invoiced'"
+                    :title="draft.status === 'invoiced' ? 'Hapus invoice terkait terlebih dahulu' : 'Hapus draft ini'"
                     type="button"
                     @click="askDeleteDraft(draft)"
-                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
-                    title="Hapus Draft"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-red-600 hover:bg-red-50 transition cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                   >
                     <Trash2Icon class="w-3.5 h-3.5" />
                   </button>
@@ -664,6 +667,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAutoRefresh, createRequestTracker } from '@/composables/useAutoRefresh';
+import { canPerform } from '@/lib/access';
 import { useAuth } from '@/composables/useAuth';
 import ImportModal from '@/components/ImportModal.vue';
 import CreateDraftModal from '@/components/CreateDraftModal.vue';
@@ -675,8 +679,9 @@ import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 const headerButtonClass = 'h-9 px-2 sm:px-3.5 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs disabled:opacity-50 transition cursor-pointer whitespace-nowrap';
 
 // AR & Telemarketing hanya melihat: tombol generate, kirim, import, tambah, validasi & hapus disembunyikan
-const { canEdit } = useAuth();
+const { canEdit, canDelete, canCreate, user } = useAuth();
 
+const canGenerate = computed(() => canPerform(user.value, 'invoices', 'create'));
 const drafts = ref([]);
 const loading = ref(false);
 const showImportModal = ref(false);
@@ -884,7 +889,7 @@ const validateDraft = async (id) => {
 };
 
 const askGenerateSingle = (draft) => {
-  if (!canEdit.value || generatingId.value === draft.id) return;
+  if (!canGenerate.value || generatingId.value === draft.id) return;
   generateModalState.title = 'Terbitkan Invoice';
   generateModalState.subtitle = 'Pilih pihak Bill To untuk dicantumkan pada lembar invoice:';
   generateModalState.targetInfo = `${draft.dealer_name || draft.dealer_code} (${draft.invoice_type || 'Invoice'})`;
@@ -923,7 +928,7 @@ const executeGenerateSingle = async (draftId, billTo) => {
 };
 
 const askGenerateSelected = () => {
-  if (!canEdit.value || selectedIds.value.length === 0 || generatingBatch.value) return;
+  if (!canGenerate.value || selectedIds.value.length === 0 || generatingBatch.value) return;
   generateModalState.title = 'Terbitkan Invoice Terpilih';
   generateModalState.subtitle = `Pilih pihak Bill To untuk ${selectedIds.value.length} invoice terpilih:`;
   generateModalState.targetInfo = `${selectedIds.value.length} Draft Terpilih`;
@@ -963,7 +968,7 @@ const executeGenerateSelected = async (billTo) => {
 };
 
 const askGenerateAll = () => {
-  if (!canEdit.value || generatingAll.value) return;
+  if (!canGenerate.value || generatingAll.value) return;
   generateModalState.title = 'Terbitkan Semua Invoice';
   generateModalState.subtitle = 'Pilih pihak Bill To untuk SEMUA draft dengan status Ready:';
   generateModalState.targetInfo = 'Semua Draft (Status Ready)';
@@ -1059,7 +1064,7 @@ const onDraftCreated = (newDraft) => {
 };
 
 const askDeleteDraft = (draft) => {
-  if (!canEdit.value) return;
+  if (!canDelete.value) return;
   confirmState.title = 'Hapus Draft Invoice';
   confirmState.message = `Apakah Anda yakin ingin menghapus draft #${draft.no || draft.id} (${draft.dealer_name})? Tindakan ini tidak dapat dibatalkan.`;
   confirmState.confirmText = 'Ya, Hapus Draft';

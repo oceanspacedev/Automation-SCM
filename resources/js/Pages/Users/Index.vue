@@ -12,20 +12,20 @@
       <div>
         <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Master User</h1>
         <p class="text-xs text-gray-500 mt-0.5">
-          Daftar akun pengguna, peran, dan pengaturan izin hak akses modul.
+          Kelola akun pengguna, role, dan status akun.
         </p>
       </div>
 
       <!-- Di layar kecil tombol selebar layar -->
-      <div v-if="canEdit" class="grid grid-cols-2 gap-2 sm:flex">
-        <button
+      <div v-if="canCreate" class="grid grid-cols-2 gap-2 sm:flex">
+        <button v-if="canCreate && canEdit"
           type="button"
           @click="showUserImport = true"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 text-xs font-medium shadow-2xs transition cursor-pointer whitespace-nowrap"
         >
           <span>Import</span>
         </button>
-        <button
+        <button v-if="canCreate"
           type="button"
           @click="openCreateModal"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-600 bg-[#1D70F5] hover:bg-blue-600 text-white text-xs font-medium shadow-2xs transition cursor-pointer whitespace-nowrap"
@@ -147,13 +147,11 @@
               </span>
             </div>
 
-            <p class="break-words"><span class="text-gray-500">Akses:</span> {{ formatPermissionsDetail(user) || '-' }}</p>
-
             <div class="flex items-end justify-between gap-3">
               <p class="min-w-0 text-gray-500 break-words">
                 {{ formatRole(user.role) }} · {{ user.whatsapp ? `+${user.whatsapp}` : '-' }}
               </p>
-              <div v-if="canEdit" class="flex items-center gap-1.5 shrink-0">
+              <div v-if="canEdit || canDelete" class="flex items-center gap-1.5 shrink-0">
                 <button
                   v-if="!user.is_active"
                   type="button"
@@ -162,14 +160,14 @@
                 >
                   ACC
                 </button>
-                <button
+                <button v-if="canEdit"
                   type="button"
                   @click="openEditModal(user)"
                   class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
                 >
                   Edit
                 </button>
-                <button
+                <button v-if="canDelete"
                   type="button"
                   @click="confirmDeleteUser(user)"
                   :disabled="currentUser?.id === user.id"
@@ -192,22 +190,21 @@
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Nama</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Email</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Peran</th>
-              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Hak Akses Modul</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">No. WhatsApp</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
-              <th v-if="canEdit" scope="col" class="py-2.5 px-3 text-center w-28">Aksi</th>
+              <th v-if="canEdit || canDelete" scope="col" class="py-2.5 px-3 text-center w-28">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
             <tr v-if="isLoading" class="text-center">
-              <td :colspan="canEdit ? 8 : 7" class="py-10 text-gray-500">
+              <td :colspan="(canEdit || canDelete) ? 7 : 6" class="py-10 text-gray-500">
                 <RefreshCwIcon class="w-4 h-4 animate-spin mx-auto mb-1 text-gray-400" />
                 <span>Memuat data...</span>
               </td>
             </tr>
 
             <tr v-else-if="filteredUsers.length === 0" class="text-center">
-              <td :colspan="canEdit ? 8 : 7" class="py-10 text-gray-500">
+              <td :colspan="(canEdit || canDelete) ? 7 : 6" class="py-10 text-gray-500">
                 <span>Tidak ada data pengguna.</span>
               </td>
             </tr>
@@ -239,12 +236,7 @@
                 {{ formatRole(user.role) }}
               </td>
 
-              <!-- 5. Hak Akses Modul -->
-              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-normal break-words leading-relaxed text-gray-700 min-w-[240px] max-w-[340px]">
-                {{ formatPermissionsDetail(user) || '-' }}
-              </td>
-
-              <!-- 6. No. WhatsApp -->
+              <!-- 5. No. WhatsApp -->
               <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 <span v-if="user.whatsapp">+{{ user.whatsapp }}</span>
                 <span v-else class="text-gray-400">-</span>
@@ -269,7 +261,7 @@
               </td>
 
               <!-- 8. Aksi -->
-              <td v-if="canEdit" class="py-2.5 px-3 text-center whitespace-nowrap text-gray-700">
+              <td v-if="canEdit || canDelete" class="py-2.5 px-3 text-center whitespace-nowrap text-gray-700">
                 <div class="inline-flex items-center justify-center gap-1">
                   <!-- Tombol ACC / Setujui (Hanya untuk akun nonaktif / pending) -->
                   <button
@@ -283,7 +275,7 @@
                   </button>
 
                   <!-- Tombol Edit -->
-                  <button
+                  <button v-if="canEdit"
                     type="button"
                     @click="openEditModal(user)"
                     class="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition cursor-pointer"
@@ -293,7 +285,7 @@
                   </button>
 
                   <!-- Tombol Hapus -->
-                  <button
+                  <button v-if="canDelete"
                     type="button"
                     @click="confirmDeleteUser(user)"
                     :disabled="currentUser?.id === user.id"
@@ -393,35 +385,7 @@
             </div>
           </div>
 
-          <!-- Hak Akses (User Permissions) - Compact Grid No Scroll -->
-          <div>
-            <div class="flex items-center justify-between mb-1">
-              <label class="font-medium text-gray-700">Hak Akses Modul</label>
-              <button
-                type="button"
-                @click="toggleAllPermissions"
-                class="text-[11px] text-gray-500 hover:text-black underline cursor-pointer"
-              >
-                {{ areAllPermissionsChecked ? 'Hapus Semua' : 'Pilih Semua' }}
-              </button>
-            </div>
-            <div class="p-2.5 rounded-lg border border-gray-200 bg-gray-50/50 grid grid-cols-2 sm:grid-cols-3 gap-2">
-              <label
-                v-for="(label, key) in permissionList"
-                :key="key"
-                class="flex items-center gap-2 cursor-pointer text-gray-700 hover:text-gray-950 select-none py-0.5"
-              >
-                <input
-                  type="checkbox"
-                  :value="key"
-                  v-model="userForm.permissions"
-                  class="rounded border-gray-300 text-gray-900 focus:ring-gray-900 cursor-pointer"
-                />
-                <span class="text-xs">{{ label }}</span>
-              </label>
-            </div>
-            <p class="mt-1 text-[11px] text-gray-500">Master Program juga membuka menu Brand, Region, dan AR. Master User juga membuka Jadwal Otomatis.</p>
-          </div>
+          <p class="text-xs text-gray-500">Hak akses mengikuti role. Pengaturannya tersedia di menu Role Permission.</p>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
             <!-- Password -->
@@ -484,14 +448,14 @@
           Hapus pengguna <strong class="text-gray-900">{{ userToDelete.name }}</strong><template v-if="userToDelete.email"> ({{ userToDelete.email }})</template>?
         </p>
         <div class="flex items-center justify-end gap-2 pt-2">
-          <button
+          <button v-if="canDelete"
             type="button"
             @click="userToDelete = null"
             class="h-8 px-3 rounded-lg border border-gray-300 hover:bg-gray-50 text-xs font-medium text-gray-700 cursor-pointer"
           >
             Batal
           </button>
-          <button
+          <button v-if="canDelete"
             type="button"
             @click="executeDeleteUser"
             :disabled="isDeleting"
@@ -530,7 +494,7 @@ import {
   Trash2 as Trash2Icon,
 } from 'lucide-vue-next';
 
-const { user: currentUser, canEdit } = useAuth();
+const { user: currentUser, canEdit , canCreate, canDelete } = useAuth();
 
 // Daftar hak akses & bawaan per peran; diganti dengan daftar dari server (User::AVAILABLE_PERMISSIONS) saat data dimuat
 const permissionList = ref({
@@ -660,7 +624,7 @@ useAutoRefresh(() => fetchUsers({ silent: true }), {
 
 // Modal Actions
 const openCreateModal = () => {
-  if (!canEdit.value) return;
+  if (!canCreate.value) return;
   isEditMode.value = false;
   formError.value = '';
   userForm.value = {
@@ -683,7 +647,7 @@ const openEditModal = (user) => {
 
   // Resolve user permissions or fallback to role defaults
   let perms = [];
-  if (Array.isArray(user.permissions) && user.permissions.length > 0) {
+  if (Array.isArray(user.permissions)) {
     perms = [...user.permissions];
   } else if (roleDefaults.value[user.role]) {
     perms = [...roleDefaults.value[user.role]];
@@ -703,14 +667,15 @@ const openEditModal = (user) => {
 };
 
 const submitUserForm = async () => {
-  if (!canEdit.value) return;
+  if (!(isEditMode.value ? canEdit.value : canCreate.value)) return;
   isSaving.value = true;
   formError.value = '';
   try {
+    const { permissions, ...payload } = userForm.value;
     if (isEditMode.value) {
-      await axios.put(`/api/users/${userForm.value.id}`, userForm.value);
+      await axios.put(`/api/users/${userForm.value.id}`, payload);
     } else {
-      await axios.post('/api/users', userForm.value);
+      await axios.post('/api/users', payload);
     }
     isModalOpen.value = false;
     await fetchUsers();
@@ -748,12 +713,12 @@ const handleApproveUser = async (user) => {
 };
 
 const confirmDeleteUser = (user) => {
-  if (!canEdit.value) return;
+  if (!canDelete.value) return;
   userToDelete.value = user;
 };
 
 const executeDeleteUser = async () => {
-  if (!canEdit.value || !userToDelete.value) return;
+  if (!canDelete.value || !userToDelete.value) return;
   isDeleting.value = true;
   try {
     await axios.delete(`/api/users/${userToDelete.value.id}`);
@@ -782,26 +747,11 @@ const formatRole = (role) => {
 };
 
 const getUserPermissions = (user) => {
-  if (Array.isArray(user.permissions) && user.permissions.length > 0) {
+  if (Array.isArray(user.effective_permissions)) return user.effective_permissions;
+  if (Array.isArray(user.permissions)) {
     return user.permissions;
   }
   return roleDefaults.value[user.role] || [];
 };
 
-const formatPermissionsSummary = (user) => {
-  const perms = getUserPermissions(user);
-  const total = Object.keys(permissionList.value).length;
-  if (perms.length >= total) {
-    return 'Semua Modul';
-  }
-  if (perms.length === 0) {
-    return 'Tidak ada akses';
-  }
-  return `${perms.length} Modul Terpilih`;
-};
-
-const formatPermissionsDetail = (user) => {
-  const perms = getUserPermissions(user);
-  return perms.map((p) => permissionList.value[p] || p).join(', ');
-};
 </script>

@@ -268,6 +268,15 @@
                     >
                       Kirim
                     </button>
+                    <button
+                      v-if="canDelete"
+                      type="button"
+                      @click.stop="deleteRecord(inv)"
+                      class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer"
+                      title="Hapus invoice ini"
+                    >
+                      Hapus
+                    </button>
                   </div>
                 </div>
               </div>
@@ -454,6 +463,17 @@
                   >
                     <SendIcon class="w-3.5 h-3.5 text-gray-600" />
                   </button>
+
+                  <!-- 4. Hapus Button (Paling Kanan) -->
+                  <button
+                    v-if="canDelete"
+                    type="button"
+                    @click.stop="deleteRecord(inv)"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                    title="Hapus Invoice Ini"
+                  >
+                    <Trash2Icon class="w-3.5 h-3.5" />
+                  </button>
                 </div>
               </td>
             </tr>
@@ -543,6 +563,7 @@ import {
   ChevronDown as ChevronDownIcon,
   Search as SearchIcon,
   Filter as FilterIcon,
+  Trash2 as Trash2Icon,
 } from '@lucide/vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Calendar } from '@/components/ui/calendar';
@@ -561,7 +582,16 @@ const headerButtonClass = 'h-9 px-2 sm:px-3.5 inline-flex items-center justify-c
 
 const { area } = useArea();
 const { brand } = useBrands();
-const { canEdit } = useAuth();
+const { canEdit, canDelete } = useAuth();
+const deleteRecord = async (record) => {
+  if (!canDelete.value || !confirm('Hapus data ini? Tindakan ini tidak dapat dibatalkan.')) return;
+  try {
+    await axios.delete('/api/invoices/' + record.id);
+    await fetchInvoices(1);
+  } catch (error) {
+    alert(error.response?.data?.message || 'Gagal menghapus data.');
+  }
+};
 
 const invoices = ref([]);
 const loading = ref(false);

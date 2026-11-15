@@ -28,7 +28,7 @@
           <span class="sm:hidden">Export</span><span class="hidden sm:inline">Export Excel</span>
         </button>
         <button
-          v-if="canEdit"
+          v-if="canCreate"
           type="button"
           @click="openCreateModal"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
@@ -94,7 +94,7 @@
                   Edit
                 </button>
                 <button
-                  v-if="canEdit"
+                  v-if="canDelete"
                   type="button"
                   @click="regionToDelete = r"
                   class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer"
@@ -114,15 +114,15 @@
               <th scope="col" class="py-2.5 px-3 text-center w-12 border-r border-gray-200">No</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">REGION</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
-              <th v-if="canEdit" scope="col" class="py-2.5 px-3 text-right">Aksi</th>
+              <th v-if="canEdit || canDelete" scope="col" class="py-2.5 px-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <tr v-if="isLoading">
-              <td :colspan="canEdit ? 4 : 3" class="py-8 text-center text-gray-500">Memuat data...</td>
+              <td :colspan="(canEdit || canDelete) ? 4 : 3" class="py-8 text-center text-gray-500">Memuat data...</td>
             </tr>
             <tr v-else-if="filteredRegions.length === 0">
-              <td :colspan="canEdit ? 4 : 3" class="py-8 text-center text-gray-500">
+              <td :colspan="(canEdit || canDelete) ? 4 : 3" class="py-8 text-center text-gray-500">
                 Belum ada region untuk {{ area.label }}.<template v-if="canEdit"> Klik "Tambah Region" untuk menambahkan.</template>
               </td>
             </tr>
@@ -149,9 +149,9 @@
                   <span>{{ r.is_active ? 'Aktif' : 'Nonaktif' }}</span>
                 </span>
               </td>
-              <td v-if="canEdit" class="py-2 px-3 text-right whitespace-nowrap">
+              <td v-if="canEdit || canDelete" class="py-2 px-3 text-right whitespace-nowrap">
                 <div class="inline-flex items-center gap-1">
-                  <button
+                  <button v-if="canEdit"
                     type="button"
                     @click="openEditModal(r)"
                     class="h-7 w-7 inline-flex items-center justify-center rounded border border-gray-200 hover:bg-gray-100 text-gray-600 transition cursor-pointer"
@@ -159,7 +159,7 @@
                   >
                     <PencilIcon class="w-3.5 h-3.5" />
                   </button>
-                  <button
+                  <button v-if="canDelete"
                     type="button"
                     @click="regionToDelete = r"
                     class="h-7 w-7 inline-flex items-center justify-center rounded border border-gray-200 hover:bg-red-50 text-red-600 hover:border-red-200 transition cursor-pointer"
@@ -241,14 +241,14 @@
           Hapus region <strong class="text-gray-900">{{ regionToDelete.name }}</strong> dari {{ area.label }}?
         </p>
         <div class="flex items-center justify-end gap-2 pt-2">
-          <button
+          <button v-if="canDelete"
             type="button"
             @click="regionToDelete = null"
             class="h-8 px-3 rounded-lg border border-gray-300 hover:bg-gray-50 text-xs font-medium text-gray-700 cursor-pointer"
           >
             Batal
           </button>
-          <button
+          <button v-if="canDelete"
             type="button"
             @click="executeDelete"
             :disabled="isDeleting"
@@ -280,7 +280,7 @@ import {
 } from 'lucide-vue-next';
 
 const { area } = useArea();
-const { canEdit } = useAuth();
+const { canEdit , canCreate, canDelete } = useAuth();
 
 const regions = ref([]);
 const isLoading = ref(false);
@@ -320,7 +320,7 @@ useAutoRefresh(() => fetchRegions({ silent: true }), {
 });
 
 const openCreateModal = () => {
-  if (!canEdit.value) return;
+  if (!canCreate.value) return;
   formData.id = null;
   formData.name = '';
   formData.is_active = true;
@@ -338,7 +338,7 @@ const openEditModal = (r) => {
 };
 
 const submitForm = async () => {
-  if (!canEdit.value) return;
+  if (!(isEditMode.value ? canEdit.value : canCreate.value)) return;
   isSaving.value = true;
   errorMessage.value = '';
   try {
@@ -368,7 +368,7 @@ const toggleStatus = async (r) => {
 };
 
 const executeDelete = async () => {
-  if (!canEdit.value) return;
+  if (!canDelete.value) return;
   isDeleting.value = true;
   try {
     await axios.delete(`/api/regions/${regionToDelete.value.id}`);

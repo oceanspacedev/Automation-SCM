@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isOpen && canEdit" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs" @click.self="close">
+  <div v-if="isOpen && canEdit && canCreate" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs" @click.self="close">
     <div class="bg-white rounded-xl max-w-lg w-full shadow-xl border border-gray-200 max-h-[90vh] flex flex-col">
       <div class="px-5 py-4 border-b border-gray-200 flex items-start justify-between gap-3">
         <div>
@@ -190,7 +190,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'imported']);
 
-const { canEdit } = useAuth();
+const { canEdit, canCreate } = useAuth();
 
 const ROLE_LABELS = { telemarketing: 'Telemarketing', ar: 'AR', scm: 'SCM', admin: 'Admin' };
 
@@ -231,7 +231,7 @@ const clearFile = () => {
 };
 
 const upload = async () => {
-  if (!canEdit.value || !selectedFile.value) return;
+  if ((!canEdit.value || !canCreate.value) || !selectedFile.value) return;
 
   uploading.value = true;
   errorMessage.value = '';

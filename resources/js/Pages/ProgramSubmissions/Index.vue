@@ -377,7 +377,7 @@
               <TableHead class="min-w-[140px] font-semibold text-gray-950">No Faktur</TableHead>
               <TableHead class="whitespace-nowrap font-semibold text-gray-950">Tgl Faktur</TableHead>
 
-              <TableHead class="min-w-[105px] w-[105px] text-center font-semibold text-gray-950 sticky top-0 right-0 z-30 bg-white border-b border-gray-200">Aksi</TableHead>
+              <TableHead class="min-w-[125px] w-[125px] text-center font-semibold text-gray-950 sticky top-0 right-0 z-30 bg-white border-b border-gray-200">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -711,6 +711,17 @@
                     :title="canEdit ? 'Lihat Detail & Edit Pengajuan' : 'Lihat Detail'"
                   >
                     <EyeIcon class="w-3.5 h-3.5 text-gray-600" />
+                  </button>
+
+                  <!-- Icon Hapus: Hapus Pengajuan Ini (Paling Kanan) -->
+                  <button
+                    v-if="canDelete"
+                    type="button"
+                    @click.stop="confirmDeleteSubmission(row)"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                    title="Hapus Pengajuan Ini"
+                  >
+                    <Trash2Icon class="w-3.5 h-3.5" />
                   </button>
                 </div>
               </TableCell>
@@ -1251,7 +1262,7 @@
                 </button>
 
                 <button
-                  v-if="canEdit && editingSubmission"
+                  v-if="canDelete && editingSubmission"
                   type="button"
                   @click="confirmDeleteSubmission(editingSubmission)"
                   class="h-8 px-3 rounded-md border border-gray-200 bg-white hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600 text-gray-600 text-xs font-normal transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
@@ -1757,7 +1768,7 @@ import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 import FilamentBadge from '@/components/ui/FilamentBadge.vue';
 import { useAuth } from '@/composables/useAuth';
 
-const { canEdit } = useAuth();
+const { canEdit, canDelete, canCreate } = useAuth();
 
 const googleSheetUrl = 'https://docs.google.com/spreadsheets/d/1rDYiHsNR43H44g2xyV-igyp1Ijv_jp8v8FblAMHqof8/edit?gid=0#gid=0';
 
@@ -2830,7 +2841,7 @@ const handleQuickSwap = async (type = 'agr_faktur') => {
 
 // Confirm delete submission
 const confirmDeleteSubmission = async (row) => {
-  if (!canEdit.value) return;
+  if (!canDelete.value) return;
   if (!row) return;
   const dealer = row.dealer_name || row.id_real || 'pengajuan ini';
   if (!confirm(`Apakah Anda yakin ingin menghapus data pengajuan "${dealer}"?\n\nCatatan: Data yang dihapus tidak akan dimunculkan lagi saat sinkronisasi spreadsheet.`)) {

@@ -1,6 +1,7 @@
 import { reactive, computed } from 'vue';
 import axios from 'axios';
-import { canEdit as canEditData } from '@/lib/access';
+import { useRoute } from 'vue-router';
+import { canPerform, canEdit as canEditData } from '@/lib/access';
 
 const state = reactive({
   user: null,
@@ -9,6 +10,8 @@ const state = reactive({
 });
 
 export function useAuth() {
+  const route = useRoute();
+  const module = computed(() => ['drafts','invoices','data_program','form_program','master_program','master_dealer','master_customer','master_user'].includes(route?.meta?.permission) ? route.meta.permission : null);
   const checkAuth = async () => {
     state.loading = true;
     try {
@@ -67,8 +70,10 @@ export function useAuth() {
   return {
     state,
     user: computed(() => state.user),
-    // Hanya Admin & SCM yang boleh mengubah data; AR & Telemarketing hanya melihat
-    canEdit: computed(() => canEditData(state.user)),
+    // Izin transaksi mengikuti modul halaman yang sedang dibuka.
+    canCreate: computed(() => module.value ? canPerform(state.user, module.value, 'create') : canEditData(state.user)),
+    canEdit: computed(() => module.value ? canPerform(state.user, module.value, 'edit') : canEditData(state.user)),
+    canDelete: computed(() => module.value ? canPerform(state.user, module.value, 'delete') : canEditData(state.user)),
     isAuthenticated: computed(() => !!state.user),
     isLoading: computed(() => state.loading),
     isInitialized: computed(() => state.initialized),

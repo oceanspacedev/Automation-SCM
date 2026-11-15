@@ -21,8 +21,8 @@
       <!-- Tombol aksi; di layar kecil tiga tombol sama lebar -->
       <div class="grid sm:flex sm:items-center gap-2" :class="canEdit ? 'grid-cols-3' : 'grid-cols-1'">
         <!-- Import: tiga jenis file, masing-masing dengan jendelanya sendiri -->
-        <div v-if="canEdit" class="relative" ref="importMenuRef">
-          <button
+        <div v-if="canCreate && canEdit" class="relative" ref="importMenuRef">
+          <button v-if="canCreate && canEdit"
             type="button"
             @click="showImportMenu = !showImportMenu"
             class="h-9 w-full px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
@@ -31,7 +31,7 @@
             <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 transition-transform duration-150" :class="showImportMenu && 'rotate-180'" />
           </button>
           <div v-if="showImportMenu" class="absolute left-0 sm:left-auto sm:right-0 top-full mt-1.5 w-56 bg-white rounded-lg shadow-lg border border-gray-200 p-1 z-50">
-            <button
+            <button v-if="canCreate && canEdit"
               v-for="option in IMPORT_OPTIONS"
               :key="option.type"
               type="button"
@@ -52,7 +52,7 @@
           <span class="sm:hidden">Export</span><span class="hidden sm:inline">Export Excel</span>
         </button>
         <button
-          v-if="canEdit"
+          v-if="canCreate"
           type="button"
           @click="openCreateModal"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
@@ -271,15 +271,15 @@
               <p class="min-w-0 text-gray-500 break-words">
                 Telemarketing {{ d.telemarketing || '-' }}<template v-if="d.telemarketing_phone"> · {{ d.telemarketing_phone }}</template>
               </p>
-              <div v-if="canEdit" class="flex items-center gap-1.5 shrink-0">
-                <button
+              <div v-if="canEdit || canDelete" class="flex items-center gap-1.5 shrink-0">
+                <button v-if="canEdit"
                   type="button"
                   @click="openEditModal(d)"
                   class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
                 >
                   Edit
                 </button>
-                <button
+                <button v-if="canDelete"
                   type="button"
                   @click="confirmDelete(d)"
                   class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer"
@@ -308,17 +308,17 @@
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Sales</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Agreement</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
-              <th v-if="canEdit" scope="col" class="py-2.5 px-3 text-right">Aksi</th>
+              <th v-if="canEdit || canDelete" scope="col" class="py-2.5 px-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <tr v-if="isLoading">
-              <td :colspan="canEdit ? 12 : 11" class="py-8 text-center text-gray-500">
+              <td :colspan="(canEdit || canDelete) ? 12 : 11" class="py-8 text-center text-gray-500">
                 Memuat data...
               </td>
             </tr>
             <tr v-else-if="dealers.length === 0">
-              <td :colspan="canEdit ? 12 : 11" class="py-8 text-center text-gray-500">
+              <td :colspan="(canEdit || canDelete) ? 12 : 11" class="py-8 text-center text-gray-500">
                 Tidak ada data dealer yang ditemukan.
               </td>
             </tr>
@@ -403,9 +403,9 @@
               </td>
 
               <!-- 9. Aksi -->
-              <td v-if="canEdit" class="py-2.5 px-3 text-right whitespace-nowrap">
+              <td v-if="canEdit || canDelete" class="py-2.5 px-3 text-right whitespace-nowrap">
                 <div class="flex items-center justify-end gap-1">
-                  <button
+                  <button v-if="canEdit"
                     type="button"
                     @click="openEditModal(d)"
                     class="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition cursor-pointer"
@@ -413,7 +413,7 @@
                   >
                     <PencilIcon class="w-3.5 h-3.5" />
                   </button>
-                  <button
+                  <button v-if="canDelete"
                     type="button"
                     @click="confirmDelete(d)"
                     class="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
@@ -703,14 +703,14 @@
           Hapus dealer <strong class="text-gray-900">{{ dealerToDelete.dealer_name }}</strong> (ID: {{ dealerToDelete.id_realme }})?
         </p>
         <div class="flex items-center justify-end gap-2 pt-2">
-          <button
+          <button v-if="canDelete"
             type="button"
             @click="dealerToDelete = null"
             class="h-8 px-3 rounded-lg border border-gray-300 hover:bg-gray-50 text-xs font-medium text-gray-700 cursor-pointer"
           >
             Batal
           </button>
-          <button
+          <button v-if="canDelete"
             type="button"
             @click="executeDelete"
             :disabled="isDeleting"
@@ -744,7 +744,7 @@ import {
   Trash2Icon,
 } from 'lucide-vue-next';
 
-const { canEdit } = useAuth();
+const { canEdit , canCreate, canDelete } = useAuth();
 
 const isImportModalOpen = ref(false);
 const isEmailImportOpen = ref(false);
@@ -761,7 +761,7 @@ const importMenuRef = ref(null);
 
 const openImport = (type) => {
   showImportMenu.value = false;
-  if (!canEdit.value) return;
+  if (!(canCreate.value && canEdit.value)) return;
   if (type === 'email') {
     isEmailImportOpen.value = true;
     return;
@@ -946,7 +946,7 @@ function openEditModal(d) {
 }
 
 async function submitForm() {
-  if (!canEdit.value) return;
+  if (!(isEditMode.value ? canEdit.value : canCreate.value)) return;
   isSaving.value = true;
   try {
     if (isEditMode.value) {
@@ -980,7 +980,7 @@ function confirmDelete(d) {
 }
 
 async function executeDelete() {
-  if (!canEdit.value || !dealerToDelete.value) return;
+  if (!canDelete.value || !dealerToDelete.value) return;
   isDeleting.value = true;
   try {
     const res = await axios.delete(`/api/dealers/${dealerToDelete.value.id}`);
@@ -1060,7 +1060,7 @@ async function fetchImportStatus() {
 }
 
 async function resumeImport() {
-  if (!canEdit.value) return;
+  if (!(canCreate.value && canEdit.value)) return;
   isResumingImport.value = true;
   try {
     const res = await axios.post('/api/dealers/import/resume');

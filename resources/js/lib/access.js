@@ -4,9 +4,10 @@
  */
 export function canAccess(user, feature) {
   if (!user) return true;
+  user = { ...user, permissions: user.effective_permissions ?? user.permissions };
 
   // 1. Jika user memiliki daftar custom permissions
-  if (Array.isArray(user.permissions) && user.permissions.length > 0) {
+  if (Array.isArray(user.permissions)) {
     if (feature === 'riwayat') {
       return ['riwayat_program', 'email_logs'].some((permission) => user.permissions.includes(permission));
     }
@@ -54,4 +55,12 @@ export function canOpenRoute(user, meta) {
   if (meta.adminOnly && user?.role !== 'admin') return false;
 
   return !meta.permission || canAccess(user, meta.permission);
+}
+
+export function canPerform(user, module, action) {
+  if (!user || user.is_active === false || !canAccess(user, module)) return false;
+  user = { ...user, permissions: user.effective_permissions ?? user.permissions };
+  if (action === 'view') return true;
+  if (Array.isArray(user.permissions)) return user.permissions.includes(module + '_' + action);
+  return ['admin', 'scm'].includes(user.role || 'scm');
 }

@@ -17,7 +17,7 @@
       </div>
 
       <button
-        v-if="canEdit"
+        v-if="canCreate"
         type="button"
         @click="openCreateModal"
         class="h-9 px-3.5 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
@@ -63,11 +63,11 @@
                 <span>{{ b.is_active ? 'Aktif' : 'Nonaktif' }}</span>
               </span>
             </div>
-            <div v-if="canEdit" class="flex items-center justify-end gap-1.5">
-              <button type="button" @click="openEditModal(b)" class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer">
+            <div v-if="canEdit || canDelete" class="flex items-center justify-end gap-1.5">
+              <button v-if="canEdit" type="button" @click="openEditModal(b)" class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer">
                 Edit
               </button>
-              <button type="button" @click="brandToDelete = b" class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer">
+              <button v-if="canDelete" type="button" @click="brandToDelete = b" class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer">
                 Hapus
               </button>
             </div>
@@ -85,12 +85,12 @@
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">FORM PUBLIK</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">URUTAN</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
-              <th v-if="canEdit" scope="col" class="py-2.5 px-3 text-right">Aksi</th>
+              <th v-if="canEdit || canDelete" scope="col" class="py-2.5 px-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <tr v-if="isLoading">
-              <td :colspan="canEdit ? 7 : 6" class="py-8 text-center text-gray-500">Memuat data...</td>
+              <td :colspan="(canEdit || canDelete) ? 7 : 6" class="py-8 text-center text-gray-500">Memuat data...</td>
             </tr>
             <tr v-else v-for="(b, index) in brands" :key="b.id" class="hover:bg-gray-50/80 transition">
               <td class="py-2 px-3 text-center text-gray-500 border-r border-gray-200">{{ index + 1 }}</td>
@@ -118,9 +118,9 @@
                   <span>{{ b.is_active ? 'Aktif' : 'Nonaktif' }}</span>
                 </span>
               </td>
-              <td v-if="canEdit" class="py-2 px-3 text-right whitespace-nowrap">
+              <td v-if="canEdit || canDelete" class="py-2 px-3 text-right whitespace-nowrap">
                 <div class="inline-flex items-center gap-1">
-                  <button
+                  <button v-if="canEdit"
                     type="button"
                     @click="openEditModal(b)"
                     class="h-7 w-7 inline-flex items-center justify-center rounded border border-gray-200 hover:bg-gray-100 text-gray-600 transition cursor-pointer"
@@ -128,7 +128,7 @@
                   >
                     <PencilIcon class="w-3.5 h-3.5" />
                   </button>
-                  <button
+                  <button v-if="canDelete"
                     type="button"
                     @click="brandToDelete = b"
                     class="h-7 w-7 inline-flex items-center justify-center rounded border border-gray-200 hover:bg-red-50 text-red-600 hover:border-red-200 transition cursor-pointer"
@@ -228,7 +228,7 @@
           >
             Batal
           </button>
-          <button
+          <button v-if="canDelete"
             type="button"
             @click="executeDelete"
             :disabled="isDeleting"
@@ -255,7 +255,7 @@ import {
   Trash2 as Trash2Icon,
 } from 'lucide-vue-next';
 
-const { canEdit } = useAuth();
+const { canEdit , canCreate, canDelete } = useAuth();
 
 const brands = ref([]);
 const isLoading = ref(false);
@@ -297,7 +297,7 @@ const showActionMessage = (message, isError = false) => {
 };
 
 const openCreateModal = () => {
-  if (!canEdit.value) return;
+  if (!canCreate.value) return;
   Object.assign(formData, { id: null, slug: '', name: '', sort_order: brands.value.length, is_active: true });
   errorMessage.value = '';
   isModalOpen.value = true;
@@ -311,7 +311,7 @@ const openEditModal = (b) => {
 };
 
 const submitForm = async () => {
-  if (!canEdit.value) return;
+  if (!(isEditMode.value ? canEdit.value : canCreate.value)) return;
   isSaving.value = true;
   errorMessage.value = '';
   try {
@@ -346,7 +346,7 @@ const closeDeleteModal = () => {
 };
 
 const executeDelete = async () => {
-  if (!canEdit.value || !brandToDelete.value) return;
+  if (!canDelete.value || !brandToDelete.value) return;
   isDeleting.value = true;
   deleteError.value = '';
   try {

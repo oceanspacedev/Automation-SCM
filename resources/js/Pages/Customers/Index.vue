@@ -27,7 +27,7 @@
           <span class="sm:hidden">Export</span><span class="hidden sm:inline">Export Excel</span>
         </button>
         <button
-          v-if="canEdit"
+          v-if="canCreate"
           type="button"
           @click="openCreateModal"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
@@ -106,15 +106,15 @@
             </div>
             <div class="flex items-center justify-between gap-3">
               <p class="min-w-0 text-gray-500 break-words">NPWP {{ c.npwp && c.npwp !== '-' ? c.npwp : '-' }}</p>
-              <div v-if="canEdit" class="flex items-center gap-1.5 shrink-0">
-                <button
+              <div v-if="canEdit || canDelete" class="flex items-center gap-1.5 shrink-0">
+                <button v-if="canEdit"
                   type="button"
                   @click="openEditModal(c)"
                   class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
                 >
                   Edit
                 </button>
-                <button
+                <button v-if="canDelete"
                   type="button"
                   @click="confirmDelete(c)"
                   class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer"
@@ -138,17 +138,17 @@
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">NPWP</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Alamat Bill-To</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
-              <th v-if="canEdit" scope="col" class="py-2.5 px-3 text-right">Aksi</th>
+              <th v-if="canEdit || canDelete" scope="col" class="py-2.5 px-3 text-right">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <tr v-if="isLoading">
-              <td :colspan="canEdit ? 7 : 6" class="py-8 text-center text-gray-500">
+              <td :colspan="(canEdit || canDelete) ? 7 : 6" class="py-8 text-center text-gray-500">
                 Memuat data...
               </td>
             </tr>
             <tr v-else-if="customers.length === 0">
-              <td :colspan="canEdit ? 7 : 6" class="py-8 text-center text-gray-500">
+              <td :colspan="(canEdit || canDelete) ? 7 : 6" class="py-8 text-center text-gray-500">
                 Tidak ada data badan usaha yang ditemukan.
               </td>
             </tr>
@@ -201,9 +201,9 @@
               </td>
 
               <!-- 7. Aksi -->
-              <td v-if="canEdit" class="py-2.5 px-3 text-right whitespace-nowrap">
+              <td v-if="canEdit || canDelete" class="py-2.5 px-3 text-right whitespace-nowrap">
                 <div class="flex items-center justify-end gap-1">
-                  <button
+                  <button v-if="canEdit"
                     type="button"
                     @click="openEditModal(c)"
                     class="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition cursor-pointer"
@@ -211,7 +211,7 @@
                   >
                     <PencilIcon class="w-3.5 h-3.5" />
                   </button>
-                  <button
+                  <button v-if="canDelete"
                     type="button"
                     @click="confirmDelete(c)"
                     class="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
@@ -399,14 +399,14 @@
           Hapus badan usaha <strong class="text-gray-900">{{ customerToDelete.name }}</strong> ({{ customerToDelete.code }})?
         </p>
         <div class="flex items-center justify-end gap-2 pt-2">
-          <button
+          <button v-if="canDelete"
             type="button"
             @click="customerToDelete = null"
             class="h-8 px-3 rounded-lg border border-gray-300 hover:bg-gray-50 text-xs font-medium text-gray-700 cursor-pointer"
           >
             Batal
           </button>
-          <button
+          <button v-if="canDelete"
             type="button"
             @click="executeDelete"
             :disabled="isDeleting"
@@ -437,7 +437,7 @@ import {
   Trash2Icon,
 } from 'lucide-vue-next';
 
-const { canEdit } = useAuth();
+const { canEdit , canCreate, canDelete } = useAuth();
 
 const customers = ref([]);
 const totalRows = ref(0);
@@ -538,7 +538,7 @@ function openEditModal(c) {
 }
 
 async function submitForm() {
-  if (!canEdit.value) return;
+  if (!(isEditMode.value ? canEdit.value : canCreate.value)) return;
   isSaving.value = true;
   try {
     if (isEditMode.value) {
@@ -572,7 +572,7 @@ function confirmDelete(c) {
 }
 
 async function executeDelete() {
-  if (!canEdit.value || !customerToDelete.value) return;
+  if (!canDelete.value || !customerToDelete.value) return;
   isDeleting.value = true;
   try {
     const res = await axios.delete(`/api/customers/${customerToDelete.value.id}`);

@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
@@ -38,6 +39,17 @@ class InvoiceController extends Controller
     /**
      * Paginated invoice list with filters.
      */
+    public function destroy(int $id): JsonResponse
+    {
+        $record = Invoice::findOrFail($id);
+        DB::transaction(function () use ($record): void {
+            $record->draft?->update(['status' => 'ready']);
+            $record->delete();
+        });
+
+        return response()->json(['success' => true, 'message' => 'Data berhasil dihapus.']);
+    }
+
     public function index(Request $request): JsonResponse
     {
         $query = Invoice::query()->with('draft');

@@ -14,6 +14,7 @@ import ProgramHistoryIndex from '../Pages/ProgramHistory/Index.vue';
 import ApprovalHistoryIndex from '../Pages/ApprovalHistory/Index.vue';
 import TestProgramIndex from '../Pages/TestProgram/Index.vue';
 import UsersIndex from '../Pages/Users/Index.vue';
+import RolePermissionsIndex from '../Pages/RolePermissions/Index.vue';
 import CustomersIndex from '../Pages/Customers/Index.vue';
 import DealersIndex from '../Pages/Dealers/Index.vue';
 import ProgramsIndex from '../Pages/Programs/Index.vue';
@@ -93,6 +94,7 @@ const routes = [
   { path: '/badan-usaha', name: 'customers.index', component: CustomersIndex, meta: { requiresAuth: true, permission: 'master_customer' } },
   { path: '/customers', redirect: '/badan-usaha' },
   ...areaRoutes('/dealers', 'dealers.index', DealersIndex, 'master_dealer'),
+  { path: '/role-permissions', name: 'role-permissions.index', component: RolePermissionsIndex, meta: { requiresAuth: true, adminOnly: true } },
   { path: '/users', name: 'users.index', component: UsersIndex, meta: { requiresAuth: true, permission: 'master_user' } },
   { path: '/jadwal-otomatis', name: 'schedules.index', component: SchedulesIndex, meta: { requiresAuth: true, permission: 'master_user' } },
   { path: '/reset-data', name: 'data-reset.index', component: DataResetIndex, meta: { requiresAuth: true, adminOnly: true } },

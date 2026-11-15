@@ -516,6 +516,7 @@ const masterColumns = computed(() => [
     canAccess('master_dealer') && { label: 'Dealer', to: '/dealers' },
     canAccess('master_customer') && { label: 'Badan Usaha', to: '/badan-usaha' },
     canAccess('master_user') && { label: 'User', to: '/users' },
+    user.value?.role === 'admin' && { label: 'Role Permission', to: '/role-permissions' },
     canAccess('master_user') && { label: 'Jadwal Otomatis', to: '/jadwal-otomatis' },
     // Reset data transaksi khusus Admin
     user.value?.role === 'admin' && { label: 'Reset Data', to: '/reset-data' },

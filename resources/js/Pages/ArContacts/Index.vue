@@ -24,7 +24,7 @@
           <span class="sm:hidden">Export</span><span class="hidden sm:inline">Export Excel</span>
         </button>
         <button
-          v-if="canEdit && freeAreas.length"
+          v-if="canCreate && freeAreas.length"
           type="button"
           @click="openCreateModal"
           class="h-9 px-2 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap"
@@ -90,15 +90,15 @@
             </div>
             <div class="flex items-end justify-between gap-3">
               <p class="min-w-0 text-gray-500 break-words">{{ c.name }} · {{ formatPhone(c.whatsapp) }}</p>
-              <div v-if="canEdit" class="flex items-center gap-1.5 shrink-0">
-                <button
+              <div v-if="canEdit || canDelete" class="flex items-center gap-1.5 shrink-0">
+                <button v-if="canEdit"
                   type="button"
                   @click="openEditModal(c)"
                   class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
                 >
                   Edit
                 </button>
-                <button
+                <button v-if="canDelete"
                   type="button"
                   @click="contactToDelete = c"
                   class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer"
@@ -120,15 +120,15 @@
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Nama AR</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">No. WhatsApp</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
-              <th v-if="canEdit" scope="col" class="py-2.5 px-3 text-center w-28">Aksi</th>
+              <th v-if="canEdit || canDelete" scope="col" class="py-2.5 px-3 text-center w-28">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
             <tr v-if="isLoading" class="text-center">
-              <td :colspan="canEdit ? 6 : 5" class="py-10 text-gray-500">Memuat data...</td>
+              <td :colspan="(canEdit || canDelete) ? 6 : 5" class="py-10 text-gray-500">Memuat data...</td>
             </tr>
             <tr v-else-if="filteredContacts.length === 0" class="text-center">
-              <td :colspan="canEdit ? 6 : 5" class="py-10 text-gray-500">Tidak ada data AR.</td>
+              <td :colspan="(canEdit || canDelete) ? 6 : 5" class="py-10 text-gray-500">Tidak ada data AR.</td>
             </tr>
             <tr v-else v-for="(c, index) in filteredContacts" :key="c.id" class="hover:bg-gray-50/70 text-gray-800">
               <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap text-gray-600">{{ index + 1 }}</td>
@@ -150,9 +150,9 @@
                   {{ c.is_active ? 'Aktif' : 'Nonaktif' }}
                 </span>
               </td>
-              <td v-if="canEdit" class="py-2.5 px-3 text-center whitespace-nowrap">
+              <td v-if="canEdit || canDelete" class="py-2.5 px-3 text-center whitespace-nowrap">
                 <div class="inline-flex items-center justify-center gap-1">
-                  <button
+                  <button v-if="canEdit"
                     type="button"
                     @click="openEditModal(c)"
                     class="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition cursor-pointer"
@@ -160,7 +160,7 @@
                   >
                     <PencilIcon class="w-3.5 h-3.5" />
                   </button>
-                  <button
+                  <button v-if="canDelete"
                     type="button"
                     @click="contactToDelete = c"
                     class="h-7 w-7 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
@@ -266,14 +266,14 @@
           <strong class="text-gray-900">{{ areaLabel(contactToDelete.area) }}</strong>? WhatsApp klaim area ini akan kembali ke nomor AR default.
         </p>
         <div class="flex items-center justify-end gap-2 pt-2">
-          <button
+          <button v-if="canDelete"
             type="button"
             @click="contactToDelete = null"
             class="h-8 px-3 rounded-lg border border-gray-300 hover:bg-gray-50 text-xs font-medium text-gray-700 cursor-pointer"
           >
             Batal
           </button>
-          <button
+          <button v-if="canDelete"
             type="button"
             @click="executeDelete"
             :disabled="isDeleting"
@@ -303,7 +303,7 @@ import {
   Trash2 as Trash2Icon,
 } from 'lucide-vue-next';
 
-const { canEdit } = useAuth();
+const { canEdit , canCreate, canDelete } = useAuth();
 
 const contacts = ref([]);
 const isLoading = ref(false);
@@ -372,7 +372,7 @@ useAutoRefresh(async () => {
 });
 
 const openCreateModal = () => {
-  if (!canEdit.value) return;
+  if (!canCreate.value) return;
   formData.id = null;
   formData.area = freeAreas.value[0]?.value || '';
   formData.name = '';
@@ -394,7 +394,7 @@ const openEditModal = (c) => {
 };
 
 const submitForm = async () => {
-  if (!canEdit.value) return;
+  if (!(isEditMode.value ? canEdit.value : canCreate.value)) return;
   isSaving.value = true;
   errorMessage.value = '';
   try {
@@ -429,7 +429,7 @@ const toggleStatus = async (c) => {
 };
 
 const executeDelete = async () => {
-  if (!canEdit.value) return;
+  if (!canDelete.value) return;
   isDeleting.value = true;
   try {
     await axios.delete(`/api/ar-contacts/${contactToDelete.value.id}`);

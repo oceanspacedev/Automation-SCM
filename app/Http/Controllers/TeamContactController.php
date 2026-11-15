@@ -31,8 +31,9 @@ class TeamContactController extends Controller
         ], 201);
     }
 
-    public function update(Request $request, TeamContact $teamContact): JsonResponse
+    public function update(Request $request, int|string $id): JsonResponse
     {
+        $teamContact = TeamContact::findOrFail($id);
         $teamContact->update($this->validateTeamContact($request));
 
         return response()->json([
@@ -42,8 +43,9 @@ class TeamContactController extends Controller
         ]);
     }
 
-    public function destroy(TeamContact $teamContact): JsonResponse
+    public function destroy(int|string $id): JsonResponse
     {
+        $teamContact = TeamContact::findOrFail($id);
         $teamContact->delete();
 
         return response()->json([
@@ -52,8 +54,9 @@ class TeamContactController extends Controller
         ]);
     }
 
-    public function toggleStatus(TeamContact $teamContact): JsonResponse
+    public function toggleStatus(int|string $id): JsonResponse
     {
+        $teamContact = TeamContact::findOrFail($id);
         $teamContact->update(['is_active' => ! $teamContact->is_active]);
 
         return response()->json([

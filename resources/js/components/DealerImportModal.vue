@@ -111,7 +111,7 @@ const props = defineProps({
 
 const isAgreement = computed(() => props.type === 'agreements');
 
-const { canEdit } = useAuth();
+const { canEdit, canCreate } = useAuth();
 
 const emit = defineEmits(['close', 'started']);
 
@@ -142,7 +142,7 @@ const clearFile = () => {
 };
 
 const upload = async () => {
-  if (!canEdit.value || !selectedFile.value) return;
+  if ((!canEdit.value || !canCreate.value) || !selectedFile.value) return;
   const replace = replaceExisting.value && !isAgreement.value;
   if (replace && !(await confirmAction({ title: 'Ganti semua dealer?', message: 'Semua dealer lama di Jawa Barat dan Jawa Tengah akan dihapus dan diganti isi file ini.', confirmText: 'Ya, Ganti Semua' }))) return;
 

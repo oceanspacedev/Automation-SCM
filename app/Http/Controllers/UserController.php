@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AppSetting;
 use App\Models\User;
 use App\Services\UserImportService;
 use Illuminate\Http\JsonResponse;
@@ -76,6 +77,27 @@ class UserController extends Controller
     /**
      * Tambah user baru.
      */
+    public function updateRolePermissions(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->isAdmin(), 403, 'Hanya Admin yang dapat mengatur hak akses role.');
+        $validated = $request->validate([
+            'role' => ['required', Rule::in(['admin', 'scm', 'ar', 'telemarketing'])],
+            'permissions' => ['present', 'array'],
+            'permissions.*' => ['string', 'distinct', Rule::in(array_keys(User::AVAILABLE_PERMISSIONS))],
+        ]);
+        if ($validated['role'] === 'admin' && ! in_array('master_user', $validated['permissions'], true)) {
+            return response()->json(['message' => 'Role Admin harus tetap memiliki akses Master User.'], 422);
+        }
+        foreach (['drafts', 'invoices', 'data_program', 'form_program', 'master_program', 'master_dealer', 'master_customer', 'master_user'] as $module) {
+            if (array_intersect([$module.'_create', $module.'_edit', $module.'_delete'], $validated['permissions']) && ! in_array($module, $validated['permissions'], true)) {
+                return response()->json(['message' => 'Aktifkan izin lihat modul sebelum mengaktifkan tambah, edit atau hapus.'], 422);
+            }
+        }
+        AppSetting::write('role_permissions_'.$validated['role'], json_encode($validated['permissions'], JSON_THROW_ON_ERROR));
+
+        return response()->json(['success' => true, 'message' => 'Hak akses role berhasil disimpan dan berlaku untuk seluruh pengguna dengan role ini.']);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $this->authorizeUserManagement($request, newRole: (string) $request->input('role'));
@@ -193,6 +215,9 @@ class UserController extends Controller
         $user->name = $validated['name'];
         $user->email = $validated['email'] ?? null;
         $user->whatsapp = User::normalizeWhatsapp($validated['whatsapp'] ?? null);
+        if ($user->role !== $validated['role']) {
+            $user->permissions = null;
+        }
         $user->role = $validated['role'];
         $user->is_active = $targetActive;
 
