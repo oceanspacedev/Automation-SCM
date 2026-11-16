@@ -37,33 +37,61 @@
         <p class="text-xs text-gray-500 mt-0.5">Daftar invoice resmi yang telah diterbitkan.</p>
       </div>
 
-      <!-- Tombol aksi; di layar kecil dua tombol sama lebar dengan label pendek -->
-      <div class="grid sm:flex sm:items-center gap-2" :class="canEdit && 'grid-cols-2'">
-        <button
-          v-if="canEdit && selectedIds.length > 0"
-          @click="askSendBatch"
-          :disabled="sendingBatch"
-          :class="headerButtonClass"
-          :title="`Kirim ${selectedIds.length} invoice terpilih`"
-        >
-          <span class="sm:hidden">{{ sendingBatch ? 'Mengirim...' : `Kirim (${selectedIds.length})` }}</span>
-          <span class="hidden sm:inline">{{ sendingBatch ? 'Mengirim...' : `Kirim (${selectedIds.length}) Terpilih` }}</span>
-        </button>
+      <!-- Tombol aksi; di layar kecil tombol membungkus rapi -->
+      <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
+        <template v-if="selectedIds.length > 0">
+          <button
+            v-if="canDelete"
+            @click="askDeleteBatch"
+            :disabled="deletingBatch || sendingBatch"
+            :class="headerDangerButtonClass"
+            :title="`Hapus ${selectedIds.length} invoice terpilih`"
+          >
+            <Trash2Icon class="w-3.5 h-3.5 mr-1 text-rose-600" />
+            <span class="sm:hidden">{{ deletingBatch ? 'Menghapus...' : `Hapus (${selectedIds.length})` }}</span>
+            <span class="hidden sm:inline">{{ deletingBatch ? 'Menghapus...' : `Hapus (${selectedIds.length}) Terpilih` }}</span>
+          </button>
 
-        <button
-          v-else-if="canEdit"
-          @click="askSendAll"
-          :disabled="sendingAll"
-          :class="headerButtonClass"
-          title="Kirim semua invoice yang belum terkirim: Email ke dealer, WhatsApp ke telemarketing per region"
-        >
-          <span class="sm:hidden">{{ sendingAll ? 'Mengirim...' : 'Kirim Semua' }}</span>
-          <span class="hidden sm:inline">{{ sendingAll ? 'Mengirim Semua...' : 'Kirim Semua Notifikasi' }}</span>
-        </button>
+          <button
+            v-if="canEdit && hasUnsentSelected"
+            @click="askSendBatch"
+            :disabled="sendingBatch || deletingBatch"
+            :class="headerButtonClass"
+            :title="`Kirim ${unsentSelectedCount} invoice terpilih`"
+          >
+            <span class="sm:hidden">{{ sendingBatch ? 'Mengirim...' : `Kirim (${unsentSelectedCount})` }}</span>
+            <span class="hidden sm:inline">{{ sendingBatch ? 'Mengirim...' : `Kirim (${unsentSelectedCount}) Terpilih` }}</span>
+          </button>
 
-        <router-link :to="`/drafts/${brand.slug}/${area.value}`" :class="headerButtonClass">
-          Draft Invoice
-        </router-link>
+          <button
+            @click="selectedIds = []"
+            :class="headerButtonClass"
+            title="Batalkan pilihan"
+          >
+            <span class="sm:hidden">Batal</span><span class="hidden sm:inline">Batal Pilih</span>
+          </button>
+
+          <router-link :to="`/drafts/${brand.slug}/${area.value}`" :class="headerButtonClass">
+            Draft Invoice
+          </router-link>
+        </template>
+
+        <template v-else>
+          <button
+            v-if="canEdit"
+            @click="askSendAll"
+            :disabled="sendingAll"
+            :class="headerButtonClass"
+            title="Kirim semua invoice yang belum terkirim: Email ke dealer, WhatsApp ke telemarketing per region"
+          >
+            <span class="sm:hidden">{{ sendingAll ? 'Mengirim...' : 'Kirim Semua' }}</span>
+            <span class="hidden sm:inline">{{ sendingAll ? 'Mengirim Semua...' : 'Kirim Semua Notifikasi' }}</span>
+          </button>
+
+          <router-link :to="`/drafts/${brand.slug}/${area.value}`" :class="headerButtonClass">
+            Draft Invoice
+          </router-link>
+        </template>
       </div>
     </div>
 
@@ -194,7 +222,7 @@
           Belum ada invoice yang dibuat. Silakan generate invoice dari menu <strong>Draft</strong>.
         </div>
         <template v-else>
-          <label v-if="canEdit && selectableInvoices.length > 0" class="px-4 py-2.5 border-b border-gray-100 flex items-center gap-3 text-xs text-gray-600 cursor-pointer">
+          <label v-if="(canEdit || canDelete) && invoices.length > 0" class="px-4 py-2.5 border-b border-gray-100 flex items-center gap-3 text-xs text-gray-600 cursor-pointer">
             <input
               type="checkbox"
               :checked="isAllSelected"
@@ -202,7 +230,7 @@
               @change="toggleSelectAll"
               class="rounded border-gray-300 text-gray-900 focus:ring-0 w-4 h-4 cursor-pointer"
             />
-            <span>Pilih semua yang belum dikirim</span>
+            <span>Pilih semua invoice di halaman ini</span>
           </label>
 
           <ul class="divide-y divide-gray-100">
@@ -213,12 +241,11 @@
               :class="selectedIds.includes(inv.id) && 'bg-gray-50'"
             >
               <input
-                v-if="canEdit"
+                v-if="canEdit || canDelete"
                 type="checkbox"
                 :value="inv.id"
                 v-model="selectedIds"
-                :disabled="isAlreadySent(inv)"
-                class="mt-0.5 rounded border-gray-300 text-gray-900 focus:ring-0 w-4 h-4 cursor-pointer disabled:opacity-30 shrink-0"
+                class="mt-0.5 rounded border-gray-300 text-gray-900 focus:ring-0 w-4 h-4 cursor-pointer shrink-0"
               />
               <div class="flex-1 min-w-0 space-y-2">
                 <div class="flex items-start justify-between gap-3">
@@ -295,15 +322,15 @@
         <table class="w-full text-left text-xs text-gray-900 border-collapse">
           <thead>
             <tr class="border-b border-gray-200 bg-gray-50 text-gray-700 font-semibold whitespace-nowrap">
-              <th v-if="canEdit" scope="col" class="py-2.5 px-3 text-center w-[44px] border-r border-gray-200">
+              <th v-if="canEdit || canDelete" scope="col" class="py-2.5 px-3 text-center w-[44px] border-r border-gray-200">
                 <input
                   type="checkbox"
                   :checked="isAllSelected"
                   :indeterminate="isIndeterminate"
                   @change="toggleSelectAll"
-                  :disabled="selectableInvoices.length === 0"
+                  :disabled="invoices.length === 0"
                   class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer disabled:opacity-30"
-                  title="Pilih semua yang belum dikirim di halaman ini"
+                  title="Pilih semua invoice di halaman ini"
                 />
               </th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">
@@ -339,7 +366,7 @@
 
           <tbody class="divide-y divide-gray-200 bg-white">
             <tr v-if="loading">
-              <td :colspan="canEdit ? 9 : 8" class="py-8 text-center text-gray-500">
+              <td :colspan="canEdit || canDelete ? 9 : 8" class="py-8 text-center text-gray-500">
                 <div class="inline-flex items-center gap-2">
                   <span class="inline-block w-4 h-4 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></span>
                   <span>Memuat data invoice...</span>
@@ -348,7 +375,7 @@
             </tr>
 
             <tr v-else-if="invoices.length === 0">
-              <td :colspan="canEdit ? 9 : 8" class="py-8 text-center text-gray-400 text-xs">
+              <td :colspan="canEdit || canDelete ? 9 : 8" class="py-8 text-center text-gray-400 text-xs">
                 Belum ada invoice yang dibuat. Silakan generate invoice dari menu <strong>Draft</strong>.
               </td>
             </tr>
@@ -360,14 +387,13 @@
               :class="[selectedIds.includes(inv.id) ? 'bg-gray-50' : 'hover:bg-gray-50/70', 'text-gray-700 font-normal transition']"
             >
               <!-- Checkbox Selection -->
-              <td v-if="canEdit" class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
+              <td v-if="canEdit || canDelete" class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
                 <input
                   type="checkbox"
                   :value="inv.id"
                   v-model="selectedIds"
-                  :disabled="isAlreadySent(inv)"
-                  class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer disabled:opacity-30"
-                  :title="isAlreadySent(inv) ? 'Sudah dikirim' : 'Pilih invoice ini'"
+                  class="rounded border-gray-300 text-gray-900 focus:ring-0 focus:ring-offset-0 w-4 h-4 cursor-pointer"
+                  :title="`Pilih invoice ${inv.invoice_number}`"
                 />
               </td>
 
@@ -482,7 +508,7 @@
           <!-- Semantic Table Footer -->
           <tfoot v-if="invoices.length > 0" class="border-t-2 border-gray-300 bg-gray-50/80 font-semibold text-gray-900">
             <tr>
-              <td :colspan="canEdit ? 7 : 6" class="py-2.5 px-3 text-xs text-gray-700 border-r border-gray-200">
+              <td :colspan="canEdit || canDelete ? 7 : 6" class="py-2.5 px-3 text-xs text-gray-700 border-r border-gray-200">
                 Total Netpay (Halaman ini)
               </td>
               <td class="py-2.5 px-3 text-right whitespace-nowrap text-xs font-bold text-gray-950 border-r border-gray-200">
@@ -523,6 +549,8 @@
       :title="confirmState.title"
       :message="confirmState.message"
       :confirm-text="confirmState.confirmText"
+      :variant="confirmState.variant || 'default'"
+      :icon="confirmState.icon || 'mail'"
       :loading="confirmState.loading"
       @confirm="onConfirmAction"
     >
@@ -579,18 +607,36 @@ import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 
 // Tombol header: tanpa ikon, satu gaya untuk semua aksi
 const headerButtonClass = 'h-9 px-2 sm:px-3.5 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs disabled:opacity-50 transition cursor-pointer whitespace-nowrap';
+const headerDangerButtonClass = 'h-9 px-2 sm:px-3.5 inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-xs font-medium text-rose-700 shadow-2xs disabled:opacity-50 transition cursor-pointer whitespace-nowrap';
 
 const { area } = useArea();
 const { brand } = useBrands();
 const { canEdit, canDelete } = useAuth();
-const deleteRecord = async (record) => {
-  if (!canDelete.value || !confirm('Hapus data ini? Tindakan ini tidak dapat dibatalkan.')) return;
-  try {
-    await axios.delete('/api/invoices/' + record.id);
-    await fetchInvoices(1);
-  } catch (error) {
-    alert(error.response?.data?.message || 'Gagal menghapus data.');
-  }
+const deleteRecord = (record) => {
+  if (!canDelete.value) return;
+  confirmState.title = 'Hapus Invoice';
+  confirmState.message = `Apakah Anda yakin ingin menghapus invoice ${record.invoice_number}? Data terkait di Data Program juga akan ikut dihapus.`;
+  confirmState.confirmText = 'Ya, Hapus Invoice';
+  confirmState.variant = 'danger';
+  confirmState.icon = 'trash';
+  confirmState.showSenderSelect = false;
+  confirmState.action = async () => {
+    confirmState.loading = true;
+    try {
+      const res = await axios.delete('/api/invoices/' + record.id);
+      alertSuccess.value = true;
+      alertMessage.value = res.data?.message || 'Invoice dan data program terkait berhasil dihapus.';
+      selectedIds.value = selectedIds.value.filter(id => id !== record.id);
+      await fetchInvoices(pagination.current_page || 1);
+      confirmState.show = false;
+    } catch (error) {
+      alertSuccess.value = false;
+      alertMessage.value = error.response?.data?.message || 'Gagal menghapus invoice.';
+    } finally {
+      confirmState.loading = false;
+    }
+  };
+  confirmState.show = true;
 };
 
 const invoices = ref([]);
@@ -600,6 +646,7 @@ const selectedInvoice = ref(null);
 const sendingId = ref(null);
 const sendingAll = ref(false);
 const sendingBatch = ref(false);
+const deletingBatch = ref(false);
 const selectedIds = ref([]);
 const alertMessage = ref(null);
 const alertSuccess = ref(true);
@@ -657,6 +704,8 @@ const confirmState = reactive({
   confirmText: 'Ya, Kirim Sekarang',
   loading: false,
   showSenderSelect: false,
+  variant: 'default',
+  icon: 'mail',
   action: null,
 });
 
@@ -674,10 +723,15 @@ const isAlreadySent = (inv) => {
   return inv.status === 'sent' || (!!inv.email_sent_at && !!inv.whatsapp_sent_at);
 };
 
-// WA dikirim ke telemarketing toko (Master Dealer), jadi invoice tanpa email tetap bisa dipilih
-const selectableInvoices = computed(() => {
-  return invoices.value.filter(inv => !isAlreadySent(inv));
+// Semua invoice di halaman dapat dipilih untuk aksi bulk (mis. hapus banyak atau kirim yang belum terkirim)
+const selectableInvoices = computed(() => invoices.value);
+
+const unsentSelectedInvoices = computed(() => {
+  return invoices.value.filter(inv => selectedIds.value.includes(inv.id) && !isAlreadySent(inv));
 });
+
+const unsentSelectedCount = computed(() => unsentSelectedInvoices.value.length);
+const hasUnsentSelected = computed(() => unsentSelectedCount.value > 0);
 
 const isAllSelected = computed(() => {
   return selectableInvoices.value.length > 0 &&
@@ -690,13 +744,54 @@ const isIndeterminate = computed(() => {
 });
 
 const toggleSelectAll = (e) => {
-  if (!canEdit.value) return;
+  if (!canEdit.value && !canDelete.value) return;
   if (e.target.checked) {
     const newIds = new Set([...selectedIds.value, ...selectableInvoices.value.map(i => i.id)]);
     selectedIds.value = Array.from(newIds);
   } else {
     const selectableIdSet = new Set(selectableInvoices.value.map(i => i.id));
     selectedIds.value = selectedIds.value.filter(id => !selectableIdSet.has(id));
+  }
+};
+
+const askDeleteBatch = () => {
+  if (!canDelete.value || selectedIds.value.length === 0 || deletingBatch.value) return;
+  confirmState.title = 'Hapus Invoice Terpilih';
+  confirmState.message = `Apakah Anda yakin ingin menghapus ${selectedIds.value.length} invoice terpilih? Data terkait di Data Program juga akan ikut dihapus.`;
+  confirmState.confirmText = `Ya, Hapus (${selectedIds.value.length}) Invoice`;
+  confirmState.variant = 'danger';
+  confirmState.icon = 'trash';
+  confirmState.showSenderSelect = false;
+  confirmState.action = async () => {
+    confirmState.loading = true;
+    try {
+      await executeDeleteBatch();
+      confirmState.show = false;
+    } finally {
+      confirmState.loading = false;
+    }
+  };
+  confirmState.show = true;
+};
+
+const executeDeleteBatch = async () => {
+  if (!canDelete.value) return;
+  deletingBatch.value = true;
+  alertMessage.value = null;
+
+  try {
+    const res = await axios.post('/api/invoices/delete-batch', {
+      ids: selectedIds.value,
+    });
+    alertSuccess.value = true;
+    alertMessage.value = res.data.message || `Berhasil menghapus ${selectedIds.value.length} invoice beserta data di Data Program.`;
+    selectedIds.value = [];
+    await fetchInvoices(pagination.current_page || 1);
+  } catch (err) {
+    alertSuccess.value = false;
+    alertMessage.value = err.response?.data?.message || 'Gagal menghapus batch invoice.';
+  } finally {
+    deletingBatch.value = false;
   }
 };
 
@@ -729,6 +824,9 @@ const askSendSingle = (inv) => {
   confirmState.title = 'Kirim Notifikasi Invoice';
   confirmState.message = `Apakah Anda yakin ingin mengirim invoice ${inv.invoice_number} ke ${destinations.join(' & ')}?`;
   confirmState.confirmText = 'Ya, Kirim Sekarang';
+  confirmState.variant = 'default';
+  confirmState.icon = 'mail';
+  confirmState.showSenderSelect = false;
   confirmState.action = async () => {
     confirmState.loading = true;
     try {
@@ -763,10 +861,12 @@ const quickSendInvoice = async (inv) => {
 };
 
 const askSendBatch = () => {
-  if (!canEdit.value || selectedIds.value.length === 0 || sendingBatch.value) return;
+  if (!canEdit.value || unsentSelectedCount.value === 0 || sendingBatch.value) return;
   confirmState.title = 'Kirim Batch Notifikasi (Email & WA)';
-  confirmState.message = `Kirim ${selectedIds.value.length} invoice terpilih? Email dikirim ke masing-masing dealer. WhatsApp dikirim ke telemarketing per region: invoice satu region dikirim dalam satu file ZIP (satu PDF per invoice).`;
-  confirmState.confirmText = `Ya, Kirim (${selectedIds.value.length}) Invoice`;
+  confirmState.message = `Kirim ${unsentSelectedCount.value} invoice terpilih? Email dikirim ke masing-masing dealer. WhatsApp dikirim ke telemarketing per region: invoice satu region dikirim dalam satu file ZIP (satu PDF per invoice).`;
+  confirmState.confirmText = `Ya, Kirim (${unsentSelectedCount.value}) Invoice`;
+  confirmState.variant = 'default';
+  confirmState.icon = 'mail';
   confirmState.showSenderSelect = true;
   confirmState.action = async () => {
     confirmState.loading = true;
@@ -787,7 +887,7 @@ const executeSendBatch = async () => {
 
   try {
     const res = await axios.post('/api/invoices/send-batch', {
-      ids: selectedIds.value,
+      ids: unsentSelectedInvoices.value.map(i => i.id),
       sender_id: batchSenderId.value,
     });
     alertSuccess.value = true;
@@ -807,6 +907,8 @@ const askSendAll = () => {
   confirmState.title = 'Kirim Semua Notifikasi Invoice';
   confirmState.message = 'Kirim semua invoice yang belum terkirim? Email dikirim ke masing-masing dealer. WhatsApp dikirim ke telemarketing per region: invoice satu region dikirim dalam satu file ZIP (satu PDF per invoice).';
   confirmState.confirmText = 'Ya, Kirim Semua';
+  confirmState.variant = 'default';
+  confirmState.icon = 'mail';
   confirmState.showSenderSelect = true;
   confirmState.action = async () => {
     confirmState.loading = true;
@@ -920,7 +1022,7 @@ const fetchInvoices = async (page = 1, { silent = false } = {}) => {
 
 // Daftar invoice dimuat ulang otomatis; berhenti selama modal terbuka atau pengiriman berjalan
 useAutoRefresh(() => fetchInvoices(pagination.current_page, { silent: true }), {
-  isPaused: () => loading.value || showEmailModal.value || confirmState.show || sendingAll.value || sendingBatch.value || sendingId.value !== null,
+  isPaused: () => loading.value || showEmailModal.value || confirmState.show || sendingAll.value || sendingBatch.value || deletingBatch.value || sendingId.value !== null,
 });
 
 const resetFilters = () => {

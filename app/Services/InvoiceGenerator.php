@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Dealer;
 use App\Models\Draft;
 use App\Models\Invoice;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -86,6 +87,14 @@ class InvoiceGenerator
                     : null;
             }
 
+            $dsaName = $lockedDraft->dsa;
+            if (empty($dsaName)) {
+                $dealer = Dealer::where('kode_bt', $lockedDraft->kode_bt)
+                    ->orWhere('id_realme', $lockedDraft->dealer_code)
+                    ->first();
+                $dsaName = $dealer?->sales_person;
+            }
+
             // 5. Create Invoice record
             $invoice = Invoice::create([
                 'area' => $lockedDraft->areaEnum()->value,
@@ -94,6 +103,7 @@ class InvoiceGenerator
                 'draft_id' => $lockedDraft->id,
                 'invoice_type' => $invoiceType,
                 'rsm' => $lockedDraft->rsm,
+                'dsa' => $dsaName,
                 'dealer_code' => $lockedDraft->dealer_code,
                 'dealer_name' => $lockedDraft->dealer_name,
                 'customer_name' => $customerName,

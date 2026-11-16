@@ -51,4 +51,21 @@ class RolePermissionsTest extends TestCase
         $user = User::factory()->create(['role' => 'ar', 'is_active' => true, 'permissions' => ['drafts']]);
         $this->actingAs($user)->getJson('/api/drafts')->assertForbidden();
     }
+
+    public function test_admin_with_stale_permissions_still_has_full_admin_permissions(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'is_active' => true,
+            'permissions' => ['form_program', 'riwayat_program'],
+        ]);
+
+        $this->assertTrue($admin->canPerform('data_program', 'edit'));
+        $this->assertTrue($admin->canPerform('data_program', 'delete'));
+        $this->assertTrue($admin->canPerform('data_program', 'create'));
+        $this->assertTrue($admin->hasPermission('data_program_edit'));
+        $this->assertTrue($admin->hasPermission('data_program_delete'));
+        $this->assertContains('data_program_edit', $admin->effective_permissions);
+        $this->assertContains('data_program_delete', $admin->effective_permissions);
+    }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Mail\InvoiceMail;
+use App\Models\DataProgram;
 use App\Models\Draft;
 use App\Models\EmailAccount;
 use App\Models\EmailLog;
@@ -37,17 +38,92 @@ class InvoiceController extends Controller
     ) {}
 
     /**
-     * Paginated invoice list with filters.
+     * Delete an invoice, its associated Data Program record, and return draft status to ready.
      */
     public function destroy(int $id): JsonResponse
     {
         $record = Invoice::findOrFail($id);
         DB::transaction(function () use ($record): void {
+            if ($record->draft_id) {
+                DataProgram::withoutGlobalScopes()
+                    ->where(function ($q) use ($record) {
+                        $q->where('draft_id', $record->draft_id)
+                            ->orWhere('row_hash', sprintf('draft_%d', $record->draft_id));
+                        if (! empty($record->invoice_number)) {
+                            $q->orWhere('cn', $record->invoice_number);
+                        }
+                    })
+                    ->delete();
+            } elseif (! empty($record->invoice_number)) {
+                DataProgram::withoutGlobalScopes()->where('cn', $record->invoice_number)->delete();
+            }
+
             $record->draft?->update(['status' => 'ready']);
             $record->delete();
         });
 
-        return response()->json(['success' => true, 'message' => 'Data berhasil dihapus.']);
+        return response()->json(['success' => true, 'message' => 'Invoice dan data program terkait berhasil dihapus.']);
+    }
+
+    /**
+     * Delete multiple invoices, associated Data Program records, and return draft statuses to ready.
+     */
+    public function destroyBatch(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'exists:invoices,id'],
+        ]);
+
+        $count = count($validated['ids']);
+
+        DB::transaction(function () use ($validated): void {
+            $invoices = Invoice::whereIn('id', $validated['ids'])->get();
+            $draftIds = [];
+            $rowHashes = [];
+            $cnNumbers = [];
+
+            foreach ($invoices as $inv) {
+                if ($inv->draft_id) {
+                    $draftIds[] = $inv->draft_id;
+                    $rowHashes[] = sprintf('draft_%d', $inv->draft_id);
+                }
+                if (! empty($inv->invoice_number)) {
+                    $cnNumbers[] = $inv->invoice_number;
+                }
+            }
+
+            if (! empty($draftIds) || ! empty($cnNumbers)) {
+                DataProgram::withoutGlobalScopes()
+                    ->where(function ($q) use ($draftIds, $rowHashes, $cnNumbers) {
+                        $hasCondition = false;
+                        if (! empty($draftIds)) {
+                            $q->whereIn('draft_id', $draftIds);
+                            $hasCondition = true;
+                        }
+                        if (! empty($rowHashes)) {
+                            $hasCondition ? $q->orWhereIn('row_hash', $rowHashes) : $q->whereIn('row_hash', $rowHashes);
+                            $hasCondition = true;
+                        }
+                        if (! empty($cnNumbers)) {
+                            $hasCondition ? $q->orWhereIn('cn', $cnNumbers) : $q->whereIn('cn', $cnNumbers);
+                        }
+                    })
+                    ->delete();
+            }
+
+            if (! empty($draftIds)) {
+                Draft::withoutGlobalScopes()->whereIn('id', $draftIds)->update(['status' => 'ready']);
+            }
+
+            Invoice::whereIn('id', $validated['ids'])->delete();
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => "Berhasil menghapus {$count} invoice beserta data di Data Program.",
+            'deleted_count' => $count,
+        ]);
     }
 
     public function index(Request $request): JsonResponse

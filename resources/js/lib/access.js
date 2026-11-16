@@ -4,6 +4,12 @@
  */
 export function canAccess(user, feature) {
   if (!user) return true;
+  const role = user.role || 'scm';
+  // Admin selalu bisa mengakses seluruh menu
+  if (role === 'admin') {
+    return true;
+  }
+
   user = { ...user, permissions: user.effective_permissions ?? user.permissions };
 
   // 1. Jika user memiliki daftar custom permissions
@@ -18,9 +24,8 @@ export function canAccess(user, feature) {
   }
 
   // 2. Fallback ke default role
-  const role = user.role || 'scm';
-  // Admin & SCM default bisa melihat semuanya
-  if (role === 'admin' || role === 'scm') {
+  // SCM default bisa melihat semuanya
+  if (role === 'scm') {
     return true;
   }
 
@@ -59,8 +64,18 @@ export function canOpenRoute(user, meta) {
 
 export function canPerform(user, module, action) {
   if (!user || user.is_active === false || !canAccess(user, module)) return false;
+  const role = user.role || 'scm';
   user = { ...user, permissions: user.effective_permissions ?? user.permissions };
   if (action === 'view') return true;
-  if (Array.isArray(user.permissions)) return user.permissions.includes(module + '_' + action);
-  return ['admin', 'scm'].includes(user.role || 'scm');
+  if (Array.isArray(user.permissions)) {
+    if (user.permissions.includes(module + '_' + action)) {
+      return true;
+    }
+    // Admin secara bawaan memiliki akses penuh jika belum dispesifikasikan di role permissions
+    if (role === 'admin') {
+      return true;
+    }
+    return false;
+  }
+  return ['admin', 'scm'].includes(role);
 }

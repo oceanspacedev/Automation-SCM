@@ -163,6 +163,8 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         Route::get('/google/status', [GoogleAuthController::class, 'status']);
         Route::post('/google/disconnect', [GoogleAuthController::class, 'disconnect']);
 
+        Route::post('/invoices/delete-batch', [InvoiceController::class, 'destroyBatch']);
+        Route::delete('/invoices/batch', [InvoiceController::class, 'destroyBatch']);
         Route::delete('/invoices/{id}', [InvoiceController::class, 'destroy']);
 
         Route::delete('/data-program/{id}', [DataProgramController::class, 'destroy']);

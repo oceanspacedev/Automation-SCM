@@ -27,6 +27,10 @@
                   <circle cx="12" cy="13" r="1.5" fill="#2563EB"/>
                 </svg>
 
+                <svg v-else-if="variant === 'danger' || icon === 'trash'" class="w-6 h-6 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+
                 <svg v-else class="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                 </svg>
@@ -62,7 +66,7 @@
               type="button"
               @click="handleConfirm"
               :disabled="loading"
-              class="h-9 px-4 rounded-lg bg-[#1D70F5] text-white text-sm font-medium hover:bg-blue-600 transition cursor-pointer disabled:opacity-50 inline-flex items-center gap-2 shadow-sm"
+              :class="confirmButtonClass"
             >
               <svg v-if="loading" class="animate-spin -ml-0.5 mr-1 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -97,7 +101,15 @@ const emit = defineEmits(['update:modelValue', 'confirm', 'cancel']);
 
 const iconBgClass = computed(() => {
   if (props.icon === 'mail') return 'bg-gray-100 border border-gray-200 text-gray-700';
+  if (props.variant === 'danger') return 'bg-rose-50 border border-rose-100 text-rose-600';
   return 'bg-amber-50 border border-amber-100';
+});
+
+const confirmButtonClass = computed(() => {
+  if (props.variant === 'danger') {
+    return 'h-9 px-4 rounded-lg bg-rose-600 text-white text-sm font-medium hover:bg-rose-700 transition cursor-pointer disabled:opacity-50 inline-flex items-center gap-2 shadow-sm';
+  }
+  return 'h-9 px-4 rounded-lg bg-[#1D70F5] text-white text-sm font-medium hover:bg-blue-600 transition cursor-pointer disabled:opacity-50 inline-flex items-center gap-2 shadow-sm';
 });
 
 const handleCancel = () => {

@@ -54,6 +54,32 @@ class InvoiceGeneratorTest extends TestCase
         $this->assertEquals('invoiced', $draft->fresh()->status);
     }
 
+    public function test_dsa_invoice_reads_dsa_instead_of_rsm(): void
+    {
+        $draft = Draft::create([
+            'cn_number' => 'CN-GEN-DSA-001',
+            'dealer_code' => 'DLR003',
+            'dealer_name' => 'CERMAT CELL',
+            'customer_name' => 'CERMAT CELL',
+            'rsm' => 'JOSEPH',
+            'dsa' => 'DODI SUPRIATNA',
+            'support_amount' => 1000000,
+            'pph_type' => 'BADAN',
+            'npwp_type' => 'BADAN',
+            'invoice_type' => 'DSA',
+            'status' => 'ready',
+        ]);
+
+        $invoice = $this->generator->generate($draft);
+
+        $this->assertSame('DODI SUPRIATNA', $invoice->dsa);
+        $this->assertSame('DODI SUPRIATNA', $invoice->dsa_name);
+        $this->assertSame('JOSEPH', $invoice->rsm);
+
+        $html = view('invoices.dsa', ['invoice' => $invoice])->render();
+        $this->assertStringContainsString('DODI SUPRIATNA', $html);
+    }
+
     public function test_can_generate_nps_fl_invoice_from_draft(): void
     {
         $draft = Draft::create([

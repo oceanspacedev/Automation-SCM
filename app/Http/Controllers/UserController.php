@@ -215,13 +215,13 @@ class UserController extends Controller
         $user->name = $validated['name'];
         $user->email = $validated['email'] ?? null;
         $user->whatsapp = User::normalizeWhatsapp($validated['whatsapp'] ?? null);
-        if ($user->role !== $validated['role']) {
+        if ($user->role !== $validated['role'] || $validated['role'] === 'admin') {
             $user->permissions = null;
         }
         $user->role = $validated['role'];
         $user->is_active = $targetActive;
 
-        if (array_key_exists('permissions', $validated)) {
+        if (array_key_exists('permissions', $validated) && $validated['role'] !== 'admin') {
             $user->permissions = $validated['permissions'];
         }
 

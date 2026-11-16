@@ -124,7 +124,7 @@ class UserImportService
                 'email' => $email,
                 'whatsapp' => $phone,
                 'role' => $person['role'],
-                'permissions' => User::getDefaultPermissionsForRole($person['role']),
+                'permissions' => $person['role'] === 'admin' ? null : User::getDefaultPermissionsForRole($person['role']),
                 // Tanpa password awal akun masuk lewat OTP WhatsApp; password acak ini tidak pernah ditampilkan
                 'password' => $password ?: Str::random(40),
                 'is_active' => true,

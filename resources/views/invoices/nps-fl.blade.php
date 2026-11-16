@@ -178,7 +178,7 @@
                     <tr>
                         <td style="text-align: left; padding-right: 4px; white-space: nowrap;">Nama NPS FL</td>
                         <td style="text-align: center; width: 14px; white-space: nowrap;">:</td>
-                        <td style="text-align: left; padding-left: 4px; white-space: nowrap;">{{ $invoice->rsm ?? $invoice->draft?->rsm ?? '-' }}</td>
+                        <td style="text-align: left; padding-left: 4px; white-space: nowrap;">{{ $invoice->dsa_name ?: ($invoice->dsa ?: ($invoice->draft?->dsa ?: '-')) }}</td>
                     </tr>
                 </table>
             </td>

@@ -362,4 +362,57 @@ class DraftImportTest extends TestCase
         $response->assertJson(['success' => true]);
         $this->assertDatabaseMissing('drafts', ['id' => $draft->id]);
     }
+
+    public function test_import_extracts_dsa_salesperson_name_from_dsa_column_cleanly(): void
+    {
+        $spreadsheet = new Spreadsheet;
+        $sheet = $spreadsheet->getActiveSheet();
+
+        $headers = [
+            'No.', 'Region', 'RSM', 'Dealer Code', 'Kode BT', 'Nama Cust by CSA',
+            'Dealer Name', 'Realqty', 'NPWP', 'Nama NPWP', 'Jenis NPWP', 'Jenis Pph',
+            'Support Amount', 'Dpp', 'Dpp Lain', 'Ppn', 'Pph', 'Netpay',
+            'KODE ITEM', 'NAMA ITEM', 'Alamat', 'Nama Program', 'Periode Program',
+            'No CN', 'Tanggal Inv', 'REFNOTE', 'DSA/NPS FL',
+        ];
+        $sheet->fromArray([$headers], null, 'A1');
+
+        $row1 = [
+            '1', 'JABAR', 'JOSEPH', 'DLR010', 'BT010', 'CERMAT CELL',
+            'CERMAT CELL', 1, '01.234.567.8-901.000', 'CERMAT CELL', 'BADAN', 'BADAN',
+            210000, 189189, 173423, 20811, 3784, 206216,
+            'ITM01', 'Barang Promo', 'Jl. Jabar', 'Program Realme', 'Nov 2026',
+            'CN2611000222', '2026-11-14', 'Ref Note', '_DODI SUPRIATNA',
+        ];
+        $sheet->fromArray([$row1], null, 'A2');
+
+        $tempPath = @tempnam(sys_get_temp_dir(), 'test_draft_dsa_').'.xlsx';
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($tempPath);
+
+        $uploadedFile = new UploadedFile($tempPath, 'draft.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', null, true);
+
+        $response = $this->postJson('/api/drafts/import', [
+            'file' => $uploadedFile,
+            'invoice_type' => 'DSA',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'data' => [
+                'total_rows' => 1,
+                'success' => 1,
+                'failed' => 0,
+            ],
+        ]);
+
+        $draft = Draft::where('cn_number', 'CN2611000222')->first();
+        $this->assertNotNull($draft);
+        $this->assertSame('JOSEPH', $draft->rsm);
+        $this->assertSame('DODI SUPRIATNA', $draft->dsa);
+        $this->assertSame('DSA', $draft->invoice_type);
+
+        @unlink($tempPath);
+    }
 }

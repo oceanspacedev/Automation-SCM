@@ -363,4 +363,79 @@ class DraftDataProgramSyncTest extends TestCase
 
         $this->assertDatabaseMissing('data_programs', ['draft_id' => $draft->id]);
     }
+
+    public function test_deleting_invoice_deletes_associated_data_program_and_resets_draft_status(): void
+    {
+        Http::fake();
+
+        $draft = Draft::create([
+            'cn_number' => 'CN-DEL-001',
+            'dealer_name' => 'DEALER TO DELETE',
+            'dealer_code' => 'DLR-DEL-1',
+            'support_amount' => 1500000,
+            'program_name' => 'PROGRAM DEL',
+            'invoice_type' => 'DSA',
+            'status' => 'ready',
+        ]);
+
+        $res = $this->postJson("/api/invoices/generate/{$draft->id}")->assertOk();
+        $invoiceId = $res->json('invoice.id');
+
+        $this->assertDatabaseHas('invoices', ['id' => $invoiceId]);
+        $this->assertDatabaseHas('data_programs', ['draft_id' => $draft->id]);
+        $this->assertSame('invoiced', $draft->fresh()->status);
+
+        $this->deleteJson("/api/invoices/{$invoiceId}")->assertOk();
+
+        $this->assertDatabaseMissing('invoices', ['id' => $invoiceId]);
+        $this->assertDatabaseMissing('data_programs', ['draft_id' => $draft->id]);
+        $this->assertSame('ready', $draft->fresh()->status);
+    }
+
+    public function test_batch_delete_invoices_deletes_all_associated_data_programs_and_resets_draft_statuses(): void
+    {
+        Http::fake();
+
+        $d1 = Draft::create([
+            'cn_number' => 'CN-DEL-002',
+            'dealer_name' => 'DEALER DEL 2',
+            'dealer_code' => 'DLR-DEL-2',
+            'support_amount' => 1000000,
+            'program_name' => 'PROGRAM DEL 2',
+            'invoice_type' => 'DSA',
+            'status' => 'ready',
+        ]);
+        $d2 = Draft::create([
+            'cn_number' => 'CN-DEL-003',
+            'dealer_name' => 'DEALER DEL 3',
+            'dealer_code' => 'DLR-DEL-3',
+            'support_amount' => 2000000,
+            'program_name' => 'PROGRAM DEL 3',
+            'invoice_type' => 'NPS FL',
+            'status' => 'ready',
+        ]);
+
+        $inv1Id = $this->postJson("/api/invoices/generate/{$d1->id}")->assertOk()->json('invoice.id');
+        $inv2Id = $this->postJson("/api/invoices/generate/{$d2->id}")->assertOk()->json('invoice.id');
+
+        $this->assertDatabaseHas('data_programs', ['draft_id' => $d1->id]);
+        $this->assertDatabaseHas('data_programs', ['draft_id' => $d2->id]);
+
+        $response = $this->postJson('/api/invoices/delete-batch', [
+            'ids' => [$inv1Id, $inv2Id],
+        ]);
+
+        $response->assertOk();
+        $response->assertJson([
+            'success' => true,
+            'deleted_count' => 2,
+        ]);
+
+        $this->assertDatabaseMissing('invoices', ['id' => $inv1Id]);
+        $this->assertDatabaseMissing('invoices', ['id' => $inv2Id]);
+        $this->assertDatabaseMissing('data_programs', ['draft_id' => $d1->id]);
+        $this->assertDatabaseMissing('data_programs', ['draft_id' => $d2->id]);
+        $this->assertSame('ready', $d1->fresh()->status);
+        $this->assertSame('ready', $d2->fresh()->status);
+    }
 }

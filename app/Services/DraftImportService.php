@@ -53,7 +53,8 @@ class DraftImportService
         25 => 'cn_number',
         26 => 'invoice_date',
         27 => 'ref_note',
-        28 => 'invoice_type',
+        28 => 'dsa',
+        29 => 'invoice_type',
     ];
 
     /**
@@ -63,6 +64,11 @@ class DraftImportService
         'no' => ['no', 'no.', 'nomor', 'num', 'no_'],
         'region' => ['region', 'wilayah', 'reg'],
         'rsm' => ['rsm', 'nama rsm'],
+        'dsa' => [
+            'dsa/nps fl', 'dsa / nps fl', 'dsa/npsfl', 'dsa / nps', 'dsa/nps', 'dsa / nps fl.',
+            'dsa', 'nps fl', 'nama dsa', 'nama nps fl', 'dsa fl', 'nps', 'dsa_nps', 'dsa fl/regular',
+            'dsa/nps fl/regular', 'sales person', 'sales',
+        ],
         'dealer_code' => ['dealer code', 'dealer_code', 'dealercode', 'kode dealer', 'kd dealer', 'dealer'],
         'kode_bt' => ['kode bt', 'kode_bt', 'kodebt', 'bt'],
         'customer_name' => ['nama cust by csa', 'nama cust', 'customer by csa', 'customer name', 'nama customer', 'customer', 'cust by csa', 'cust'],
@@ -88,7 +94,7 @@ class DraftImportService
         'cn_number' => ['no cn', 'no_cn', 'cn number', 'nomor cn', 'cn'],
         'invoice_date' => ['tanggal inv', 'tanggal_inv', 'tgl inv', 'invoice date', 'tgl invoice', 'tanggal invoice', 'tanggal'],
         'ref_note' => ['refnote', 'ref note', 'ref_note', 'reference note', 'catatan'],
-        'invoice_type' => ['dsa/nps fl', 'dsa / nps fl', 'dsa/npsfl', 'dsa / nps', 'dsa/nps', 'dsa / nps fl.', 'dsa', 'nps fl', 'invoice type', 'tipe invoice'],
+        'invoice_type' => ['invoice type', 'tipe invoice', 'jenis invoice', 'type invoice'],
     ];
 
     /**
@@ -196,33 +202,93 @@ class DraftImportService
                 $cleanData['item_code'] = preg_replace('/^\d+\.\s*/', '', $cleanData['item_code']);
             }
 
-            // Validation & Fallback: DSA/NPS FL/REGULAR
+            // Extract & clean DSA / NPS FL salesperson name and determine invoice_type
             $rowErrors = [];
             $rawType = strtoupper(trim((string) ($cleanData['invoice_type'] ?? '')));
+            $rawDsa = trim((string) ($cleanData['dsa'] ?? ''));
+            $dsaName = null;
 
-            if ($rawType === '' || is_null($cleanData['invoice_type'])) {
-                // Empty in Excel: gracefully fallback to default invoice type
-                $normDefault = strtoupper(trim($defaultInvoiceType ?? ''));
-                if ($normDefault === 'DSA') {
+            if ($rawType !== '') {
+                // Explicit invoice_type column was present
+                if (str_contains($rawType, 'DSA')) {
                     $cleanData['invoice_type'] = 'DSA';
-                } elseif (str_contains($normDefault, 'REGUL')) {
+                } elseif (str_contains($rawType, 'REGUL')) {
                     $cleanData['invoice_type'] = 'REGULAR';
-                } else {
+                } elseif (str_contains($rawType, 'NPS')) {
                     $cleanData['invoice_type'] = 'NPS FL';
+                } else {
+                    $rowErrors[] = [
+                        'row' => $excelRowNumber,
+                        'field' => 'DSA/NPS FL/REGULAR',
+                        'value' => (string) ($cleanData['invoice_type'] ?? ''),
+                        'error' => "Nilai tipe invoice harus bernilai 'DSA', 'NPS FL', atau 'REGULAR'.",
+                    ];
                 }
-            } elseif (str_contains($rawType, 'DSA')) {
-                $cleanData['invoice_type'] = 'DSA';
-            } elseif (str_contains($rawType, 'REGUL')) {
-                $cleanData['invoice_type'] = 'REGULAR';
-            } elseif (str_contains($rawType, 'NPS')) {
-                $cleanData['invoice_type'] = 'NPS FL';
+
+                if ($rawDsa !== '') {
+                    $cleanedName = preg_replace('/^(DSA|NPS(\s*FL)?|REGULAR)[_\s-]+/i', '', $rawDsa);
+                    $cleanedName = ltrim($cleanedName, "_- \t\n\r\0\x0B");
+                    if ($cleanedName !== '' && ! in_array(strtoupper($cleanedName), ['DSA', 'NPS', 'NPS FL', 'REGULAR', '-'])) {
+                        $dsaName = $cleanedName;
+                    }
+                }
             } else {
-                $rowErrors[] = [
-                    'row' => $excelRowNumber,
-                    'field' => 'DSA/NPS FL/REGULAR',
-                    'value' => (string) ($cleanData['invoice_type'] ?? ''),
-                    'error' => "Nilai tipe invoice harus bernilai 'DSA', 'NPS FL', atau 'REGULAR'.",
-                ];
+                // No separate invoice_type column; evaluate rawDsa (mapped from DSA/NPS FL column)
+                $upperDsa = strtoupper($rawDsa);
+                $isKnownType = str_contains($upperDsa, 'DSA') || str_contains($upperDsa, 'NPS') || str_contains($upperDsa, 'REGUL');
+
+                if ($isKnownType) {
+                    if (str_contains($upperDsa, 'DSA')) {
+                        $cleanData['invoice_type'] = 'DSA';
+                    } elseif (str_contains($upperDsa, 'REGUL')) {
+                        $cleanData['invoice_type'] = 'REGULAR';
+                    } else {
+                        $cleanData['invoice_type'] = 'NPS FL';
+                    }
+
+                    $cleanedName = preg_replace('/^(DSA|NPS(\s*FL)?|REGULAR)[_\s-]+/i', '', $rawDsa);
+                    $cleanedName = ltrim($cleanedName, "_- \t\n\r\0\x0B");
+                    if ($cleanedName !== '' && ! in_array(strtoupper($cleanedName), ['DSA', 'NPS', 'NPS FL', 'REGULAR', '-'])) {
+                        $dsaName = $cleanedName;
+                    }
+                } elseif ($rawDsa === '') {
+                    // Gracefully fallback to default invoice type
+                    $normDefault = strtoupper(trim($defaultInvoiceType ?? ''));
+                    if ($normDefault === 'DSA') {
+                        $cleanData['invoice_type'] = 'DSA';
+                    } elseif (str_contains($normDefault, 'REGUL')) {
+                        $cleanData['invoice_type'] = 'REGULAR';
+                    } else {
+                        $cleanData['invoice_type'] = 'NPS FL';
+                    }
+                } elseif (str_starts_with($rawDsa, '_') || str_contains($rawDsa, ' ')) {
+                    // Salesperson name like "_DODI SUPRIATNA" or "DODI SUPRIATNA"
+                    $normDefault = strtoupper(trim($defaultInvoiceType ?? ''));
+                    if ($normDefault === 'DSA') {
+                        $cleanData['invoice_type'] = 'DSA';
+                    } elseif (str_contains($normDefault, 'REGUL')) {
+                        $cleanData['invoice_type'] = 'REGULAR';
+                    } else {
+                        $cleanData['invoice_type'] = 'NPS FL';
+                    }
+
+                    $dsaName = ltrim($rawDsa, "_- \t\n\r\0\x0B");
+                } else {
+                    $rowErrors[] = [
+                        'row' => $excelRowNumber,
+                        'field' => 'DSA/NPS FL/REGULAR',
+                        'value' => $rawDsa,
+                        'error' => "Nilai tipe invoice harus bernilai 'DSA', 'NPS FL', atau 'REGULAR'.",
+                    ];
+                }
+            }
+
+            // Area and salesperson fallback from Master Dealer
+            $dealer = $this->findMasterDealer($cleanData['kode_bt'] ?? null, $cleanData['dealer_code'] ?? null);
+            $cleanData['dsa'] = $dsaName ?: $dealer?->sales_person;
+            $cleanData['area'] = $dealer?->area ?? $importArea;
+            if ($cleanData['area'] !== $importArea) {
+                $movedToArea[$cleanData['area']] = ($movedToArea[$cleanData['area']] ?? 0) + 1;
             }
 
             // No CN dipakai sebagai nomor invoice, jadi wajib diisi dan tidak boleh dobel
@@ -289,13 +355,6 @@ class DraftImportService
                 'calculated' => $calcResult,
                 'errors' => [],
             ];
-
-            // Area mengikuti toko di Master Dealer (mis. diimport dari tab Jawa Barat tapi tokonya Jawa Tengah)
-            $dealer = $this->findMasterDealer($cleanData['kode_bt'] ?? null, $cleanData['dealer_code'] ?? null);
-            $cleanData['area'] = $dealer?->area ?? $importArea;
-            if ($cleanData['area'] !== $importArea) {
-                $movedToArea[$cleanData['area']] = ($movedToArea[$cleanData['area']] ?? 0) + 1;
-            }
 
             if ($previewOnly) {
                 $previewRows[] = $this->previewRow($excelRowNumber, $cleanData, [], $hasDiff);
@@ -485,7 +544,7 @@ class DraftImportService
 
         // String fields
         $stringFields = [
-            'no', 'region', 'rsm', 'dealer_code', 'kode_bt', 'customer_name',
+            'no', 'region', 'rsm', 'dsa', 'dealer_code', 'kode_bt', 'customer_name',
             'dealer_name', 'npwp', 'npwp_name', 'npwp_type', 'pph_type',
             'item_code', 'item_name', 'address', 'email', 'whatsapp', 'program_name',
             'program_period', 'cn_number', 'ref_note', 'invoice_type',

@@ -65,6 +65,27 @@ class Invoice extends Model
         return self::numberToWords((int) round($this->netpay)).' Rupiah';
     }
 
+    /**
+     * Nama DSA / NPS FL yang ditampilkan di invoice.
+     * Mengambil dari kolom dsa invoice, fallback ke draft->dsa, atau ke sales_person di Master Dealer.
+     */
+    public function getDsaNameAttribute(): ?string
+    {
+        if (! empty($this->attributes['dsa'])) {
+            return $this->attributes['dsa'];
+        }
+
+        if (! empty($this->draft?->dsa)) {
+            return $this->draft->dsa;
+        }
+
+        $dealer = Dealer::where('kode_bt', $this->draft?->kode_bt ?? $this->dealer_code)
+            ->orWhere('id_realme', $this->dealer_code)
+            ->first();
+
+        return $dealer?->sales_person;
+    }
+
     public static function numberToWords(int|float $number): string
     {
         $number = (int) abs($number);

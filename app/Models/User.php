@@ -203,17 +203,23 @@ class User extends Authenticatable
             return false;
         }
 
-        if (AppSetting::read('role_permissions_'.($this->role ?? 'scm')) !== null) {
-            return in_array($permission, self::getDefaultPermissionsForRole($this->role ?? 'scm'), true);
+        $role = $this->role ?? 'scm';
+        $rolePermissions = self::getDefaultPermissionsForRole($role);
+
+        // Role Admin selalu mengikuti hak akses Admin (bawaan penuh atau konfigurasi Role Permission)
+        if ($this->isAdmin()) {
+            return in_array($permission, $rolePermissions, true);
+        }
+
+        if (AppSetting::read('role_permissions_'.$role) !== null) {
+            return in_array($permission, $rolePermissions, true);
         }
 
         if (is_array($this->permissions)) {
             return in_array($permission, $this->permissions, true);
         }
 
-        $defaults = self::getDefaultPermissionsForRole($this->role ?? 'scm');
-
-        return in_array($permission, $defaults, true);
+        return in_array($permission, $rolePermissions, true);
     }
 
     /** @return Attribute<list<string>, never> */
@@ -224,6 +230,12 @@ class User extends Authenticatable
                 return [];
             }
             $role = $this->role ?? 'scm';
+
+            // Role Admin selalu mendapatkan hak akses Admin
+            if ($this->isAdmin()) {
+                return self::getDefaultPermissionsForRole('admin');
+            }
+
             if (AppSetting::read('role_permissions_'.$role) !== null) {
                 return self::getDefaultPermissionsForRole($role);
             }
