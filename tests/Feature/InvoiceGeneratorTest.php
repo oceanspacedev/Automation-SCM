@@ -78,6 +78,14 @@ class InvoiceGeneratorTest extends TestCase
 
         $html = view('invoices.dsa', ['invoice' => $invoice])->render();
         $this->assertStringContainsString('DODI SUPRIATNA', $html);
+        $this->assertStringContainsString('Nama DSA :', $html);
+        $this->assertStringContainsString('Mohon lakukan transfer ke rekening bank berikut:', $html);
+        $this->assertStringContainsString('Saldo program dapat digunakan maksimal 30 hari sejak tanggal terbit.', $html);
+
+        $htmlNps = view('invoices.nps-fl', ['invoice' => $invoice])->render();
+        $this->assertStringContainsString('Nama NPS FL :', $htmlNps);
+        $this->assertStringContainsString('Mohon lakukan transfer ke rekening bank berikut:', $htmlNps);
+        $this->assertStringContainsString('Saldo program dapat digunakan maksimal 30 hari sejak tanggal terbit.', $htmlNps);
     }
 
     public function test_can_generate_nps_fl_invoice_from_draft(): void
