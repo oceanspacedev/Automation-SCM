@@ -480,6 +480,7 @@
                   <label class="block font-medium text-gray-700 mb-1">No. Pembayaran</label>
                   <input
                     v-model="form.no_pembayaran"
+                    @input="handleNoPembayaranInput"
                     type="text"
                     placeholder="No Pembayaran..."
                     class="w-full h-8.5 px-3 rounded-lg border border-gray-300 text-xs text-gray-900 focus:outline-none focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-white transition"
@@ -962,6 +963,23 @@ const handleTglShareCnChange = () => {
   const diffDays = Math.max(0, Math.round((today.getTime() - shareCnDate.getTime()) / (1000 * 60 * 60 * 24)));
   form.lama_pending = String(diffDays);
   form.keterangan = diffDays > 30 ? 'LEBIH DARI 30 HARI' : 'KURANG DARI 30 HARI';
+};
+
+// No. Pembayaran diisi manual: otomatis status potong = SUDAH POTONG & status AR = DONE
+const handleNoPembayaranInput = () => {
+  const val = String(form.no_pembayaran || '').trim();
+  if (val !== '') {
+    if (form.status_potong_purchase !== 'SUDAH POTONG' && form.status_potong_purchase !== 'DONE TRANSFER') {
+      form.status_potong_purchase = 'SUDAH POTONG';
+    }
+    if (form.status_potong_ar !== 'DONE' && form.status_potong_ar !== 'DONE TRANSFER') {
+      form.status_potong_ar = 'DONE';
+    }
+    if (!form.tgl_potong_tf) {
+      const today = new Date();
+      form.tgl_potong_tf = `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`;
+    }
+  }
 };
 
 const handleClose = () => {

@@ -432,6 +432,103 @@ class DataProgramTest extends TestCase
         $this->assertTrue((int) $dp->lama_pending > 30);
     }
 
+    public function test_filling_no_pembayaran_marks_claim_as_sudah_potong_and_notifies_tax_team(): void
+    {
+        Http::fake([
+            '*waghub*' => Http::response(['success' => true, 'data' => ['id' => 'msg_tax']], 200),
+        ]);
+
+        $dp = DataProgram::create([
+            'row_hash' => 'hash_test_ar_cut_auto',
+            'dealer_name' => 'DEALER TEST AR CUT',
+            'kode_bt' => 'BT-ARCUT',
+            'program_name' => 'PROGRAM AR CUT 2026',
+            'status_potong_purchase' => 'BISA DI POTONG',
+            'status_potong_ar' => 'DEALER SETUJU (PROSES AR)',
+        ]);
+
+        $response = $this->putJson("/api/data-program/{$dp->id}", [
+            'no_pembayaran' => 'PAY-2026-001',
+            'push_to_sheet' => false,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true);
+
+        $dp->refresh();
+        $this->assertSame('SUDAH POTONG', $dp->status_potong_purchase);
+        $this->assertSame('DONE', $dp->status_potong_ar);
+        $this->assertSame('PAY-2026-001', $dp->no_pembayaran);
+        $this->assertNotNull($dp->tgl_potong_tf);
+
+        $this->assertDatabaseHas('program_approval_logs', [
+            'data_program_id' => $dp->id,
+            'event' => 'cut',
+        ]);
+
+        $this->assertDatabaseHas('program_approval_logs', [
+            'data_program_id' => $dp->id,
+            'event' => 'tax_notified',
+        ]);
+    }
+
+    public function test_bulk_updating_no_pembayaran_marks_claims_as_sudah_potong(): void
+    {
+        Http::fake([
+            '*waghub*' => Http::response(['success' => true, 'data' => ['id' => 'msg_tax']], 200),
+            'script.google.com/*' => Http::response(['success' => true], 200),
+        ]);
+
+        $dp1 = DataProgram::create([
+            'row_hash' => 'hash_bulk_1',
+            'dealer_name' => 'DEALER BULK 1',
+            'kode_bt' => 'BT-BULK-1',
+            'program_name' => 'PROGRAM BULK',
+            'status_potong_purchase' => 'BISA DI POTONG',
+            'status_potong_ar' => 'DEALER SETUJU (PROSES AR)',
+        ]);
+
+        $dp2 = DataProgram::create([
+            'row_hash' => 'hash_bulk_2',
+            'dealer_name' => 'DEALER BULK 2',
+            'kode_bt' => 'BT-BULK-2',
+            'program_name' => 'PROGRAM BULK',
+            'status_potong_purchase' => 'BISA DI POTONG',
+            'status_potong_ar' => 'DEALER SETUJU (PROSES AR)',
+        ]);
+
+        $response = $this->putJson('/api/data-program/bulk', [
+            'field' => 'no_pembayaran',
+            'rows' => [
+                ['id' => $dp1->id, 'value' => 'PAY-BULK-001'],
+                ['id' => $dp2->id, 'value' => 'PAY-BULK-002'],
+            ],
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true);
+
+        $dp1->refresh();
+        $dp2->refresh();
+
+        $this->assertSame('SUDAH POTONG', $dp1->status_potong_purchase);
+        $this->assertSame('DONE', $dp1->status_potong_ar);
+        $this->assertSame('PAY-BULK-001', $dp1->no_pembayaran);
+
+        $this->assertSame('SUDAH POTONG', $dp2->status_potong_purchase);
+        $this->assertSame('DONE', $dp2->status_potong_ar);
+        $this->assertSame('PAY-BULK-002', $dp2->no_pembayaran);
+
+        $this->assertDatabaseHas('program_approval_logs', [
+            'data_program_id' => $dp1->id,
+            'event' => 'cut',
+        ]);
+        $this->assertDatabaseHas('program_approval_logs', [
+            'data_program_id' => $dp2->id,
+            'event' => 'cut',
+        ]);
+    }
+
     public function test_a_row_with_a_long_faktur_link_can_be_edited_and_gets_a_telemarketing_number(): void
     {
         // Link faktur dari Form Program disimpan di "<dealer>/<program>/<nama file>", bisa lebih dari 255 karakter

@@ -30,7 +30,7 @@ class DataProgramController extends Controller
      *
      * @var array<int, string>
      */
-    private const GRID_FIELDS = ['no_po', 'no_po_sj', 'no_transaksi', 'no_sj'];
+    private const GRID_FIELDS = ['no_po', 'no_po_sj', 'no_transaksi', 'no_sj', 'no_pembayaran'];
 
     public function __construct(
         protected DataProgramSyncService $syncService,
@@ -720,6 +720,9 @@ class DataProgramController extends Controller
         $dp->stampInputDate();
         $dp->save();
 
+        $actor = $request->user()?->name ?: ($request->user()?->email ?: 'AR');
+        $transition = $this->handleArSettlementTransition($dp, $actor);
+
         $sheetPushResult = null;
         if ($pushToSheet) {
             try {
@@ -729,16 +732,24 @@ class DataProgramController extends Controller
             }
         }
 
+        $message = 'Data Program berhasil diperbarui.';
+        if ($transition['settled']) {
+            $message = $transition['message'];
+        }
+        if ($sheetPushResult && ($sheetPushResult['success'] ?? false)) {
+            $message .= ' Perubahan juga telah dikirim ke Google Spreadsheet.';
+        }
+
         return response()->json([
             'success' => true,
-            'message' => 'Data Program berhasil diperbarui.'.($sheetPushResult && ($sheetPushResult['success'] ?? false) ? ' Perubahan juga telah dikirim ke Google Spreadsheet.' : ''),
-            'data' => $dp,
+            'message' => $message,
+            'data' => $dp->fresh(),
             'sheet_push' => $sheetPushResult,
         ]);
     }
 
     /**
-     * Set No PO, No PO/SJ, No Transaksi or No SJ on several rows at once (cell edits and drag-to-fill in the Data Program table),
+     * Set No PO, No PO/SJ, No Transaksi, No SJ or No Pembayaran on several rows at once (cell edits and drag-to-fill in the Data Program table),
      * then send those rows to the area's Google Spreadsheet in a single request.
      */
     public function bulkUpdate(Request $request): JsonResponse
@@ -754,16 +765,26 @@ class DataProgramController extends Controller
         ]);
 
         $dataPrograms = DataProgram::whereIn('id', array_column($validated['rows'], 'id'))->get()->keyBy('id');
+        $actor = $request->user()?->name ?: ($request->user()?->email ?: 'AR');
 
         foreach ($validated['rows'] as $row) {
-            $dp = $dataPrograms->get($row['id'])?->fill([$validated['field'] => $row['value'] ?? null]);
+            $dp = $dataPrograms->get($row['id']);
+            if (! $dp) {
+                continue;
+            }
+
+            $dp->fill([$validated['field'] => $row['value'] ?? null]);
 
             // Tgl Input = hari No PO/SJ diisi (sama seperti import No PO/SJ)
             if ($validated['field'] === 'no_po_sj') {
-                $dp?->stampInputDate(whenMissing: true);
+                $dp->stampInputDate(whenMissing: true);
             }
 
-            $dp?->save();
+            $dp->save();
+
+            if ($validated['field'] === 'no_pembayaran') {
+                $this->handleArSettlementTransition($dp, $actor);
+            }
         }
 
         $sheetPushResults = [];
@@ -786,6 +807,91 @@ class DataProgramController extends Controller
             'data' => $dataPrograms->values(),
             'sheet_push' => $sheetPushResults,
         ]);
+    }
+
+    /**
+     * If the row is being settled by AR (payment number filled or status set to cut/done)
+     * and was not previously settled, synchronize statuses, log the CUT event, and notify the tax team.
+     *
+     * @return array{settled: bool, tax_notified: bool, message: ?string}
+     */
+    protected function handleArSettlementTransition(DataProgram $dp, ?string $actor = null): array
+    {
+        $hasPayment = filled($dp->no_pembayaran);
+        $purchaseStatus = strtoupper(trim((string) $dp->status_potong_purchase));
+        $arStatus = strtoupper(trim((string) $dp->status_potong_ar));
+
+        $wantsCut = $hasPayment
+            || in_array($purchaseStatus, ['SUDAH POTONG', DataProgram::DONE_TRANSFER], true)
+            || in_array($arStatus, ['DONE', 'SUDAH POTONG', DataProgram::DONE_TRANSFER], true);
+
+        if (! $wantsCut) {
+            return ['settled' => false, 'tax_notified' => false, 'message' => null];
+        }
+
+        // Set standardized settled status and date
+        if ($dp->isTransfer()) {
+            $dp->status_potong_purchase = DataProgram::DONE_TRANSFER;
+            $dp->status_potong_ar = DataProgram::DONE_TRANSFER;
+        } else {
+            $dp->status_potong_purchase = 'SUDAH POTONG';
+            $dp->status_potong_ar = 'DONE';
+        }
+
+        if (blank($dp->tgl_potong_tf)) {
+            $dp->tgl_potong_tf = date('n/j/Y');
+        }
+
+        $dp->save();
+
+        // Record approval log if not already recorded for this stage
+        $event = $dp->isTransfer() ? ProgramApprovalLog::TRANSFERRED : ProgramApprovalLog::CUT;
+        $alreadyLogged = $dp->approvalLogs()->where('event', $event)->exists();
+
+        if (! $alreadyLogged) {
+            ProgramApprovalLog::record(
+                $dp,
+                $event,
+                actor: $actor ?: 'AR',
+                note: $dp->no_pembayaran ? "No. Pembayaran: {$dp->no_pembayaran}" : null
+            );
+        }
+
+        // Estafet otomatis ke Tim Pajak (jika belum dinotifikasi)
+        $taxNotified = false;
+        $taxMessage = null;
+        if ($dp->tax_notified_at === null) {
+            try {
+                $result = $this->waService->sendDataProgramTaxCheckNotification($dp);
+                $taxNotified = (bool) ($result['success'] ?? false);
+                $taxMessage = $result['message'] ?? null;
+
+                if ($taxNotified) {
+                    $dp->forceFill(['tax_notified_at' => now()])->save();
+                } else {
+                    Log::warning("Gagal kirim WA cek pajak otomatis untuk DataProgram ID {$dp->id}: {$taxMessage}");
+                }
+
+                ProgramApprovalLog::record(
+                    $dp,
+                    ProgramApprovalLog::TAX_NOTIFIED,
+                    $taxNotified,
+                    actor: ProgramApprovalLog::AUTOMATIC,
+                    recipient: ProgramApprovalLog::teamRecipient($dp, TeamContact::TAX),
+                    note: $taxMessage
+                );
+            } catch (\Throwable $e) {
+                Log::warning("Error kirim WA cek pajak untuk DataProgram ID {$dp->id}: {$e->getMessage()}");
+            }
+        }
+
+        return [
+            'settled' => true,
+            'tax_notified' => $taxNotified,
+            'message' => $taxNotified
+                ? 'Klaim diselesaikan (Sudah Potong) & notifikasi WA cek pajak terkirim ke Tim Pajak.'
+                : 'Klaim diselesaikan (Sudah Potong).',
+        ];
     }
 
     /**
