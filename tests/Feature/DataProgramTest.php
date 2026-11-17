@@ -472,61 +472,24 @@ class DataProgramTest extends TestCase
         ]);
     }
 
-    public function test_bulk_updating_no_pembayaran_marks_claims_as_sudah_potong(): void
+    public function test_bulk_update_does_not_allow_no_pembayaran(): void
     {
-        Http::fake([
-            '*waghub*' => Http::response(['success' => true, 'data' => ['id' => 'msg_tax']], 200),
-            'script.google.com/*' => Http::response(['success' => true], 200),
-        ]);
-
-        $dp1 = DataProgram::create([
-            'row_hash' => 'hash_bulk_1',
-            'dealer_name' => 'DEALER BULK 1',
-            'kode_bt' => 'BT-BULK-1',
-            'program_name' => 'PROGRAM BULK',
-            'status_potong_purchase' => 'BISA DI POTONG',
-            'status_potong_ar' => 'DEALER SETUJU (PROSES AR)',
-        ]);
-
-        $dp2 = DataProgram::create([
-            'row_hash' => 'hash_bulk_2',
-            'dealer_name' => 'DEALER BULK 2',
-            'kode_bt' => 'BT-BULK-2',
-            'program_name' => 'PROGRAM BULK',
-            'status_potong_purchase' => 'BISA DI POTONG',
-            'status_potong_ar' => 'DEALER SETUJU (PROSES AR)',
+        $dp = DataProgram::create([
+            'row_hash' => 'hash_bulk_reject_no_pembayaran',
+            'dealer_name' => 'DEALER TEST',
+            'kode_bt' => 'BT-TEST',
+            'program_name' => 'PROGRAM TEST',
         ]);
 
         $response = $this->putJson('/api/data-program/bulk', [
             'field' => 'no_pembayaran',
             'rows' => [
-                ['id' => $dp1->id, 'value' => 'PAY-BULK-001'],
-                ['id' => $dp2->id, 'value' => 'PAY-BULK-002'],
+                ['id' => $dp->id, 'value' => 'PAY-001'],
             ],
         ]);
 
-        $response->assertOk()
-            ->assertJsonPath('success', true);
-
-        $dp1->refresh();
-        $dp2->refresh();
-
-        $this->assertSame('SUDAH POTONG', $dp1->status_potong_purchase);
-        $this->assertSame('DONE', $dp1->status_potong_ar);
-        $this->assertSame('PAY-BULK-001', $dp1->no_pembayaran);
-
-        $this->assertSame('SUDAH POTONG', $dp2->status_potong_purchase);
-        $this->assertSame('DONE', $dp2->status_potong_ar);
-        $this->assertSame('PAY-BULK-002', $dp2->no_pembayaran);
-
-        $this->assertDatabaseHas('program_approval_logs', [
-            'data_program_id' => $dp1->id,
-            'event' => 'cut',
-        ]);
-        $this->assertDatabaseHas('program_approval_logs', [
-            'data_program_id' => $dp2->id,
-            'event' => 'cut',
-        ]);
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['field']);
     }
 
     public function test_a_row_with_a_long_faktur_link_can_be_edited_and_gets_a_telemarketing_number(): void

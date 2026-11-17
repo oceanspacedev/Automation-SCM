@@ -30,7 +30,7 @@ class DataProgramController extends Controller
      *
      * @var array<int, string>
      */
-    private const GRID_FIELDS = ['no_po', 'no_po_sj', 'no_transaksi', 'no_sj', 'no_pembayaran'];
+    private const GRID_FIELDS = ['no_po', 'no_po_sj', 'no_transaksi', 'no_sj'];
 
     public function __construct(
         protected DataProgramSyncService $syncService,
@@ -749,7 +749,7 @@ class DataProgramController extends Controller
     }
 
     /**
-     * Set No PO, No PO/SJ, No Transaksi, No SJ or No Pembayaran on several rows at once (cell edits and drag-to-fill in the Data Program table),
+     * Set No PO, No PO/SJ, No Transaksi or No SJ on several rows at once (cell edits and drag-to-fill in the Data Program table),
      * then send those rows to the area's Google Spreadsheet in a single request.
      */
     public function bulkUpdate(Request $request): JsonResponse
@@ -765,7 +765,6 @@ class DataProgramController extends Controller
         ]);
 
         $dataPrograms = DataProgram::whereIn('id', array_column($validated['rows'], 'id'))->get()->keyBy('id');
-        $actor = $request->user()?->name ?: ($request->user()?->email ?: 'AR');
 
         foreach ($validated['rows'] as $row) {
             $dp = $dataPrograms->get($row['id']);
@@ -781,10 +780,6 @@ class DataProgramController extends Controller
             }
 
             $dp->save();
-
-            if ($validated['field'] === 'no_pembayaran') {
-                $this->handleArSettlementTransition($dp, $actor);
-            }
         }
 
         $sheetPushResults = [];

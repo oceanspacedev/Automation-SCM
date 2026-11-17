@@ -670,7 +670,7 @@
               </td>
 
               <!-- 39. No. Pembayaran -->
-              <td data-field="no_pembayaran" class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 {{ row.no_pembayaran || '-' }}
               </td>
 
