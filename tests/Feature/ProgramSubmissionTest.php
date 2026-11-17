@@ -1632,6 +1632,33 @@ class ProgramSubmissionTest extends TestCase
         config(['filesystems.disks.s3.key' => 'test-key', 'filesystems.disks.s3.bucket' => 'scm']);
         Storage::fake('s3');
 
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'is_complete' => true,
+                                'cek_dokumen' => 'LENGKAP',
+                                'status_potong_purchase' => 'BISA DI POTONG',
+                                'keterangan' => 'Semua dokumen lengkap dan valid',
+                                'dealer_name' => 'Toko Jaya Selular',
+                                'cn_program_name' => 'PROGRAM DSA FEBRUARI 2026',
+                                'has_stamp' => true,
+                                'has_signature' => true,
+                                'has_npwp' => true,
+                                'note_pph' => 'ok',
+                                'doc_validation' => [
+                                    'cn' => ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'Dokumen CN valid.'],
+                                    'faktur' => ['status' => 'empty', 'actual_type' => 'none', 'message' => 'Faktur tidak diperlukan untuk Non-PKP.'],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
         $cnFile = UploadedFile::fake()->create('credit_note_toko_jaya.pdf', 50, 'application/pdf');
         $agrFile = UploadedFile::fake()->create('agreement_toko_jaya.pdf', 50, 'application/pdf');
 
@@ -1669,6 +1696,32 @@ class ProgramSubmissionTest extends TestCase
     {
         Storage::fake('public');
         config(['filesystems.disks.s3.key' => 'test-key', 'filesystems.disks.s3.bucket' => 'scm']);
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'is_complete' => true,
+                                'cek_dokumen' => 'LENGKAP',
+                                'status_potong_purchase' => 'BISA DI POTONG',
+                                'keterangan' => 'Semua dokumen lengkap dan valid',
+                                'dealer_name' => 'Toko Jaya Selular',
+                                'cn_program_name' => 'PROGRAM DSA FEBRUARI 2026',
+                                'has_stamp' => true,
+                                'has_signature' => true,
+                                'has_npwp' => true,
+                                'note_pph' => 'ok',
+                                'doc_validation' => [
+                                    'cn' => ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'Dokumen CN valid.'],
+                                    'faktur' => ['status' => 'empty', 'actual_type' => 'none', 'message' => 'Faktur tidak diperlukan untuk Non-PKP.'],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
         // Disk S3 tidak melempar error: unggahan yang gagal mengembalikan false
         $failingS3 = Mockery::mock(FilesystemAdapter::class);
         $failingS3->shouldReceive('putFileAs')->andReturn(false);
@@ -2052,43 +2105,40 @@ class ProgramSubmissionTest extends TestCase
 
     public function test_inspect_document_files_overrides_ai_mismatch_when_typo_matches(): void
     {
-        $service = app(DocumentAnalysisService::class);
-
-        // Simulate AI router returning mismatch due to "NEWCO CELL" vs "NEWCOO CELL"
-        $mock = new class extends DocumentAnalysisService
-        {
-            public function inspectDocumentFiles(array $formData, array $filesOrUrls): array
-            {
-                // Inject AI response containing dealer mismatch
-                $parsed = [
-                    'dealer_name' => 'NEWCO CELL',
-                    'dealer_mismatch' => true,
-                    'agr_dealer_name' => 'NEWCO CELL',
-                    'agr_dealer_mismatch' => true,
-                    'agr_program_name' => 'PROGRAM DSA JULI 2026',
-                    'agr_program_mismatch' => false,
-                    'is_complete' => false,
-                    'cek_dokumen' => 'NAMA DEALER TIDAK SESUAI (CN)',
-                    'status_potong_purchase' => 'BELUM BISA POTONG',
-                    'keterangan' => "Nama dealer di formulir ('NEWCOO CELL') berbeda dengan dokumen Credit Note ('NEWCO CELL').",
-                    'doc_validation' => [
-                        'cn' => [
-                            'status' => 'invalid',
-                            'actual_type' => 'cn',
-                            'message' => "Nama dealer di dokumen ('NEWCO CELL') berbeda dengan Form ('NEWCOO CELL').",
-                        ],
-                        'agr' => [
-                            'status' => 'invalid',
-                            'actual_type' => 'agr',
-                            'message' => "Nama dealer pada dokumen Agreement ('NEWCO CELL') berbeda dengan formulir ('NEWCOO CELL').",
+        Cache::flush();
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'dealer_name' => 'NEWCO CELL',
+                                'dealer_mismatch' => true,
+                                'cn_program_name' => 'PROGRAM DSA JULI 2026',
+                                'cn_program_mismatch' => false,
+                                'is_complete' => false,
+                                'cek_dokumen' => 'NAMA DEALER TIDAK SESUAI (CN)',
+                                'status_potong_purchase' => 'BELUM BISA POTONG',
+                                'keterangan' => "Nama dealer di formulir ('NEWCOO CELL') berbeda dengan dokumen Credit Note ('NEWCO CELL').",
+                                'has_stamp' => true,
+                                'has_signature' => true,
+                                'has_npwp' => true,
+                                'note_pph' => 'ok',
+                                'doc_validation' => [
+                                    'cn' => [
+                                        'status' => 'invalid',
+                                        'actual_type' => 'cn',
+                                        'message' => "Nama dealer di dokumen ('NEWCO CELL') berbeda dengan Form ('NEWCOO CELL').",
+                                    ],
+                                ],
+                            ]),
                         ],
                     ],
-                ];
+                ],
+            ], 200),
+        ]);
 
-                // Calling parent inspect with parsed injected by mocking method or verifying override
-                return parent::inspectDocumentFiles($formData, $filesOrUrls);
-            }
-        };
+        $service = app(DocumentAnalysisService::class);
 
         $cnFile = UploadedFile::fake()->create('CN_NEWCO_CELL.pdf', 100, 'application/pdf');
         $agrFile = UploadedFile::fake()->create('AGR_NEWCO_CELL.pdf', 100, 'application/pdf');
@@ -2243,35 +2293,41 @@ class ProgramSubmissionTest extends TestCase
 
     public function test_inspect_document_files_without_signature_sets_belum_bisa_potong_and_ttd_belum_ada(): void
     {
-        $service = new class extends DocumentAnalysisService
-        {
-            protected function inspectWithGemini(array $formData, array $filesOrUrls): ?array
-            {
-                return [
-                    'dealer_name' => 'NAZMY CELL GARUT',
-                    'dealer_mismatch' => false,
-                    'cn_program_name' => 'PROGRAM DSA OKTOBER 2026',
-                    'cn_program_mismatch' => false,
-                    'is_complete' => false,
-                    'cek_dokumen' => 'TTD BELUM ADA',
-                    'status_potong_purchase' => 'BELUM BISA POTONG',
-                    'keterangan' => 'Dokumen Credit Note / Invoice belum ditandatangani oleh pihak dealer.',
-                    'dpp' => 315315,
-                    'dpp_lain' => 0,
-                    'ppn' => 0,
-                    'nilai_pph' => 7883,
-                    'net_pay' => 307432,
-                    'has_stamp' => false,
-                    'has_signature' => false,
-                    'has_npwp' => true,
-                    'note_pph' => 'CAP? TTD?',
-                    'doc_validation' => [
-                        'cn' => ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'Dokumen diunggah'],
+        Cache::flush();
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'dealer_name' => 'NAZMY CELL GARUT',
+                                'dealer_mismatch' => false,
+                                'cn_program_name' => 'PROGRAM DSA OKTOBER 2026',
+                                'cn_program_mismatch' => false,
+                                'is_complete' => false,
+                                'cek_dokumen' => 'TTD BELUM ADA',
+                                'status_potong_purchase' => 'BELUM BISA POTONG',
+                                'keterangan' => 'Dokumen Credit Note / Invoice belum ditandatangani oleh pihak dealer.',
+                                'dpp' => 315315,
+                                'dpp_lain' => 0,
+                                'ppn' => 0,
+                                'nilai_pph' => 7883,
+                                'net_pay' => 307432,
+                                'has_stamp' => false,
+                                'has_signature' => false,
+                                'has_npwp' => true,
+                                'note_pph' => 'CAP? TTD?',
+                                'doc_validation' => [
+                                    'cn' => ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'Dokumen diunggah'],
+                                ],
+                            ]),
+                        ],
                     ],
-                ];
-            }
-        };
+                ],
+            ], 200),
+        ]);
 
+        $service = app(DocumentAnalysisService::class);
         $result = $service->inspectDocumentFiles([
             'dealer_name' => 'NAZMY CELL GARUT',
             'program_name' => 'PROGRAM DSA OKTOBER 2026',
@@ -2289,37 +2345,42 @@ class ProgramSubmissionTest extends TestCase
 
     public function test_inspect_document_files_handles_dpp_nilai_lain_and_corrects_net_pay(): void
     {
-        $service = new class extends DocumentAnalysisService
-        {
-            protected function inspectWithGemini(array $formData, array $filesOrUrls): ?array
-            {
-                // AI salah mengira DPP Nilai Lain sebagai DPP dan menghitung net_pay = 891892 + 107027 = 998919
-                return [
-                    'dealer_name' => 'PANGLIMA PONSEL _ CV ZABEELA BINTANG USAHA',
-                    'dealer_mismatch' => false,
-                    'cn_program_name' => 'PROGRAM DSA OKTOBER 2026',
-                    'cn_program_mismatch' => false,
-                    'is_complete' => true,
-                    'cek_dokumen' => 'LENGKAP',
-                    'status_potong_purchase' => 'BISA DI POTONG',
-                    'keterangan' => 'Dokumen lengkap',
-                    'dpp' => 891892,
-                    'dpp_lain' => 891892,
-                    'ppn' => 107027,
-                    'nilai_pph' => 19459,
-                    'net_pay' => 998919, // Angka salah dari AI
-                    'has_stamp' => true,
-                    'has_signature' => true,
-                    'has_npwp' => true,
-                    'note_pph' => 'ok',
-                    'doc_validation' => [
-                        'cn' => ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'Dokumen diunggah'],
-                        'faktur' => ['status' => 'valid', 'actual_type' => 'faktur', 'message' => 'Dokumen diunggah'],
+        Cache::flush();
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'dealer_name' => 'PANGLIMA PONSEL _ CV ZABEELA BINTANG USAHA',
+                                'dealer_mismatch' => false,
+                                'cn_program_name' => 'PROGRAM DSA OKTOBER 2026',
+                                'cn_program_mismatch' => false,
+                                'is_complete' => true,
+                                'cek_dokumen' => 'LENGKAP',
+                                'status_potong_purchase' => 'BISA DI POTONG',
+                                'keterangan' => 'Dokumen lengkap',
+                                'dpp' => 891892,
+                                'dpp_lain' => 891892,
+                                'ppn' => 107027,
+                                'nilai_pph' => 19459,
+                                'net_pay' => 998919, // Angka salah dari AI
+                                'has_stamp' => true,
+                                'has_signature' => true,
+                                'has_npwp' => true,
+                                'note_pph' => 'ok',
+                                'doc_validation' => [
+                                    'cn' => ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'Dokumen diunggah'],
+                                    'faktur' => ['status' => 'valid', 'actual_type' => 'faktur', 'message' => 'Dokumen diunggah'],
+                                ],
+                            ]),
+                        ],
                     ],
-                ];
-            }
-        };
+                ],
+            ], 200),
+        ]);
 
+        $service = app(DocumentAnalysisService::class);
         $result = $service->inspectDocumentFiles([
             'dealer_name' => 'PANGLIMA PONSEL _ CV ZABEELA BINTANG USAHA',
             'program_name' => 'PROGRAM DSA OKTOBER 2026',
@@ -2335,5 +2396,63 @@ class ProgramSubmissionTest extends TestCase
 
         $this->assertEquals(972973.0, $result['financial']['dpp']);
         $this->assertEquals(1060541.0, $result['financial']['net_pay']);
+    }
+
+    public function test_inspect_document_files_accepts_signature_over_stamp_pattern(): void
+    {
+        Cache::flush();
+        // Dokumen dengan pola tanda tangan dan cap toko (seperti BERKAT CELL PURWAKARTA):
+        // Diakui sah dengan has_stamp: true, has_signature: true, note_pph: 'ok', status: 'BISA DI POTONG'
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'dealer_name' => 'BERKAT CELL PURWAKARTA',
+                                'dealer_mismatch' => false,
+                                'cn_program_name' => 'PROGRAM DSA OKTOBER 2026',
+                                'cn_program_mismatch' => false,
+                                'is_complete' => true,
+                                'cek_dokumen' => 'LENGKAP',
+                                'status_potong_purchase' => 'BISA DI POTONG',
+                                'keterangan' => 'Dokumen Credit Note lengkap dan valid.',
+                                'dpp' => 486486,
+                                'dpp_lain' => 0,
+                                'ppn' => 0,
+                                'nilai_pph' => 12162,
+                                'net_pay' => 474324,
+                                'has_stamp' => true,
+                                'has_signature' => true,
+                                'has_npwp' => true,
+                                'note_pph' => 'ok',
+                                'doc_validation' => [
+                                    'cn' => ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'Dokumen Credit Note terverifikasi.'],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $service = app(DocumentAnalysisService::class);
+        $result = $service->inspectDocumentFiles([
+            'dealer_name' => 'BERKAT CELL PURWAKARTA',
+            'program_name' => 'PROGRAM DSA OKTOBER 2026',
+            'dpp' => 486486,
+            'net_pay' => 474324,
+        ], [
+            'cn' => UploadedFile::fake()->create('CN_BERKAT.pdf', 100, 'application/pdf'),
+        ]);
+
+        // Dokumen dengan tanda tangan menimpa cap toko wajib diakui sah dan bisa dipotong
+        $this->assertTrue($result['is_clean']);
+        $this->assertSame('BISA DI POTONG', $result['status_potong_purchase']);
+        $this->assertSame('LENGKAP', $result['cek_dokumen']);
+        $this->assertTrue($result['audit']['has_signature']);
+        $this->assertTrue($result['audit']['has_stamp']);
+        $this->assertSame('ok', $result['audit']['note_pph']);
+        $this->assertSame('valid', $result['doc_validation']['cn']['status']);
     }
 }

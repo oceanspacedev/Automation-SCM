@@ -2108,10 +2108,10 @@ Analisis Finansial & Pajak:
   * no_faktur: Nomor Faktur Pajak jika ditemukan (format: 010.xxx-xx.xxxxxxxx)
   * tgl_faktur: Tanggal Faktur Pajak (format: DD/MM/YYYY)
 - Audit Fisik / Kelengkapan Dokumen:
-  * has_stamp: boolean (apakah ada stempel/cap basah atau digital dari dealer/perusahaan)
-  * has_signature: boolean (apakah dokumen ditandatangani oleh pihak dealer pada kolom tanda tangan / "Hormat Kami")
+  * has_stamp: boolean (apakah ada stempel/cap toko/badan usaha, baik berwarna merah, ungu, biru, maupun hitam, fisik maupun digital)
+  * has_signature: boolean (apakah dokumen ditandatangani/diparaf oleh pihak dealer, baik tanda tangan basah, digital, scan, maupun goresan pulpen/paraf di atas atau di samping cap stempel toko)
   * has_npwp: boolean (apakah NPWP tertera atau valid)
-  * note_pph: Catatan ringkas status fisik: "ok" jika lengkap dan ada cap/TTD/NPWP, atau sebutkan yang kurang seperti "CAP?", "TTD?", "NPWP?", "CAP? TTD?", dsb.
+  * note_pph: Catatan ringkas status fisik: "ok" jika lengkap dan ada cap/TTD/NPWP, atau sebutkan yang kurang seperti "CAP?", "TTD?", "NPWP?", dsb.
 
 - Validasi Isi Dokumen (Deteksi Dokumen Tertukar, Digabung, atau Tidak Sesuai):
   Status per slot ("valid", "swapped", "invalid", "empty"):
@@ -2189,9 +2189,14 @@ Ketentuan Penentuan Output:
      * "status_potong_purchase": "BELUM BISA POTONG"
      * "keterangan": "File yang diunggah pada slot tersebut bukan dokumen resmi yang diminta."
 
-5. KELENGKAPAN TANDA TANGAN (has_signature):
-   - Dokumen Credit Note / Invoice WAJIB ditandatangani oleh pihak dealer (tanda tangan basah, digital, atau scan pada bagian tanda tangan / "Hormat Kami").
-   - JIKA LEMBAR CN / INVOICE TIDAK ADA TANDA TANGAN (has_signature = false / kolom tanda tangan kosong):
+5. KELENGKAPAN TANDA TANGAN & CAP STEMPEL (has_signature & has_stamp) - SANGAT PENTING:
+   - Ketentuan Tanda Tangan & Cap:
+     * POLA TANDA TANGAN MENIMPA CAP / STEMPEL: Sangat lazim bagi dealer/toko menandatangani atau memberi paraf pulpen langsung di atas / di dalam / melintang menimpa cap stempel toko (contoh: stempel merah/ungu/biru bertuliskan nama toko seperti "BERKAT", lalu di atasnya diguratkan tanda tangan atau paraf pulpen hitam/biru di bawah tulisan "PIHAK KEDUA" atau di atas nama toko). POLA SEPERTI INI SAH, VALID, DAN WAJIB DIANGGAP SEBAGAI DOKUMEN YANG SUDAH DITANDATANGANI DAN DICAP (has_signature: true, has_stamp: true)!
+     * Area pengesahan / tanda tangan TIDAK HARUS bertuliskan "Hormat Kami": bisa bertuliskan "PIHAK KEDUA", "Dikeluarkan oleh", "Penerima", "Hormat Kami", "Toko", atau langsung nama dealer (misal: "BERKAT CELL PURWAKARTA") di bagian bawah dokumen.
+     * Tanda tangan bisa berupa tanda tangan penuh, goresan pulpen, paraf, atau inisial yang dibubuhkan di area pengesahan, baik di atas stempel, di dalam stempel, maupun di dekat nama dealer.
+     * JIKA DOKUMEN SUDAH MEMILIKI CAP / STEMPEL RESMI TOKO (has_stamp = true), apalagi disertai coretan pulpen/paraf di area stempel, MAKA has_signature WAJIB bernilai TRUE dan dokumen SAH untuk diproses! JANGAN PERNAH menyimpulkan has_signature: false atau menambahkan "TTD?" pada dokumen yang sudah memiliki cap dan tanda tangan seperti ini!
+     * HANYA set has_signature: false jika area tanda tangan / pengesahan BENAR-BENAR POLOS/KOSONG TOTAL (sama sekali tidak ada tanda tangan, tidak ada paraf, dan tidak ada cap/stempel toko, hanya teks polos ketikan komputer tanpa ada pengesahan fisik/digital).
+   - JIKA LEMBAR CN / INVOICE BENAR-BENAR POLOS TANPA TANDA TANGAN & TANPA CAP SAMA SEKALI (has_signature = false & has_stamp = false):
      * "is_complete": false
      * "status_potong_purchase": "BELUM BISA POTONG"
      * "cek_dokumen": Jika hanya tanda tangan yang kurang, isi "TTD BELUM ADA". Jika ada dokumen lain yang kurang, sebutkan bersamaan (misal "TTD & FAKTUR BELUM ADA").
