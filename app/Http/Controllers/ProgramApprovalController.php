@@ -6,11 +6,14 @@ use App\Models\ArContact;
 use App\Models\DataProgram;
 use App\Models\ProgramApprovalLog;
 use App\Models\TeamContact;
+use App\Services\DataProgramSyncService;
 use App\Services\ProgramApprovalFlow;
+use App\Services\WhatsAppService;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 
 /**
@@ -35,9 +38,14 @@ class ProgramApprovalController extends Controller
         ProgramApprovalLog::TAX_NOTIFIED => 'Notifikasi WhatsApp ke Tim Pajak',
         ProgramApprovalLog::TAX_CHECKED => 'Dicek Tim Pajak',
         ProgramApprovalLog::SCM_NOTIFIED => 'Notifikasi WhatsApp ke Tim SCM (hasil cek pajak)',
+        ProgramApprovalLog::ROLLED_BACK => 'Tahap approval dikembalikan',
     ];
 
-    public function __construct(private ProgramApprovalFlow $flow) {}
+    public function __construct(
+        private ProgramApprovalFlow $flow,
+        private DataProgramSyncService $syncService,
+        private WhatsAppService $waService,
+    ) {}
 
     /**
      * Rows in the flow (filtered by stage & search) with their steps, and how many rows are at each stage.
@@ -162,5 +170,184 @@ class ProgramApprovalController extends Controller
             'settlement' => in_array($stage, ['cut', 'tax_checked'], true) ? ($row->isTransfer() ? 'Done transfer' : 'Sudah potong') : null,
             'steps' => $this->flow->steps($row, $row->approvalLogs, $arName, $teamNames['tax'], $teamNames['scm']),
         ];
+    }
+
+    /**
+     * Roll back a row's approval to an earlier stage (e.g. from tax check back to AR, or postponed/telemarketing).
+     */
+    public function rollback(Request $request, int $id): JsonResponse
+    {
+        $validated = $request->validate([
+            'target_stage' => ['required', Rule::in(['approved', 'postponed', 'waiting_telemarketing', 'awaiting_transfer'])],
+            'reason' => ['required', 'string', 'max:500'],
+            'notify_ar' => ['nullable', 'boolean'],
+            'notify_scm' => ['nullable', 'boolean'],
+        ], [
+            'target_stage.required' => 'Tahap tujuan wajib dipilih.',
+            'target_stage.in' => 'Tahap tujuan tidak valid.',
+            'reason.required' => 'Alasan pengembalian tahap wajib diisi.',
+            'reason.max' => 'Alasan pengembalian maksimal 500 karakter.',
+        ]);
+
+        $row = DataProgram::query()->with('approvalLogs')->findOrFail($id);
+        $oldStage = $this->flow->stage($row);
+        $targetStage = $validated['target_stage'];
+        $reason = trim($validated['reason']);
+        $actor = $request->user()?->name ?: ($request->user()?->email ?: 'User');
+
+        $stageLabels = [
+            'approved' => 'Menunggu AR',
+            'postponed' => 'Ditunda Dealer (Pending)',
+            'waiting_telemarketing' => 'Awal (Belum ke Telemarketing)',
+            'awaiting_transfer' => 'Menunggu Transfer SCM',
+        ];
+        $targetLabel = $stageLabels[$targetStage] ?? $targetStage;
+
+        match ($targetStage) {
+            'approved' => $row->fill([
+                'status_potong_purchase' => 'BISA DI POTONG',
+                'status_potong_ar' => 'DEALER SETUJU (PROSES AR)',
+                'tf_status' => 'POTONG',
+                'no_pembayaran' => null,
+                'tgl_potong_tf' => null,
+                'tax_checked_at' => null,
+                'cek_pajak_tarif' => null,
+                'selisih' => 0,
+                'note_pph' => null,
+                'tax_notified_at' => null,
+                'scm_notified_at' => null,
+            ]),
+            'awaiting_transfer' => $row->fill([
+                'status_potong_purchase' => 'BISA DI POTONG',
+                'status_potong_ar' => DataProgram::TRANSFER_APPROVED,
+                'tf_status' => 'TF',
+                'no_pembayaran' => null,
+                'tgl_potong_tf' => null,
+                'tax_checked_at' => null,
+                'cek_pajak_tarif' => null,
+                'selisih' => 0,
+                'note_pph' => null,
+                'tax_notified_at' => null,
+                'scm_notified_at' => null,
+            ]),
+            'postponed' => $row->fill([
+                'status_potong_purchase' => 'BISA DI POTONG',
+                'status_potong_ar' => 'PENDING DEALER',
+                'no_pembayaran' => null,
+                'tgl_potong_tf' => null,
+                'tax_checked_at' => null,
+                'cek_pajak_tarif' => null,
+                'selisih' => 0,
+                'note_pph' => null,
+                'tax_notified_at' => null,
+                'scm_notified_at' => null,
+            ]),
+            'waiting_telemarketing' => $row->fill([
+                'status_potong_purchase' => 'BISA DI POTONG',
+                'status_potong_ar' => 'BELUM POTONG',
+                'telemarketing_notified_at' => null,
+                'telemarketing_reminder_count' => 0,
+                'no_pembayaran' => null,
+                'tgl_potong_tf' => null,
+                'tax_checked_at' => null,
+                'cek_pajak_tarif' => null,
+                'selisih' => 0,
+                'note_pph' => null,
+                'tax_notified_at' => null,
+                'scm_notified_at' => null,
+            ]),
+        };
+
+        $row->save();
+
+        $oldStageLabel = ProgramApprovalFlow::STAGES[$oldStage] ?? $oldStage;
+        $logNote = "Dikembalikan dari tahap '{$oldStageLabel}' ke '{$targetLabel}'. Alasan: {$reason}";
+
+        ProgramApprovalLog::record(
+            $row,
+            ProgramApprovalLog::ROLLED_BACK,
+            actor: $actor,
+            note: $logNote
+        );
+
+        $this->pushDpToSpreadsheet($row, withTaxCheck: true);
+
+        if (! empty($validated['notify_ar']) && $targetStage === 'approved') {
+            try {
+                $this->waService->sendDataProgramClaimNotificationToAr($row);
+            } catch (\Throwable $e) {
+                Log::warning("Gagal kirim ulang WA ke AR saat rollback DataProgram ID {$row->id}: ".$e->getMessage());
+            }
+        }
+
+        if (! empty($validated['notify_scm']) && $targetStage === 'awaiting_transfer') {
+            try {
+                $this->waService->sendDataProgramTransferRequestToScm($row);
+            } catch (\Throwable $e) {
+                Log::warning("Gagal kirim WA ke Tim SCM saat rollback DataProgram ID {$row->id}: ".$e->getMessage());
+            }
+        }
+
+        $row->refresh()->load('approvalLogs');
+        $arName = $this->arNameResolver();
+        $teamNames = $this->teamNamesResolver();
+
+        return response()->json([
+            'success' => true,
+            'message' => "Tahap approval berhasil dikembalikan ke {$targetLabel}.",
+            'data' => $this->present($row, $arName($row), $teamNames($row)) + [
+                'timeline' => $row->approvalLogs->map(fn (ProgramApprovalLog $log) => [
+                    'id' => $log->id,
+                    'event' => $log->event,
+                    'label' => self::EVENT_LABELS[$log->event] ?? $log->event,
+                    'success' => $log->success,
+                    'actor' => $log->actor,
+                    'recipient' => $log->recipient,
+                    'note' => $log->note,
+                    'at' => $log->created_at?->toIso8601String(),
+                ])->all(),
+            ],
+        ]);
+    }
+
+    /**
+     * Push updated row to Google Spreadsheet master.
+     */
+    protected function pushDpToSpreadsheet(DataProgram $dp, bool $withTaxCheck = false): void
+    {
+        try {
+            $rowIndex = (int) str_replace('row_', '', (string) $dp->row_hash);
+            $this->syncService->pushUpdatesToSpreadsheet([[
+                'row_index' => $rowIndex > 0 ? $rowIndex : null,
+                'kode_bt' => $dp->kode_bt,
+                'dealer_name' => $dp->dealer_name,
+                'program' => $dp->program,
+                'program_name' => $dp->program_name,
+                'periode' => $dp->periode,
+                'status_potong_purchase' => $dp->status_potong_purchase,
+                'status_potong_ar' => $dp->status_potong_ar,
+                'tgl_potong_tf' => $dp->tgl_potong_tf,
+                'no_pembayaran' => $dp->no_pembayaran,
+                'tf_status' => $dp->tf_status,
+                'bank' => $dp->bank,
+                'norek' => $dp->norek,
+                'namrek' => $dp->namrek,
+                'cek_dokumen' => $dp->cek_dokumen,
+                'keterangan' => $dp->keterangan,
+                'cn' => $dp->cn,
+                'agrement' => $dp->agrement,
+                'cek_fp' => $dp->cek_fp,
+                'no_faktur_pajak' => $dp->no_faktur_pajak,
+                'ket_faktur_pajak' => $dp->ket_faktur_pajak,
+                'noted' => $dp->noted,
+                ...($withTaxCheck ? [
+                    'cek_pajak_tarif' => $dp->cek_pajak_tarif,
+                    'selisih' => $dp->selisih,
+                    'note_pph' => $dp->note_pph,
+                ] : []),
+            ]], null, $dp->areaEnum(), $dp->brand);
+        } catch (\Throwable $e) {
+            Log::warning("Gagal push rollback DataProgram ID {$dp->id} ke Google Spreadsheet: ".$e->getMessage());
+        }
     }
 }

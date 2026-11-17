@@ -14,6 +14,7 @@
         'potong' => ['Pemotongan selesai diproses', 'Status klaim menjadi SUDAH POTONG, lalu diteruskan ke Tim Pajak untuk cek PPh.', ['label' => 'SUDAH POTONG', 'tone' => 'emerald']],
         'transfer' => ['Transfer selesai dicatat', 'Status klaim menjadi DONE TRANSFER, lalu diteruskan ke Tim Pajak untuk cek PPh.', ['label' => \App\Models\DataProgram::DONE_TRANSFER, 'tone' => 'emerald']],
         'cek_pajak' => ['Cek pajak tersimpan', 'Cek Pajak, Selisih, dan Note PPh tersimpan, lalu hasilnya diteruskan ke Tim SCM.', ['label' => 'SUDAH DICEK PAJAK', 'tone' => 'emerald']],
+        'kembalikan_ke_ar' => ['Klaim dikembalikan ke Tim AR', 'Status pemotongan telah dibatalkan dan pengajuan dikembalikan ke antrean Tim AR untuk ditinjau ulang.', ['label' => 'DIKEMBALIKAN KE AR', 'tone' => 'amber']],
         default => ['Klaim ditunda', 'Status dicatat sebagai pending. Tawarkan kembali pada pesanan dealer berikutnya.', ['label' => 'PENDING DEALER', 'tone' => 'gray']],
     };
 
@@ -32,6 +33,9 @@
         $rows[] = ['label' => 'Cek Pajak', 'value' => $dp->cek_pajak_tarif];
         $rows[] = ['label' => 'Selisih', 'value' => $rupiah($dp->selisih)];
         $rows[] = ['label' => 'Note PPh', 'value' => $dp->note_pph, 'wide' => true];
+    }
+    if ($action === 'kembalikan_ke_ar') {
+        $rows[] = ['label' => 'Alasan Pengembalian', 'value' => $alasan ?? '-', 'wide' => true];
     }
     $rows[] = ['label' => $isTransfer ? 'Nominal Transfer' : 'Nominal Potongan', 'value' => $rupiah($dp->net_pay), 'strong' => true];
     if ($action === 'setuju_transfer') {

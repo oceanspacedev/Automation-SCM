@@ -175,9 +175,9 @@ class ProgramApprovalFlow
                 ? $this->transferSteps($row, $latest, $stage, $isCut, $scmName)
                 : $this->cutSteps($row, $latest, $stage, $isCut, $arName)),
             // WA ke Tim Pajak terkirim otomatis saat AR memotong / SCM mentransfer; bisa dikirim ulang dari Riwayat Approval
-            $this->step('tax', 'Notifikasi WhatsApp ke Tim Pajak', $tax !== null || $row->tax_notified_at !== null || $taxChecked,
-                log: $tax ?? ($taxAttempt?->success === false ? $taxAttempt : null),
-                at: $tax?->created_at?->toIso8601String() ?? $row->tax_notified_at?->toIso8601String(),
+            $this->step('tax', 'Notifikasi WhatsApp ke Tim Pajak', $isCut && ($tax !== null || $row->tax_notified_at !== null || $taxChecked),
+                log: $isCut ? ($tax ?? ($taxAttempt?->success === false ? $taxAttempt : null)) : null,
+                at: $isCut ? ($tax?->created_at?->toIso8601String() ?? $row->tax_notified_at?->toIso8601String()) : null,
                 failed: $tax === null && $row->tax_notified_at === null && $isCut && ! $taxChecked && $taxAttempt?->success === false,
                 person: $taxName, role: 'Pajak'),
             $this->step('tax_check', 'Dicek Tim Pajak', $taxChecked, log: $taxCheck,
@@ -185,21 +185,30 @@ class ProgramApprovalFlow
                 at: $taxCheck?->created_at?->toIso8601String() ?? $row->tax_checked_at?->toIso8601String(),
                 person: $taxName, role: 'Pajak'),
             // Hasil cek pajak dikirim otomatis ke Tim SCM; baris yang dicek di spreadsheet dianggap sudah selesai
-            $this->step('scm', 'Notifikasi WhatsApp ke Tim SCM', $scm !== null || ($taxChecked && ! $checkedThroughLink),
-                log: $scm ?? ($scmAttempt?->success === false ? $scmAttempt : null),
+            $this->step('scm', 'Notifikasi WhatsApp ke Tim SCM', $taxChecked && ($scm !== null || ! $checkedThroughLink),
+                log: $taxChecked ? ($scm ?? ($scmAttempt?->success === false ? $scmAttempt : null)) : null,
                 failed: $scm === null && $checkedThroughLink && $scmAttempt?->success === false,
                 person: $scmName, role: 'SCM'),
         ];
 
         // Langkah pertama yang belum selesai adalah posisi baris saat ini
+        $halt = false;
         foreach ($steps as $index => $step) {
+            if ($halt) {
+                $steps[$index]['state'] = 'waiting';
+
+                continue;
+            }
+
             if ($step['state'] === 'waiting') {
                 $steps[$index]['state'] = 'current';
+                $halt = true;
 
-                break;
+                continue;
             }
+
             if (in_array($step['state'], ['failed', 'postponed'], true)) {
-                break;
+                $halt = true;
             }
         }
 

@@ -189,6 +189,94 @@
             <span v-if="waMessage" :class="['break-words', waMessage.error ? 'text-rose-700' : 'text-emerald-700']">{{ waMessage.text }}</span>
           </div>
 
+          <!-- Aksi Pengembalian Tahap / Rollback Approval -->
+          <div v-if="canEdit && canRollback" class="pt-2 border-t border-gray-100 space-y-2">
+            <div class="flex items-center justify-between">
+              <button
+                type="button"
+                @click="showRollbackForm = !showRollbackForm"
+                class="inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-700 hover:text-amber-800 transition cursor-pointer"
+              >
+                <RotateCcwIcon class="w-3.5 h-3.5" />
+                <span>{{ showRollbackForm ? 'Tutup form pengembalian' : 'Kembalikan tahap approval' }}</span>
+              </button>
+              <span v-if="rollbackSuccess" class="text-[11px] text-emerald-700 font-medium break-words">{{ rollbackSuccess }}</span>
+            </div>
+
+            <!-- Form Rollback -->
+            <div v-if="showRollbackForm" class="p-3 bg-amber-50/70 rounded-lg border border-amber-200 space-y-2.5">
+              <div>
+                <label class="block text-[11px] font-medium text-amber-950 mb-1">Kembalikan ke Tahap</label>
+                <select
+                  v-model="rollbackTarget"
+                  class="w-full h-8 text-[11px] bg-white text-gray-900 border border-amber-300 rounded-md px-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                >
+                  <option v-for="opt in availableRollbackTargets" :key="opt.value" :value="opt.value">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-medium text-amber-950 mb-1">
+                  Alasan Pengembalian <span class="text-rose-600">*</span>
+                </label>
+                <textarea
+                  v-model="rollbackReason"
+                  rows="2"
+                  maxlength="500"
+                  placeholder="mis. Faktur pajak tidak valid / salah nomor pembayaran / dealer minta tunda"
+                  class="w-full p-2 text-[11px] bg-white text-gray-900 border border-amber-300 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-gray-400"
+                ></textarea>
+              </div>
+
+              <div v-if="rollbackTarget === 'approved'" class="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="notify_ar_checkbox"
+                  v-model="rollbackNotifyAr"
+                  class="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 border-gray-300 cursor-pointer"
+                />
+                <label for="notify_ar_checkbox" class="text-[11px] text-amber-950 cursor-pointer select-none">
+                  Kirim notifikasi WhatsApp ulang ke Tim AR
+                </label>
+              </div>
+
+              <div v-if="rollbackTarget === 'awaiting_transfer'" class="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="notify_scm_checkbox"
+                  v-model="rollbackNotifyScm"
+                  class="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 border-gray-300 cursor-pointer"
+                />
+                <label for="notify_scm_checkbox" class="text-[11px] text-amber-950 cursor-pointer select-none">
+                  Kirim notifikasi WhatsApp transfer ke Tim SCM
+                </label>
+              </div>
+
+              <p v-if="rollbackError" class="text-[11px] text-rose-700 font-medium">{{ rollbackError }}</p>
+
+              <div class="flex items-center justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  @click="showRollbackForm = false"
+                  class="px-2.5 py-1 text-[11px] text-gray-600 hover:text-gray-900 bg-white border border-gray-200 rounded-md transition cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="button"
+                  @click="submitRollback"
+                  :disabled="submittingRollback || !rollbackReason.trim()"
+                  class="px-3 py-1 text-[11px] font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-md transition inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <RefreshCwIcon v-if="submittingRollback" class="w-3 h-3 animate-spin" />
+                  <span>{{ submittingRollback ? 'Memproses...' : 'Konfirmasi Kembalikan' }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div class="space-y-2 border-t border-gray-100">
             <p class="pt-3 font-medium text-gray-900">Semua catatan</p>
             <p v-if="detailLoading" class="text-gray-500">Memuat...</p>
@@ -227,6 +315,7 @@ import {
   Check as CheckIcon,
   X as XIcon,
   Pause as PauseIcon,
+  RotateCcw as RotateCcwIcon,
 } from 'lucide-vue-next';
 
 // Bulatan langkah: hijau selesai, kuning posisi sekarang, merah WA gagal, oranye ditunda, abu-abu belum
@@ -270,6 +359,62 @@ const detail = ref(null);
 const detailLoading = ref(false);
 const sendingWa = ref(false);
 const waMessage = ref(null);
+
+const showRollbackForm = ref(false);
+const rollbackTarget = ref('approved');
+const rollbackReason = ref('');
+const rollbackNotifyAr = ref(false);
+const rollbackNotifyScm = ref(false);
+const submittingRollback = ref(false);
+const rollbackError = ref('');
+const rollbackSuccess = ref('');
+
+const availableRollbackTargets = computed(() => {
+  const currentStage = detail.value?.stage;
+
+  if (currentStage === 'tax_checked' || currentStage === 'cut') {
+    return [
+      { value: 'approved', label: 'Menunggu AR (Potong piutang - batalkan status selesai)' },
+      { value: 'awaiting_transfer', label: 'Menunggu Transfer SCM (Transfer bank - batalkan status selesai)' },
+      { value: 'postponed', label: 'Ditunda Dealer (Pending Dealer)' },
+      { value: 'waiting_telemarketing', label: 'Reset ke Awal (Belum ke Telemarketing)' },
+    ];
+  }
+
+  if (currentStage === 'approved') {
+    return [
+      { value: 'awaiting_transfer', label: 'Alihkan ke Transfer SCM (Dealer minta transfer bank)' },
+      { value: 'postponed', label: 'Ditunda Dealer (Pending Dealer)' },
+      { value: 'waiting_telemarketing', label: 'Reset ke Awal (Belum ke Telemarketing)' },
+    ];
+  }
+
+  if (currentStage === 'awaiting_transfer') {
+    return [
+      { value: 'approved', label: 'Alihkan ke Potong AR (Dealer minta potong piutang)' },
+      { value: 'postponed', label: 'Ditunda Dealer (Pending Dealer)' },
+      { value: 'waiting_telemarketing', label: 'Reset ke Awal (Belum ke Telemarketing)' },
+    ];
+  }
+
+  if (currentStage === 'postponed') {
+    return [
+      { value: 'approved', label: 'Menunggu AR (Dealer Setuju Potong)' },
+      { value: 'awaiting_transfer', label: 'Menunggu Transfer SCM (Dealer Setuju Ditransfer)' },
+      { value: 'waiting_telemarketing', label: 'Reset ke Awal (Belum ke Telemarketing)' },
+    ];
+  }
+
+  if (currentStage === 'waiting_approval') {
+    return [
+      { value: 'waiting_telemarketing', label: 'Reset ke Awal (Belum ke Telemarketing)' },
+    ];
+  }
+
+  return [];
+});
+
+const canRollback = computed(() => availableRollbackTargets.value.length > 0);
 
 // WA yang bisa dikirim (ulang) dari Detail: permintaan transfer ke Tim SCM, ke Tim Pajak selama belum dicek, lalu
 // hasilnya ke Tim SCM bila belum terkirim
@@ -419,8 +564,60 @@ async function openDetail(row) {
   }
 }
 
-// Pesan kirim WA milik baris yang sedang dibuka saja
-watch(() => detail.value?.id, () => { waMessage.value = null; });
+// Reset state saat membuka baris baru
+watch(() => detail.value?.id, () => {
+  waMessage.value = null;
+  showRollbackForm.value = false;
+  rollbackReason.value = '';
+  rollbackError.value = '';
+  rollbackSuccess.value = '';
+  rollbackNotifyAr.value = false;
+  rollbackNotifyScm.value = false;
+  if (availableRollbackTargets.value.length > 0) {
+    rollbackTarget.value = availableRollbackTargets.value[0].value;
+  }
+});
+
+async function submitRollback() {
+  if (!canEdit.value || !detail.value || !rollbackReason.value.trim()) return;
+
+  submittingRollback.value = true;
+  rollbackError.value = '';
+  rollbackSuccess.value = '';
+
+  try {
+    const res = await axios.post(`/api/data-program/${detail.value.id}/approval-history/rollback`, {
+      target_stage: rollbackTarget.value,
+      reason: rollbackReason.value.trim(),
+      notify_ar: rollbackNotifyAr.value,
+      notify_scm: rollbackNotifyScm.value,
+    });
+
+    rollbackSuccess.value = res.data?.message || 'Tahap approval berhasil dikembalikan.';
+    if (res.data?.data) {
+      detail.value = {
+        ...detail.value,
+        ...res.data.data,
+      };
+
+      const idx = rows.value.findIndex((r) => r.id === detail.value.id);
+      if (idx !== -1) {
+        rows.value[idx] = {
+          ...rows.value[idx],
+          ...res.data.data,
+        };
+      }
+    }
+
+    showRollbackForm.value = false;
+    rollbackReason.value = '';
+    fetchRows(pagination.current_page);
+  } catch (err) {
+    rollbackError.value = err.response?.data?.message || 'Gagal mengembalikan tahap approval.';
+  } finally {
+    submittingRollback.value = false;
+  }
+}
 
 async function resendWhatsApp() {
   if (!canEdit.value) return;

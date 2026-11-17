@@ -238,6 +238,7 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         Route::get('/data-program/reconciliation-logs', [DataProgramController::class, 'reconciliationLogs']);
         Route::get('/data-program/approval-history', [ProgramApprovalController::class, 'index']);
         Route::get('/data-program/{id}/approval-history', [ProgramApprovalController::class, 'show']);
+        Route::post('/data-program/{id}/approval-history/rollback', [ProgramApprovalController::class, 'rollback']);
         Route::put('/data-program/bulk', [DataProgramController::class, 'bulkUpdate']);
         Route::put('/data-program/{id}', [DataProgramController::class, 'update']);
     });

@@ -175,9 +175,51 @@
                         class="{{ $buttonClass }} bg-[#1769e0] hover:bg-[#1257c2] text-white">
                     Simpan cek pajak
                 </button>
+
+                <!-- Pilihan kembalikan ke AR bila dokumen/nominal bermasalah -->
+                <div class="pt-3 border-t border-gray-100">
+                    <button type="button" id="btn-toggle-kembalikan" onclick="toggleKembalikanForm()"
+                            class="w-full text-center text-xs text-amber-700 hover:text-amber-800 font-medium py-1.5 transition-colors cursor-pointer">
+                        Ada kendala dokumen / selisih? Kembalikan ke Tim AR
+                    </button>
+                    <div id="form-kembalikan" class="{{ $errors->has('alasan_kembali') ? '' : 'hidden' }} mt-2 p-3 bg-amber-50 rounded-[10px] border border-amber-200 space-y-3">
+                        <div>
+                            <label for="alasan_kembali" class="block text-xs font-medium text-amber-950 mb-1">
+                                Alasan Pengembalian ke AR <span class="text-rose-600">*</span>
+                            </label>
+                            <textarea id="alasan_kembali" name="alasan_kembali" rows="2" maxlength="500"
+                                      placeholder="mis. Faktur pajak tidak valid / nominal potong keliru"
+                                      class="w-full p-2.5 text-xs bg-white text-gray-900 border border-amber-300 rounded-[8px] focus:outline-none focus:ring-1 focus:ring-amber-500">{{ old('alasan_kembali') }}</textarea>
+                            @error('alasan_kembali')
+                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div class="flex items-center justify-end gap-2">
+                            <button type="button" onclick="toggleKembalikanForm(false)"
+                                    class="h-8 px-3 text-xs bg-white text-gray-700 border border-gray-200 rounded-[8px] hover:bg-gray-50">
+                                Batal
+                            </button>
+                            <button type="submit" name="action" value="kembalikan_ke_ar" formnovalidate
+                                    class="h-8 px-3 text-xs font-medium bg-amber-600 hover:bg-amber-700 text-white rounded-[8px] transition-colors cursor-pointer">
+                                Konfirmasi Kembalikan ke AR
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <script>
+                function toggleKembalikanForm(forceState) {
+                    const form = document.getElementById('form-kembalikan');
+                    const btn = document.getElementById('btn-toggle-kembalikan');
+                    const isHidden = forceState !== undefined ? !forceState : form.classList.contains('hidden');
+                    form.classList.toggle('hidden', !isHidden);
+                    btn.classList.toggle('hidden', isHidden);
+                    if (isHidden) {
+                        document.getElementById('alasan_kembali')?.focus();
+                    }
+                }
+
                 // Selisih = PPh − Cek Pajak (format Indonesia: titik ribuan, koma desimal), selama belum diubah sendiri
                 (function () {
                     const pph = {{ (float) ($dp->nilai_pph ?? 0) }};

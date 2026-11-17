@@ -28,7 +28,7 @@ class ProgramClaimConfirmationController extends Controller
         'telemarketing' => ['setuju', 'setuju_transfer', 'tunda'],
         'ar' => ['potong', 'tunda'],
         'scm' => ['transfer'],
-        'pajak' => ['cek_pajak'],
+        'pajak' => ['cek_pajak', 'kembalikan_ke_ar'],
     ];
 
     /**
@@ -44,6 +44,7 @@ class ProgramClaimConfirmationController extends Controller
         'potong' => ['approved'],
         'transfer' => ['awaiting_transfer'],
         'cek_pajak' => ['cut', 'tax_checked'],
+        'kembalikan_ke_ar' => ['cut', 'tax_checked'],
     ];
 
     public function __construct(
@@ -356,12 +357,43 @@ class ProgramClaimConfirmationController extends Controller
 
                 // Estafet Otomatis: hasil cek pajak dikirim ke WA Tim SCM
                 $scmNotification = $this->notifyScm($dp);
+            } elseif ($action === 'kembalikan_ke_ar') {
+                $validated = $request->validate([
+                    'alasan_kembali' => ['required', 'string', 'max:500'],
+                ], [
+                    'alasan_kembali.required' => 'Alasan pengembalian ke AR wajib diisi.',
+                    'alasan_kembali.max' => 'Alasan pengembalian maksimal 500 karakter.',
+                ]);
+
+                $alasan = trim($validated['alasan_kembali']);
+                $dp->update([
+                    'status_potong_purchase' => 'BISA DI POTONG',
+                    'status_potong_ar' => 'DEALER SETUJU (PROSES AR)',
+                    'no_pembayaran' => null,
+                    'tgl_potong_tf' => null,
+                    'tax_checked_at' => null,
+                    'cek_pajak_tarif' => null,
+                    'selisih' => 0,
+                    'note_pph' => null,
+                    'tax_notified_at' => null,
+                    'scm_notified_at' => null,
+                ]);
+
+                ProgramApprovalLog::record(
+                    $dp,
+                    ProgramApprovalLog::ROLLED_BACK,
+                    actor: $this->linkActor($role),
+                    note: "Dikembalikan ke AR oleh Tim Pajak. Alasan: {$alasan}"
+                );
+
+                $this->pushDpToSpreadsheet($dp, withTaxCheck: true);
             }
 
             return view('data_programs.confirmed', [
                 'dp' => $dp->fresh(),
                 'action' => $action,
                 'role' => $role,
+                'alasan' => $alasan ?? null,
                 'arNotification' => $arNotification,
                 'taxNotification' => $taxNotification,
                 'scmNotification' => $scmNotification,

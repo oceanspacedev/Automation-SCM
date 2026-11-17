@@ -46,6 +46,8 @@ class ProgramApprovalLog extends Model
 
     public const TRANSFERRED = 'transferred';
 
+    public const ROLLED_BACK = 'rolled_back';
+
     /**
      * Who acted through a WhatsApp confirmation link, by the link's role.
      *

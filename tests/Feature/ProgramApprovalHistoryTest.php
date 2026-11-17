@@ -443,4 +443,130 @@ class ProgramApprovalHistoryTest extends TestCase
             ->assertJsonPath('data.0.steps.1.actor', 'Otomatis')
             ->assertJsonPath('data.0.steps.1.recipient', 'SALSABILA 081200000001');
     }
+
+    public function test_rollback_approval_to_ar_resets_cut_status_and_records_audit_log(): void
+    {
+        Cache::put(DataProgramSyncService::CACHE_KEY_SPREADSHEET_URL, 'https://script.google.com/macros/s/test_token/exec');
+        $row = $this->dataProgram([
+            'status_potong_purchase' => 'SUDAH POTONG',
+            'status_potong_ar' => 'DONE',
+            'tgl_potong_tf' => '11/17/2026',
+            'no_pembayaran' => 'PAY-ROLLBACK-01',
+            'tax_notified_at' => now(),
+        ]);
+
+        $response = $this->postJson("/api/data-program/{$row->id}/approval-history/rollback", [
+            'target_stage' => 'approved',
+            'reason' => 'Faktur pajak tidak valid, perlu dicek ulang oleh AR',
+        ], self::HEADERS);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.stage', 'approved')
+            ->assertJsonPath('data.steps.*.state', ['done', 'done', 'done', 'done', 'current', 'waiting', 'waiting', 'waiting']);
+
+        $row->refresh();
+        $this->assertSame('BISA DI POTONG', $row->status_potong_purchase);
+        $this->assertSame('DEALER SETUJU (PROSES AR)', $row->status_potong_ar);
+        $this->assertNull($row->no_pembayaran);
+        $this->assertNull($row->tgl_potong_tf);
+        $this->assertNull($row->tax_notified_at);
+
+        $this->assertDatabaseHas('program_approval_logs', [
+            'data_program_id' => $row->id,
+            'event' => 'rolled_back',
+        ]);
+    }
+
+    public function test_rollback_approval_to_awaiting_transfer_scm(): void
+    {
+        Cache::put(DataProgramSyncService::CACHE_KEY_SPREADSHEET_URL, 'https://script.google.com/macros/s/test_token/exec');
+        $row = $this->dataProgram([
+            'status_potong_purchase' => 'SUDAH POTONG',
+            'status_potong_ar' => 'DONE',
+            'tgl_potong_tf' => '11/17/2026',
+            'no_pembayaran' => 'PAY-CUT-01',
+        ]);
+
+        $response = $this->postJson("/api/data-program/{$row->id}/approval-history/rollback", [
+            'target_stage' => 'awaiting_transfer',
+            'reason' => 'Dealer tidak ada order baru, dialihkan ke transfer via SCM',
+        ], self::HEADERS);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.stage', 'awaiting_transfer');
+
+        $row->refresh();
+        $this->assertSame('BISA DI POTONG', $row->status_potong_purchase);
+        $this->assertSame(DataProgram::TRANSFER_APPROVED, $row->status_potong_ar);
+        $this->assertSame('TF', $row->tf_status);
+        $this->assertTrue($row->isTransfer());
+        $this->assertNull($row->no_pembayaran);
+
+        $this->assertDatabaseHas('program_approval_logs', [
+            'data_program_id' => $row->id,
+            'event' => 'rolled_back',
+        ]);
+    }
+
+    public function test_rollback_approval_to_postponed_or_initial(): void
+    {
+        Cache::put(DataProgramSyncService::CACHE_KEY_SPREADSHEET_URL, 'https://script.google.com/macros/s/test_token/exec');
+        $row = $this->dataProgram([
+            'status_potong_ar' => 'DEALER SETUJU (PROSES AR)',
+            'telemarketing_notified_at' => now(),
+        ]);
+
+        // Rollback ke Ditunda Dealer
+        $this->postJson("/api/data-program/{$row->id}/approval-history/rollback", [
+            'target_stage' => 'postponed',
+            'reason' => 'Dealer minta tunda potong',
+        ], self::HEADERS)
+            ->assertOk()
+            ->assertJsonPath('data.stage', 'postponed');
+
+        $row->refresh();
+        $this->assertSame('PENDING DEALER', $row->status_potong_ar);
+
+        // Rollback ke Awal (Belum ke Telemarketing)
+        $this->postJson("/api/data-program/{$row->id}/approval-history/rollback", [
+            'target_stage' => 'waiting_telemarketing',
+            'reason' => 'Reset ke awal',
+        ], self::HEADERS)
+            ->assertOk()
+            ->assertJsonPath('data.stage', 'waiting_telemarketing')
+            ->assertJsonPath('data.steps.*.state', ['done', 'current', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting']);
+
+        $row->refresh();
+        $this->assertSame('BELUM POTONG', $row->status_potong_ar);
+        $this->assertNull($row->telemarketing_notified_at);
+    }
+
+    public function test_tax_team_can_return_claim_to_ar_from_confirmation_link(): void
+    {
+        Cache::put(DataProgramSyncService::CACHE_KEY_SPREADSHEET_URL, 'https://script.google.com/macros/s/test_token/exec');
+        $row = $this->dataProgram([
+            'status_potong_purchase' => 'SUDAH POTONG',
+            'status_potong_ar' => 'DONE',
+            'tgl_potong_tf' => '11/17/2026',
+            'no_pembayaran' => 'PAY-TAX-REVISE',
+        ]);
+
+        $this->confirm($row, 'pajak', [
+            'action' => 'kembalikan_ke_ar',
+            'alasan_kembali' => 'Selisih PPh terlalu besar, harap hubungi dealer',
+        ])->assertOk()->assertSee('Klaim dikembalikan ke Tim AR');
+
+        $row->refresh();
+        $this->assertSame('BISA DI POTONG', $row->status_potong_purchase);
+        $this->assertSame('DEALER SETUJU (PROSES AR)', $row->status_potong_ar);
+        $this->assertNull($row->no_pembayaran);
+
+        $this->assertDatabaseHas('program_approval_logs', [
+            'data_program_id' => $row->id,
+            'event' => 'rolled_back',
+            'actor' => 'Tim Pajak (link WA)',
+        ]);
+    }
 }
