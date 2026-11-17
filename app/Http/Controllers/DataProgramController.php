@@ -495,6 +495,18 @@ class DataProgramController extends Controller
             $force = $request->boolean('force', false);
             $pushToSheet = $request->boolean('push_to_sheet', true);
 
+            // Jika uji ulang paksa diminta (force = true), jalankan ulang analisis AI pada submission yang cocok bila ada
+            if ($force) {
+                $existingSub = $this->reconciliationService->findMatchingSubmission($dp);
+                if ($existingSub && (! empty($existingSub->credit_note_url) || ! empty($existingSub->tax_invoice_url))) {
+                    try {
+                        app(DocumentAnalysisService::class)->analyzeSubmission($existingSub);
+                    } catch (\Throwable $e) {
+                        Log::warning("Re-analyzing submission {$existingSub->id} during force reconcile failed: {$e->getMessage()}");
+                    }
+                }
+            }
+
             $result = $this->reconciliationService->reconcileSingle($dp, null, $force, null, 'manual_row');
 
             $matchedSubmission = null;

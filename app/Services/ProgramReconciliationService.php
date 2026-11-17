@@ -731,6 +731,25 @@ class ProgramReconciliationService
             $hasFinancialMatch = true; // tentative match based on dealer & program
         }
 
+        // Auto-reconcile when submission net_pay (e.g. 998.919) was calculated using DPP Nilai Lain + PPN
+        // instead of actual Net Pay (DPP + PPN - PPh = 972.973 + 107.027 - 19.459 = 1.060.541)
+        if (! $hasFinancialMatch && $dpNet > 0 && $subNet > 0) {
+            $dppLain = (float) ($dataProgram->dpp_lain ?: round($dpDpp * (11 / 12), 2));
+            $ppn = (float) ($dataProgram->ppn ?: round($dpDpp * 0.11, 2));
+            if ($dppLain > 0 && abs($subNet - ($dppLain + $ppn)) <= 5.0) {
+                $hasFinancialMatch = true;
+                $selisih = 0.0;
+                $submission->update([
+                    'net_pay' => $dpNet,
+                    'dpp' => $dpDpp,
+                    'dpp_lain' => $dppLain,
+                    'ppn' => $ppn,
+                    'nilai_pph' => (float) ($dataProgram->nilai_pph ?: 0),
+                ]);
+                $subNet = $dpNet;
+            }
+        }
+
         $isPkp = $this->isPkp($dataProgram, $submission);
 
         // 4. Missing Documents Summary based on PKP status

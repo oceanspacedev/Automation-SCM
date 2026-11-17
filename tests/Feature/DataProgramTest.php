@@ -1056,6 +1056,58 @@ class DataProgramTest extends TestCase
         $this->assertEquals('https://drive.google.com/open?id=test_single_agr', $dpFresh->agrement);
     }
 
+    public function test_reconcile_row_auto_matches_submission_with_dpp_nilai_lain_calculation(): void
+    {
+        $dp = DataProgram::create([
+            'row_hash' => 'hash_dpp_nilai_lain_dp',
+            'dealer_name' => 'PANGLIMA PONSEL _ CV ZABEELA BINTANG USAHA',
+            'kode_bt' => 'BT05838',
+            'id_gs' => 'DLKC0002',
+            'program_name' => 'PROGRAM DSA OKTOBER 2026',
+            'region' => 'BIG BANDUNG',
+            'wajib_pajak' => 'BADAN PKP',
+            'dpp' => 972973,
+            'dpp_lain' => 891891.92,
+            'ppn' => 107027,
+            'nilai_pph' => 19459,
+            'net_pay' => 1060541,
+        ]);
+
+        // Submission with AI-calculated net_pay using DPP Nilai Lain + PPN = 998919
+        $sub = ProgramSubmission::create([
+            'row_hash' => 'hash_dpp_nilai_lain_sub',
+            'dealer_name' => 'PANGLIMA PONSEL _ CV ZABEELA BINTANG USAHA',
+            'id_real' => 'DLKC0002',
+            'program_name' => 'PROGRAM DSA OKTOBER 2026',
+            'region' => 'BIG BANDUNG',
+            'dpp' => 891892,
+            'ppn' => 107027,
+            'net_pay' => 998919,
+            'credit_note_url' => 'https://drive.google.com/open?id=test_cn_zabeela',
+            'agreement_url' => 'https://drive.google.com/open?id=test_agr_zabeela',
+            'tax_invoice_url' => 'https://drive.google.com/open?id=test_faktur_zabeela',
+        ]);
+
+        $response = $this->postJson("/api/data-program/{$dp->id}/reconcile", [
+            'force' => true,
+            'push_to_sheet' => false,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('matched', true)
+            ->assertJsonPath('details.status_potong_purchase', 'BISA DI POTONG')
+            ->assertJsonPath('details.cek_dokumen', 'LENGKAP')
+            ->assertJsonPath('details.is_financial_match', true);
+
+        $dp->refresh();
+        $this->assertSame('BISA DI POTONG', $dp->status_potong_purchase);
+        $this->assertSame('LENGKAP', $dp->cek_dokumen);
+
+        $sub->refresh();
+        $this->assertEquals(1060541.0, $sub->net_pay);
+    }
+
     public function test_reconciliation_keeps_the_refnote_and_stores_the_match_note_separately(): void
     {
         $dp = DataProgram::create([
