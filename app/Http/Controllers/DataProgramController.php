@@ -350,7 +350,8 @@ class DataProgramController extends Controller
                     return null;
                 }
                 $trimmed = trim($url);
-                if (str_starts_with($trimmed, 'http://') || str_starts_with($trimmed, 'https://')) {
+                $lower = strtolower($trimmed);
+                if (str_starts_with($lower, 'http://') || str_starts_with($lower, 'https://')) {
                     return SpreadsheetExport::link($trimmed, $label);
                 }
 
@@ -372,8 +373,9 @@ class DataProgramController extends Controller
                 $toLink($r->program_2, 'Bukti TF'),
                 $toLink($r->cn, 'CN'),
                 $toLink($r->agrement, 'Agreement'),
-                $r->cek_fp,
-                $r->cek_evidance, $r->noted, $r->norek, $r->namrek, $r->bank, $r->big_region,
+                $toLink($r->cek_fp, 'Cek FP'),
+                $toLink($r->cek_evidance, 'Cek Evidance'),
+                $r->noted, $r->norek, $r->namrek, $r->bank, $r->big_region,
             ]);
 
             return $spreadsheetExport->download(

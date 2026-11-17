@@ -157,8 +157,11 @@ class DataProgramTest extends TestCase
             'program_name' => 'Program Realme 8 Pro',
             'region' => 'BIG CIREBON 2',
             'net_pay' => 196396,
+            'program_2' => 'https://storage.completeselular.com/scm/CV%20OLIVIA/TF_123.pdf',
             'cn' => 'https://storage.completeselular.com/scm/CV%20OLIVIA/CN_123.pdf',
             'agrement' => 'https://storage.completeselular.com/scm/CV%20OLIVIA/AGR_123.pdf',
+            'cek_fp' => 'https://storage.completeselular.com/scm/CV%20OLIVIA/FP_123.pdf',
+            'cek_evidance' => 'https://storage.completeselular.com/scm/CV%20OLIVIA/KTP_123.pdf',
         ]);
 
         $response = $this->get('/api/data-program/export?format=xlsx');
@@ -173,8 +176,11 @@ class DataProgramTest extends TestCase
         $this->assertSame('NAMA DEALER', $rows[0][0]);
         $this->assertSame('CV OLIVIA', $rows[1][0]);
         $this->assertSame('BT03429', $rows[1][2]);
+        $this->assertSame('Bukti TF', $rows[1][45]);
         $this->assertSame('CN', $rows[1][46]);
         $this->assertSame('Agreement', $rows[1][47]);
+        $this->assertSame('Cek FP', $rows[1][48]);
+        $this->assertSame('Cek Evidance', $rows[1][49]);
     }
 
     public function test_can_receive_webhook_single_row(): void
