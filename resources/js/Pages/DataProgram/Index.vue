@@ -42,12 +42,28 @@
             <!-- Sinkronkan Sekarang, Buka Spreadsheet & Atur Link Spreadsheet disembunyikan; isi tabel dikelola dari aplikasi -->
             <button
               type="button"
+              @click="handleExportExcel"
+              :disabled="isExporting"
+              class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" class="w-3.5 h-3.5 shrink-0">
+                <path fill="#166e40" d="M37 6H17a2 2 0 0 0-2 2v32a2 2 0 0 0 2 2h20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>
+                <path fill="#23a455" d="M37 6H24v36h13a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/>
+                <path fill="#2ecc71" opacity=".35" d="M24 13h15v4H24zm0 7h15v4H24zm0 7h15v4H24zm0 7h15v4H24z"/>
+                <path fill="#107c41" d="M22 13H8a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V15a2 2 0 0 0-2-2z"/>
+                <path fill="#ffffff" d="M12.4 28.5l2.4-4.8 2.4 4.8h2.3l-3.5-6.5 3.3-6.5h-2.3l-2.2 4.7-2.2-4.7h-2.3l3.3 6.5-3.5 6.5h2.3z"/>
+              </svg>
+              <span>{{ isExporting ? 'Mengekspor...' : 'Export Excel (.xlsx)' }}</span>
+            </button>
+
+            <button
+              type="button"
               @click="handleExportCsv"
               :disabled="isExporting"
               class="w-full text-left px-2.5 py-1.5 text-xs font-normal text-gray-700 hover:bg-gray-100 hover:text-gray-900 rounded-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
             >
               <DownloadIcon class="w-3.5 h-3.5 text-gray-500 shrink-0" />
-              <span>{{ isExporting ? 'Mengekspor...' : 'Export CSV' }}</span>
+              <span>{{ isExporting ? 'Mengekspor...' : 'Export CSV (.csv)' }}</span>
             </button>
 
             <button
@@ -1345,6 +1361,11 @@ const handleTriggerSync = () => {
   triggerSync();
 };
 
+const handleExportExcel = () => {
+  showSpreadsheetDropdown.value = false;
+  exportExcel();
+};
+
 const handleExportCsv = () => {
   showSpreadsheetDropdown.value = false;
   exportCsv();
@@ -1518,7 +1539,7 @@ const triggerSync = async () => {
   }
 };
 
-const exportCsv = () => {
+const exportData = (format = 'excel') => {
   if (isExporting.value) return;
   isExporting.value = true;
 
@@ -1529,6 +1550,7 @@ const exportCsv = () => {
   if (filters.dealer) params.append('dealer', filters.dealer);
   if (filters.status_purchase) params.append('status_purchase', filters.status_purchase);
   if (filters.status_ar) params.append('status_ar', filters.status_ar);
+  params.append('format', format === 'excel' ? 'xlsx' : 'csv');
 
   const qs = params.toString();
   const url = `/api/data-program/export${qs ? '?' + qs : ''}`;
@@ -1544,6 +1566,9 @@ const exportCsv = () => {
     isExporting.value = false;
   }, 2000);
 };
+
+const exportExcel = () => exportData('excel');
+const exportCsv = () => exportData('csv');
 
 // State for Reconciliation History Modal
 const showHistoryModal = ref(false);

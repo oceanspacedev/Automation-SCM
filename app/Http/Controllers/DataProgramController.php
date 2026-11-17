@@ -270,11 +270,18 @@ class DataProgramController extends Controller
     }
 
     /**
-     * Export filtered dataset to CSV.
+     * Export filtered dataset to CSV or Excel (.xlsx).
      */
-    public function export(Request $request): StreamedResponse
+    public function export(Request $request, SpreadsheetExport $spreadsheetExport): StreamedResponse
     {
         $query = DataProgram::query();
+
+        if ($ids = $request->input('ids')) {
+            $idList = is_array($ids) ? $ids : array_filter(explode(',', (string) $ids));
+            if (! empty($idList)) {
+                $query->whereIn('id', $idList);
+            }
+        }
 
         if ($search = trim((string) $request->input('search'))) {
             $query->where(function ($q) use ($search) {
@@ -283,7 +290,10 @@ class DataProgramController extends Controller
                     ->orWhere('program_name', 'like', "%{$search}%")
                     ->orWhere('program', 'like', "%{$search}%")
                     ->orWhere('sales_person', 'like', "%{$search}%")
-                    ->orWhere('id_gs', 'like', "%{$search}%");
+                    ->orWhere('id_gs', 'like', "%{$search}%")
+                    ->orWhere('no_po', 'like', "%{$search}%")
+                    ->orWhere('no_transaksi', 'like', "%{$search}%")
+                    ->orWhere('no_faktur_pajak', 'like', "%{$search}%");
             });
         }
 
@@ -305,6 +315,18 @@ class DataProgramController extends Controller
             $query->where('status_potong_purchase', $statusPurchase);
         }
 
+        if ($statusAr = trim((string) $request->input('status_ar'))) {
+            $query->where('status_potong_ar', $statusAr);
+        }
+
+        if ($cekDokumen = trim((string) $request->input('cek_dokumen'))) {
+            $query->where('cek_dokumen', $cekDokumen);
+        }
+
+        if ($keterangan = trim((string) $request->input('keterangan'))) {
+            $query->where('keterangan', $keterangan);
+        }
+
         $headers = [
             'NAMA DEALER', 'PROGRAM', 'Kode BT', 'NAMA PROGRAM', 'PERIODE',
             'REGION', 'NO PO', 'ID GS', 'Status DL',
@@ -319,6 +341,48 @@ class DataProgramController extends Controller
             'NPWP', 'NAMA NPWP', 'BUKTI TF', 'CN', 'AGREMENT', 'CEK FP',
             'CEK EVIDANCE', 'Noted', 'Norek', 'Namrek', 'Bank', 'BIG REGION',
         ];
+
+        $format = strtolower(trim((string) $request->input('format', 'csv')));
+
+        if (in_array($format, ['xlsx', 'excel'], true)) {
+            $toLink = static function (?string $url, string $label): array|string|null {
+                if (blank($url)) {
+                    return null;
+                }
+                $trimmed = trim($url);
+                if (str_starts_with($trimmed, 'http://') || str_starts_with($trimmed, 'https://')) {
+                    return SpreadsheetExport::link($trimmed, $label);
+                }
+
+                return $trimmed;
+            };
+
+            $rows = $query->lazy()->map(fn (DataProgram $r) => [
+                $r->dealer_name, $r->program, $r->kode_bt, $r->program_name, $r->periode,
+                $r->region, $r->no_po, $r->id_gs, $r->status_dl,
+                $r->sales_person, $r->telemarketing, $r->wajib_pajak, $r->trf_pph,
+                $r->incentive, $r->dpp, $r->dpp_lain, $r->ppn, $r->nilai_pph, $r->net_pay,
+                $r->cek_pajak_tarif, $r->selisih, $r->note_pph, $r->no_faktur_pajak,
+                $r->ket_faktur_pajak, $r->no_po_sj, $r->no_transaksi, $r->tgl_input,
+                $r->tgl_share_cn, $r->lama_pending, $r->keterangan, $r->cek_dokumen,
+                $r->status_potong_purchase, $r->status_potong_ar, $r->tgl_potong_tf,
+                $r->no_uid, $r->no_pembayaran, $r->tgl_input_bank_pph, $r->tf_status,
+                $r->tgl_proses, $r->tgl_sj, $r->no_sj, $r->info_bank, $r->pending_potongan,
+                $r->npwp, $r->nama_npwp,
+                $toLink($r->program_2, 'Bukti TF'),
+                $toLink($r->cn, 'CN'),
+                $toLink($r->agrement, 'Agreement'),
+                $r->cek_fp,
+                $r->cek_evidance, $r->noted, $r->norek, $r->namrek, $r->bank, $r->big_region,
+            ]);
+
+            return $spreadsheetExport->download(
+                'data_program_'.date('Ymd_His').'.xlsx',
+                'Data Program',
+                $headers,
+                $rows
+            );
+        }
 
         return response()->streamDownload(function () use ($query, $headers) {
             $output = fopen('php://output', 'w');

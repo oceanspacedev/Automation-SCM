@@ -34,6 +34,7 @@ export default defineConfig({
         },
     },
     server: {
+        port: 5174,
         watch: {
             ignored: ['**/storage/framework/views/**', '**/vendor/**', '**/.claude/**'],
         },
