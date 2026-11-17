@@ -1243,10 +1243,13 @@ PROMPT;
         $tglFaktur = null;
 
         $cnText = $infos['cn']['text'];
-        $dpp = $this->amountAfterLabel($cnText, 'DPP|DASARPENGENAANPAJAK');
+        $dpp = $this->amountAfterLabel($cnText, 'DPP|DASARPENGENAANPAJAK|SUBTOTAL|HARGAJUAL');
         $ppn = $this->amountAfterLabel($cnText, 'PPN|PAJAKPERTAMBAHANNILAI') ?? 0.0;
         $nilaiPph = $this->amountAfterLabel($cnText, 'PPH|PAJAKPENGHASILAN');
-        $netPay = $this->amountAfterLabel($cnText, 'NETPAY|TOTALBAYAR|DITERIMA');
+        if ($nilaiPph === null && preg_match('/(?:PPN|PPH)\s*2\s*%\s*[:=]?\s*(?:RP\.?)?(\d[\d.,]*)/i', $cnText, $m)) {
+            $nilaiPph = (float) str_replace(['.', ','], ['', '.'], $m[1]);
+        }
+        $netPay = $this->amountAfterLabel($cnText, 'NETPAY|TOTALBAYAR|DITERIMA|TOTAL');
 
         $fakturText = $infos['faktur']['text'].' '.$cnText;
         if (preg_match('/(010\.\d{3}[-\.]\d{2}[-\.]\d{8})/', $fakturText, $m)) {
@@ -1265,6 +1268,11 @@ PROMPT;
             $missing[] = 'FAKTUR';
         }
 
+        $hasSignature = isset($formData['has_signature']) ? (bool) $formData['has_signature'] : true;
+        if (! empty($formData['note_pph']) && str_contains(strtoupper((string) $formData['note_pph']), 'TTD')) {
+            $hasSignature = false;
+        }
+
         if ($hasMerged) {
             $statusPurchase = 'BELUM BISA POTONG';
             $cekDokumen = 'DOKUMEN DIGABUNG ('.implode(', ', array_unique($mergedDetails)).')';
@@ -1273,6 +1281,10 @@ PROMPT;
             $statusPurchase = 'BELUM BISA POTONG';
             $cekDokumen = 'DOKUMEN TERTUKAR ('.implode(', ', $swapDetails).')';
             $keterangan = 'Dokumen tertukar posisi upload. Harap perbaiki posisi slot Credit Note dan Agreement.';
+        } elseif (! $hasSignature) {
+            $statusPurchase = 'BELUM BISA POTONG';
+            $cekDokumen = empty($missing) ? 'TTD BELUM ADA' : 'TTD & '.implode(' & ', $missing).' BELUM ADA';
+            $keterangan = 'Dokumen Credit Note / Invoice belum ditandatangani oleh pihak dealer.';
         } elseif (! empty($missing)) {
             $statusPurchase = 'BELUM BISA POTONG';
             $cekDokumen = implode(' & ', $missing).' BELUM ADA';
@@ -1395,7 +1407,7 @@ PROMPT;
             'has_invalid' => $hasInvalid,
             'has_swapped' => $hasSwapped,
             'has_merged' => $hasMerged,
-            'is_clean' => (! $hasSwapped && ! $hasInvalid && ! $hasMerged && ! $dealerMismatch && ! $cnProgramMismatch && ! $agrDealerMismatch && ! $agrProgramMismatch),
+            'is_clean' => (! $hasSwapped && ! $hasInvalid && ! $hasMerged && ! $dealerMismatch && ! $cnProgramMismatch && ! $agrDealerMismatch && ! $agrProgramMismatch && $hasSignature),
             'cek_dokumen' => $cekDokumen,
             'status_potong_purchase' => $statusPurchase,
             'keterangan' => $keterangan,
@@ -1417,9 +1429,9 @@ PROMPT;
             'no_faktur' => $noFaktur,
             'tgl_faktur' => $tglFaktur,
             'has_stamp' => true,
-            'has_signature' => true,
+            'has_signature' => $hasSignature,
             'has_npwp' => true,
-            'note_pph' => 'ok',
+            'note_pph' => $hasSignature ? 'ok' : 'TTD?',
             'doc_validation' => $docValidation,
         ];
     }
@@ -1571,6 +1583,30 @@ PROMPT;
         $ppn = isset($parsed['ppn']) && is_numeric($parsed['ppn']) ? (float) $parsed['ppn'] : ($formData['ppn'] ?? 0.0);
         $nilaiPph = isset($parsed['nilai_pph']) && is_numeric($parsed['nilai_pph']) ? (float) $parsed['nilai_pph'] : ($formData['nilai_pph'] ?? null);
         $netPay = isset($parsed['net_pay']) && is_numeric($parsed['net_pay']) ? (float) $parsed['net_pay'] : ($formData['net_pay'] ?? null);
+
+        // Koreksi bila AI salah mengambil DPP Nilai Lain (misal 891.892) sebagai DPP utama
+        if ($dpp !== null && ! empty($formData['dpp'])) {
+            $formDpp = (float) $formData['dpp'];
+            if ($formDpp > $dpp && abs($dpp - round($formDpp * (11 / 12))) <= 10) {
+                if ($dppLain === 0.0) {
+                    $dppLain = $dpp;
+                }
+                $dpp = $formDpp;
+            }
+        }
+
+        // Koreksi bila AI menghitung Net Pay dengan rumus salah (DPP Nilai Lain + PPN = 891.892 + 107.027 = 998.919)
+        // Padahal Net Pay sesungguhnya adalah DPP + PPN - PPh = 972.973 + 107.027 - 19.459 = 1.060.541
+        if ($netPay !== null && ! empty($formData['net_pay'])) {
+            $expectedFormNet = (float) $formData['net_pay'];
+            $calculatedWithDppLain = ($dppLain > 0 ? $dppLain : $dpp) + $ppn;
+            if (abs($netPay - $calculatedWithDppLain) <= 5.0 && abs($expectedFormNet - $netPay) > 10.0) {
+                $expectedProperNet = round(($dpp ?? 0) + $ppn - ($nilaiPph ?? 0), 2);
+                if (abs($expectedFormNet - $expectedProperNet) <= 10.0) {
+                    $netPay = $expectedFormNet;
+                }
+            }
+        }
 
         $hasPpn = ! empty($ppn) && (float) $ppn > 0;
         $hasFaktur = (! empty($parsed['no_faktur']) && trim((string) $parsed['no_faktur']) !== '-') || $slotHasUrl['faktur'];
@@ -1766,6 +1802,17 @@ PROMPT;
             }
         }
 
+        $hasSignature = (bool) ($parsed['has_signature'] ?? true);
+        $auditNotePph = (string) ($parsed['note_pph'] ?? '');
+        if (str_contains(strtoupper($auditNotePph), 'TTD?')) {
+            $hasSignature = false;
+        }
+
+        if (! $hasSignature && isset($docValidation['cn'])) {
+            $docValidation['cn']['status'] = 'invalid';
+            $docValidation['cn']['message'] = 'Dokumen Credit Note / Invoice belum ditandatangani oleh pihak dealer.';
+        }
+
         // Finalize statusPurchase, cekDokumen, and keterangan
         if ($hasMerged) {
             $statusPurchase = 'BELUM BISA POTONG';
@@ -1792,6 +1839,10 @@ PROMPT;
             $statusPurchase = 'BELUM BISA POTONG';
             $cekDokumen = 'NAMA PROGRAM TIDAK SESUAI (CN)';
             $keterangan = "Nama program di formulir ('{$inputProgram}') berbeda dengan nama program pada dokumen Credit Note ('{$extractedCnProgram}'). Harap sesuaikan dokumen Credit Note atau program yang dipilih.";
+        } elseif (! $hasSignature) {
+            $statusPurchase = 'BELUM BISA POTONG';
+            $cekDokumen = empty($missingDocs) ? 'TTD BELUM ADA' : 'TTD & '.implode(' & ', $missingDocs).' BELUM ADA';
+            $keterangan = 'Dokumen Credit Note / Invoice belum ditandatangani oleh pihak dealer.';
         } elseif ($hasInvalid) {
             $statusPurchase = 'BELUM BISA POTONG';
             $cekDokumen = 'DOKUMEN TIDAK SESUAI ('.implode(', ', $invalidDetails).')';
@@ -1808,7 +1859,12 @@ PROMPT;
                 : 'Dokumen Credit Note lengkap untuk dealer Non PKP dan siap diproses potong.';
         }
 
-        $isClean = (! $hasSwapped && ! $hasInvalid && empty($missingDocs) && ! $dealerMismatch && ! $cnProgramMismatch);
+        $isClean = (! $hasSwapped && ! $hasInvalid && empty($missingDocs) && ! $dealerMismatch && ! $cnProgramMismatch && $hasSignature);
+
+        $notePphResult = $parsed['note_pph'] ?? 'ok';
+        if (! $hasSignature && ! str_contains(strtoupper($notePphResult), 'TTD?')) {
+            $notePphResult = ($notePphResult === 'ok' || empty($notePphResult)) ? 'TTD?' : trim($notePphResult.' TTD?');
+        }
 
         return [
             'success' => true,
@@ -1841,11 +1897,14 @@ PROMPT;
             ],
             'audit' => [
                 'has_stamp' => $parsed['has_stamp'] ?? true,
-                'has_signature' => $parsed['has_signature'] ?? true,
+                'has_signature' => $hasSignature,
                 'has_npwp' => $parsed['has_npwp'] ?? true,
-                'note_pph' => $parsed['note_pph'] ?? 'ok',
+                'note_pph' => $notePphResult,
             ],
-            'raw_analysis' => $parsed,
+            'raw_analysis' => array_merge($parsed, [
+                'has_signature' => $hasSignature,
+                'note_pph' => $notePphResult,
+            ]),
         ];
     }
 
@@ -2036,17 +2095,21 @@ Analisis Finansial & Pajak:
   * incentive: Nilai kotor insentif program yang dijanjikan.
     - Untuk dealer PKP (ada Faktur Pajak / PPN): Incentive = DPP + PPN (contoh: DPP 2.934.189 + PPN 322.761 = Incentive 3.256.950).
     - Untuk dealer Non-PKP (PPN 0% / tidak ada Faktur Pajak): Incentive = DPP x 1.11 dibulatkan ke ribuan terdekat (contoh: DPP 450.450 -> Incentive 500.000).
-  * dpp: Dasar Pengenaan Pajak (DPP yang tercetak di lembar CN atau Faktur)
-  * dpp_lain: DPP Nilai Lain (jika "-" atau kosong isi 0)
-  * ppn: Pajak Pertambahan Nilai (PPN, jika "-" atau kosong isi 0)
-  * nilai_pph: Potongan PPh (tertulis PPH di CN)
-  * net_pay: Nilai bersih yang dibayarkan ke dealer (DPP + PPN - PPh)
+  * dpp: Dasar Pengenaan Pajak utama (DPP / Subtotal / Harga Jual pada Credit Note atau Invoice, contoh: Rp 972.973).
+    - PENTING (DPP NILAI LAIN): Jika Faktur Pajak memakai DPP Nilai Lain, pada Faktur Pajak terdapat "Harga Jual / Penggantian" (Rp 972.973) dan "Dasar Pengenaan Pajak" (Rp 891.892). DPP utama adalah Harga Jual / Subtotal pada Invoice/CN (Rp 972.973), BUKAN nilai 891.892 (yang merupakan dpp_lain)! JANGAN PERNAH mengisi dpp dengan nilai DPP Nilai Lain!
+  * dpp_lain: DPP Nilai Lain jika Faktur Pajak / CN menggunakan fasilitas nilai lain (contoh: Rp 891.891,92 atau Rp 891.892 di Faktur Pajak). Jika tidak ada fasilitas nilai lain, isi 0.
+  * ppn: Pajak Pertambahan Nilai (PPN, jika "-" atau kosong isi 0, contoh: Rp 107.027).
+  * nilai_pph: Potongan PPh (biasanya tertulis PPH 2% atau potongan pajak di CN/Invoice, contoh: Rp 19.459).
+    - Toleransi salah ketik: Jika di Invoice dealer tertulis "PPN 2%" di bawah PPN 11%/12% dengan nilai 2% dari DPP (misal Rp 19.459), ini adalah potongan PPh Pasal 23, masukkan ke nilai_pph!
+  * net_pay: Nilai bersih yang DITRANSFER / DIBAYARKAN ke dealer.
+    - SANGAT PENTING: SELALU UTAMAKAN membaca langsung angka "TOTAL", "Net Pay", "Total Bayar", "Jumlah Diterima", atau "Di Transfer ke" yang tercetak di lembar Credit Note / Invoice (contoh: pada invoice tertulis "TOTAL: Rp 1,060,541", maka net_pay = 1060541). JANGAN membuat perhitungan sendiri yang menghasilkan angka berbeda (seperti 998.919) jika angka TOTAL sudah tercetak jelas di Invoice / CN!
+    - Rumus validasi: DPP + PPN - PPh (contoh: 972.973 + 107.027 - 19.459 = 1.060.541).
   * cek_pajak_tarif_pph: Selalu isi 0 (pengecekan/penentuan tarif pajak dilakukan oleh Tim Pajak internal, bukan oleh AI)
   * no_faktur: Nomor Faktur Pajak jika ditemukan (format: 010.xxx-xx.xxxxxxxx)
   * tgl_faktur: Tanggal Faktur Pajak (format: DD/MM/YYYY)
 - Audit Fisik / Kelengkapan Dokumen:
   * has_stamp: boolean (apakah ada stempel/cap basah atau digital dari dealer/perusahaan)
-  * has_signature: boolean (apakah dokumen ditandatangani)
+  * has_signature: boolean (apakah dokumen ditandatangani oleh pihak dealer pada kolom tanda tangan / "Hormat Kami")
   * has_npwp: boolean (apakah NPWP tertera atau valid)
   * note_pph: Catatan ringkas status fisik: "ok" jika lengkap dan ada cap/TTD/NPWP, atau sebutkan yang kurang seperti "CAP?", "TTD?", "NPWP?", "CAP? TTD?", dsb.
 
@@ -2125,6 +2188,17 @@ Ketentuan Penentuan Output:
      * "cek_dokumen": Sebutkan dokumen yang salah upload, contoh: "DOKUMEN TIDAK SESUAI (FAKTUR)"
      * "status_potong_purchase": "BELUM BISA POTONG"
      * "keterangan": "File yang diunggah pada slot tersebut bukan dokumen resmi yang diminta."
+
+5. KELENGKAPAN TANDA TANGAN (has_signature):
+   - Dokumen Credit Note / Invoice WAJIB ditandatangani oleh pihak dealer (tanda tangan basah, digital, atau scan pada bagian tanda tangan / "Hormat Kami").
+   - JIKA LEMBAR CN / INVOICE TIDAK ADA TANDA TANGAN (has_signature = false / kolom tanda tangan kosong):
+     * "is_complete": false
+     * "status_potong_purchase": "BELUM BISA POTONG"
+     * "cek_dokumen": Jika hanya tanda tangan yang kurang, isi "TTD BELUM ADA". Jika ada dokumen lain yang kurang, sebutkan bersamaan (misal "TTD & FAKTUR BELUM ADA").
+     * "keterangan": "Dokumen Credit Note / Invoice belum ditandatangani oleh pihak dealer."
+     * doc_validation.cn.status: "invalid"
+     * doc_validation.cn.message: "Dokumen Credit Note / Invoice belum ditandatangani oleh pihak dealer."
+     * "note_pph": Wajib mencantumkan "TTD?" (misal "TTD?", "CAP? TTD?", dsb).
 
 Format Keluaran:
 Wajib mengembalikan JSON murni TANPA pembungkus markdown ```json ``` dengan key berikut:

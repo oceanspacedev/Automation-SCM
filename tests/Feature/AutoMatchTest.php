@@ -192,6 +192,31 @@ class AutoMatchTest extends TestCase
         Http::assertSentCount(1);
     }
 
+    public function test_submission_without_signature_sets_status_to_belum_bisa_potong_in_data_program(): void
+    {
+        $dataProgram = $this->dataProgram();
+        $this->submission([
+            'note_pph' => 'CAP? TTD?',
+            'status_potong_purchase' => 'BELUM BISA POTONG',
+            'cek_dokumen' => 'TTD BELUM ADA',
+            'raw_data' => [
+                'has_signature' => false,
+            ],
+        ]);
+
+        $this->artisan('program:auto-match')->assertSuccessful();
+
+        $dataProgram->refresh();
+        $this->assertSame('BELUM BISA POTONG', $dataProgram->status_potong_purchase);
+        $this->assertSame('TTD BELUM ADA', $dataProgram->cek_dokumen);
+        $this->assertSame('CAP? TTD?', $dataProgram->note_pph);
+        $this->assertNull($dataProgram->telemarketing_notified_at);
+
+        // Notify telemarketing cron should NOT notify rows that are BELUM BISA POTONG
+        $this->artisan('program:notify-telemarketing')->assertSuccessful();
+        Http::assertNothingSent();
+    }
+
     /**
      * @param  array<string, mixed>  $attributes
      */

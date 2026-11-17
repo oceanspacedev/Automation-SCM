@@ -2240,4 +2240,100 @@ class ProgramSubmissionTest extends TestCase
         $this->post('/api/program-submissions/pre-validate', $payload('BERKAH CELLULAR'), ['Accept' => 'application/json'])->assertOk();
         Http::assertSentCount(2);
     }
+
+    public function test_inspect_document_files_without_signature_sets_belum_bisa_potong_and_ttd_belum_ada(): void
+    {
+        $service = new class extends DocumentAnalysisService
+        {
+            protected function inspectWithGemini(array $formData, array $filesOrUrls): ?array
+            {
+                return [
+                    'dealer_name' => 'NAZMY CELL GARUT',
+                    'dealer_mismatch' => false,
+                    'cn_program_name' => 'PROGRAM DSA OKTOBER 2026',
+                    'cn_program_mismatch' => false,
+                    'is_complete' => false,
+                    'cek_dokumen' => 'TTD BELUM ADA',
+                    'status_potong_purchase' => 'BELUM BISA POTONG',
+                    'keterangan' => 'Dokumen Credit Note / Invoice belum ditandatangani oleh pihak dealer.',
+                    'dpp' => 315315,
+                    'dpp_lain' => 0,
+                    'ppn' => 0,
+                    'nilai_pph' => 7883,
+                    'net_pay' => 307432,
+                    'has_stamp' => false,
+                    'has_signature' => false,
+                    'has_npwp' => true,
+                    'note_pph' => 'CAP? TTD?',
+                    'doc_validation' => [
+                        'cn' => ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'Dokumen diunggah'],
+                    ],
+                ];
+            }
+        };
+
+        $result = $service->inspectDocumentFiles([
+            'dealer_name' => 'NAZMY CELL GARUT',
+            'program_name' => 'PROGRAM DSA OKTOBER 2026',
+        ], [
+            'cn' => UploadedFile::fake()->create('CN_NAZMY.pdf', 100, 'application/pdf'),
+        ]);
+
+        $this->assertFalse($result['is_clean']);
+        $this->assertSame('BELUM BISA POTONG', $result['status_potong_purchase']);
+        $this->assertSame('TTD BELUM ADA', $result['cek_dokumen']);
+        $this->assertFalse($result['audit']['has_signature']);
+        $this->assertStringContainsString('TTD?', $result['audit']['note_pph']);
+        $this->assertSame('invalid', $result['doc_validation']['cn']['status']);
+    }
+
+    public function test_inspect_document_files_handles_dpp_nilai_lain_and_corrects_net_pay(): void
+    {
+        $service = new class extends DocumentAnalysisService
+        {
+            protected function inspectWithGemini(array $formData, array $filesOrUrls): ?array
+            {
+                // AI salah mengira DPP Nilai Lain sebagai DPP dan menghitung net_pay = 891892 + 107027 = 998919
+                return [
+                    'dealer_name' => 'PANGLIMA PONSEL _ CV ZABEELA BINTANG USAHA',
+                    'dealer_mismatch' => false,
+                    'cn_program_name' => 'PROGRAM DSA OKTOBER 2026',
+                    'cn_program_mismatch' => false,
+                    'is_complete' => true,
+                    'cek_dokumen' => 'LENGKAP',
+                    'status_potong_purchase' => 'BISA DI POTONG',
+                    'keterangan' => 'Dokumen lengkap',
+                    'dpp' => 891892,
+                    'dpp_lain' => 891892,
+                    'ppn' => 107027,
+                    'nilai_pph' => 19459,
+                    'net_pay' => 998919, // Angka salah dari AI
+                    'has_stamp' => true,
+                    'has_signature' => true,
+                    'has_npwp' => true,
+                    'note_pph' => 'ok',
+                    'doc_validation' => [
+                        'cn' => ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'Dokumen diunggah'],
+                        'faktur' => ['status' => 'valid', 'actual_type' => 'faktur', 'message' => 'Dokumen diunggah'],
+                    ],
+                ];
+            }
+        };
+
+        $result = $service->inspectDocumentFiles([
+            'dealer_name' => 'PANGLIMA PONSEL _ CV ZABEELA BINTANG USAHA',
+            'program_name' => 'PROGRAM DSA OKTOBER 2026',
+            'dpp' => 972973,
+            'dpp_lain' => 891891.92,
+            'ppn' => 107027,
+            'nilai_pph' => 19459,
+            'net_pay' => 1060541,
+        ], [
+            'cn' => UploadedFile::fake()->create('CN_ZABEELA.pdf', 100, 'application/pdf'),
+            'faktur' => UploadedFile::fake()->create('FAKTUR_ZABEELA.pdf', 100, 'application/pdf'),
+        ]);
+
+        $this->assertEquals(972973.0, $result['financial']['dpp']);
+        $this->assertEquals(1060541.0, $result['financial']['net_pay']);
+    }
 }

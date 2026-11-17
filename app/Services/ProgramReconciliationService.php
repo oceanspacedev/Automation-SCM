@@ -749,8 +749,41 @@ class ProgramReconciliationService
 
         $allDocsPresent = count($missingDocs) === 0;
 
+        // Check if submission document has valid signature
+        $hasSignature = true;
+        $submissionRaw = is_array($submission->raw_data) ? $submission->raw_data : [];
+        if (isset($submissionRaw['has_signature'])) {
+            $hasSignature = (bool) $submissionRaw['has_signature'];
+        } elseif (isset($submissionRaw['audit']['has_signature'])) {
+            $hasSignature = (bool) $submissionRaw['audit']['has_signature'];
+        } elseif (isset($submissionRaw['inspection']['audit']['has_signature'])) {
+            $hasSignature = (bool) $submissionRaw['inspection']['audit']['has_signature'];
+        } elseif (! empty($submission->note_pph) && str_contains(strtoupper((string) $submission->note_pph), 'TTD')) {
+            $hasSignature = false;
+        } elseif (! empty($submission->cek_dokumen) && str_contains(strtoupper((string) $submission->cek_dokumen), 'TTD')) {
+            $hasSignature = false;
+        } elseif (! empty($submission->doc_validation['cn']['status']) && $submission->doc_validation['cn']['status'] === 'invalid' && str_contains(strtolower((string) ($submission->doc_validation['cn']['message'] ?? '')), 'tanda tangan')) {
+            $hasSignature = false;
+        }
+
         // 5. Determine Status Potong Purchase & Cek Dokumen
-        if ($hasFinancialMatch && $allDocsPresent) {
+        if (! $hasSignature) {
+            $statusPurchase = 'BELUM BISA POTONG';
+            $cekDokumen = $allDocsPresent ? 'TTD BELUM ADA' : 'TTD & '.implode(' & ', $missingDocs).' BELUM ADA';
+            $keterangan = sprintf(
+                'MATCH Test Program #%d (Finansial Sesuai, Dokumen Belum Ditandatangani: %s)',
+                $submission->id,
+                $cekDokumen
+            );
+        } elseif (! empty($submission->status_potong_purchase) && $submission->status_potong_purchase === 'BELUM BISA POTONG' && ! empty($submission->cek_dokumen) && $submission->cek_dokumen !== 'LENGKAP' && ! str_contains($submission->cek_dokumen, 'MATCH')) {
+            $statusPurchase = 'BELUM BISA POTONG';
+            $cekDokumen = $submission->cek_dokumen;
+            $keterangan = sprintf(
+                'MATCH Test Program #%d (Dokumen Bermasalah: %s)',
+                $submission->id,
+                $cekDokumen
+            );
+        } elseif ($hasFinancialMatch && $allDocsPresent) {
             $statusPurchase = 'BISA DI POTONG';
             $cekDokumen = 'LENGKAP';
             $keterangan = sprintf(
@@ -803,6 +836,11 @@ class ProgramReconciliationService
             $dataProgram->tgl_potong_tf = date('n/j/Y');
         }
 
+        // Transfer note_pph from submission if present
+        if (! empty($submission->note_pph) && ($force || empty($dataProgram->note_pph) || $dataProgram->note_pph === '-')) {
+            $dataProgram->note_pph = trim((string) $submission->note_pph);
+        }
+
         $dataProgram->cek_dokumen = $cekDokumen;
         // 'keterangan' (aging/manual) dan 'noted' (Refnote dari Excel) tidak boleh ditimpa hasil pencocokan;
         // catatan hasil pencocokan disimpan terpisah di 'match_note'
@@ -810,7 +848,9 @@ class ProgramReconciliationService
 
         $dataProgram->save();
 
-        if ($hasFinancialMatch && $allDocsPresent) {
+        if (! $hasSignature) {
+            $matchLogStatus = ProgramReconciliationLog::STATUS_DOC_INCOMPLETE;
+        } elseif ($hasFinancialMatch && $allDocsPresent) {
             $matchLogStatus = ProgramReconciliationLog::STATUS_MATCHED;
         } elseif (! $hasFinancialMatch) {
             $matchLogStatus = ProgramReconciliationLog::STATUS_NOMINAL_MISMATCH;
