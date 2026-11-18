@@ -2455,4 +2455,256 @@ class ProgramSubmissionTest extends TestCase
         $this->assertSame('ok', $result['audit']['note_pph']);
         $this->assertSame('valid', $result['doc_validation']['cn']['status']);
     }
+
+    public function test_pribadi_pkp_faktur_pajak_matches_npwp_name_and_allows_pre_validate_and_submit(): void
+    {
+        Storage::fake('public');
+        Cache::flush();
+
+        Dealer::create([
+            'kode_bt' => 'BT08644',
+            'id_realme' => 'DLBC8644',
+            'dealer_name' => 'MITRA PONSEL',
+            'region' => 'CIKAMPEK',
+            'npwp' => '6172022007910001',
+            'npwp_name' => 'JULIANTO',
+            'npwp_type' => 'PRIBADI PKP',
+            'email' => 'mitraponsel@contoh.test',
+            'is_active' => true,
+        ]);
+
+        // Simulasi AI yang keliru membandingkan Nama PKP (JULIANTO) dengan nama toko (MITRA PONSEL)
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'dealer_name' => 'MITRA PONSEL',
+                                'dealer_mismatch' => false,
+                                'cn_program_name' => 'PROGRAM DSA OKTOBER 2026',
+                                'cn_program_mismatch' => false,
+                                'is_complete' => false,
+                                'cek_dokumen' => 'DOKUMEN TIDAK SESUAI (FAKTUR)',
+                                'status_potong_purchase' => 'BELUM BISA POTONG',
+                                'keterangan' => 'Nama PKP pada Faktur Pajak (JULIANTO) tidak sesuai dengan nama dealer (MITRA PONSEL).',
+                                'dpp' => 405405,
+                                'dpp_lain' => 371621,
+                                'ppn' => 44595,
+                                'nilai_pph' => 10135,
+                                'net_pay' => 439865,
+                                'no_faktur' => '04002600489926455',
+                                'tgl_faktur' => '16/11/2026',
+                                'has_stamp' => true,
+                                'has_signature' => true,
+                                'has_npwp' => true,
+                                'note_pph' => 'ok',
+                                'doc_validation' => [
+                                    'cn' => ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'Dokumen Credit Note terverifikasi.'],
+                                    'faktur' => [
+                                        'status' => 'invalid',
+                                        'actual_type' => 'faktur',
+                                        'message' => 'Nama PKP pada Faktur Pajak (JULIANTO) tidak sesuai dengan nama dealer (MITRA PONSEL).',
+                                    ],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+            '*' => Http::response(['success' => true], 200),
+        ]);
+
+        $cnFile = UploadedFile::fake()->create('CN_MITRA_PONSEL.pdf', 100, 'application/pdf');
+        $agrFile = UploadedFile::fake()->create('AGR_MITRA_PONSEL.pdf', 100, 'application/pdf');
+        $fakturFile = UploadedFile::fake()->create('OutputTaxInvoice-6172022007910001.pdf', 100, 'application/pdf');
+
+        $preValidate = $this->post('/api/program-submissions/pre-validate', [
+            'program_name' => 'PROGRAM DSA OKTOBER 2026',
+            'region' => 'CIKAMPEK',
+            'id_real' => 'DLBC8644',
+            'kode_bt' => 'BT08644',
+            'dealer_name' => 'MITRA PONSEL',
+            'sales_name' => 'JULIANTO',
+            'is_pkp' => true,
+            'credit_note_file' => $cnFile,
+            'tax_invoice_file' => $fakturFile,
+        ], ['Accept' => 'application/json']);
+
+        $preValidate->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.is_clean', true)
+            ->assertJsonPath('data.has_invalid', false)
+            ->assertJsonPath('data.status_potong_purchase', 'BISA DI POTONG')
+            ->assertJsonPath('data.cek_dokumen', 'LENGKAP')
+            ->assertJsonPath('data.doc_validation.faktur.status', 'valid');
+
+        // Pastikan data jenis_npwp, nama_npwp, dan npwp dari Master Dealer ikut dikirim ke AI
+        Http::assertSent(function ($request) {
+            $userText = (string) ($request['messages'][1]['content'][0]['text'] ?? '');
+
+            return str_contains($userText, '"jenis_npwp":"PRIBADI PKP"')
+                && str_contains($userText, '"nama_npwp":"JULIANTO"')
+                && str_contains($userText, '"npwp":"6172022007910001"');
+        });
+
+        $submit = $this->postJson('/api/program-submissions/submit-form', [
+            'program_name' => 'PROGRAM DSA OKTOBER 2026',
+            'region' => 'CIKAMPEK',
+            'id_real' => 'DLBC8644',
+            'kode_bt' => 'BT08644',
+            'dealer_name' => 'MITRA PONSEL',
+            'sales_name' => 'JULIANTO',
+            'whatsapp' => '081213361551',
+            'is_pkp' => true,
+            'credit_note_file' => $cnFile,
+            'agreement_file' => $agrFile,
+            'tax_invoice_file' => $fakturFile,
+        ]);
+
+        $submit->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('status_potong_purchase', 'BISA DI POTONG')
+            ->assertJsonPath('doc_validation.faktur.status', 'valid');
+    }
+
+    public function test_pribadi_pkp_faktur_pajak_rejects_mismatched_npwp_name(): void
+    {
+        Storage::fake('public');
+        Cache::flush();
+
+        Dealer::create([
+            'kode_bt' => 'BT08645',
+            'id_realme' => 'DLBC8645',
+            'dealer_name' => 'MITRA PONSEL',
+            'region' => 'CIKAMPEK',
+            'npwp' => '6172022007910001',
+            'npwp_name' => 'JULIANTO',
+            'npwp_type' => 'PRIBADI PKP',
+            'is_active' => true,
+        ]);
+
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'dealer_name' => 'MITRA PONSEL',
+                                'dealer_mismatch' => false,
+                                'cn_program_name' => 'PROGRAM DSA OKTOBER 2026',
+                                'cn_program_mismatch' => false,
+                                'faktur_pkp_name' => 'BUDI SANTOSO',
+                                'faktur_npwp' => '9999999999999999',
+                                'is_complete' => true,
+                                'cek_dokumen' => 'LENGKAP',
+                                'status_potong_purchase' => 'BISA DI POTONG',
+                                'keterangan' => 'Lengkap',
+                                'dpp' => 405405,
+                                'ppn' => 44595,
+                                'nilai_pph' => 10135,
+                                'net_pay' => 439865,
+                                'has_stamp' => true,
+                                'has_signature' => true,
+                                'has_npwp' => true,
+                                'note_pph' => 'ok',
+                                'doc_validation' => [
+                                    'cn' => ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'Dokumen CN valid.'],
+                                    'faktur' => ['status' => 'valid', 'actual_type' => 'faktur', 'message' => 'Dokumen Faktur valid.'],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $preValidate = $this->post('/api/program-submissions/pre-validate', [
+            'program_name' => 'PROGRAM DSA OKTOBER 2026',
+            'region' => 'CIKAMPEK',
+            'id_real' => 'DLBC8645',
+            'kode_bt' => 'BT08645',
+            'dealer_name' => 'MITRA PONSEL',
+            'sales_name' => 'JULIANTO',
+            'is_pkp' => true,
+            'credit_note_file' => UploadedFile::fake()->create('CN_MITRA_PONSEL.pdf', 100, 'application/pdf'),
+            'tax_invoice_file' => UploadedFile::fake()->create('FAKTUR_ORANG_LAIN.pdf', 100, 'application/pdf'),
+        ], ['Accept' => 'application/json']);
+
+        $preValidate->assertOk()
+            ->assertJsonPath('data.is_clean', false)
+            ->assertJsonPath('data.has_invalid', true)
+            ->assertJsonPath('data.status_potong_purchase', 'BELUM BISA POTONG')
+            ->assertJsonPath('data.doc_validation.faktur.status', 'invalid');
+
+        $this->assertStringContainsString('BUDI SANTOSO', (string) $preValidate->json('data.doc_validation.faktur.message'));
+        $this->assertStringContainsString('JULIANTO', (string) $preValidate->json('data.doc_validation.faktur.message'));
+    }
+
+    public function test_faktur_pajak_matches_via_npwp_number_including_15_vs_16_digit_and_nitku(): void
+    {
+        Cache::flush();
+        $service = app(DocumentAnalysisService::class);
+
+        $this->assertTrue($service->isNpwpMatching('6172022007910001', '6172022007910001'));
+        $this->assertTrue($service->isNpwpMatching('6172022007910001000000', '6172022007910001'));
+        $this->assertTrue($service->isNpwpMatching('31.352.339.1-426.000', '0313523391426000'));
+        $this->assertFalse($service->isNpwpMatching('6172022007910001', '9999999999999999'));
+        $this->assertFalse($service->isNpwpMatching('0000000000000000', '0000000000000000'));
+
+        Http::fake([
+            '*/chat/completions' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'dealer_name' => 'MITRA PONSEL',
+                                'dealer_mismatch' => false,
+                                'cn_program_name' => 'PROGRAM DSA OKTOBER 2026',
+                                'cn_program_mismatch' => false,
+                                'faktur_pkp_name' => 'JULIANTO',
+                                'faktur_npwp' => '6172022007910001000000',
+                                'cn_npwp' => '6172022007910001',
+                                'is_complete' => false,
+                                'cek_dokumen' => 'DOKUMEN TIDAK SESUAI (FAKTUR)',
+                                'status_potong_purchase' => 'BELUM BISA POTONG',
+                                'keterangan' => 'Nama PKP pada Faktur Pajak (JULIANTO) tidak sesuai dengan nama dealer (MITRA PONSEL).',
+                                'dpp' => 405405,
+                                'ppn' => 44595,
+                                'nilai_pph' => 10135,
+                                'net_pay' => 439865,
+                                'has_stamp' => true,
+                                'has_signature' => true,
+                                'has_npwp' => true,
+                                'note_pph' => 'ok',
+                                'doc_validation' => [
+                                    'cn' => ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'Dokumen CN valid.'],
+                                    'faktur' => [
+                                        'status' => 'invalid',
+                                        'actual_type' => 'faktur',
+                                        'message' => 'Nama PKP pada Faktur Pajak (JULIANTO) tidak sesuai dengan nama dealer (MITRA PONSEL).',
+                                    ],
+                                ],
+                            ]),
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        // Bahkan jika nama_npwp belum terisi di Master Dealer, kecocokan NPWP antara CN & Faktur Pajak tetap meloloskan Faktur
+        $result = $service->inspectDocumentFiles([
+            'dealer_name' => 'MITRA PONSEL',
+            'program_name' => 'PROGRAM DSA OKTOBER 2026',
+            'npwp_type' => 'PRIBADI PKP',
+            'is_pkp_master' => true,
+        ], [
+            'cn' => UploadedFile::fake()->create('CN_MITRA.pdf', 100, 'application/pdf'),
+            'faktur' => UploadedFile::fake()->create('FAKTUR_MITRA.pdf', 100, 'application/pdf'),
+        ]);
+
+        $this->assertTrue($result['is_clean']);
+        $this->assertSame('BISA DI POTONG', $result['status_potong_purchase']);
+        $this->assertSame('valid', $result['doc_validation']['faktur']['status']);
+    }
 }

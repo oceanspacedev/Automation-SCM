@@ -853,6 +853,172 @@ PROMPT;
     }
 
     /**
+     * Compare an expected NPWP holder name against the PKP name on a Faktur Pajak.
+     * Stricter than store-name matching so unrelated personal names sharing common suffixes (e.g. "JULIANTO" vs "BUDI SANTOSO") don't falsely match.
+     */
+    public function isNpwpNameMatching(?string $expectedName, ?string $fakturPkpName): bool
+    {
+        $expected = trim((string) $expectedName);
+        $actual = trim((string) $fakturPkpName);
+
+        if ($expected === '' || $expected === '-' || $actual === '' || $actual === '-') {
+            return true;
+        }
+
+        $stripPrefix = static function (string $value): string {
+            $clean = strtolower((string) preg_replace('/[^a-zA-Z0-9\s]/', ' ', $value));
+            $clean = (string) preg_replace('/\b(?:pt|cv|ud|pd|tb|bpk|ibu|sdr|tn|ny|h|hj|dr|drs|ir|se|sh|st)\b/i', ' ', $clean);
+
+            return trim((string) preg_replace('/\s+/', ' ', $clean));
+        };
+
+        $normExpected = $stripPrefix($expected);
+        $normActual = $stripPrefix($actual);
+
+        if ($normExpected === '' || $normActual === '') {
+            return false;
+        }
+
+        $compactExpected = str_replace(' ', '', $normExpected);
+        $compactActual = str_replace(' ', '', $normActual);
+
+        if ($compactExpected === $compactActual) {
+            return true;
+        }
+
+        $expectedTokens = array_values(array_filter(explode(' ', $normExpected), fn (string $t) => strlen($t) >= 3));
+        $actualTokens = array_values(array_filter(explode(' ', $normActual), fn (string $t) => strlen($t) >= 3));
+        if (! empty($expectedTokens) && ! empty($actualTokens)) {
+            $shorter = count($expectedTokens) <= count($actualTokens) ? $expectedTokens : $actualTokens;
+            $longer = count($expectedTokens) <= count($actualTokens) ? $actualTokens : $expectedTokens;
+            $allShorterMatch = true;
+            foreach ($shorter as $token) {
+                $matched = false;
+                foreach ($longer as $candidate) {
+                    if ($token === $candidate || (min(strlen($token), strlen($candidate)) >= 5 && levenshtein($token, $candidate) <= 1)) {
+                        $matched = true;
+                        break;
+                    }
+                }
+                if (! $matched) {
+                    $allShorterMatch = false;
+                    break;
+                }
+            }
+            if ($allShorterMatch) {
+                return true;
+            }
+        }
+
+        if (min(strlen($compactExpected), strlen($compactActual)) >= 5 && levenshtein($compactExpected, $compactActual) <= 2) {
+            return true;
+        }
+
+        similar_text($compactExpected, $compactActual, $percent);
+
+        return $percent >= 85;
+    }
+
+    /**
+     * Compare two NPWP numbers ignoring punctuation, 15-vs-16 digit leading zero, and 22-digit Coretax NITKU suffix.
+     */
+    public function isNpwpMatching(?string $npwpA, ?string $npwpB): bool
+    {
+        $digitsA = preg_replace('/\D+/', '', (string) $npwpA);
+        $digitsB = preg_replace('/\D+/', '', (string) $npwpB);
+
+        if (strlen($digitsA) < 15 || strlen($digitsB) < 15) {
+            return false;
+        }
+
+        $normalize = static function (string $digits): string {
+            if (strlen($digits) === 22 && str_ends_with($digits, '000000')) {
+                $digits = substr($digits, 0, 16);
+            }
+
+            return ltrim($digits, '0');
+        };
+
+        $normA = $normalize($digitsA);
+        $normB = $normalize($digitsB);
+
+        return $normA !== '' && strlen($normA) >= 14 && $normA === $normB;
+    }
+
+    /**
+     * Check whether an NPWP belongs to one of the Bill To distributors (e.g. CV TOP SELULAR).
+     */
+    protected function isBillToNpwp(string $npwp): bool
+    {
+        foreach (CustomerLookupService::billToNpwps() as $billToNpwp) {
+            if ($this->isNpwpMatching($npwp, $billToNpwp)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Extract Pengusaha Kena Pajak (PKP) name and NPWP from Faktur Pajak text.
+     *
+     * @param  array<string, mixed>  $fakturInfo
+     * @return array{pkp_name: ?string, npwp: ?string}
+     */
+    protected function extractFakturPkpInfo(array $fakturInfo): array
+    {
+        $text = (string) ($fakturInfo['text'] ?? '');
+        if (trim($text) === '') {
+            return ['pkp_name' => null, 'npwp' => null];
+        }
+
+        $pkpSection = $text;
+        if (preg_match('/Pengusaha\s+Kena\s+Pajak\s*:?(.*?)(?:Pembeli\s+Barang\s+Kena\s+Pajak|Penerima\s+Jasa\s+Kena\s+Pajak|$)/is', $text, $sectionMatch)) {
+            $pkpSection = $sectionMatch[1];
+        }
+
+        $pkpName = null;
+        if (preg_match('/Nama\s*:\s*([^\r\n]+)/i', $pkpSection, $nameMatch)) {
+            $candidate = trim((string) preg_replace('/\s+/', ' ', $nameMatch[1]));
+            $pkpName = $this->dealerNameOrNull($candidate);
+        }
+
+        $npwp = null;
+        if (preg_match('/NPWP\s*:\s*([0-9.\-\s]{15,25})/i', $pkpSection, $npwpMatch)) {
+            $digits = preg_replace('/\D+/', '', $npwpMatch[1]);
+            if (strlen($digits) >= 15 && ! $this->isBillToNpwp($digits)) {
+                $npwp = $digits;
+            }
+        }
+
+        return ['pkp_name' => $pkpName, 'npwp' => $npwp];
+    }
+
+    /**
+     * Extract dealer's NPWP from Credit Note text, excluding Bill To distributor NPWPs.
+     *
+     * @param  array<string, mixed>  $cnInfo
+     */
+    protected function extractDealerNpwpFromCn(array $cnInfo): ?string
+    {
+        $text = (string) ($cnInfo['text'] ?? '');
+        if (trim($text) === '') {
+            return null;
+        }
+
+        if (preg_match_all('/NPWP\s*[:=]?\s*([0-9.\-\s]{15,25})/i', $text, $matches)) {
+            foreach ($matches[1] as $raw) {
+                $digits = preg_replace('/\D+/', '', $raw);
+                if (strlen($digits) >= 15 && ! $this->isBillToNpwp($digits)) {
+                    return $digits;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Extract dealer name from Agreement text or filename.
      */
     public function extractDealerNameFromAgr(array $agrInfo): ?string
@@ -1497,18 +1663,29 @@ PROMPT;
         // Try AI Vision Router if API key is configured
         if (! empty($config['api_key'])) {
             try {
+                $userPayload = [
+                    'id_real' => $formData['id_real'] ?? '-',
+                    'dealer_name' => $formData['dealer_name'] ?? '-',
+                    'program_name' => $formData['program_name'] ?? '-',
+                    'sales_name' => $formData['sales_name'] ?? '-',
+                    'status_pajak' => ($formData['is_pkp_master'] ?? ! empty($formData['is_pkp'])) ? 'PKP' : 'NON PKP',
+                    'has_cn_file' => $slotHasUrl['cn'],
+                    'has_faktur_file' => $slotHasUrl['faktur'],
+                ];
+                if (! empty($formData['npwp_type'])) {
+                    $userPayload['jenis_npwp'] = trim((string) $formData['npwp_type']);
+                }
+                if (! empty($formData['npwp_name'])) {
+                    $userPayload['nama_npwp'] = trim((string) $formData['npwp_name']);
+                }
+                if (! empty($formData['npwp'])) {
+                    $userPayload['npwp'] = trim((string) $formData['npwp']);
+                }
+
                 $userParts = [
                     [
                         'type' => 'text',
-                        'text' => json_encode([
-                            'id_real' => $formData['id_real'] ?? '-',
-                            'dealer_name' => $formData['dealer_name'] ?? '-',
-                            'program_name' => $formData['program_name'] ?? '-',
-                            'sales_name' => $formData['sales_name'] ?? '-',
-                            'status_pajak' => ($formData['is_pkp_master'] ?? ! empty($formData['is_pkp'])) ? 'PKP' : 'NON PKP',
-                            'has_cn_file' => $slotHasUrl['cn'],
-                            'has_faktur_file' => $slotHasUrl['faktur'],
-                        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                        'text' => json_encode($userPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
                     ],
                 ];
 
@@ -1784,6 +1961,79 @@ PROMPT;
             }
         }
 
+        // Validasi Nama PKP / NPWP pada Faktur Pajak (khususnya PRIBADI PKP yang nama PKP-nya adalah Nama NPWP, bukan nama toko)
+        $fakturPkpMismatch = false;
+        $expectedNpwpName = trim((string) ($formData['npwp_name'] ?? ''));
+        $expectedNpwp = trim((string) ($formData['npwp'] ?? ''));
+        $npwpType = strtoupper(trim((string) ($formData['npwp_type'] ?? '')));
+        $isPribadiPkp = str_contains($npwpType, 'PRIBADI') && str_contains($npwpType, 'PKP');
+
+        if (! $hasSwapped && $slotHasUrl['faktur'] && isset($docValidation['faktur']) && ($docValidation['faktur']['actual_type'] ?? '') !== 'merged') {
+            $fakturMsg = (string) ($docValidation['faktur']['message'] ?? '');
+            $fakturPkpName = trim((string) ($parsed['faktur_pkp_name'] ?? ''));
+            $fakturNpwp = trim((string) ($parsed['faktur_npwp'] ?? ''));
+            $cnNpwp = trim((string) ($parsed['cn_npwp'] ?? ''));
+
+            if ($fakturPkpName === '' && preg_match('/(?:nama\s+pkp|faktur\s+pajak)[^()\r\n]*\(\s*[\'"]?([^)\'"]+)[\'"]?\s*\)/i', $fakturMsg, $m)) {
+                $fakturPkpName = trim($m[1]);
+            }
+
+            if ($fakturPkpName === '' || $fakturNpwp === '') {
+                $fakturExtracted = $this->extractFakturPkpInfo($this->extractFileContentInfo($filesOrUrls['faktur'] ?? null));
+                if ($fakturPkpName === '' && $fakturExtracted['pkp_name'] !== null) {
+                    $fakturPkpName = $fakturExtracted['pkp_name'];
+                }
+                if ($fakturNpwp === '' && $fakturExtracted['npwp'] !== null) {
+                    $fakturNpwp = $fakturExtracted['npwp'];
+                }
+            }
+
+            if ($cnNpwp === '' && $slotHasUrl['cn']) {
+                $cnNpwp = $this->extractDealerNpwpFromCn($this->extractFileContentInfo($filesOrUrls['cn'] ?? null)) ?? '';
+            }
+
+            $npwpMatches = ($fakturNpwp !== '' && $expectedNpwp !== '' && $this->isNpwpMatching($fakturNpwp, $expectedNpwp))
+                || ($fakturNpwp !== '' && $cnNpwp !== '' && $this->isNpwpMatching($fakturNpwp, $cnNpwp));
+            $pkpMatchesNpwpName = $fakturPkpName !== '' && $expectedNpwpName !== '' && $this->isNpwpNameMatching($expectedNpwpName, $fakturPkpName);
+            $pkpMatchesDealerName = $fakturPkpName !== '' && $inputDealer !== '' && $inputDealer !== '-' && $this->isDealerNameMatching($inputDealer, $fakturPkpName);
+
+            $lowerFakturMsg = strtolower($fakturMsg);
+            $isFakturNameError = ($docValidation['faktur']['status'] ?? '') === 'invalid'
+                && (
+                    str_contains($lowerFakturMsg, 'pkp')
+                    || str_contains($lowerFakturMsg, 'dealer')
+                    || str_contains($lowerFakturMsg, 'npwp')
+                    || str_contains($lowerFakturMsg, 'nama')
+                    || str_contains($lowerFakturMsg, 'tidak sesuai')
+                    || str_contains($lowerFakturMsg, 'berbeda')
+                );
+
+            if ($isPribadiPkp && $expectedNpwpName !== '') {
+                if ($pkpMatchesNpwpName || $npwpMatches) {
+                    if ($isFakturNameError) {
+                        $docValidation['faktur']['status'] = 'valid';
+                        $docValidation['faktur']['actual_type'] = 'faktur';
+                        $docValidation['faktur']['message'] = 'Dokumen Faktur Pajak terverifikasi sesuai Nama NPWP.';
+                    }
+                } elseif ($fakturPkpName !== '') {
+                    $fakturPkpMismatch = true;
+                    $docValidation['faktur'] = [
+                        'status' => 'invalid',
+                        'actual_type' => 'faktur',
+                        'message' => "Nama PKP pada Faktur Pajak ({$fakturPkpName}) tidak sesuai dengan Nama NPWP dealer ({$expectedNpwpName}).",
+                    ];
+                }
+            } elseif ($expectedNpwpName !== '' || $npwpMatches) {
+                if ($pkpMatchesNpwpName || $pkpMatchesDealerName || $npwpMatches) {
+                    if ($isFakturNameError) {
+                        $docValidation['faktur']['status'] = 'valid';
+                        $docValidation['faktur']['actual_type'] = 'faktur';
+                        $docValidation['faktur']['message'] = 'Dokumen Faktur Pajak terverifikasi sesuai data NPWP dealer.';
+                    }
+                }
+            }
+        }
+
         // Recompute invalid details from docValidation
         $hasInvalid = false;
         $invalidDetails = [];
@@ -1846,7 +2096,9 @@ PROMPT;
         } elseif ($hasInvalid) {
             $statusPurchase = 'BELUM BISA POTONG';
             $cekDokumen = 'DOKUMEN TIDAK SESUAI ('.implode(', ', $invalidDetails).')';
-            $keterangan = 'File dokumen yang diunggah tidak sesuai atau tidak terbaca.';
+            $keterangan = $fakturPkpMismatch && ! empty($docValidation['faktur']['message'])
+                ? (string) $docValidation['faktur']['message']
+                : 'File dokumen yang diunggah tidak sesuai atau tidak terbaca.';
         } elseif (! empty($missingDocs)) {
             $statusPurchase = 'BELUM BISA POTONG';
             $cekDokumen = implode(' & ', $missingDocs).' BELUM ADA';
@@ -1922,6 +2174,7 @@ PROMPT;
     public function analyzeSubmission(ProgramSubmission $submission): array
     {
         $reconciliation = app(ProgramReconciliationService::class);
+        $masterDealer = $reconciliation->masterDealer($submission);
 
         $res = $this->inspectDocumentFiles([
             'id_real' => $submission->id_real,
@@ -1929,7 +2182,10 @@ PROMPT;
             'program_name' => $submission->program_name,
             'sales_name' => $submission->sales_name,
             'is_pkp' => $reconciliation->isPkpFromSubmission($submission),
-            'is_pkp_master' => $reconciliation->masterPkpStatus($submission),
+            'is_pkp_master' => $masterDealer?->isPkp(),
+            'npwp_type' => $masterDealer?->npwp_type,
+            'npwp_name' => $masterDealer?->npwp_name,
+            'npwp' => $masterDealer?->npwp,
             'dpp' => $submission->dpp,
             'ppn' => $submission->ppn,
             'dpp_lain' => $submission->dpp_lain,
@@ -2183,6 +2439,15 @@ Ketentuan Penentuan Output:
        - "cek_dokumen": "NAMA DEALER TIDAK SESUAI (CN)"
        - "keterangan": "Nama dealer di formulir ('[Nama Dealer Form]') berbeda dengan dokumen Credit Note ('[Nama Dealer Dokumen]'). Harap perbaiki atau isi '-' agar nama otomatis diambil dari dokumen."
        - Pada doc_validation.cn.message: "Nama dealer di dokumen ('[Nama Dealer Dokumen]') berbeda dengan Form ('[Nama Dealer Form]')."
+   - Validasi Nama PKP & NPWP pada Faktur Pajak (SANGAT PENTING):
+     * Selalu ekstrak Nama Pengusaha Kena Pajak pada Faktur Pajak ke field "faktur_pkp_name", nomor NPWP Pengusaha Kena Pajak pada Faktur Pajak ke "faktur_npwp", dan nomor NPWP dealer pada Credit Note ke "cn_npwp".
+     * Nama penerbit pada Faktur Pajak tercantum pada bagian "Pengusaha Kena Pajak" -> "Nama" & "NPWP" (BUKAN pada bagian "Pembeli Barang Kena Pajak" seperti CV TOP SELULAR).
+     * KHUSUS PRIBADI PKP (jenis_npwp mengandung "PRIBADI PKP") ATAU JIKA "nama_npwp" TERSEDIA PADA DATA INPUT:
+       - Pada Faktur Pajak, nama Pengusaha Kena Pajak adalah NAMA NPWP / NAMA PEMILIK ("nama_npwp"), BUKAN nama toko ("dealer_name")!
+       - Contoh: dealer di formulir & CN adalah "MITRA PONSEL" dengan jenis_npwp "PRIBADI PKP" dan nama_npwp "JULIANTO", maka pada Faktur Pajak tertera Pengusaha Kena Pajak Nama: "JULIANTO". INI COCOK & VALID! JANGAN PERNAH membandingkan Nama PKP pada Faktur Pajak dengan nama toko ("MITRA PONSEL") dan JANGAN PERNAH menandai slot faktur sebagai "invalid" apabila Nama PKP cocok dengan "nama_npwp" ("JULIANTO")!
+       - Untuk PRIBADI PKP: cocokkan Nama PKP pada Faktur Pajak terhadap "nama_npwp" (dengan toleransi typo kecil/spasi). Jika tidak cocok dengan "nama_npwp" dan nomor NPWP juga tidak cocok, barulah tandai slot faktur "invalid" dengan pesan "Nama PKP pada Faktur Pajak ([Nama PKP]) tidak sesuai dengan Nama NPWP dealer ([nama_npwp])."
+       - Untuk BADAN: Nama PKP pada Faktur Pajak valid apabila cocok dengan "nama_npwp" ATAU "dealer_name".
+     * VALIDASI NOMOR NPWP: Jika nomor NPWP pada Faktur Pajak cocok dengan "npwp" data input ATAU cocok dengan nomor NPWP yang tertera pada Credit Note / Invoice (abaikan tanda titik/strip, angka 0 di depan untuk format 15 vs 16 digit, atau 6 nol di belakang NITKU), maka Faktur Pajak adalah SAH milik dealer yang sama -> status slot faktur WAJIB "valid"!
    - Dokumen bukan dokumen resmi program atau file acak (foto selfie, nota sembarangan, dll):
      * "is_complete": false
      * "cek_dokumen": Sebutkan dokumen yang salah upload, contoh: "DOKUMEN TIDAK SESUAI (FAKTUR)"
@@ -2229,6 +2494,9 @@ Wajib mengembalikan JSON murni TANPA pembungkus markdown ```json ``` dengan key 
   "note_pph": string,
   "no_faktur": string | null,
   "tgl_faktur": string | null,
+  "faktur_pkp_name": string | null,
+  "faktur_npwp": string | null,
+  "cn_npwp": string | null,
   "doc_validation": {
     "cn": { "status": "valid" | "swapped" | "invalid" | "empty", "actual_type": "cn" | "agr" | "faktur" | "other" | "none", "message": string },
     "faktur": { "status": "valid" | "swapped" | "invalid" | "empty", "actual_type": "cn" | "agr" | "faktur" | "other" | "none", "message": string }

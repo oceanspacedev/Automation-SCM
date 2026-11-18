@@ -103,6 +103,16 @@ class CustomerLookupService
     }
 
     /**
+     * NPWPs of the standard Bill To companies (CV TOP SELULAR and the others), never the dealer's own NPWP.
+     *
+     * @return list<string>
+     */
+    public static function billToNpwps(): array
+    {
+        return array_values(array_unique(array_filter(array_column(self::$billToOptions, 'npwp'))));
+    }
+
+    /**
      * Get all available standard Bill To options.
      */
     public static function getBillToOptions(): array

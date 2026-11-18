@@ -1164,6 +1164,8 @@ class ProgramSubmissionController extends Controller
      */
     public function preValidateForm(Request $request): JsonResponse
     {
+        $masterDealer = $this->masterDealer($request);
+
         $formData = [
             'program_name' => (string) $request->input('program_name', ''),
             'region' => (string) $request->input('region', ''),
@@ -1172,7 +1174,10 @@ class ProgramSubmissionController extends Controller
             'sales_name' => (string) $request->input('sales_name', ''),
             'whatsapp' => (string) $request->input('whatsapp', ''),
             'is_pkp' => $request->boolean('is_pkp', false),
-            'is_pkp_master' => $this->masterDealerPkpStatus($request),
+            'is_pkp_master' => $masterDealer?->isPkp(),
+            'npwp_type' => $masterDealer?->npwp_type,
+            'npwp_name' => $masterDealer?->npwp_name,
+            'npwp' => $masterDealer?->npwp,
         ];
 
         $files = [
@@ -1258,7 +1263,10 @@ class ProgramSubmissionController extends Controller
             'sales_name' => trim((string) $request->input('sales_name')),
             'whatsapp' => trim((string) $request->input('whatsapp')),
             'is_pkp' => $request->boolean('is_pkp', false),
-            'is_pkp_master' => $this->masterDealerPkpStatus($request),
+            'is_pkp_master' => $masterDealer?->isPkp(),
+            'npwp_type' => $masterDealer?->npwp_type,
+            'npwp_name' => $masterDealer?->npwp_name,
+            'npwp' => $masterDealer?->npwp,
         ];
 
         $cnFile = $request->file('credit_note_file');

@@ -273,13 +273,20 @@ class ProgramReconciliationService
     }
 
     /**
+     * Master Dealer record for the submitting store (null when not found).
+     */
+    public function masterDealer(ProgramSubmission $submission): ?Dealer
+    {
+        return app(AreaContext::class)
+            ->run($submission->areaEnum(), fn () => Dealer::findByIdReal($submission->id_real, $submission->dealer_name));
+    }
+
+    /**
      * PKP status of the submitting store from its Jenis NPWP in Master Dealer (null when the store or its type is unknown).
      */
     public function masterPkpStatus(ProgramSubmission $submission): ?bool
     {
-        return app(AreaContext::class)
-            ->run($submission->areaEnum(), fn () => Dealer::findByIdReal($submission->id_real, $submission->dealer_name))
-            ?->isPkp();
+        return $this->masterDealer($submission)?->isPkp();
     }
 
     /**
