@@ -74,6 +74,7 @@
               <option value="scm">SCM</option>
               <option value="ar">AR</option>
               <option value="telemarketing">Telemarketing</option>
+              <option value="pajak">Pajak</option>
             </select>
             <ChevronDownIcon class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           </div>
@@ -379,6 +380,7 @@
                   <option value="scm">SCM</option>
                   <option value="ar">AR</option>
                   <option value="telemarketing">Telemarketing</option>
+                  <option value="pajak">Pajak</option>
                 </select>
                 <ChevronDownIcon class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
               </div>
@@ -516,6 +518,7 @@ const roleDefaults = ref({
   scm: ALL_MODULES,
   ar: ['drafts', 'invoices', 'riwayat_program'],
   telemarketing: ['form_program', 'riwayat_program'],
+  pajak: ['data_program', 'invoices', 'riwayat_program'],
 });
 
 // State
@@ -741,6 +744,8 @@ const formatRole = (role) => {
       return 'AR';
     case 'telemarketing':
       return 'Telemarketing';
+    case 'pajak':
+      return 'Pajak';
     default:
       return role || '-';
   }

@@ -52,6 +52,20 @@ class RolePermissionsTest extends TestCase
         $this->actingAs($user)->getJson('/api/drafts')->assertForbidden();
     }
 
+    public function test_admin_can_set_permissions_for_pajak_role(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $pajakUser = User::factory()->create(['role' => 'pajak', 'is_active' => true]);
+
+        $this->actingAs($admin)->putJson('/api/role-permissions', [
+            'role' => 'pajak',
+            'permissions' => ['data_program', 'data_program_edit', 'invoices'],
+        ])->assertOk();
+
+        $this->assertTrue($pajakUser->fresh()->canPerform('data_program', 'edit'));
+        $this->assertFalse($pajakUser->fresh()->canPerform('data_program', 'delete'));
+    }
+
     public function test_admin_with_stale_permissions_still_has_full_admin_permissions(): void
     {
         $admin = User::factory()->create([

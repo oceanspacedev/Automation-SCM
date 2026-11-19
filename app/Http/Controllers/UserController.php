@@ -55,6 +55,7 @@ class UserController extends Controller
             'scm' => User::where('role', 'scm')->count(),
             'ar' => User::where('role', 'ar')->count(),
             'telemarketing' => User::where('role', 'telemarketing')->count(),
+            'pajak' => User::where('role', 'pajak')->count(),
             'active' => User::where('is_active', true)->count(),
             'inactive' => User::where('is_active', false)->count(),
             'pending' => User::where('is_active', false)->count(),
@@ -70,6 +71,7 @@ class UserController extends Controller
                 'scm' => User::getDefaultPermissionsForRole('scm'),
                 'ar' => User::getDefaultPermissionsForRole('ar'),
                 'telemarketing' => User::getDefaultPermissionsForRole('telemarketing'),
+                'pajak' => User::getDefaultPermissionsForRole('pajak'),
             ],
         ]);
     }
@@ -81,7 +83,7 @@ class UserController extends Controller
     {
         abort_unless($request->user()?->isAdmin(), 403, 'Hanya Admin yang dapat mengatur hak akses role.');
         $validated = $request->validate([
-            'role' => ['required', Rule::in(['admin', 'scm', 'ar', 'telemarketing'])],
+            'role' => ['required', Rule::in(['admin', 'scm', 'ar', 'telemarketing', 'pajak'])],
             'permissions' => ['present', 'array'],
             'permissions.*' => ['string', 'distinct', Rule::in(array_keys(User::AVAILABLE_PERMISSIONS))],
         ]);
@@ -106,7 +108,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'string', 'email', 'max:255', 'unique:users,email'],
             'whatsapp' => ['nullable', 'string', 'max:25'],
-            'role' => ['required', Rule::in(['admin', 'scm', 'ar', 'telemarketing'])],
+            'role' => ['required', Rule::in(['admin', 'scm', 'ar', 'telemarketing', 'pajak'])],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', Rule::in(array_keys(User::AVAILABLE_PERMISSIONS))],
             'password' => ['required', ...User::passwordRules()],
@@ -147,7 +149,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'file' => ['required', 'file', 'extensions:xlsx,xls,csv', 'max:51200'],
             'password' => ['nullable', ...User::passwordRules()],
-            'role' => ['nullable', Rule::in(['admin', 'scm', 'ar', 'telemarketing'])],
+            'role' => ['nullable', Rule::in(['admin', 'scm', 'ar', 'telemarketing', 'pajak'])],
         ], [
             'file.required' => 'Pilih file Excel terlebih dahulu.',
             'file.extensions' => 'File harus berformat .xlsx, .xls, atau .csv.',
@@ -187,7 +189,7 @@ class UserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'whatsapp' => ['nullable', 'string', 'max:25'],
-            'role' => ['required', Rule::in(['admin', 'scm', 'ar', 'telemarketing'])],
+            'role' => ['required', Rule::in(['admin', 'scm', 'ar', 'telemarketing', 'pajak'])],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', Rule::in(array_keys(User::AVAILABLE_PERMISSIONS))],
             'password' => ['nullable', ...User::passwordRules()],

@@ -43,6 +43,36 @@ class UserRegistrationTest extends TestCase
         $this->assertTrue($user->hasPermission('invoices') || in_array('invoices', $user->permissions));
     }
 
+    public function test_user_can_register_with_role_pajak(): void
+    {
+        $payload = [
+            'name' => 'Tim Pajak',
+            'email' => 'pajak@scm.test',
+            'whatsapp' => '08123456780',
+            'role' => 'pajak',
+            'password' => 'secret123',
+            'password_confirmation' => 'secret123',
+        ];
+
+        $response = $this->postJson('/api/register', $payload);
+
+        $response->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.role', 'pajak')
+            ->assertJsonPath('data.is_active', false);
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'pajak@scm.test',
+            'role' => 'pajak',
+            'is_active' => false,
+        ]);
+
+        $user = User::where('email', 'pajak@scm.test')->first();
+        $this->assertTrue($user->isPajak());
+        $this->assertTrue(in_array('data_program', $user->permissions, true));
+        $this->assertTrue(in_array('data_program_edit', $user->permissions, true));
+    }
+
     public function test_inactive_user_cannot_login_until_approved(): void
     {
         User::factory()->create([

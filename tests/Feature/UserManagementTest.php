@@ -24,19 +24,27 @@ class UserManagementTest extends TestCase
         User::factory()->create(['role' => 'scm', 'is_active' => true]);
         User::factory()->create(['role' => 'ar', 'is_active' => true]);
         User::factory()->create(['role' => 'telemarketing', 'is_active' => false]);
+        User::factory()->create(['role' => 'pajak', 'is_active' => true]);
 
         $response = $this->getJson('/api/users');
 
         // Termasuk Admin yang login di setUp
         $response->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('stats.total', 5)
+            ->assertJsonPath('stats.total', 6)
             ->assertJsonPath('stats.admin', 2)
             ->assertJsonPath('stats.scm', 1)
             ->assertJsonPath('stats.ar', 1)
             ->assertJsonPath('stats.telemarketing', 1)
-            ->assertJsonPath('stats.active', 4)
-            ->assertJsonPath('stats.inactive', 1);
+            ->assertJsonPath('stats.pajak', 1)
+            ->assertJsonPath('stats.active', 5)
+            ->assertJsonPath('stats.inactive', 1)
+            ->assertJsonPath('default_permissions.pajak', [
+                'data_program',
+                'data_program_edit',
+                'invoices',
+                'riwayat_program',
+            ]);
     }
 
     public function test_can_create_user_with_role_and_formatted_whatsapp(): void
@@ -62,6 +70,37 @@ class UserManagementTest extends TestCase
             'role' => 'scm',
             'whatsapp' => '6281234567890',
         ]);
+    }
+
+    public function test_can_create_and_update_user_with_role_pajak(): void
+    {
+        $payload = [
+            'name' => 'Staff Pajak',
+            'email' => 'staff.pajak@scm.test',
+            'whatsapp' => '081234567891',
+            'role' => 'pajak',
+            'password' => 'secret123',
+            'is_active' => true,
+        ];
+
+        $response = $this->postJson('/api/users', $payload);
+
+        $response->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.role', 'pajak');
+
+        $userId = $response->json('data.id');
+
+        $updateResponse = $this->putJson("/api/users/{$userId}", [
+            'name' => 'Staff Pajak Senior',
+            'email' => 'staff.pajak@scm.test',
+            'role' => 'pajak',
+            'is_active' => true,
+        ]);
+
+        $updateResponse->assertOk()
+            ->assertJsonPath('data.name', 'Staff Pajak Senior')
+            ->assertJsonPath('data.role', 'pajak');
     }
 
     public function test_accounts_can_be_saved_without_email(): void

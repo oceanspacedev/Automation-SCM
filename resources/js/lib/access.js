@@ -30,7 +30,8 @@ export function canAccess(user, feature) {
   }
 
   if (feature === 'drafts') return role === 'ar';
-  if (feature === 'invoices') return role === 'ar';
+  if (feature === 'invoices') return role === 'ar' || role === 'pajak';
+  if (feature === 'data_program') return role === 'pajak';
   if (feature === 'form_program') return role === 'telemarketing';
   if (feature === 'riwayat') return true;
   if (feature === 'riwayat_program') return true;

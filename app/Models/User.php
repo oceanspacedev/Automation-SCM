@@ -188,6 +188,12 @@ class User extends Authenticatable
                 'form_program',
                 'riwayat_program',
             ],
+            'pajak' => [
+                'data_program',
+                'data_program_edit',
+                'invoices',
+                'riwayat_program',
+            ],
             default => [
                 'form_program',
             ],
@@ -267,6 +273,11 @@ class User extends Authenticatable
     public function isTelemarketing(): bool
     {
         return $this->role === 'telemarketing';
+    }
+
+    public function isPajak(): bool
+    {
+        return $this->role === 'pajak';
     }
 
     /**

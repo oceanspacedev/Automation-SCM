@@ -192,7 +192,7 @@ const emit = defineEmits(['close', 'imported']);
 
 const { canEdit, canCreate } = useAuth();
 
-const ROLE_LABELS = { telemarketing: 'Telemarketing', ar: 'AR', scm: 'SCM', admin: 'Admin' };
+const ROLE_LABELS = { telemarketing: 'Telemarketing', ar: 'AR', scm: 'SCM', pajak: 'Pajak', admin: 'Admin' };
 
 const roleOptions = computed(() =>
   Object.entries(ROLE_LABELS)

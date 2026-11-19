@@ -46,7 +46,7 @@ import { useAuth } from '@/composables/useAuth';
 import { notify } from '@/composables/useNotify';
 
 const { checkAuth } = useAuth();
-const roles = [{ key: 'admin', label: 'Admin' }, { key: 'scm', label: 'SCM' }, { key: 'ar', label: 'AR' }, { key: 'telemarketing', label: 'Telemarketing' }];
+const roles = [{ key: 'admin', label: 'Admin' }, { key: 'scm', label: 'SCM' }, { key: 'ar', label: 'AR' }, { key: 'telemarketing', label: 'Telemarketing' }, { key: 'pajak', label: 'Pajak' }];
 const actions = [{ key: 'view', label: 'Lihat' }, { key: 'create', label: 'Tambah' }, { key: 'edit', label: 'Edit' }, { key: 'delete', label: 'Hapus' }];
 const groups = [
   { label: 'Transaksi', modules: [{ key: 'drafts', label: 'Draft', transaction: true }, { key: 'invoices', label: 'Invoice', transaction: true }, { key: 'data_program', label: 'Data Program', transaction: true }, { key: 'form_program', label: 'Form Program', transaction: true }] },

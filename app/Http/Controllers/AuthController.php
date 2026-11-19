@@ -22,7 +22,7 @@ class AuthController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'whatsapp' => ['nullable', 'string', 'max:25'],
-            'role' => ['required', Rule::in(['scm', 'ar', 'telemarketing'])],
+            'role' => ['required', Rule::in(['scm', 'ar', 'telemarketing', 'pajak'])],
             'password' => ['required', ...User::passwordRules(), 'confirmed'],
         ], [
             'email.unique' => 'Email ini sudah terdaftar di sistem.',

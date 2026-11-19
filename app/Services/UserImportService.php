@@ -41,6 +41,8 @@ class UserImportService
         'ar' => 'ar',
         'telemarketing' => 'telemarketing',
         'tele' => 'telemarketing',
+        'pajak' => 'pajak',
+        'tax' => 'pajak',
     ];
 
     /**
