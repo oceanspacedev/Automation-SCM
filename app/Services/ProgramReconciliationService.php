@@ -60,6 +60,274 @@ class ProgramReconciliationService
     }
 
     /**
+     * Map of Indonesian and English month names/abbreviations to month numbers (1..12).
+     */
+    public const MONTH_MAP = [
+        'JANUARI' => 1, 'JANUAR' => 1, 'JANUARY' => 1, 'JAN' => 1,
+        'FEBRUARI' => 2, 'FEBRUAR' => 2, 'FEBRUARY' => 2, 'FEB' => 2,
+        'MARET' => 3, 'MARCH' => 3, 'MAR' => 3,
+        'APRIL' => 4, 'APR' => 4,
+        'MEI' => 5, 'MAY' => 5,
+        'JUNI' => 6, 'JUNE' => 6, 'JUN' => 6,
+        'JULI' => 7, 'JULY' => 7, 'JUL' => 7,
+        'AGUSTUS' => 8, 'AUGUSTUS' => 8, 'AUGUST' => 8, 'AGU' => 8, 'AGT' => 8, 'AUG' => 8,
+        'SEPTEMBER' => 9, 'SEPT' => 9, 'SEP' => 9,
+        'OKTOBER' => 10, 'OCTOBER' => 10, 'OKT' => 10, 'OCT' => 10,
+        'NOVEMBER' => 11, 'NOV' => 11,
+        'DESEMBER' => 12, 'DECEMBER' => 12, 'DES' => 12, 'DEC' => 12,
+    ];
+
+    /**
+     * Extract month numbers (1..12) present in a string.
+     *
+     * @return list<int>
+     */
+    public function extractMonths(?string $str): array
+    {
+        if (empty($str)) {
+            return [];
+        }
+
+        $clean = strtoupper(trim((string) $str));
+        $months = [];
+
+        if (preg_match_all('/\b20[2-3][0-9][\-_\/.](0[1-9]|1[0-2])\b/', $clean, $m)) {
+            foreach ($m[1] as $mon) {
+                $months[] = (int) $mon;
+            }
+        }
+
+        if (preg_match_all('/\b(0[1-9]|1[0-2])[\-_\/.](20[2-3][0-9])\b/', $clean, $m)) {
+            foreach ($m[1] as $mon) {
+                $months[] = (int) $mon;
+            }
+        }
+
+        $cleanTokens = preg_replace('/[^A-Z0-9\s]/', ' ', $clean);
+        $tokens = array_filter(explode(' ', $cleanTokens), fn ($t) => strlen($t) >= 3);
+
+        foreach ($tokens as $token) {
+            if (isset(self::MONTH_MAP[$token])) {
+                $months[] = self::MONTH_MAP[$token];
+            }
+        }
+
+        return array_values(array_unique($months));
+    }
+
+    /**
+     * Extract quarter numbers (1..4) present in a string (e.g. Q1, Q2, KWARTAL 1).
+     *
+     * @return list<int>
+     */
+    public function extractQuarters(?string $str): array
+    {
+        if (empty($str)) {
+            return [];
+        }
+
+        $clean = strtoupper(trim((string) $str));
+        $quarters = [];
+
+        if (preg_match_all('/\bQ([1-4])\b/', $clean, $m)) {
+            foreach ($m[1] as $q) {
+                $quarters[] = (int) $q;
+            }
+        }
+
+        if (preg_match_all('/\b(?:KWARTAL|QUARTER)\s*([1-4])\b/', $clean, $m)) {
+            foreach ($m[1] as $q) {
+                $quarters[] = (int) $q;
+            }
+        }
+
+        return array_values(array_unique($quarters));
+    }
+
+    /**
+     * Extract 4-digit years (e.g. 2024, 2025, 2026) present in a string.
+     *
+     * @return list<int>
+     */
+    public function extractYears(?string $str): array
+    {
+        if (empty($str)) {
+            return [];
+        }
+
+        preg_match_all('/\b(20[2-3][0-9])\b/', (string) $str, $matches);
+        if (empty($matches[1])) {
+            return [];
+        }
+
+        $years = array_map('intval', $matches[1]);
+
+        return array_values(array_unique($years));
+    }
+
+    /**
+     * Extract core program identifier tokens, removing generic structural words,
+     * detected month names, and year numbers.
+     *
+     * @return list<string>
+     */
+    public function extractCoreProgramTokens(?string $str): array
+    {
+        if (empty($str)) {
+            return [];
+        }
+
+        $clean = strtoupper(trim((string) $str));
+        $clean = preg_replace('/[^A-Z0-9\s]/', ' ', $clean);
+        $tokens = array_filter(explode(' ', $clean), fn ($t) => strlen($t) >= 1);
+
+        $fillerWords = [
+            'PROGRAM', 'PERIODE', 'PERIOD', 'BULAN', 'MONTH', 'TAHUN', 'YEAR', 'DATE', 'TANGGAL',
+        ];
+
+        $core = [];
+        foreach ($tokens as $t) {
+            if (in_array($t, $fillerWords, true)) {
+                continue;
+            }
+            if (isset(self::MONTH_MAP[$t])) {
+                continue;
+            }
+            if (preg_match('/^20[2-3][0-9]$/', $t)) {
+                continue;
+            }
+            if (preg_match('/^Q[1-4]$/', $t)) {
+                continue;
+            }
+            if (is_numeric($t) && strlen($t) <= 2) {
+                continue;
+            }
+            $core[] = $t;
+        }
+
+        return array_values($core);
+    }
+
+    /**
+     * Check if a Form Program submission's program matches a DataProgram's program.
+     * Strictly verifies:
+     * 1. Exact normalized match.
+     * 2. Months / Periods: If both have month(s) specified, they MUST overlap (e.g. JUNI vs AGUSTUS will strictly return false).
+     * 3. Quarters: If both have quarter(s) specified, they MUST overlap (e.g. Q2 vs Q3 will strictly return false).
+     * 4. Years: If both have year(s) specified, they MUST overlap (e.g. 2025 vs 2026 will strictly return false).
+     * 5. Core Program Tokens: Core program identifier (e.g. DSA, CASHBACK, 351, PRICE PROTECTION) MUST match.
+     */
+    public function isProgramMatch(
+        ?string $subProg,
+        ?string $dpProgName,
+        ?string $dpPeriode = null,
+        ?string $dpProgram = null
+    ): bool {
+        $normSub = $this->normalizeProgramName($subProg);
+        $normDpName = $this->normalizeProgramName($dpProgName);
+        $normDpProg = $this->normalizeProgramName($dpProgram);
+
+        // If submission has no program name, we cannot verify match
+        if (empty($normSub)) {
+            return false;
+        }
+
+        // If DataProgram has neither program_name nor program, we cannot verify match
+        if (empty($normDpName) && empty($normDpProg)) {
+            return false;
+        }
+
+        // 1. Direct exact match with program_name or program
+        if ($normSub === $normDpName || (! empty($normDpProg) && $normSub === $normDpProg)) {
+            return true;
+        }
+
+        // 2. Strict Month Check
+        $subMonths = $this->extractMonths($normSub);
+        $dpMonths = array_values(array_unique([
+            ...$this->extractMonths($dpProgName),
+            ...$this->extractMonths($dpPeriode),
+            ...$this->extractMonths($dpProgram),
+        ]));
+
+        if (! empty($subMonths) && ! empty($dpMonths)) {
+            $sharedMonths = array_intersect($subMonths, $dpMonths);
+            if (empty($sharedMonths)) {
+                // Different months (e.g. JUNI vs AGUSTUS) - strictly NOT a match!
+                return false;
+            }
+        }
+
+        // 3. Strict Quarter Check
+        $subQuarters = $this->extractQuarters($normSub);
+        $dpQuarters = array_values(array_unique([
+            ...$this->extractQuarters($dpProgName),
+            ...$this->extractQuarters($dpPeriode),
+            ...$this->extractQuarters($dpProgram),
+        ]));
+
+        if (! empty($subQuarters) && ! empty($dpQuarters)) {
+            $sharedQuarters = array_intersect($subQuarters, $dpQuarters);
+            if (empty($sharedQuarters)) {
+                return false;
+            }
+        }
+
+        // 4. Strict Year Check
+        $subYears = $this->extractYears($normSub);
+        $dpYears = array_values(array_unique([
+            ...$this->extractYears($dpProgName),
+            ...$this->extractYears($dpPeriode),
+            ...$this->extractYears($dpProgram),
+        ]));
+
+        if (! empty($subYears) && ! empty($dpYears)) {
+            $sharedYears = array_intersect($subYears, $dpYears);
+            if (empty($sharedYears)) {
+                return false;
+            }
+        }
+
+        // 5. Core Program Tokens Check
+        $subCore = $this->extractCoreProgramTokens($normSub);
+        $dpNameCore = $this->extractCoreProgramTokens($dpProgName);
+        $dpProgCore = $this->extractCoreProgramTokens($dpProgram);
+
+        // If neither side has core tokens (e.g. only years/months), require month/year match
+        if (empty($subCore) && empty($dpNameCore) && empty($dpProgCore)) {
+            return ! empty($subMonths) || ! empty($subYears);
+        }
+
+        $matchesCore = function (array $tokensA, array $tokensB): bool {
+            if (empty($tokensA) || empty($tokensB)) {
+                return false;
+            }
+            if ($tokensA === $tokensB) {
+                return true;
+            }
+            $strA = implode(' ', $tokensA);
+            $strB = implode(' ', $tokensB);
+            if ($strA === $strB || str_contains($strA, $strB) || str_contains($strB, $strA)) {
+                return true;
+            }
+            $overlap = array_intersect($tokensA, $tokensB);
+            $minCount = min(count($tokensA), count($tokensB));
+
+            return count($overlap) >= 1 && (count($overlap) / $minCount >= 0.5);
+        };
+
+        if ($matchesCore($subCore, $dpNameCore)) {
+            return true;
+        }
+
+        if (! empty($dpProgCore) && $matchesCore($subCore, $dpProgCore)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Check if a URL is a valid Google Drive or HTTP link.
      */
     public function isValidUrl(?string $url): bool
@@ -377,59 +645,17 @@ class ProgramReconciliationService
         }
 
         // 4. Strict Program Name Check: Program name MUST match.
-        $dpProgNorm = $this->normalizeProgramName($dataProgram->program_name);
-        $subProgNorm = $this->normalizeProgramName($sub->program_name);
+        // Different programs or different periods (e.g. JUNI vs AGUSTUS) are strictly disqualified!
+        if (! $this->isProgramMatch($sub->program_name, $dataProgram->program_name, $dataProgram->periode, $dataProgram->program)) {
+            return null;
+        }
 
-        if (! empty($dpProgNorm) && ! empty($subProgNorm)) {
-            $progMatched = false;
-            if ($dpProgNorm === $subProgNorm) {
-                $score += 40;
-                $progMatched = true;
-            } elseif (str_contains($subProgNorm, $dpProgNorm) || str_contains($dpProgNorm, $subProgNorm)) {
-                $score += 25;
-                $progMatched = true;
-            } else {
-                $noise = [
-                    'PROGRAM', 'PERIODE', 'BULAN', 'SERIES', 'TAHUN', 'YEAR', 'DATE',
-                    'PRICE', 'PROTECTION', 'SELL', 'OUT', 'CASHBACK', 'COMMISSION', 'ALL', 'TYPE',
-                    'JANUARI', 'FEBRUARI', 'MARET', 'APRIL', 'MEI', 'JUNI', 'JULI', 'AGUSTUS',
-                    'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DESEMBER',
-                    'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC',
-                ];
-                $filterDistinctive = function ($norm) use ($noise) {
-                    $tokens = explode(' ', $norm);
-
-                    return array_values(array_filter($tokens, function ($t) use ($noise) {
-                        if (strlen($t) < 2) {
-                            return false;
-                        }
-                        if (in_array($t, $noise, true)) {
-                            return false;
-                        }
-                        if (preg_match('/^202[0-9]$/', $t)) {
-                            return false;
-                        }
-
-                        return true;
-                    }));
-                };
-
-                $t1 = $filterDistinctive($dpProgNorm);
-                $t2 = $filterDistinctive($subProgNorm);
-
-                $overlap = array_intersect($t1, $t2);
-                if (! empty($t1) && ! empty($t2)) {
-                    $minCount = min(count($t1), count($t2));
-                    if (count($overlap) >= 1 && (count($overlap) / $minCount >= 0.5)) {
-                        $score += min(25, count($overlap) * 10);
-                        $progMatched = true;
-                    }
-                }
-            }
-
-            if (! $progMatched) {
-                return null;
-            }
+        $normSub = $this->normalizeProgramName($sub->program_name);
+        $normDp = $this->normalizeProgramName($dataProgram->program_name);
+        if ($normSub === $normDp) {
+            $score += 40;
+        } else {
+            $score += 25;
         }
 
         // 5. Financial Amount Match (Net Pay or DPP)
@@ -619,7 +845,40 @@ class ProgramReconciliationService
             $submission = $this->findMatchingSubmission($dataProgram, $preloadedSubmissions);
         }
 
+        // Strictly verify that the submission's program matches the DataProgram's program
+        if ($submission && ! $this->isProgramMatch($submission->program_name, $dataProgram->program_name, $dataProgram->periode, $dataProgram->program)) {
+            $submission = null;
+        }
+
         if (! $submission) {
+            $hadOldMatch = str_contains((string) $dataProgram->match_note, 'MATCH Test Program')
+                || str_contains((string) $dataProgram->match_note, 'SELISIH Test Program');
+
+            if ($force || $hadOldMatch) {
+                if ($dataProgram->status_potong_purchase === 'BISA DI POTONG' || $hadOldMatch) {
+                    $dataProgram->status_potong_purchase = 'BELUM BISA POTONG';
+                }
+                $dataProgram->cek_dokumen = 'BELUM MATCH TEST';
+                $dataProgram->match_note = 'Belum ditemukan data matching di Test Program.';
+
+                // Reset foreign drive documents that belong to a submission of a different program
+                foreach (['cn', 'agrement', 'cek_fp'] as $col) {
+                    $url = trim((string) $dataProgram->{$col});
+                    if ($url !== '' && $url !== '-') {
+                        $isForeign = ProgramSubmission::withoutGlobalScopes()
+                            ->where(fn ($q) => $q->where('credit_note_url', $url)->orWhere('agreement_url', $url)->orWhere('tax_invoice_url', $url))
+                            ->get()
+                            ->contains(fn ($ps) => ! $this->isProgramMatch($ps->program_name, $dataProgram->program_name, $dataProgram->periode, $dataProgram->program));
+
+                        if ($isForeign) {
+                            $dataProgram->{$col} = null;
+                        }
+                    }
+                }
+
+                $dataProgram->save();
+            }
+
             $log = ProgramReconciliationLog::create([
                 'batch_id' => $batchId,
                 'data_program_id' => $dataProgram->id,
