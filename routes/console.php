@@ -63,6 +63,13 @@ Schedule::command('program:notify-telemarketing')
     ->withoutOverlapping()
     ->runInBackground();
 
+// WhatsApp pengingat ke telemarketing untuk invoice yang belum di-upload ke Form Program; jamnya diatur di Master → Jadwal Otomatis.
+Schedule::command('invoices:remind-telemarketing-upload')
+    ->everyMinute()
+    ->when(fn () => AutomationSchedule::isDueNow(AutomationSchedule::INVOICE_REMIND_UPLOAD))
+    ->withoutOverlapping()
+    ->runInBackground();
+
 Artisan::command('program:refresh-completeness', function () {
     $this->info('Memperbarui status kelengkapan dokumen Non-PKP...');
     $reconciler = app(ProgramReconciliationService::class);

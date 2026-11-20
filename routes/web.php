@@ -195,6 +195,8 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         Route::post('/invoices/{id}/send', [InvoiceController::class, 'sendEmail']);
         Route::post('/invoices/{id}/send-email', [InvoiceController::class, 'sendEmail']);
         Route::post('/invoices/{id}/quick-send-email', [InvoiceController::class, 'quickSendEmail']);
+        Route::post('/invoices/remind-upload-batch', [InvoiceController::class, 'remindUploadBatch']);
+        Route::post('/invoices/{id}/remind-upload', [InvoiceController::class, 'remindUpload']);
         Route::get('/email-logs', [InvoiceController::class, 'emailLogs']);
         Route::get('/whatsapp-logs', [InvoiceController::class, 'whatsAppLogs']);
 

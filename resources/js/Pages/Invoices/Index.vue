@@ -15,15 +15,46 @@
         <!-- Layar kecil: badge Google turun ke baris berikutnya bila tidak muat -->
         <div class="flex flex-wrap md:flex-nowrap items-center gap-x-2.5 gap-y-1">
           <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Invoices</h1>
-          <!-- Google Connection Status Badge -->
-          <span
-            v-if="googleStatus.is_connected"
-            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-normal bg-gray-50 text-gray-600 border border-gray-200 max-w-full"
-            :title="`Terhubung dengan akun Google: ${googleStatus.account_email}`"
-          >
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-            <span class="truncate">Gmail: {{ googleStatus.account_email }}</span>
-          </span>
+          <!-- Google Connection Status Badge with Action Popover -->
+          <Popover v-if="googleStatus.is_connected">
+            <PopoverTrigger as-child>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-normal bg-gray-50 hover:bg-gray-100 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-300 border border-gray-200 dark:border-slate-700 transition cursor-pointer max-w-full"
+                title="Klik untuk opsi akun Google / Gmail"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                <span class="truncate">Gmail: {{ googleStatus.account_email }}</span>
+                <ChevronDownIcon class="w-3 h-3 text-gray-400 shrink-0" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" class="w-64 p-3 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl text-xs space-y-2.5">
+              <div>
+                <p class="font-medium text-gray-900 dark:text-white">Akun Gmail Terhubung</p>
+                <p class="text-gray-500 dark:text-slate-400 text-[11px] truncate mt-0.5">{{ googleStatus.account_email }}</p>
+              </div>
+              <div class="pt-2 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                <a
+                  v-if="canEdit"
+                  href="/auth/google/redirect"
+                  class="px-2.5 py-1 text-[11px] font-medium text-gray-700 dark:text-slate-200 bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-md transition cursor-pointer border border-gray-200 dark:border-slate-700"
+                  title="Ganti akun Google Workspace"
+                >
+                  Ganti Akun
+                </a>
+                <button
+                  v-if="canEdit"
+                  type="button"
+                  @click="disconnectGoogle"
+                  :disabled="disconnectingGoogle"
+                  class="px-2.5 py-1 text-[11px] font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-md transition cursor-pointer disabled:opacity-50"
+                  title="Putuskan / Logout akun Gmail ini"
+                >
+                  {{ disconnectingGoogle ? 'Memproses...' : 'Logout Gmail' }}
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
           <a
             v-else-if="canEdit"
             href="/auth/google/redirect"
@@ -47,7 +78,7 @@
             :class="headerDangerButtonClass"
             :title="`Hapus ${selectedIds.length} invoice terpilih`"
           >
-            <Trash2Icon class="w-3.5 h-3.5 mr-1 text-rose-600" />
+            <Trash2Icon class="w-3.5 h-3.5 mr-1 text-rose-600 dark:text-rose-300 shrink-0" />
             <span class="sm:hidden">{{ deletingBatch ? 'Menghapus...' : `Hapus (${selectedIds.length})` }}</span>
             <span class="hidden sm:inline">{{ deletingBatch ? 'Menghapus...' : `Hapus (${selectedIds.length}) Terpilih` }}</span>
           </button>
@@ -61,6 +92,30 @@
           >
             <span class="sm:hidden">{{ sendingBatch ? 'Mengirim...' : `Kirim (${unsentSelectedCount})` }}</span>
             <span class="hidden sm:inline">{{ sendingBatch ? 'Mengirim...' : `Kirim (${unsentSelectedCount}) Terpilih` }}</span>
+          </button>
+
+          <button
+            v-if="canEdit && hasSentSelected"
+            @click="askResendBatch"
+            :disabled="sendingBatch || deletingBatch"
+            :class="headerButtonClass"
+            :title="`Kirim ulang ${sentSelectedCount} invoice terpilih ke Email & WhatsApp (tanpa masuk ke Data Program lagi)`"
+          >
+            <RotateCcwIcon class="w-3.5 h-3.5 mr-1 text-amber-600" />
+            <span class="sm:hidden">{{ sendingBatch ? 'Mengirim Ulang...' : `Kirim Ulang (${sentSelectedCount})` }}</span>
+            <span class="hidden sm:inline">{{ sendingBatch ? 'Mengirim Ulang...' : `Kirim Ulang (${sentSelectedCount}) Terpilih` }}</span>
+          </button>
+
+          <button
+            v-if="canEdit && unuploadedSelectedCount > 0"
+            @click="askRemindUploadBatch"
+            :disabled="remindingBatch"
+            :class="headerButtonClass"
+            :title="`Kirim WhatsApp ke telemarketing mengingatkan untuk upload dokumen ${unuploadedSelectedCount} invoice terpilih ke Form Program`"
+          >
+            <BellIcon class="w-3.5 h-3.5 mr-1 text-gray-600" />
+            <span class="sm:hidden">{{ remindingBatch ? 'Mengingatkan...' : `Ingatkan Upload (${unuploadedSelectedCount})` }}</span>
+            <span class="hidden sm:inline">{{ remindingBatch ? 'Mengingatkan...' : `Ingatkan Upload (${unuploadedSelectedCount})` }}</span>
           </button>
 
           <button
@@ -109,14 +164,51 @@
     <div class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
       <!-- Toolbar (Search & Filter like Filament) -->
       <div class="p-3 sm:px-4 sm:py-3.5 border-b border-gray-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <!-- Left: Quick Selection Info; teks keterangan disembunyikan di layar kecil -->
-        <div class="flex items-center gap-2 text-xs" :class="selectedIds.length === 0 && 'hidden sm:flex'">
+        <!-- Left: Quick Selection Info / Upload Status Quick Filters -->
+        <div class="flex items-center gap-2 text-xs">
           <span v-if="selectedIds.length > 0" class="font-medium text-gray-900 bg-gray-100 px-2.5 py-1 rounded-md">
             {{ selectedIds.length }} invoice terpilih
           </span>
-          <span v-else class="text-gray-400 text-xs">
-            Daftar invoice resmi diterbitkan
-          </span>
+          <div v-else class="flex items-center gap-1.5 overflow-x-auto">
+            <button
+              type="button"
+              @click="setUploadFilter('')"
+              :class="[
+                'h-8 px-3 rounded-lg text-xs font-medium transition cursor-pointer select-none whitespace-nowrap bg-white border',
+                !filters.upload_status
+                  ? 'border-gray-900 text-gray-950 font-semibold shadow-2xs'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              ]"
+            >
+              Semua
+            </button>
+            <button
+              type="button"
+              @click="setUploadFilter('unuploaded')"
+              :class="[
+                'h-8 px-3 rounded-lg text-xs font-medium transition cursor-pointer select-none whitespace-nowrap bg-white border',
+                filters.upload_status === 'unuploaded'
+                  ? 'border-gray-900 text-gray-950 font-semibold shadow-2xs'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              ]"
+              title="Tampilkan invoice yang belum di-upload ke Form Program"
+            >
+              Belum Upload
+            </button>
+            <button
+              type="button"
+              @click="setUploadFilter('uploaded')"
+              :class="[
+                'h-8 px-3 rounded-lg text-xs font-medium transition cursor-pointer select-none whitespace-nowrap bg-white border',
+                filters.upload_status === 'uploaded'
+                  ? 'border-gray-900 text-gray-950 font-semibold shadow-2xs'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              ]"
+              title="Tampilkan invoice yang sudah di-upload ke Form Program"
+            >
+              Sudah Upload
+            </button>
+          </div>
         </div>
 
         <!-- Right: Search Box & Filter Popover -->
@@ -167,6 +259,20 @@
                 >
                   Reset
                 </button>
+              </div>
+
+              <!-- Status Upload Form Filter -->
+              <div class="space-y-1">
+                <label class="text-[11px] font-medium text-gray-700">Status Upload Form</label>
+                <select
+                  v-model="filters.upload_status"
+                  @change="fetchInvoices(1)"
+                  class="w-full h-8 px-2.5 text-xs rounded-lg border border-gray-300 bg-white text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-950 cursor-pointer"
+                >
+                  <option value="">Semua</option>
+                  <option value="unuploaded">Belum Upload</option>
+                  <option value="uploaded">Sudah Upload (Form Uploaded)</option>
+                </select>
               </div>
 
               <!-- Tipe Filter -->
@@ -260,13 +366,34 @@
                 <p class="text-gray-500 truncate">{{ inv.customer_name || '-' }}</p>
 
                 <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-                  <span class="inline-flex items-center gap-1.5 text-gray-900">
+                  <div class="inline-flex items-center gap-1.5 text-xs">
+                    <span class="inline-flex items-center gap-1.5 text-gray-900 font-medium">
+                      <span
+                        class="w-1.5 h-1.5 rounded-full"
+                        :class="inv.status === 'sent' ? 'bg-emerald-500' : (inv.status === 'paid' ? 'bg-blue-500' : (inv.status === 'cancelled' ? 'bg-rose-500' : 'bg-gray-400'))"
+                      ></span>
+                      {{ inv.status === 'sent' ? 'DELIVERED' : (inv.status ? inv.status.toUpperCase() : 'GENERATED') }}
+                    </span>
+                    <span class="text-gray-300">·</span>
+                    <button
+                      v-if="!inv.is_uploaded_to_form && canEdit"
+                      type="button"
+                      @click="askRemindUploadSingle(inv)"
+                      class="inline-flex items-center gap-1 text-[11px] text-amber-700 hover:text-amber-900 font-medium cursor-pointer underline"
+                      title="Dokumen belum di-upload ke Form. Klik untuk ingatkan WA ke Telemarketing."
+                    >
+                      <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                      Belum Upload
+                    </button>
                     <span
-                      class="w-1.5 h-1.5 rounded-full"
-                      :class="inv.status === 'sent' ? 'bg-emerald-500' : (inv.status === 'paid' ? 'bg-blue-500' : (inv.status === 'cancelled' ? 'bg-rose-500' : 'bg-gray-400'))"
-                    ></span>
-                    {{ inv.status === 'sent' ? 'DELIVERED' : (inv.status ? inv.status.toUpperCase() : 'GENERATED') }}
-                  </span>
+                      v-else
+                      class="inline-flex items-center gap-1 text-[11px] font-medium"
+                      :class="inv.is_uploaded_to_form ? 'text-emerald-700' : 'text-gray-500'"
+                    >
+                      <span class="w-1.5 h-1.5 rounded-full" :class="inv.is_uploaded_to_form ? 'bg-emerald-500' : 'bg-gray-300'"></span>
+                      {{ inv.is_uploaded_to_form ? 'Form Uploaded' : 'Belum Upload' }}
+                    </span>
+                  </div>
                   <div class="flex items-center gap-1.5 shrink-0">
                     <router-link
                       :to="`/invoices/${inv.id}`"
@@ -283,9 +410,17 @@
                     </a>
                     <span
                       v-if="isAlreadySent(inv)"
-                      class="h-8 px-2.5 inline-flex items-center rounded-lg border border-gray-200 bg-gray-50 text-gray-400 font-medium select-none"
+                      class="inline-flex items-center gap-1.5"
                     >
-                      Terkirim
+                      <button
+                        v-if="canEdit"
+                        type="button"
+                        @click="openEmailModal(inv)"
+                        class="h-8 px-2.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100 font-medium cursor-pointer"
+                        title="Kirim ulang notifikasi invoice (Email/WhatsApp)"
+                      >
+                        Kirim Ulang
+                      </button>
                     </span>
                     <button
                       v-else-if="canEdit"
@@ -299,7 +434,7 @@
                       v-if="canDelete"
                       type="button"
                       @click.stop="deleteRecord(inv)"
-                      class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer"
+                      class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 dark:text-rose-300 font-medium cursor-pointer"
                       title="Hapus invoice ini"
                     >
                       Hapus
@@ -424,20 +559,41 @@
 
               <!-- Status -->
               <td class="py-2.5 px-3 text-center border-r border-gray-100 whitespace-nowrap">
-                <span
-                  :class="[
-                    'inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border',
-                    inv.status === 'sent'
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      : (inv.status === 'paid'
-                        ? 'bg-blue-50 text-blue-700 border-blue-200'
-                        : (inv.status === 'cancelled'
-                          ? 'bg-rose-50 text-rose-700 border-rose-200'
-                          : 'bg-gray-100 text-gray-700 border-gray-200'))
-                  ]"
-                >
-                  {{ inv.status === 'sent' ? 'DELIVERED' : (inv.status ? inv.status.toUpperCase() : 'GENERATED') }}
-                </span>
+                <div class="inline-flex flex-col items-center gap-0.5">
+                  <span
+                    :class="[
+                      'inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium border',
+                      inv.status === 'sent'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                        : (inv.status === 'paid'
+                          ? 'bg-blue-50 text-blue-700 border-blue-200'
+                          : (inv.status === 'cancelled'
+                            ? 'bg-rose-50 text-rose-700 border-rose-200'
+                            : 'bg-gray-100 text-gray-700 border-gray-200'))
+                    ]"
+                  >
+                    {{ inv.status === 'sent' ? 'DELIVERED' : (inv.status ? inv.status.toUpperCase() : 'GENERATED') }}
+                  </span>
+                  <button
+                    v-if="!inv.is_uploaded_to_form && canEdit"
+                    type="button"
+                    @click.stop="askRemindUploadSingle(inv)"
+                    class="inline-flex items-center gap-1 text-[10px] text-amber-700 hover:text-amber-900 font-medium cursor-pointer transition select-none hover:underline"
+                    title="Dokumen belum di-upload ke Form Program. Klik untuk kirim pengingat WhatsApp ke Telemarketing."
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0"></span>
+                    <span>Belum Upload</span>
+                  </button>
+                  <span
+                    v-else
+                    class="inline-flex items-center gap-1 text-[10px] font-medium select-none"
+                    :class="inv.is_uploaded_to_form ? 'text-emerald-700' : 'text-gray-400'"
+                    :title="inv.is_uploaded_to_form ? 'Dokumen sudah di-upload ke Form Program' : 'Dokumen belum di-upload ke Form Program'"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="inv.is_uploaded_to_form ? 'bg-emerald-500' : 'bg-gray-300'"></span>
+                    <span>{{ inv.is_uploaded_to_form ? 'Form Uploaded' : 'Belum Upload' }}</span>
+                  </span>
+                </div>
               </td>
 
               <!-- Tanggal -->
@@ -472,22 +628,16 @@
                     <FileTextIcon class="w-3.5 h-3.5 text-gray-600" />
                   </a>
 
-                  <!-- 3. Kirim / Sent Action -->
-                  <span
-                    v-if="isAlreadySent(inv)"
-                    class="h-7 w-7.5 inline-flex items-center justify-center bg-gray-50 text-gray-400 select-none"
-                    title="Invoice ini sudah terkirim"
-                  >
-                    <CheckCircleIcon class="w-3.5 h-3.5 text-gray-400" />
-                  </span>
+                  <!-- 3. Kirim / Kirim Ulang Action -->
                   <button
-                    v-else-if="canEdit"
+                    v-if="canEdit"
                     type="button"
                     @click="openEmailModal(inv)"
                     class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
-                    title="Kirim Invoice via Email/WhatsApp"
+                    :title="isAlreadySent(inv) ? 'Kirim Ulang Invoice via Email/WhatsApp' : 'Kirim Invoice via Email/WhatsApp'"
                   >
-                    <SendIcon class="w-3.5 h-3.5 text-gray-600" />
+                    <RotateCcwIcon v-if="isAlreadySent(inv)" class="w-3.5 h-3.5 text-amber-600" />
+                    <SendIcon v-else class="w-3.5 h-3.5 text-gray-600" />
                   </button>
 
                   <!-- 4. Hapus Button (Paling Kanan) -->
@@ -495,7 +645,7 @@
                     v-if="canDelete"
                     type="button"
                     @click.stop="deleteRecord(inv)"
-                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-red-600 hover:bg-red-50 transition cursor-pointer"
+                    class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-rose-300 hover:bg-red-50 dark:hover:bg-rose-950/50 transition cursor-pointer"
                     title="Hapus Invoice Ini"
                   >
                     <Trash2Icon class="w-3.5 h-3.5" />
@@ -540,6 +690,7 @@
       :customer-name="selectedInvoice?.customer_name"
       :default-email="selectedInvoice?.email || selectedInvoice?.draft?.email"
       :default-whatsapp="selectedInvoice?.whatsapp || selectedInvoice?.draft?.whatsapp"
+      :is-resend="selectedInvoice ? isAlreadySent(selectedInvoice) : false"
       @sent="onEmailSent"
     />
 
@@ -592,6 +743,9 @@ import {
   Search as SearchIcon,
   Filter as FilterIcon,
   Trash2 as Trash2Icon,
+  RotateCcw as RotateCcwIcon,
+  Bell as BellIcon,
+  Check as CheckIcon,
 } from '@lucide/vue';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Calendar } from '@/components/ui/calendar';
@@ -607,7 +761,7 @@ import FilamentPagination from '@/components/ui/FilamentPagination.vue';
 
 // Tombol header: tanpa ikon, satu gaya untuk semua aksi
 const headerButtonClass = 'h-9 px-2 sm:px-3.5 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs disabled:opacity-50 transition cursor-pointer whitespace-nowrap';
-const headerDangerButtonClass = 'h-9 px-2 sm:px-3.5 inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-xs font-medium text-rose-700 shadow-2xs disabled:opacity-50 transition cursor-pointer whitespace-nowrap';
+const headerDangerButtonClass = 'h-9 px-2 sm:px-3.5 inline-flex items-center justify-center rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-xs font-medium text-rose-700 dark:bg-rose-950/40 dark:border-rose-800/80 dark:text-rose-300 dark:hover:bg-rose-900/60 dark:hover:text-rose-100 shadow-2xs disabled:opacity-50 transition cursor-pointer whitespace-nowrap';
 
 const { area } = useArea();
 const { brand } = useBrands();
@@ -646,6 +800,7 @@ const selectedInvoice = ref(null);
 const sendingId = ref(null);
 const sendingAll = ref(false);
 const sendingBatch = ref(false);
+const remindingBatch = ref(false);
 const deletingBatch = ref(false);
 const selectedIds = ref([]);
 const alertMessage = ref(null);
@@ -697,6 +852,20 @@ const fetchGoogleStatus = async () => {
   }
 };
 
+const disconnectingGoogle = ref(false);
+const disconnectGoogle = async () => {
+  if (!confirm('Putuskan koneksi akun Google / Gmail ini?')) return;
+  disconnectingGoogle.value = true;
+  try {
+    await axios.post('/api/google/disconnect');
+    await fetchGoogleStatus();
+  } catch (err) {
+    alert(err.response?.data?.message || 'Gagal memutuskan koneksi Google.');
+  } finally {
+    disconnectingGoogle.value = false;
+  }
+};
+
 const confirmState = reactive({
   show: false,
   title: '',
@@ -732,6 +901,17 @@ const unsentSelectedInvoices = computed(() => {
 
 const unsentSelectedCount = computed(() => unsentSelectedInvoices.value.length);
 const hasUnsentSelected = computed(() => unsentSelectedCount.value > 0);
+
+const sentSelectedInvoices = computed(() => {
+  return invoices.value.filter(inv => selectedIds.value.includes(inv.id) && isAlreadySent(inv));
+});
+const sentSelectedCount = computed(() => sentSelectedInvoices.value.length);
+const hasSentSelected = computed(() => sentSelectedCount.value > 0);
+
+const unuploadedSelectedInvoices = computed(() => {
+  return invoices.value.filter(inv => selectedIds.value.includes(inv.id) && !inv.is_uploaded_to_form);
+});
+const unuploadedSelectedCount = computed(() => unuploadedSelectedInvoices.value.length);
 
 const isAllSelected = computed(() => {
   return selectableInvoices.value.length > 0 &&
@@ -796,7 +976,7 @@ const executeDeleteBatch = async () => {
 };
 
 const openEmailModal = (inv) => {
-  if (!canEdit.value || isAlreadySent(inv)) return;
+  if (!canEdit.value) return;
   selectedInvoice.value = inv;
   showEmailModal.value = true;
 };
@@ -902,6 +1082,104 @@ const executeSendBatch = async () => {
   }
 };
 
+const askResendBatch = () => {
+  if (!canEdit.value || sentSelectedCount.value === 0 || sendingBatch.value) return;
+  confirmState.title = 'Kirim Ulang Batch Notifikasi (Email & WA)';
+  confirmState.message = `Kirim ulang notifikasi untuk ${sentSelectedCount.value} invoice terpilih ke Email & WhatsApp? Pengiriman ulang ini tidak akan memasukkan data baru ke Data Program.`;
+  confirmState.confirmText = `Ya, Kirim Ulang (${sentSelectedCount.value}) Invoice`;
+  confirmState.variant = 'default';
+  confirmState.icon = 'mail';
+  confirmState.showSenderSelect = true;
+  confirmState.action = async () => {
+    confirmState.loading = true;
+    try {
+      await executeResendBatch();
+      confirmState.show = false;
+    } finally {
+      confirmState.loading = false;
+    }
+  };
+  confirmState.show = true;
+};
+
+const executeResendBatch = async () => {
+  if (!canEdit.value) return;
+  sendingBatch.value = true;
+  alertMessage.value = null;
+
+  try {
+    const res = await axios.post('/api/invoices/send-batch', {
+      ids: sentSelectedInvoices.value.map(i => i.id),
+      sender_id: batchSenderId.value,
+      resend: true,
+    });
+    alertSuccess.value = true;
+    alertMessage.value = res.data.message;
+    selectedIds.value = [];
+    fetchInvoices(pagination.current_page);
+  } catch (err) {
+    alertSuccess.value = false;
+    alertMessage.value = err.response?.data?.message || 'Gagal memproses pengiriman ulang batch.';
+  } finally {
+    sendingBatch.value = false;
+  }
+};
+
+const askRemindUploadSingle = (inv) => {
+  if (!canEdit.value) return;
+  confirmState.title = 'Ingatkan Upload Dokumen';
+  confirmState.message = `Kirim pesan WhatsApp ke Telemarketing untuk mengingatkan upload invoice & credit note ${inv.invoice_number} (${inv.dealer_name}) ke Google Form / Form Program?`;
+  confirmState.confirmText = 'Ya, Kirim Pengingat WA';
+  confirmState.variant = 'default';
+  confirmState.icon = 'mail';
+  confirmState.showSenderSelect = false;
+  confirmState.action = async () => {
+    confirmState.loading = true;
+    try {
+      const res = await axios.post(`/api/invoices/${inv.id}/remind-upload`);
+      alertSuccess.value = true;
+      alertMessage.value = res.data.message || 'Pengingat upload berhasil dikirim ke Telemarketing.';
+      confirmState.show = false;
+    } catch (err) {
+      alertSuccess.value = false;
+      alertMessage.value = err.response?.data?.message || 'Gagal mengirim pengingat upload.';
+    } finally {
+      confirmState.loading = false;
+    }
+  };
+  confirmState.show = true;
+};
+
+const askRemindUploadBatch = () => {
+  if (!canEdit.value || unuploadedSelectedCount.value === 0 || remindingBatch.value) return;
+  confirmState.title = 'Ingatkan Upload Dokumen (Batch)';
+  confirmState.message = `Kirim pesan WhatsApp ke masing-masing Telemarketing region untuk mengingatkan upload ${unuploadedSelectedCount.value} invoice terpilih ke Google Form / Form Program? Pesan akan dirangkum per region.`;
+  confirmState.confirmText = `Ya, Ingatkan (${unuploadedSelectedCount.value}) Invoice`;
+  confirmState.variant = 'default';
+  confirmState.icon = 'mail';
+  confirmState.showSenderSelect = false;
+  confirmState.action = async () => {
+    confirmState.loading = true;
+    remindingBatch.value = true;
+    try {
+      const res = await axios.post('/api/invoices/remind-upload-batch', {
+        ids: unuploadedSelectedInvoices.value.map(i => i.id),
+      });
+      alertSuccess.value = true;
+      alertMessage.value = res.data.message || 'Pengingat upload berhasil dikirim ke Telemarketing.';
+      selectedIds.value = [];
+      confirmState.show = false;
+    } catch (err) {
+      alertSuccess.value = false;
+      alertMessage.value = err.response?.data?.message || 'Gagal mengirim pengingat upload massal.';
+    } finally {
+      confirmState.loading = false;
+      remindingBatch.value = false;
+    }
+  };
+  confirmState.show = true;
+};
+
 const askSendAll = () => {
   if (!canEdit.value || sendingAll.value) return;
   confirmState.title = 'Kirim Semua Notifikasi Invoice';
@@ -947,6 +1225,7 @@ const filters = reactive({
   search: '',
   invoice_type: '',
   status: '',
+  upload_status: '',
   date: '',
 });
 
@@ -954,9 +1233,16 @@ const activeFilterCount = computed(() => {
   let count = 0;
   if (filters.invoice_type) count++;
   if (filters.status) count++;
+  if (filters.upload_status) count++;
   if (filters.date) count++;
   return count;
 });
+
+const setUploadFilter = (status) => {
+  if (filters.upload_status === status) return;
+  filters.upload_status = status;
+  fetchInvoices(1);
+};
 
 const selectedCalendarDate = computed(() => {
   if (!filters.date) return undefined;
@@ -1029,6 +1315,7 @@ const resetFilters = () => {
   filters.search = '';
   filters.invoice_type = '';
   filters.status = '';
+  filters.upload_status = '';
   filters.date = '';
   isFilterOpen.value = false;
   fetchInvoices(1);

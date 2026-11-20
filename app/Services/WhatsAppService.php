@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\ArContact;
+use App\Models\Brand;
 use App\Models\DataProgram;
+use App\Models\Dealer;
 use App\Models\Invoice;
 use App\Models\ProgramSubmission;
 use App\Models\TeamContact;
@@ -523,6 +525,134 @@ class WhatsAppService
             '',
             '_Ocean Space - Pesan otomatis sistem SCM Invoice_',
         ]);
+    }
+
+    /**
+     * Build formatted message reminding telemarketing to upload the invoice document to Google Form / Form Program.
+     */
+    public function buildInvoiceUploadReminderMessage(Invoice $invoice, string $uploadUrl): string
+    {
+        $dealerName = $invoice->dealer_name ?: '-';
+        $kodeBt = $invoice->dealer_code ?: ($invoice->draft?->kode_bt ?: '-');
+        $programName = $invoice->program_name ?: '-';
+        $netPayFormatted = 'Rp '.number_format((float) ($invoice->netpay ?? 0), 0, ',', '.');
+        $invoiceNumber = $invoice->invoice_number ?: '-';
+
+        $lines = [
+            '*⚠️ PENGINGAT: DOKUMEN BELUM DI-UPLOAD KE FORM PROGRAM*',
+            '',
+            'Halo Tim Telemarketing / Sales,',
+            "Dokumen klaim/invoice berikut *BELUM DI-UPLOAD* ke Form Program {$invoice->brandName()}:",
+            '',
+            "*No. Invoice:* {$invoiceNumber}",
+            "*Dealer:* {$dealerName} ({$kodeBt})",
+            "*Program:* {$programName}",
+            "*Total Net Pay:* {$netPayFormatted}",
+            '',
+            'Mohon segera pastikan dokumen fisik telah ditandatangani & dicap basah oleh pihak dealer, kemudian unggah dokumennya melalui tautan formulir berikut:',
+            '',
+            '👉 *[ LINK FORM UPLOAD DOKUMEN ]*',
+            $uploadUrl,
+            '',
+            'Terima kasih atas kerja samanya.',
+            '_Ocean Space - Pesan otomatis sistem SCM Invoice_',
+        ];
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Build region batch message reminding telemarketing of invoices whose documents are not yet uploaded.
+     *
+     * @param  Collection<int, Invoice>  $invoices
+     */
+    public function buildRegionUploadReminderMessage(string $region, ?string $telemarketingName, Collection $invoices, string $uploadUrl): string
+    {
+        $first = $invoices->first();
+        $brandName = $first?->brandName() ?? 'Program';
+        $greeting = $telemarketingName ? "Halo {$telemarketingName} (Tim Telemarketing / Sales)," : 'Halo Tim Telemarketing / Sales,';
+        $lines = [
+            '*⚠️ PENGINGAT: DOKUMEN BELUM DI-UPLOAD KE FORM PROGRAM*',
+            '',
+            $greeting,
+            "Berikut daftar invoice Region *{$region}* yang dokumennya *BELUM DI-UPLOAD* ke Form Program {$brandName}:",
+            '',
+        ];
+
+        $shown = $invoices->take(15);
+        foreach ($shown as $index => $invoice) {
+            $rupiah = 'Rp '.number_format((float) ($invoice->netpay ?? 0), 0, ',', '.');
+            $lines[] = ($index + 1).". {$invoice->invoice_number} · {$invoice->dealer_name} · {$rupiah}";
+        }
+        if ($invoices->count() > $shown->count()) {
+            $lines[] = '… dan '.($invoices->count() - $shown->count()).' invoice lainnya.';
+        }
+
+        $lines[] = '';
+        $lines[] = 'Mohon segera pastikan dokumen telah ditandatangani & dicap dealer, lalu unggah dokumen melalui tautan formulir berikut:';
+        $lines[] = '';
+        $lines[] = '👉 *[ LINK FORM UPLOAD DOKUMEN ]*';
+        $lines[] = $uploadUrl;
+        $lines[] = '';
+        $lines[] = 'Terima kasih atas kerja samanya.';
+        $lines[] = '_Ocean Space - Pesan otomatis sistem SCM Invoice_';
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Send upload reminder for a single invoice to telemarketing via WhatsApp.
+     *
+     * @return array{success: bool, message: string, provider_id: ?string}
+     */
+    public function sendInvoiceUploadReminderToTelemarketing(Invoice $invoice, ?string $overridePhone = null): array
+    {
+        $dealer = Dealer::findByIdReal($invoice->draft?->kode_bt, $invoice->dealer_name)
+            ?? Dealer::findByIdReal($invoice->dealer_code ?: $invoice->draft?->dealer_code, $invoice->dealer_name);
+
+        $phone = $overridePhone ?: ($dealer?->telemarketing_phone ?: config('services.wag.telemarketing_phone'));
+        $text = $this->buildInvoiceUploadReminderMessage($invoice, $invoice->documentUploadUrl());
+        $clientRef = "REMIND-UP-INV-{$invoice->id}-".now()->format('His');
+
+        $result = $this->sendTextMessage($phone, $text, $clientRef);
+
+        WhatsAppLog::create([
+            'invoice_id' => $invoice->id,
+            'invoice_number' => $invoice->invoice_number,
+            'recipient_phone' => $this->formatPhone($phone) ?: $phone,
+            'status' => $result['success'] ? 'sent' : 'failed',
+            'provider_message_id' => $result['provider_id'] ?? null,
+            'error_message' => $result['success'] ? null : $result['message'],
+        ]);
+
+        return $result;
+    }
+
+    /**
+     * Send general text message through the WhatsApp gateway.
+     *
+     * @return array{success: bool, message: string, provider_id: ?string}
+     */
+    public function sendTextMessage(string $phone, string $text, string $clientReference): array
+    {
+        $cleanPhone = $this->formatPhone($phone);
+        if (empty($cleanPhone)) {
+            return [
+                'success' => false,
+                'message' => 'Nomor WhatsApp tidak valid atau belum disetel.',
+                'provider_id' => null,
+            ];
+        }
+
+        $res = $this->sendTeamText($cleanPhone, $text, $clientReference);
+
+        return [
+            'success' => $res['success'],
+            'message' => $res['success']
+                ? "Pesan WhatsApp berhasil dikirim ke {$cleanPhone}."
+                : ($res['error'] ?? 'Pengiriman WhatsApp gagal.'),
+            'provider_id' => $res['provider_id'] ?? null,
+        ];
     }
 
     /**
@@ -1326,6 +1456,37 @@ class WhatsAppService
         $salesName = $dp->sales_person ?: '-';
         $cekDokumen = $dp->cek_dokumen ?: 'LENGKAP';
         $netPayFormatted = 'Rp '.number_format((float) ($dp->net_pay ?? 0), 0, ',', '.');
+
+        $isNotUploaded = $dp->status_potong_purchase !== 'BISA DI POTONG' || in_array(strtoupper(trim((string) $dp->cek_dokumen)), ['BELUM MATCH TEST', 'TIDAK LENGKAP', ''], true);
+
+        if ($isNotUploaded) {
+            $uploadUrl = Brand::documentUploadUrl($dp->brand, $dp->areaEnum());
+            $title = $reminderNumber === null
+                ? '*PENGINGAT: DOKUMEN BELUM DI-UPLOAD KE FORM PROGRAM*'
+                : "*PENGINGAT KE-{$reminderNumber}: DOKUMEN BELUM DI-UPLOAD KE FORM PROGRAM*";
+            $intro = 'Halo Tim Telemarketing / Sales, dokumen klaim program berikut *BELUM DI-UPLOAD* ke Google Form / Form Program:';
+
+            return implode("\n", [
+                $title,
+                '',
+                $intro,
+                '',
+                "*Kode BT / ID Real:* {$kodeBt}",
+                "*Dealer:* {$dealerName}",
+                "*Region:* {$region}",
+                "*Program:* {$programName}",
+                "*Sales:* {$salesName}",
+                "*Nominal Klaim (Net Pay):* {$netPayFormatted}",
+                '*Status Dokumen:* '.($dp->cek_dokumen ?: 'BELUM DI-UPLOAD'),
+                '',
+                'Mohon segera pastikan dokumen fisik telah ditandatangani & dicap basah oleh dealer, lalu unggah dokumen melalui tautan formulir berikut:',
+                '',
+                '👉 *[ LINK FORM UPLOAD DOKUMEN ]*',
+                $uploadUrl,
+                '',
+                '_Ocean Space - Pesan otomatis sistem SCM_',
+            ]);
+        }
 
         $intro = match (true) {
             $reminderNumber === null => 'Halo Tim Telemarketing / Sales, dokumen klaim program berikut telah LENGKAP dan SIAP DITAWARKAN POTONG ke dealer saat order:',

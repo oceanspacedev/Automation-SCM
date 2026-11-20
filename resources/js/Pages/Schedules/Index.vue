@@ -20,7 +20,7 @@
     <section
       v-if="!isLoading && (!schedulerAlive || schedulerCheckError)"
       role="status"
-      class="max-w-3xl rounded-xl border border-gray-200 bg-white shadow-xs px-5 sm:px-6 py-4 flex items-start gap-3"
+      class="rounded-xl border border-gray-200 bg-white shadow-xs px-5 sm:px-6 py-4 flex items-start gap-3"
     >
       <AlertTriangleIcon class="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
       <div class="min-w-0 flex-1 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
@@ -40,177 +40,180 @@
       </div>
     </section>
 
-    <section
-      v-for="item in schedules"
-      :key="item.key"
-      class="max-w-3xl rounded-xl border border-gray-200 bg-white shadow-xs"
-    >
-      <!-- Judul & saklar aktif -->
-      <div class="px-5 sm:px-6 py-4 flex items-start justify-between gap-4">
-        <div class="min-w-0">
-          <h2 class="text-sm font-semibold text-gray-950">{{ item.name }}</h2>
-          <p class="mt-0.5 text-xs text-gray-500">{{ item.description }}</p>
+    <!-- Dua Kolom / Dua Layar Form Jadwal Otomatis -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
+      <section
+        v-for="item in schedules"
+        :key="item.key"
+        class="rounded-xl border border-gray-200 bg-white shadow-xs flex flex-col justify-between overflow-hidden"
+      >
+        <!-- Judul & saklar aktif -->
+        <div class="px-5 sm:px-6 py-4 flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <h2 class="text-sm font-semibold text-gray-950">{{ item.name }}</h2>
+            <p class="mt-0.5 text-xs text-gray-500 leading-normal">{{ item.description }}</p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            :aria-checked="forms[item.key].is_active"
+            :aria-label="forms[item.key].is_active ? 'Nonaktifkan jadwal' : 'Aktifkan jadwal'"
+            :disabled="!canEdit"
+            @click="forms[item.key].is_active = !forms[item.key].is_active"
+            class="shrink-0 inline-flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer disabled:cursor-default"
+          >
+            <span :class="[switchTrackClass, forms[item.key].is_active ? 'bg-gray-900 dark:bg-white' : 'bg-gray-300 dark:bg-slate-700']">
+              <span :class="[switchKnobClass, forms[item.key].is_active ? 'translate-x-4' : 'translate-x-0']"></span>
+            </span>
+            {{ forms[item.key].is_active ? 'Aktif' : 'Nonaktif' }}
+          </button>
         </div>
-        <button
-          type="button"
-          role="switch"
-          :aria-checked="forms[item.key].is_active"
-          :aria-label="forms[item.key].is_active ? 'Nonaktifkan jadwal' : 'Aktifkan jadwal'"
-          :disabled="!canEdit"
-          @click="forms[item.key].is_active = !forms[item.key].is_active"
-          class="shrink-0 inline-flex items-center gap-2 text-xs font-medium text-gray-700 cursor-pointer disabled:cursor-default"
-        >
-          <span :class="[switchTrackClass, forms[item.key].is_active ? 'bg-gray-900 dark:bg-white' : 'bg-gray-300 dark:bg-slate-700']">
-            <span :class="[switchKnobClass, forms[item.key].is_active ? 'translate-x-4' : 'translate-x-0']"></span>
-          </span>
-          {{ forms[item.key].is_active ? 'Aktif' : 'Nonaktif' }}
-        </button>
-      </div>
 
-      <!-- Pengaturan: label di kiri, isian di kanan -->
-      <div class="border-t border-gray-100 divide-y divide-gray-100" :class="!forms[item.key].is_active && 'opacity-60'">
-        <div :class="rowClass">
-          <p :class="rowLabelClass">Jadwal</p>
-          <div class="space-y-3 min-w-0">
-            <div class="inline-flex items-center gap-1 p-1 rounded-lg border border-gray-200 bg-gray-50 text-xs">
-              <button
-                v-for="mode in modes"
-                :key="mode.value"
-                type="button"
-                :disabled="!canEdit"
-                @click="forms[item.key].mode = mode.value"
-                :class="[
-                  'h-7 px-3 rounded-md font-medium transition cursor-pointer disabled:cursor-default',
-                  forms[item.key].mode === mode.value ? 'bg-white text-gray-900 shadow-2xs border border-gray-200' : ['text-gray-500', canEdit && 'hover:text-gray-900']
-                ]"
-              >
-                {{ mode.label }}
-              </button>
-            </div>
-
-            <select
-              v-if="forms[item.key].mode === 'interval'"
-              :id="`interval-${item.key}`"
-              v-model.number="forms[item.key].interval_minutes"
-              :disabled="!canEdit"
-              aria-label="Interval"
-              :class="[selectClass, 'w-full sm:w-52 px-3']"
-            >
-              <option v-for="minutes in intervalChoices" :key="minutes" :value="minutes">{{ intervalLabel(minutes) }}</option>
-            </select>
-
-            <div v-else class="flex flex-wrap items-center gap-2">
-              <span
-                v-for="time in forms[item.key].times"
-                :key="time"
-                class="inline-flex items-center gap-1 h-8 pl-3 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-900 tabular-nums"
-                :class="canEdit ? 'pr-1' : 'pr-3'"
-              >
-                {{ time }}
-                <button v-if="canEdit" type="button" @click="removeTime(item.key, time)" class="p-1 text-gray-400 hover:text-gray-700 cursor-pointer" :title="`Hapus jam ${time}`">
-                  <XIcon class="w-3 h-3" />
+        <!-- Pengaturan: label di kiri, isian di kanan -->
+        <div class="border-t border-gray-100 divide-y divide-gray-100 flex-1" :class="!forms[item.key].is_active && 'opacity-60'">
+          <div :class="rowClass">
+            <p :class="rowLabelClass">Jadwal</p>
+            <div class="space-y-3 min-w-0">
+              <div class="inline-flex items-center gap-1 p-1 rounded-lg border border-gray-200 bg-gray-50 text-xs">
+                <button
+                  v-for="mode in modes"
+                  :key="mode.value"
+                  type="button"
+                  :disabled="!canEdit"
+                  @click="forms[item.key].mode = mode.value"
+                  :class="[
+                    'h-7 px-3 rounded-md font-medium transition cursor-pointer disabled:cursor-default',
+                    forms[item.key].mode === mode.value ? 'bg-white text-gray-900 shadow-2xs border border-gray-200' : ['text-gray-500', canEdit && 'hover:text-gray-900']
+                  ]"
+                >
+                  {{ mode.label }}
                 </button>
-              </span>
+              </div>
 
-              <!-- Tambah jam (24 jam) -->
-              <span v-if="canEdit" class="inline-flex items-center gap-1">
-                <select :id="`hour-${item.key}`" v-model="newTimes[item.key].hour" aria-label="Jam" :class="[selectClass, 'w-16 px-2']">
-                  <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
-                </select>
-                <span class="text-xs text-gray-400">:</span>
-                <select :id="`minute-${item.key}`" v-model="newTimes[item.key].minute" aria-label="Menit" :class="[selectClass, 'w-16 px-2']">
-                  <option v-for="m in minutes" :key="m" :value="m">{{ m }}</option>
-                </select>
-                <button type="button" @click="addTime(item.key)" :class="smallButtonClass">Tambah</button>
-              </span>
-            </div>
-            <p v-if="canEdit && forms[item.key].mode === 'times' && !forms[item.key].times.length" class="text-[11px] text-gray-500">Tambahkan minimal satu jam.</p>
-          </div>
-        </div>
-
-        <div :class="rowClass">
-          <p :class="rowLabelClass">Hari</p>
-          <div class="space-y-2 min-w-0">
-            <div class="grid grid-cols-7 gap-1.5 sm:flex sm:flex-wrap">
-              <button
-                v-for="day in weekDays"
-                :key="day.value"
-                type="button"
-                :disabled="!canEdit"
-                @click="toggleDay(item.key, day.value)"
-                :aria-pressed="isDayOn(item.key, day.value)"
-                :class="[
-                  'h-8 sm:w-11 rounded-lg border text-xs font-medium transition cursor-pointer disabled:cursor-default',
-                  isDayOn(item.key, day.value)
-                    ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
-                    : ['border-gray-300 bg-white text-gray-600', canEdit && 'hover:bg-gray-50']
-                ]"
-              >
-                {{ day.label }}
-              </button>
-            </div>
-            <p class="text-[11px] text-gray-500">{{ forms[item.key].days.length ? 'Hanya di hari yang dipilih.' : 'Tidak ada yang dipilih: jalan setiap hari.' }}</p>
-          </div>
-        </div>
-
-        <!-- Pengingat WA selama dealer belum menyetujui -->
-        <div v-if="item.key === 'telemarketing_wa'" :class="rowClass">
-          <p :class="rowLabelClass">Pengingat</p>
-          <div class="space-y-2 min-w-0">
-            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
               <select
-                :id="`reminder-days-${item.key}`"
-                v-model.number="forms[item.key].reminder_every_days"
+                v-if="forms[item.key].mode === 'interval'"
+                :id="`interval-${item.key}`"
+                v-model.number="forms[item.key].interval_minutes"
                 :disabled="!canEdit"
-                aria-label="Jarak pengingat"
+                aria-label="Interval"
                 :class="[selectClass, 'w-full sm:w-52 px-3']"
               >
-                <option v-for="days in reminderDayChoices" :key="days" :value="days">{{ days ? `Setiap ${days} hari` : 'Tanpa pengingat' }}</option>
+                <option v-for="minutes in intervalChoices" :key="minutes" :value="minutes">{{ intervalLabel(minutes) }}</option>
               </select>
-              <select
-                v-if="forms[item.key].reminder_every_days"
-                :id="`reminder-max-${item.key}`"
-                v-model.number="forms[item.key].reminder_max"
-                :disabled="!canEdit"
-                aria-label="Jumlah pengingat"
-                :class="[selectClass, 'w-full sm:w-40 px-3']"
-              >
-                <option v-for="count in reminderMaxChoices" :key="count" :value="count">Maksimal {{ count }} kali</option>
-              </select>
-            </div>
-            <p class="text-[11px] text-gray-500 leading-relaxed">{{ reminderHint(forms[item.key]) }}</p>
-          </div>
-        </div>
-      </div>
 
-      <!-- Ringkasan & aksi -->
-      <div class="px-5 sm:px-6 py-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <dl class="text-xs space-y-1 min-w-0">
-          <div class="flex gap-2">
-            <dt class="text-gray-500 w-24 shrink-0">Berikutnya</dt>
-            <dd class="text-gray-900">{{ nextRunLabel(forms[item.key]) }}</dd>
+              <div v-else class="flex flex-wrap items-center gap-2">
+                <span
+                  v-for="time in forms[item.key].times"
+                  :key="time"
+                  class="inline-flex items-center gap-1 h-8 pl-3 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-900 tabular-nums"
+                  :class="canEdit ? 'pr-1' : 'pr-3'"
+                >
+                  {{ time }}
+                  <button v-if="canEdit" type="button" @click="removeTime(item.key, time)" class="p-1 text-gray-400 hover:text-gray-700 cursor-pointer" :title="`Hapus jam ${time}`">
+                    <XIcon class="w-3 h-3" />
+                  </button>
+                </span>
+
+                <!-- Tambah jam (24 jam) -->
+                <span v-if="canEdit" class="inline-flex items-center gap-1">
+                  <select :id="`hour-${item.key}`" v-model="newTimes[item.key].hour" aria-label="Jam" :class="[selectClass, 'w-16 px-2']">
+                    <option v-for="h in hours" :key="h" :value="h">{{ h }}</option>
+                  </select>
+                  <span class="text-xs text-gray-400">:</span>
+                  <select :id="`minute-${item.key}`" v-model="newTimes[item.key].minute" aria-label="Menit" :class="[selectClass, 'w-16 px-2']">
+                    <option v-for="m in minutes" :key="m" :value="m">{{ m }}</option>
+                  </select>
+                  <button type="button" @click="addTime(item.key)" :class="smallButtonClass">Tambah</button>
+                </span>
+              </div>
+              <p v-if="canEdit && forms[item.key].mode === 'times' && !forms[item.key].times.length" class="text-[11px] text-gray-500">Tambahkan minimal satu jam.</p>
+            </div>
           </div>
-          <div class="flex gap-2">
-            <dt class="text-gray-500 w-24 shrink-0">Terakhir jalan</dt>
-            <dd class="text-gray-900 min-w-0 break-words">
-              {{ item.last_run_at ? formatDateTime(item.last_run_at) : 'Belum pernah' }}
-              <span v-if="item.last_result" class="block text-gray-500 mt-0.5">{{ item.last_result }}</span>
-            </dd>
+
+          <div :class="rowClass">
+            <p :class="rowLabelClass">Hari</p>
+            <div class="space-y-2 min-w-0">
+              <div class="grid grid-cols-7 gap-1 sm:flex sm:flex-wrap">
+                <button
+                  v-for="day in weekDays"
+                  :key="day.value"
+                  type="button"
+                  :disabled="!canEdit"
+                  @click="toggleDay(item.key, day.value)"
+                  :aria-pressed="isDayOn(item.key, day.value)"
+                  :class="[
+                    'h-8 sm:w-10 rounded-lg border text-xs font-medium transition cursor-pointer disabled:cursor-default',
+                    isDayOn(item.key, day.value)
+                      ? 'border-gray-900 bg-gray-900 text-white dark:bg-white dark:text-gray-900 dark:border-white'
+                      : ['border-gray-300 bg-white text-gray-600', canEdit && 'hover:bg-gray-50']
+                  ]"
+                >
+                  {{ day.label }}
+                </button>
+              </div>
+              <p class="text-[11px] text-gray-500">{{ forms[item.key].days.length ? 'Hanya di hari yang dipilih.' : 'Tidak ada yang dipilih: jalan setiap hari.' }}</p>
+            </div>
           </div>
-        </dl>
-        <div class="flex flex-col items-stretch sm:items-end gap-1.5 shrink-0">
-          <div v-if="canEdit" class="flex items-center gap-2">
-            <button type="button" @click="runNow(item.key)" :disabled="!!busy[item.key]" :class="buttonClass">
-              {{ busy[item.key] === 'run' ? 'Menjalankan...' : 'Jalankan sekarang' }}
-            </button>
-            <button type="button" @click="save(item.key)" :disabled="!!busy[item.key]" :class="primaryButtonClass">
-              {{ busy[item.key] === 'save' ? 'Menyimpan...' : 'Simpan' }}
-            </button>
+
+          <!-- Pengingat WA selama dealer belum menyetujui / belum upload -->
+          <div v-if="item.key === 'telemarketing_wa' || item.key === 'invoice_remind_upload'" :class="rowClass">
+            <p :class="rowLabelClass">Pengingat</p>
+            <div class="space-y-2 min-w-0">
+              <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                <select
+                  :id="`reminder-days-${item.key}`"
+                  v-model.number="forms[item.key].reminder_every_days"
+                  :disabled="!canEdit"
+                  aria-label="Jarak pengingat"
+                  :class="[selectClass, 'w-full sm:w-48 px-3']"
+                >
+                  <option v-for="days in reminderDayChoices" :key="days" :value="days">{{ days ? `Setiap ${days} hari` : 'Tanpa pengingat' }}</option>
+                </select>
+                <select
+                  v-if="forms[item.key].reminder_every_days"
+                  :id="`reminder-max-${item.key}`"
+                  v-model.number="forms[item.key].reminder_max"
+                  :disabled="!canEdit"
+                  aria-label="Jumlah pengingat"
+                  :class="[selectClass, 'w-full sm:w-36 px-3']"
+                >
+                  <option v-for="count in reminderMaxChoices" :key="count" :value="count">Maksimal {{ count }} kali</option>
+                </select>
+              </div>
+              <p class="text-[11px] text-gray-500 leading-relaxed">{{ reminderHint(forms[item.key], item.key) }}</p>
+            </div>
           </div>
-          <p v-if="messages[item.key]" class="text-xs sm:text-right" :class="messages[item.key].error ? 'text-red-600' : 'text-emerald-700'">{{ messages[item.key].text }}</p>
         </div>
-      </div>
-    </section>
+
+        <!-- Ringkasan & aksi -->
+        <div class="px-5 sm:px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-auto">
+          <dl class="text-xs space-y-1 min-w-0">
+            <div class="flex gap-2">
+              <dt class="text-gray-500 w-20 shrink-0">Berikutnya</dt>
+              <dd class="text-gray-900 font-medium">{{ nextRunLabel(forms[item.key]) }}</dd>
+            </div>
+            <div class="flex gap-2">
+              <dt class="text-gray-500 w-20 shrink-0">Terakhir</dt>
+              <dd class="text-gray-900 min-w-0 break-words">
+                {{ item.last_run_at ? formatDateTime(item.last_run_at) : 'Belum pernah' }}
+                <span v-if="item.last_result" class="block text-gray-500 mt-0.5 text-[11px]">{{ item.last_result }}</span>
+              </dd>
+            </div>
+          </dl>
+          <div class="flex flex-col items-stretch sm:items-end gap-1.5 shrink-0">
+            <div v-if="canEdit" class="flex items-center gap-2">
+              <button type="button" @click="runNow(item.key)" :disabled="!!busy[item.key]" :class="buttonClass">
+                {{ busy[item.key] === 'run' ? 'Menjalankan...' : 'Jalankan sekarang' }}
+              </button>
+              <button type="button" @click="save(item.key)" :disabled="!!busy[item.key]" :class="primaryButtonClass">
+                {{ busy[item.key] === 'save' ? 'Menyimpan...' : 'Simpan' }}
+              </button>
+            </div>
+            <p v-if="messages[item.key]" class="text-xs sm:text-right" :class="messages[item.key].error ? 'text-red-600' : 'text-emerald-700'">{{ messages[item.key].text }}</p>
+          </div>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -225,8 +228,8 @@ const { canEdit } = useAuth();
 
 const buttonClass = 'h-9 px-3.5 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 shadow-2xs transition cursor-pointer whitespace-nowrap disabled:opacity-50';
 const selectClass = 'h-9 rounded-lg border border-gray-300 bg-white text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-900 cursor-pointer disabled:cursor-default';
-const rowClass = 'px-5 sm:px-6 py-4 grid gap-2 sm:grid-cols-[120px_minmax(0,1fr)] sm:gap-6';
-const rowLabelClass = 'text-xs font-medium text-gray-700 sm:pt-2';
+const rowClass = 'px-5 sm:px-6 py-3.5 grid gap-2 sm:grid-cols-[100px_minmax(0,1fr)] sm:gap-4';
+const rowLabelClass = 'text-xs font-medium text-gray-700 sm:pt-1.5';
 const switchTrackClass = 'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors';
 const switchKnobClass = 'h-4 w-4 rounded-full bg-white dark:bg-slate-900 shadow-sm transition-transform';
 const smallButtonClass = 'h-9 px-3 inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50 text-xs font-medium text-gray-700 transition cursor-pointer whitespace-nowrap';
@@ -247,6 +250,7 @@ const DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu
 
 const RUN_CONFIRMATIONS = {
   telemarketing_wa: 'Kirim WhatsApp sekarang ke telemarketing untuk semua baris BISA DI POTONG yang belum dikirimi, beserta pengingat yang sudah waktunya?',
+  invoice_remind_upload: 'Cek invoice yang belum di-upload dan kirim WhatsApp pengingat sekarang ke telemarketing?',
 };
 
 // Pilihan jam 00–23 dan menit kelipatan 5 (format 24 jam)
@@ -293,9 +297,16 @@ function fillForm(item) {
   newTimes[item.key] = { hour: '08', minute: '00' };
 }
 
-const reminderHint = (form) => (form.reminder_every_days
-  ? `Bila dealer belum setuju (belum dijawab atau ditunda), WA dikirim ulang ${form.reminder_every_days} hari setelah WA terakhir, paling banyak ${form.reminder_max} kali, pada jadwal di atas.`
-  : 'WA ke telemarketing hanya dikirim sekali per baris.');
+const reminderHint = (form, key) => {
+  if (key === 'invoice_remind_upload') {
+    return form.reminder_every_days
+      ? `Invoice yang dokumennya belum di-upload ke Form Program akan diingatkan setelah ${form.reminder_every_days} hari terbit, dan diulang setiap ${form.reminder_every_days} hari maksimal ${form.reminder_max} kali pada jadwal di atas.`
+      : 'Pengingat otomatis tidak aktif jika disetel Tanpa Pengingat.';
+  }
+  return form.reminder_every_days
+    ? `Bila dealer belum setuju (belum dijawab atau ditunda), WA dikirim ulang ${form.reminder_every_days} hari setelah WA terakhir, paling banyak ${form.reminder_max} kali, pada jadwal di atas.`
+    : 'WA ke telemarketing hanya dikirim sekali per baris.';
+};
 
 async function fetchSchedules() {
   isLoading.value = true;

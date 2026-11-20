@@ -136,161 +136,234 @@
     </div>
 
     <!-- Detail: langkah lengkap dan semua catatan -->
-    <div v-if="detail" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs" @click.self="detail = null">
-      <div class="bg-white rounded-xl max-w-md w-full shadow-xl border border-gray-200 max-h-[90vh] flex flex-col text-[11px]">
-        <div class="px-4 py-3.5 border-b border-gray-100 flex items-start justify-between gap-3">
+    <div v-if="detail" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs" @click.self="detail = null">
+      <div class="bg-white dark:bg-slate-900 rounded-xl max-w-lg sm:max-w-xl w-full shadow-2xl border border-gray-200 dark:border-slate-800 max-h-[88vh] flex flex-col text-[11px] overflow-hidden">
+        <!-- Header -->
+        <div class="px-5 py-4 border-b border-gray-100 dark:border-slate-800 flex items-start justify-between gap-3 bg-white dark:bg-slate-900 shrink-0">
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <h3 class="text-xs font-semibold text-gray-950">{{ detail.dealer_name || '-' }}</h3>
-              <span :class="['inline-flex items-center h-[18px] px-1.5 rounded-full text-[10px] font-medium ring-1 ring-inset', stageBadgeClass(detail.stage)]">
+              <h3 class="text-sm font-semibold text-gray-950 dark:text-white">{{ detail.dealer_name || '-' }}</h3>
+              <span :class="['inline-flex items-center h-[20px] px-2 rounded-full text-[10px] font-medium ring-1 ring-inset', stageBadgeClass(detail.stage)]">
                 {{ detail.stage_label }}
               </span>
               <span v-if="detail.settlement" :class="settlementBadgeClass">{{ detail.settlement }}</span>
             </div>
-            <p class="text-gray-500 mt-0.5">{{ rowMeta(detail) }}</p>
-            <p v-if="detail.periode" class="text-gray-500">{{ detail.periode }}</p>
+            <p class="text-xs text-gray-500 dark:text-slate-400 mt-1">{{ rowMeta(detail) }}</p>
+            <p v-if="detail.periode" class="text-xs text-gray-400 dark:text-slate-500">{{ detail.periode }}</p>
           </div>
-          <button type="button" @click="detail = null" class="p-1 -m-1 text-gray-400 hover:text-gray-600 cursor-pointer" title="Tutup">
-            <XIcon class="w-3.5 h-3.5" />
+          <button type="button" @click="detail = null" class="p-1.5 -m-1 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition cursor-pointer" title="Tutup">
+            <XIcon class="w-4 h-4" />
           </button>
         </div>
 
-        <div class="px-4 py-3.5 space-y-4 overflow-y-auto">
-          <!-- Alur vertikal -->
-          <ol>
-            <li v-for="(step, index) in detail.steps" :key="step.key" class="relative flex gap-2.5 pb-3.5 last:pb-0">
-              <span
-                v-if="index < detail.steps.length - 1"
-                :class="['absolute left-2 top-5 bottom-0 w-0.5 rounded-full overflow-hidden', connectorClass(detail.steps[index + 1].state)]"
-              >
-                <span v-if="detail.steps[index + 1].state === 'current'" class="flow-runner-y"></span>
-              </span>
-              <StepDot :state="step.state" class="relative z-10 shrink-0" />
-              <div class="min-w-0 pt-px space-y-px">
-                <p class="flex flex-wrap items-center gap-x-2">
-                  <span :class="['font-medium', stepLabelClass(step.state)]">{{ step.label }}</span>
-                  <span class="text-gray-400">{{ stepStateLabel(step) }}</span>
-                </p>
-                <p v-if="step.person" class="text-gray-700">
-                  <span v-if="step.role" class="text-gray-400">{{ step.role }} · </span>{{ displayName(step.person) }}
-                </p>
-                <p v-if="step.at || step.date" class="text-gray-500 tabular-nums">{{ stepTime(step, true) }}</p>
-                <p v-if="step.actor" class="text-gray-500">Oleh {{ step.actor }}<template v-if="step.recipient"> · ke {{ step.recipient }}</template></p>
-                <p v-if="step.note && step.key !== 'ready'" class="text-gray-500 break-words">{{ step.note }}</p>
-              </div>
-            </li>
-          </ol>
+        <!-- Segmented Tab Header -->
+        <div class="px-5 border-b border-gray-100 dark:border-slate-800 flex items-center gap-2 bg-gray-50/70 dark:bg-slate-800/40 shrink-0">
+          <button
+            type="button"
+            @click="activeDetailTab = 'steps'"
+            :class="[
+              'py-2.5 px-3 text-xs font-medium border-b-2 transition -mb-px flex items-center gap-1.5 cursor-pointer',
+              activeDetailTab === 'steps'
+                ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white font-semibold'
+                : 'border-transparent text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white'
+            ]"
+          >
+            <span>Alur Approval</span>
+            <span v-if="detail.steps?.length" class="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-200/80 dark:bg-slate-700 text-gray-700 dark:text-slate-200">
+              {{ completedStepsCount }}/{{ detail.steps.length }}
+            </span>
+          </button>
 
-          <!-- Kirim (ulang) WA ke Tim Pajak (sudah dipotong, belum dicek) atau hasil cek pajak ke Tim SCM, mis. bila WA otomatis gagal -->
-          <div v-if="canEdit && (resendAction || waMessage)" class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <button v-if="resendAction" type="button" @click="resendWhatsApp" :disabled="sendingWa" :class="[detailButtonClass, 'inline-flex disabled:opacity-50']">
-              {{ sendingWa ? 'Mengirim...' : resendAction.label }}
-            </button>
-            <span v-if="waMessage" :class="['break-words', waMessage.error ? 'text-rose-700' : 'text-emerald-700']">{{ waMessage.text }}</span>
-          </div>
+          <button
+            type="button"
+            @click="activeDetailTab = 'logs'"
+            :class="[
+              'py-2.5 px-3 text-xs font-medium border-b-2 transition -mb-px flex items-center gap-1.5 cursor-pointer',
+              activeDetailTab === 'logs'
+                ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white font-semibold'
+                : 'border-transparent text-gray-500 hover:text-gray-900 dark:text-slate-400 dark:hover:text-white'
+            ]"
+          >
+            <span>Semua Catatan</span>
+            <span v-if="detail.timeline?.length" class="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-200/80 dark:bg-slate-700 text-gray-700 dark:text-slate-200">
+              {{ detail.timeline.length }}
+            </span>
+          </button>
+        </div>
 
-          <!-- Aksi Pengembalian Tahap / Rollback Approval -->
-          <div v-if="canEdit && canRollback" class="pt-2 border-t border-gray-100 space-y-2">
-            <div class="flex items-center justify-between">
-              <button
-                type="button"
-                @click="showRollbackForm = !showRollbackForm"
-                class="inline-flex items-center gap-1.5 text-[11px] font-medium text-amber-700 hover:text-amber-800 transition cursor-pointer"
-              >
-                <RotateCcwIcon class="w-3.5 h-3.5" />
-                <span>{{ showRollbackForm ? 'Tutup form pengembalian' : 'Kembalikan tahap approval' }}</span>
-              </button>
-              <span v-if="rollbackSuccess" class="text-[11px] text-emerald-700 font-medium break-words">{{ rollbackSuccess }}</span>
-            </div>
-
-            <!-- Form Rollback -->
-            <div v-if="showRollbackForm" class="p-3 bg-amber-50/70 rounded-lg border border-amber-200 space-y-2.5">
-              <div>
-                <label class="block text-[11px] font-medium text-amber-950 mb-1">Kembalikan ke Tahap</label>
-                <select
-                  v-model="rollbackTarget"
-                  class="w-full h-8 text-[11px] bg-white text-gray-900 border border-amber-300 rounded-md px-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+        <!-- Body Scroll Content -->
+        <div class="p-5 overflow-y-auto flex-1 space-y-4">
+          <!-- TAB 1: ALUR APPROVAL (STEPPER) -->
+          <div v-if="activeDetailTab === 'steps'" class="space-y-4">
+            <ol>
+              <li v-for="(step, index) in detail.steps" :key="step.key" class="relative flex gap-3 pb-3.5 last:pb-0">
+                <span
+                  v-if="index < detail.steps.length - 1"
+                  :class="['absolute left-2.5 top-5 bottom-0 w-0.5 rounded-full overflow-hidden', connectorClass(detail.steps[index + 1].state)]"
                 >
-                  <option v-for="opt in availableRollbackTargets" :key="opt.value" :value="opt.value">
-                    {{ opt.label }}
-                  </option>
-                </select>
-              </div>
+                  <span v-if="detail.steps[index + 1].state === 'current'" class="flow-runner-y"></span>
+                </span>
+                <StepDot :state="step.state" class="relative z-10 shrink-0 mt-0.5" />
+                <div class="min-w-0 flex-1 pt-px">
+                  <div class="flex items-center justify-between gap-2">
+                    <span :class="['font-medium text-xs', stepLabelClass(step.state)]">{{ step.label }}</span>
+                    <span :class="['text-[10px] px-2 py-0.5 rounded-full font-medium', stepBadgeClass(step.state)]">
+                      {{ stepStateLabel(step) }}
+                    </span>
+                  </div>
 
-              <div>
-                <label class="block text-[11px] font-medium text-amber-950 mb-1">
-                  Alasan Pengembalian <span class="text-rose-600">*</span>
-                </label>
-                <textarea
-                  v-model="rollbackReason"
-                  rows="2"
-                  maxlength="500"
-                  placeholder="mis. Faktur pajak tidak valid / salah nomor pembayaran / dealer minta tunda"
-                  class="w-full p-2 text-[11px] bg-white text-gray-900 border border-amber-300 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-gray-400"
-                ></textarea>
-              </div>
+                  <div class="flex flex-wrap items-center gap-x-2 text-[11px] text-gray-500 dark:text-slate-400 mt-1">
+                    <span v-if="step.person" class="text-gray-800 dark:text-slate-200 font-medium">
+                      <span v-if="step.role" class="text-gray-400 dark:text-slate-500 font-normal">{{ step.role }} · </span>{{ displayName(step.person) }}
+                    </span>
+                    <span v-if="(step.at || step.date) && step.person" class="text-gray-300 dark:text-slate-700">·</span>
+                    <span v-if="step.at || step.date" class="tabular-nums">{{ stepTime(step, true) }}</span>
+                  </div>
 
-              <div v-if="rollbackTarget === 'approved'" class="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="notify_ar_checkbox"
-                  v-model="rollbackNotifyAr"
-                  class="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 border-gray-300 cursor-pointer"
-                />
-                <label for="notify_ar_checkbox" class="text-[11px] text-amber-950 cursor-pointer select-none">
-                  Kirim notifikasi WhatsApp ulang ke Tim AR
-                </label>
-              </div>
+                  <p v-if="step.actor" class="text-gray-500 dark:text-slate-400 text-[11px] mt-0.5">
+                    Oleh {{ step.actor }}<template v-if="step.recipient"> · Ke {{ step.recipient }}</template>
+                  </p>
 
-              <div v-if="rollbackTarget === 'awaiting_transfer'" class="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="notify_scm_checkbox"
-                  v-model="rollbackNotifyScm"
-                  class="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 border-gray-300 cursor-pointer"
-                />
-                <label for="notify_scm_checkbox" class="text-[11px] text-amber-950 cursor-pointer select-none">
-                  Kirim notifikasi WhatsApp transfer ke Tim SCM
-                </label>
-              </div>
-
-              <p v-if="rollbackError" class="text-[11px] text-rose-700 font-medium">{{ rollbackError }}</p>
-
-              <div class="flex items-center justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  @click="showRollbackForm = false"
-                  class="px-2.5 py-1 text-[11px] text-gray-600 hover:text-gray-900 bg-white border border-gray-200 rounded-md transition cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="button"
-                  @click="submitRollback"
-                  :disabled="submittingRollback || !rollbackReason.trim()"
-                  class="px-3 py-1 text-[11px] font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-md transition inline-flex items-center gap-1.5 cursor-pointer"
-                >
-                  <RefreshCwIcon v-if="submittingRollback" class="w-3 h-3 animate-spin" />
-                  <span>{{ submittingRollback ? 'Memproses...' : 'Konfirmasi Kembalikan' }}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div class="space-y-2 border-t border-gray-100">
-            <p class="pt-3 font-medium text-gray-900">Semua catatan</p>
-            <p v-if="detailLoading" class="text-gray-500">Memuat...</p>
-            <p v-else-if="!detail.timeline?.length" class="text-gray-500">Belum ada catatan.</p>
-            <ul v-else class="rounded-lg border border-gray-200 divide-y divide-gray-100">
-              <li v-for="item in detail.timeline" :key="item.id" class="px-3 py-2 space-y-px">
-                <div class="flex items-start justify-between gap-3">
-                  <span :class="['font-medium', item.success ? 'text-gray-900' : 'text-rose-700']">{{ item.label }}{{ item.success ? '' : ' · gagal' }}</span>
-                  <span class="text-[10px] text-gray-400 tabular-nums whitespace-nowrap">{{ formatDateTime(item.at) }}</span>
+                  <p v-if="step.note && step.key !== 'ready' && !isRedundantWaNote(step.note)" class="text-gray-700 dark:text-slate-200 text-xs mt-1.5 p-2 bg-gray-50 dark:bg-slate-800/80 rounded-md border border-gray-200/70 dark:border-slate-700 break-words font-sans leading-relaxed">
+                    {{ step.note }}
+                  </p>
                 </div>
-                <p v-if="item.actor || item.recipient" class="text-gray-500 break-words">
-                  <template v-if="item.actor">Oleh {{ item.actor }}</template><template v-if="item.actor && item.recipient"> · </template><template v-if="item.recipient">ke {{ item.recipient }}</template>
+              </li>
+            </ol>
+
+            <!-- Kirim (ulang) WA ke Tim Pajak (sudah dipotong, belum dicek) atau hasil cek pajak ke Tim SCM, mis. bila WA otomatis gagal -->
+            <div v-if="canEdit && (resendAction || waMessage)" class="pt-3 border-t border-gray-100 dark:border-slate-800 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <button v-if="resendAction" type="button" @click="resendWhatsApp" :disabled="sendingWa" :class="[detailButtonClass, 'inline-flex disabled:opacity-50']">
+                {{ sendingWa ? 'Mengirim...' : resendAction.label }}
+              </button>
+              <span v-if="waMessage" :class="['break-words text-xs', waMessage.error ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400']">{{ waMessage.text }}</span>
+            </div>
+
+            <!-- Aksi Pengembalian Tahap / Rollback Approval -->
+            <div v-if="canEdit && canRollback" class="pt-2 border-t border-gray-100 dark:border-slate-800 space-y-2">
+              <div class="flex items-center justify-between">
+                <button
+                  type="button"
+                  @click="showRollbackForm = !showRollbackForm"
+                  class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 hover:text-amber-800 transition cursor-pointer"
+                >
+                  <RotateCcwIcon class="w-3.5 h-3.5" />
+                  <span>{{ showRollbackForm ? 'Tutup form pengembalian' : 'Kembalikan tahap approval' }}</span>
+                </button>
+                <span v-if="rollbackSuccess" class="text-xs text-emerald-700 dark:text-emerald-400 font-medium break-words">{{ rollbackSuccess }}</span>
+              </div>
+
+              <!-- Form Rollback -->
+              <div v-if="showRollbackForm" class="p-3 bg-amber-50/70 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800/60 space-y-2.5">
+                <div>
+                  <label class="block text-xs font-medium text-amber-950 dark:text-amber-200 mb-1">Kembalikan ke Tahap</label>
+                  <select
+                    v-model="rollbackTarget"
+                    class="w-full h-8 text-xs bg-white dark:bg-slate-800 text-gray-900 dark:text-white border border-amber-300 dark:border-amber-700 rounded-md px-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                  >
+                    <option v-for="opt in availableRollbackTargets" :key="opt.value" :value="opt.value">
+                      {{ opt.label }}
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-medium text-amber-950 dark:text-amber-200 mb-1">
+                    Alasan Pengembalian <span class="text-rose-600 dark:text-rose-400">*</span>
+                  </label>
+                  <textarea
+                    v-model="rollbackReason"
+                    rows="2"
+                    maxlength="500"
+                    placeholder="mis. Faktur pajak tidak valid / salah nomor pembayaran / dealer minta tunda"
+                    class="w-full p-2 text-xs bg-white dark:bg-slate-800 text-gray-900 dark:text-white border border-amber-300 dark:border-amber-700 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-500 placeholder:text-gray-400 dark:placeholder:text-slate-500"
+                  ></textarea>
+                </div>
+
+                <div v-if="rollbackTarget === 'approved'" class="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="notify_ar_checkbox"
+                    v-model="rollbackNotifyAr"
+                    class="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 border-gray-300 dark:border-slate-700 cursor-pointer"
+                  />
+                  <label for="notify_ar_checkbox" class="text-xs text-amber-950 dark:text-amber-200 cursor-pointer select-none">
+                    Kirim notifikasi WhatsApp ulang ke Tim AR
+                  </label>
+                </div>
+
+                <div v-if="rollbackTarget === 'awaiting_transfer'" class="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="notify_scm_checkbox"
+                    v-model="rollbackNotifyScm"
+                    class="w-3.5 h-3.5 rounded text-amber-600 focus:ring-amber-500 border-gray-300 dark:border-slate-700 cursor-pointer"
+                  />
+                  <label for="notify_scm_checkbox" class="text-xs text-amber-950 dark:text-amber-200 cursor-pointer select-none">
+                    Kirim notifikasi WhatsApp transfer ke Tim SCM
+                  </label>
+                </div>
+
+                <p v-if="rollbackError" class="text-xs text-rose-700 dark:text-rose-400 font-medium">{{ rollbackError }}</p>
+
+                <div class="flex items-center justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    @click="showRollbackForm = false"
+                    class="px-2.5 py-1 text-xs text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-md transition cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    @click="submitRollback"
+                    :disabled="submittingRollback || !rollbackReason.trim()"
+                    class="px-3 py-1 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-md transition inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <RefreshCwIcon v-if="submittingRollback" class="w-3 h-3 animate-spin" />
+                    <span>{{ submittingRollback ? 'Memproses...' : 'Konfirmasi Kembalikan' }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 2: SEMUA CATATAN (TIMELINE LOGS) -->
+          <div v-else-if="activeDetailTab === 'logs'" class="space-y-3">
+            <div v-if="detailLoading" class="py-8 text-center text-gray-500 dark:text-slate-400">
+              <RefreshCwIcon class="w-4 h-4 animate-spin mx-auto mb-1 text-gray-400" />
+              <span>Memuat catatan...</span>
+            </div>
+            <div v-else-if="!detail.timeline?.length" class="py-8 text-center text-gray-400 dark:text-slate-500">
+              Belum ada catatan aktivitas untuk baris ini.
+            </div>
+            <ul v-else class="space-y-2">
+              <li
+                v-for="item in detail.timeline"
+                :key="item.id"
+                class="p-3 rounded-lg border border-gray-100 dark:border-slate-800 bg-gray-50/60 dark:bg-slate-800/40 hover:bg-gray-50 dark:hover:bg-slate-800/70 transition"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex items-center gap-2">
+                    <span :class="['w-1.5 h-1.5 rounded-full shrink-0', item.success ? 'bg-emerald-500' : 'bg-rose-500']"></span>
+                    <span :class="['font-semibold text-xs', item.success ? 'text-gray-900 dark:text-slate-100' : 'text-rose-700 dark:text-rose-400']">
+                      {{ item.label }}{{ item.success ? '' : ' · gagal' }}
+                    </span>
+                  </div>
+                  <span class="text-[11px] text-gray-400 dark:text-slate-500 tabular-nums whitespace-nowrap">
+                    {{ formatDateTime(item.at) }}
+                  </span>
+                </div>
+
+                <p v-if="item.actor || item.recipient" class="text-gray-500 dark:text-slate-400 text-xs mt-1 break-words">
+                  <template v-if="item.actor">Oleh {{ item.actor }}</template>
+                  <template v-if="item.actor && item.recipient"> · </template>
+                  <template v-if="item.recipient">Ke {{ item.recipient }}</template>
                 </p>
-                <p v-if="item.note" class="text-gray-500 break-words">{{ item.note }}</p>
+
+                <p v-if="item.note" class="text-gray-600 dark:text-slate-300 text-xs mt-1.5 p-2 bg-white dark:bg-slate-900 rounded-md border border-gray-200/60 dark:border-slate-800 break-words font-sans leading-relaxed">
+                  {{ item.note }}
+                </p>
               </li>
             </ul>
           </div>
@@ -359,6 +432,25 @@ const detail = ref(null);
 const detailLoading = ref(false);
 const sendingWa = ref(false);
 const waMessage = ref(null);
+const activeDetailTab = ref('steps'); // 'steps' | 'logs'
+
+const completedStepsCount = computed(() => {
+  return detail.value?.steps?.filter((s) => s.state === 'done').length || 0;
+});
+
+const isRedundantWaNote = (note) => {
+  if (!note) return true;
+  const s = String(note).toLowerCase();
+  return s.includes('berhasil dikirim ke whatsapp') || s.startsWith('notifikasi klaim program') || s.startsWith('permintaan transfer');
+};
+
+const stepBadgeClass = (state) => {
+  if (state === 'done') return 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800/80 dark:text-emerald-300';
+  if (state === 'current') return 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-800/80 dark:text-amber-300';
+  if (state === 'failed') return 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/40 dark:border-rose-800/80 dark:text-rose-300';
+  if (state === 'postponed') return 'bg-orange-50 text-orange-700 border border-orange-200 dark:bg-orange-950/40 dark:border-orange-800/80 dark:text-orange-300';
+  return 'bg-gray-100 text-gray-500 border border-gray-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-400';
+};
 
 const showRollbackForm = ref(false);
 const rollbackTarget = ref('approved');
@@ -566,6 +658,7 @@ async function openDetail(row) {
 
 // Reset state saat membuka baris baru
 watch(() => detail.value?.id, () => {
+  activeDetailTab.value = 'steps';
   waMessage.value = null;
   showRollbackForm.value = false;
   rollbackReason.value = '';

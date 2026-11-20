@@ -326,9 +326,10 @@
                 <button
                   @click="handleLogout"
                   type="button"
-                  class="w-full text-left px-3 py-2 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+                  class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
                 >
-                  Keluar
+                  <LogOutIcon class="w-4 h-4 text-red-500 shrink-0" />
+                  <span>Keluar dari Akun</span>
                 </button>
               </PopoverContent>
             </Popover>
@@ -414,6 +415,22 @@
           </div>
         </div>
       </nav>
+
+      <!-- Profil & Logout Mobile -->
+      <div class="p-3.5 border-t border-gray-100 dark:border-slate-800 space-y-2 mt-auto">
+        <div class="px-2 py-1 text-xs">
+          <p class="font-medium text-gray-900 dark:text-white">{{ user.name || 'Admin SCM' }}</p>
+          <p class="text-gray-500 dark:text-slate-400 truncate text-[11px]">{{ user.email || '-' }}</p>
+        </div>
+        <button
+          @click="handleLogout"
+          type="button"
+          class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer"
+        >
+          <LogOutIcon class="w-4 h-4 text-red-500 shrink-0" />
+          <span>Keluar dari Akun</span>
+        </button>
+      </div>
           </aside>
         </Transition>
       </Teleport>
@@ -455,6 +472,7 @@ import {
   ChevronDown as ChevronDownIcon,
   Menu as MenuIcon,
   X as XIcon,
+  LogOut as LogOutIcon,
 } from 'lucide-vue-next';
 
 const route = useRoute();

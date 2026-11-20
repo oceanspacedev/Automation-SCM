@@ -172,4 +172,47 @@ class AutomationScheduleTest extends TestCase
         $this->assertNotNull($dataProgram->fresh()->telemarketing_notified_at);
         Http::assertSentCount(1);
     }
+
+    public function test_invoice_upload_reminder_schedule_can_be_configured_and_run_now(): void
+    {
+        config([
+            'services.wag.token' => 'fake_token',
+            'services.wag.url' => 'https://waghub.mekayastudio.com',
+        ]);
+        Http::fake(['https://waghub.mekayastudio.com/api/v1/messages' => Http::response(['success' => true, 'data' => ['id' => 'msg_up_1']], 200)]);
+
+        $admin = User::factory()->create();
+
+        // Check it exists in API
+        $this->actingAs($admin)
+            ->getJson('/api/automation-schedules')
+            ->assertOk()
+            ->assertJsonPath('data.1.key', 'invoice_remind_upload')
+            ->assertJsonPath('data.1.reminder_every_days', 3);
+
+        // Update schedule
+        $this->actingAs($admin)
+            ->putJson('/api/automation-schedules/invoice_remind_upload', [
+                'is_active' => true,
+                'mode' => 'times',
+                'times' => ['10:00', '15:00'],
+                'days' => [1, 2, 3, 4, 5],
+                'reminder_every_days' => 2,
+                'reminder_max' => 5,
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.times', ['10:00', '15:00'])
+            ->assertJsonPath('data.reminder_every_days', 2)
+            ->assertJsonPath('data.reminder_max', 5);
+
+        // Run now triggers command and records run
+        $this->actingAs($admin)
+            ->postJson('/api/automation-schedules/invoice_remind_upload/run')
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $schedule = AutomationSchedule::forKey(AutomationSchedule::INVOICE_REMIND_UPLOAD);
+        $this->assertNotNull($schedule->last_run_at);
+        $this->assertNotNull($schedule->last_result);
+    }
 }

@@ -18,6 +18,7 @@ class AutomationScheduleController extends Controller
      */
     private const COMMANDS = [
         AutomationSchedule::TELEMARKETING_WA => 'program:notify-telemarketing',
+        AutomationSchedule::INVOICE_REMIND_UPLOAD => 'invoices:remind-telemarketing-upload',
     ];
 
     public function index(Request $request): JsonResponse

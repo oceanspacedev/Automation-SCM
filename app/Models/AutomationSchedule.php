@@ -22,6 +22,8 @@ class AutomationSchedule extends Model
 
     public const TELEMARKETING_WA = 'telemarketing_wa';
 
+    public const INVOICE_REMIND_UPLOAD = 'invoice_remind_upload';
+
     public const MODE_INTERVAL = 'interval';
 
     public const MODE_TIMES = 'times';

@@ -14,7 +14,7 @@
           <!-- Header -->
           <div class="px-6 pt-5 pb-4 border-b border-gray-100 flex items-start justify-between gap-4 shrink-0">
             <div class="min-w-0">
-              <h3 class="text-base font-semibold text-gray-950">Kirim Invoice</h3>
+              <h3 class="text-base font-semibold text-gray-950">{{ isResend ? 'Kirim Ulang Invoice' : 'Kirim Invoice' }}</h3>
               <p class="mt-0.5 text-xs text-gray-500 truncate">{{ invoiceNumber }} · {{ dealerName || customerName || 'Pemberitahuan Invoice' }}</p>
             </div>
             <button type="button" @click="close" class="p-1 -m-1 text-gray-400 hover:text-gray-700 cursor-pointer shrink-0" title="Tutup">
@@ -99,7 +99,7 @@
               :disabled="loading || (!email && !whatsapp)"
               class="h-9 px-4 rounded-lg bg-gray-900 hover:bg-gray-800 dark:bg-white dark:hover:bg-slate-200 text-xs font-medium text-white dark:text-gray-900 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
-              {{ loading ? 'Mengirim...' : 'Kirim Invoice' }}
+              {{ loading ? 'Mengirim...' : (isResend ? 'Kirim Ulang Notifikasi' : 'Kirim Invoice') }}
             </button>
           </div>
         </div>
@@ -124,6 +124,7 @@ const props = defineProps({
   customerName: String,
   defaultEmail: String,
   defaultWhatsapp: String,
+  isResend: Boolean,
 });
 
 const emit = defineEmits(['update:modelValue', 'sent']);

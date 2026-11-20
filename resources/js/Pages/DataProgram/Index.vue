@@ -265,49 +265,56 @@
                 <p class="text-sm font-semibold text-gray-950">{{ formatRupiah(row.net_pay) }}</p>
                 <p class="text-gray-500">Net Pay</p>
               </div>
-              <div class="flex items-center gap-1.5 shrink-0">
+              <div class="flex items-center gap-1 shrink-0">
                 <button
                   type="button"
                   @click="viewRow(row)"
                   :disabled="reconcilingRowId === row.id"
-                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer disabled:opacity-50"
+                  class="h-6 px-1.5 inline-flex items-center gap-1 rounded border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 dark:bg-slate-800/80 dark:border-slate-700 dark:text-slate-200 text-[11px] font-medium transition cursor-pointer disabled:opacity-50"
+                  :title="canEdit ? 'Cek kecocokan data dengan Test Program' : 'Lihat data program ini'"
                 >
-                  {{ reconcilingRowId === row.id ? 'Menguji...' : 'Lihat' }}
+                  <RefreshCwIcon v-if="reconcilingRowId === row.id" class="w-3 h-3 animate-spin text-gray-400" />
+                  <EyeIcon v-else class="w-3 h-3 text-gray-500 dark:text-slate-400" />
+                  <span>Lihat</span>
                 </button>
                 <button
                   v-if="!canEdit"
                   type="button"
                   @click="openHistoryModal(row)"
-                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
+                  class="h-6 px-1.5 inline-flex items-center gap-1 rounded border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 dark:bg-slate-800/80 dark:border-slate-700 dark:text-slate-200 text-[11px] font-medium transition cursor-pointer"
                 >
-                  Riwayat
+                  <HistoryIcon class="w-3 h-3 text-gray-500 dark:text-slate-400" />
+                  <span>Riwayat</span>
                 </button>
                 <button
                   v-if="canEdit"
                   type="button"
                   @click="openEditModal(row)"
-                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer"
+                  class="h-6 px-1.5 inline-flex items-center gap-1 rounded border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 dark:bg-slate-800/80 dark:border-slate-700 dark:text-slate-200 text-[11px] font-medium transition cursor-pointer"
                 >
-                  Edit
+                  <PencilIcon class="w-3 h-3 text-gray-500 dark:text-slate-400" />
+                  <span>Edit</span>
                 </button>
                 <button
                   v-if="canEdit && row.status_potong_purchase === 'BISA DI POTONG'"
                   type="button"
                   @click="sendWaToTelemarketing(row)"
                   :disabled="sendingWaId === row.id"
-                  class="h-8 px-2.5 inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium cursor-pointer disabled:opacity-50"
+                  class="h-6 px-1.5 inline-flex items-center gap-1 rounded border border-emerald-300 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800/80 dark:text-emerald-300 text-[11px] font-medium transition cursor-pointer disabled:opacity-50"
                 >
-                  <WhatsAppIcon v-if="sendingWaId !== row.id" class="w-3.5 h-3.5 text-[#25D366]" />
+                  <RefreshCwIcon v-if="sendingWaId === row.id" class="w-3 h-3 animate-spin text-emerald-600" />
+                  <WhatsAppIcon v-else class="w-3 h-3 text-[#25D366]" />
                   <span>WA</span>
                 </button>
                 <button
                   v-if="canDelete"
                   type="button"
-                  class="h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-red-600 font-medium cursor-pointer"
+                  class="h-6 px-1.5 inline-flex items-center gap-1 rounded border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800/80 dark:text-rose-300 text-[11px] font-medium transition cursor-pointer"
                   @click.stop="deleteRecord(row)"
                   title="Hapus data ini"
                 >
-                  Hapus
+                  <Trash2Icon class="w-3 h-3" />
+                  <span>Hapus</span>
                 </button>
               </div>
             </div>
@@ -405,7 +412,7 @@
               <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Bank</th>
               <th scope="col" class="py-2.5 px-3 border-r border-b border-gray-200 bg-gray-50 sticky top-0 z-30 shadow-[0_1px_0_0_#e5e7eb]" style="top: 0px;">Big Region</th>
               <!-- Kolom Aksi (Sticky Right di pojok kanan) -->
-              <th scope="col" class="py-2.5 px-3 text-center border-l border-b border-gray-200 bg-gray-50 sticky right-0 top-0 z-40 min-w-[195px] shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.08),0_1px_0_0_#e5e7eb]" style="right: 0px; top: 0px;">Aksi</th>
+              <th scope="col" class="py-2.5 px-3 text-center border-l border-b border-gray-200 bg-gray-50 sticky right-0 top-0 z-40 min-w-[205px] shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.08),0_1px_0_0_#e5e7eb]" style="right: 0px; top: 0px;">Aksi</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white" @click="canEdit && onGridClick($event)">
@@ -820,65 +827,70 @@
 
               <!-- Kolom Aksi (Sticky Right di pojok kanan) -->
               <td
-                class="py-2.5 px-3 text-center border-l border-gray-100 whitespace-nowrap sticky right-0 z-20 bg-white group-hover:bg-gray-50 transition-colors shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.08)] min-w-[195px]"
+                class="py-2 px-2.5 text-center border-l border-gray-100 whitespace-nowrap sticky right-0 z-20 bg-white group-hover:bg-gray-50 transition-colors shadow-[-3px_0_6px_-2px_rgba(0,0,0,0.08)] min-w-[205px]"
                 style="right: 0px;"
               >
-                <div class="flex items-center justify-center gap-1.5">
+                <div class="flex items-center justify-center gap-1">
+                  <!-- 1. Lihat / Cek Kecocokan -->
                   <button
                     type="button"
                     @click.stop="viewRow(row)"
                     :disabled="reconcilingRowId === row.id"
-                    class="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-medium transition cursor-pointer shadow-2xs disabled:opacity-50"
+                    class="h-6 px-1.5 inline-flex items-center gap-1 rounded border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-700 dark:bg-slate-800/80 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700/80 text-[11px] font-medium transition cursor-pointer shadow-2xs disabled:opacity-50"
                     :title="canEdit ? 'Cek kecocokan data dengan Test Program' : 'Lihat data program ini'"
                   >
                     <RefreshCwIcon v-if="reconcilingRowId === row.id" class="w-3 h-3 animate-spin text-gray-400" />
-                    <EyeIcon v-else class="w-3.5 h-3.5 text-gray-500" />
+                    <EyeIcon v-else class="w-3 h-3 text-gray-500 dark:text-slate-400" />
                     <span>Lihat</span>
                   </button>
 
+                  <!-- 2. Riwayat (jika readonly) -->
                   <button
                     v-if="!canEdit"
                     type="button"
                     @click.stop="openHistoryModal(row)"
-                    class="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white hover:bg-gray-100 text-gray-800 text-xs font-medium transition cursor-pointer shadow-2xs"
+                    class="h-6 px-1.5 inline-flex items-center gap-1 rounded border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 dark:bg-slate-800/80 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700/80 text-[11px] font-medium transition cursor-pointer shadow-2xs"
                     title="Riwayat pencocokan baris ini"
                   >
-                    <HistoryIcon class="w-3.5 h-3.5 text-gray-600" />
+                    <HistoryIcon class="w-3 h-3 text-gray-500 dark:text-slate-400" />
                     <span>Riwayat</span>
                   </button>
 
+                  <!-- 3. Edit (jika canEdit) -->
                   <button
                     v-if="canEdit"
                     type="button"
                     @click.stop="openEditModal(row)"
-                    class="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white hover:bg-gray-100 text-gray-800 text-xs font-medium transition cursor-pointer shadow-2xs"
+                    class="h-6 px-1.5 inline-flex items-center gap-1 rounded border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 dark:bg-slate-800/80 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700/80 text-[11px] font-medium transition cursor-pointer shadow-2xs"
                     title="Edit data program ini di web"
                   >
-                    <PencilIcon class="w-3.5 h-3.5 text-gray-600" />
+                    <PencilIcon class="w-3 h-3 text-gray-500 dark:text-slate-400" />
                     <span>Edit</span>
                   </button>
 
+                  <!-- 4. Kirim WA ke Telemarketing (jika BISA DI POTONG) -->
                   <button
                     v-if="canEdit && row.status_potong_purchase === 'BISA DI POTONG'"
                     type="button"
                     @click.stop="sendWaToTelemarketing(row)"
                     :disabled="sendingWaId === row.id"
-                    class="h-7 px-2 inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium transition cursor-pointer shadow-2xs disabled:opacity-50"
+                    class="h-6 px-1.5 inline-flex items-center gap-1 rounded border border-emerald-300 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:border-emerald-800/80 dark:text-emerald-300 dark:hover:bg-emerald-900/50 text-[11px] font-medium transition cursor-pointer shadow-2xs disabled:opacity-50"
                     :title="row.telemarketing_notified_at ? `WA telemarketing terkirim ${formatDateTime(row.telemarketing_notified_at)}. Klik untuk kirim ulang.` : 'Kirim ke WhatsApp Telemarketing'"
                   >
                     <RefreshCwIcon v-if="sendingWaId === row.id" class="w-3 h-3 animate-spin text-emerald-600" />
-                    <WhatsAppIcon v-else class="w-3.5 h-3.5 text-[#25D366]" />
+                    <WhatsAppIcon v-else class="w-3 h-3 text-[#25D366]" />
                     <span>WA</span>
                   </button>
 
+                  <!-- 5. Hapus -->
                   <button
                     v-if="canDelete"
                     type="button"
                     @click.stop="deleteRecord(row)"
-                    class="h-7 px-2.5 inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white hover:bg-red-50 hover:border-red-200 text-red-600 text-xs font-medium transition cursor-pointer shadow-2xs"
+                    class="h-6 px-1.5 inline-flex items-center gap-1 rounded border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:border-rose-800/80 dark:text-rose-300 dark:hover:bg-rose-900/50 text-[11px] font-medium transition cursor-pointer shadow-2xs"
                     title="Hapus data ini"
                   >
-                    <Trash2Icon class="w-3.5 h-3.5" />
+                    <Trash2Icon class="w-3 h-3" />
                     <span>Hapus</span>
                   </button>
                 </div>

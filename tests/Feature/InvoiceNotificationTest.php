@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Mail\InvoiceMail;
+use App\Models\DataProgram;
 use App\Models\Dealer;
 use App\Models\Draft;
 use App\Models\Invoice;
+use App\Models\ProgramSubmission;
 use App\Models\User;
 use App\Services\DraftImportService;
 use App\Services\InvoiceGenerator;
@@ -275,6 +277,86 @@ class InvoiceNotificationTest extends TestCase
         $this->assertDatabaseHas('whatsapp_logs', ['invoice_id' => $invoices[2]->id, 'recipient_phone' => '6282222222222', 'status' => 'sent']);
     }
 
+    public function test_resend_invoice_does_not_duplicate_data_program(): void
+    {
+        $this->fakeInvoiceChannels();
+        Dealer::create(['kode_bt' => 'BT07238', 'dealer_name' => '6003 MOBILE', 'telemarketing_phone' => '081111111111']);
+        $invoice = $this->regionInvoice('BANDUNG', 'BT07238', '6003 MOBILE', 'CN-RESEND-001', 'mobile6003@example.com');
+        $invoice->update(['status' => 'sent', 'email_sent_at' => now(), 'whatsapp_sent_at' => now()]);
+
+        $initialDataProgramCount = DataProgram::count();
+
+        // Resend single invoice via POST /api/invoices/{id}/send
+        $response = $this->postJson("/api/invoices/{$invoice->id}/send", [
+            'email' => 'mobile6003@example.com',
+            'resend' => true,
+        ]);
+
+        $response->assertOk()
+            ->assertJson(['success' => true]);
+
+        // Verify DataProgram count did not increase
+        $this->assertSame($initialDataProgramCount, DataProgram::count());
+        Mail::assertSent(InvoiceMail::class);
+    }
+
+    public function test_resend_batch_invoices_with_resend_flag(): void
+    {
+        $this->fakeInvoiceChannels();
+        Dealer::create(['kode_bt' => 'BT07238', 'dealer_name' => '6003 MOBILE', 'telemarketing' => 'Tele Bandung', 'telemarketing_phone' => '081111111111']);
+        $invoice = $this->regionInvoice('BANDUNG', 'BT07238', '6003 MOBILE', 'CN-RESEND-002', 'mobile6003@example.com');
+        $invoice->update(['status' => 'sent', 'email_sent_at' => now(), 'whatsapp_sent_at' => now()]);
+
+        $initialDataProgramCount = DataProgram::count();
+
+        $response = $this->postJson('/api/invoices/send-batch', [
+            'ids' => [$invoice->id],
+            'resend' => true,
+        ]);
+
+        $response->assertOk()
+            ->assertJson(['success' => true, 'sent' => 1]);
+
+        $this->assertSame($initialDataProgramCount, DataProgram::count());
+    }
+
+    public function test_remind_upload_single_sends_whatsapp_to_telemarketing(): void
+    {
+        $this->fakeInvoiceChannels();
+        Dealer::create(['kode_bt' => 'BT07238', 'dealer_name' => '6003 MOBILE', 'telemarketing' => 'Tele Bandung', 'telemarketing_phone' => '081111111111']);
+        $invoice = $this->regionInvoice('BANDUNG', 'BT07238', '6003 MOBILE', 'CN-REMIND-001', 'mobile6003@example.com');
+
+        $response = $this->postJson("/api/invoices/{$invoice->id}/remind-upload");
+
+        $response->assertOk()
+            ->assertJson(['success' => true]);
+
+        Http::assertSent(fn ($request) => str_ends_with($request->url(), '/api/v1/messages')
+            && $request['recipient']['value'] === '6281111111111'
+            && str_contains($request['message']['text'], 'BELUM DI-UPLOAD'));
+    }
+
+    public function test_remind_upload_batch_sends_grouped_whatsapp_per_region(): void
+    {
+        $this->fakeInvoiceChannels();
+        Dealer::create(['kode_bt' => 'BT07238', 'dealer_name' => '6003 MOBILE', 'telemarketing' => 'Tele Bandung', 'telemarketing_phone' => '081111111111']);
+        $invoice1 = $this->regionInvoice('BANDUNG', 'BT07238', '6003 MOBILE', 'CN-REMIND-002', 'mobile6003@example.com');
+        $invoice2 = $this->regionInvoice('BANDUNG', 'BT07238', '6003 MOBILE', 'CN-REMIND-003', 'mobile6003@example.com');
+
+        $response = $this->postJson('/api/invoices/remind-upload-batch', [
+            'ids' => [$invoice1->id, $invoice2->id],
+        ]);
+
+        $response->assertOk()
+            ->assertJson(['success' => true, 'sent' => 2]);
+
+        Http::assertSent(fn ($request) => str_ends_with($request->url(), '/api/v1/messages')
+            && $request['recipient']['value'] === '6281111111111'
+            && str_contains($request['message']['text'], 'BELUM DI-UPLOAD')
+            && str_contains($request['message']['text'], 'CN-REMIND-002')
+            && str_contains($request['message']['text'], 'CN-REMIND-003'));
+    }
+
     public function test_region_whatsapp_attachment_uses_a_public_mirror_when_the_app_is_opened_over_wifi(): void
     {
         $this->fakeInvoiceChannels();
@@ -344,11 +426,48 @@ class InvoiceNotificationTest extends TestCase
             'invoice_number' => $invoiceNumber,
             'draft_id' => $draft->id,
             'invoice_type' => 'NPS FL',
+            'dealer_code' => $kodeBt,
             'dealer_name' => $dealerName,
             'customer_name' => $dealerName,
             'program_name' => 'PROGRAM SEPTEMBER 2026',
             'email' => $email,
             'status' => 'generated',
         ]);
+    }
+
+    public function test_filter_invoices_by_upload_status(): void
+    {
+        $invUploaded = $this->regionInvoice('BANDUNG', 'BT0991', 'TOKO UPLOADED', 'INV-UPL-001', 'toko1@example.com');
+        $invNotUploaded = $this->regionInvoice('BANDUNG', 'BT0992', 'TOKO NOT UPLOADED', 'INV-NOT-002', 'toko2@example.com');
+
+        // Create matching submission for $invUploaded
+        ProgramSubmission::create([
+            'id_real' => 'BT0991',
+            'dealer_name' => 'TOKO UPLOADED',
+            'program_name' => 'PROGRAM SEPTEMBER 2026',
+            'credit_note_url' => 'https://drive.google.com/file/d/test_cn_inv',
+            'row_hash' => 'hash_inv_test_sub',
+        ]);
+
+        // 1. Filter: uploaded
+        $resUploaded = $this->getJson('/api/invoices?upload_status=uploaded');
+        $resUploaded->assertOk();
+        $itemsUploaded = collect($resUploaded->json('data'))->pluck('invoice_number')->all();
+        $this->assertContains('INV-UPL-001', $itemsUploaded);
+        $this->assertNotContains('INV-NOT-002', $itemsUploaded);
+
+        // 2. Filter: unuploaded
+        $resUnuploaded = $this->getJson('/api/invoices?upload_status=unuploaded');
+        $resUnuploaded->assertOk();
+        $itemsUnuploaded = collect($resUnuploaded->json('data'))->pluck('invoice_number')->all();
+        $this->assertNotContains('INV-UPL-001', $itemsUnuploaded);
+        $this->assertContains('INV-NOT-002', $itemsUnuploaded);
+
+        // 3. Filter: all
+        $resAll = $this->getJson('/api/invoices');
+        $resAll->assertOk();
+        $itemsAll = collect($resAll->json('data'))->pluck('invoice_number')->all();
+        $this->assertContains('INV-UPL-001', $itemsAll);
+        $this->assertContains('INV-NOT-002', $itemsAll);
     }
 }

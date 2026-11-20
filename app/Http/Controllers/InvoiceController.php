@@ -9,6 +9,7 @@ use App\Models\EmailAccount;
 use App\Models\EmailLog;
 use App\Models\GoogleToken;
 use App\Models\Invoice;
+use App\Models\ProgramSubmission;
 use App\Models\WhatsAppLog;
 use App\Services\CustomerLookupService;
 use App\Services\DataProgramSyncService;
@@ -27,6 +28,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class InvoiceController extends Controller
 {
@@ -148,12 +150,59 @@ class InvoiceController extends Controller
             $query->where('status', $status);
         }
 
+        if ($uploadStatus = $request->input('upload_status')) {
+            if ($uploadStatus === 'uploaded' || $uploadStatus === 'yes') {
+                $query->whereUploadedToForm();
+            } elseif ($uploadStatus === 'unuploaded' || $uploadStatus === 'no') {
+                $query->whereNotUploadedToForm();
+            }
+        }
+
         if ($date = $request->input('date')) {
             $query->where('invoice_date', $date);
         }
 
         $perPage = min((int) $request->input('per_page', 15), 100);
         $invoices = $query->orderByDesc('id')->paginate($perPage);
+
+        $collection = $invoices->getCollection();
+        if ($collection->isNotEmpty()) {
+            $kodeBts = $collection->map(fn (Invoice $i) => $i->dealer_code ?: $i->draft?->kode_bt)->filter()->unique()->all();
+            $programNames = $collection->pluck('program_name')->filter()->unique()->all();
+            $invNumbers = $collection->pluck('invoice_number')->filter()->unique()->all();
+            $draftIds = $collection->pluck('draft_id')->filter()->unique()->all();
+
+            $uploadedSubmissions = ProgramSubmission::withoutGlobalScopes(['area', 'brand'])
+                ->whereIn('id_real', $kodeBts)
+                ->whereIn('program_name', $programNames)
+                ->where(fn ($q) => $q->whereNotNull('credit_note_url')->orWhereNotNull('agreement_url'))
+                ->get(['id_real', 'program_name'])
+                ->mapWithKeys(fn ($s) => ["{$s->id_real}|{$s->program_name}" => true])
+                ->all();
+
+            $uploadedDpCns = DataProgram::withoutGlobalScopes(['area', 'brand'])
+                ->where(function ($q) use ($invNumbers, $draftIds) {
+                    $q->whereIn('cn', $invNumbers);
+                    if (! empty($draftIds)) {
+                        $q->orWhereIn('draft_id', $draftIds);
+                    }
+                })
+                ->where(function ($q) {
+                    $q->where(fn ($sub) => $sub->where('cek_dokumen', '!=', 'BELUM MATCH TEST')->whereNotNull('cek_dokumen'))
+                        ->orWhere(fn ($sub) => $sub->whereNotNull('cn')->where('cn', 'like', 'http%'))
+                        ->orWhere(fn ($sub) => $sub->whereNotNull('agrement')->where('agrement', 'like', 'http%'));
+                })
+                ->pluck('cn')
+                ->flip()
+                ->all();
+
+            $collection->each(function (Invoice $inv) use ($uploadedSubmissions, $uploadedDpCns) {
+                $kodeBt = $inv->dealer_code ?: $inv->draft?->kode_bt;
+                $key = "{$kodeBt}|{$inv->program_name}";
+                $isUploaded = isset($uploadedSubmissions[$key]) || isset($uploadedDpCns[$inv->invoice_number]);
+                $inv->setAttribute('is_uploaded_to_form', $isUploaded);
+            });
+        }
 
         return response()->json($invoices);
     }
@@ -452,14 +501,7 @@ class InvoiceController extends Controller
     public function sendEmail(Request $request, $id): JsonResponse
     {
         $invoice = Invoice::with('draft')->findOrFail($id);
-
-        $hasSentAll = ($invoice->email_sent_at && $invoice->whatsapp_sent_at);
-        if ($invoice->status === 'sent' && $hasSentAll && ! $request->has('email') && ! $request->has('whatsapp')) {
-            return response()->json([
-                'success' => false,
-                'message' => "Invoice {$invoice->invoice_number} sudah pernah dikirim lengkap ke Email dan WhatsApp.",
-            ], 422);
-        }
+        $wasAlreadySent = (bool) ($invoice->email_sent_at || $invoice->whatsapp_sent_at);
 
         // Validate sender if sender_id provided
         if ($request->has('sender_id')) {
@@ -564,7 +606,8 @@ class InvoiceController extends Controller
             $updates['status'] = 'sent';
             $invoice->update($updates);
 
-            $msg = "Invoice {$invoice->invoice_number} berhasil dikirim ke ".implode(' & ', $sentChannels).'.';
+            $actionText = $wasAlreadySent ? 'berhasil dikirim ulang ke' : 'berhasil dikirim ke';
+            $msg = "Invoice {$invoice->invoice_number} {$actionText} ".implode(' & ', $sentChannels).'.';
             if (! empty($failedChannels)) {
                 $msg .= ' (Gagal pada: '.implode(', ', $failedChannels).')';
             }
@@ -605,16 +648,20 @@ class InvoiceController extends Controller
             ], 422);
         }
 
-        $invoices = $this->unsentInvoices()->whereIn('id', $ids)->get();
+        $resend = $request->boolean('resend', false);
+        $invoices = Invoice::with('draft')->whereIn('id', $ids)->orderBy('id')->get();
 
         if ($invoices->isEmpty()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Semua invoice yang dipilih sudah pernah dikirim sebelumnya.',
+                'message' => 'Invoice yang dipilih tidak ditemukan.',
             ], 422);
         }
 
-        return $this->sendInvoices($invoices, $this->resolveSender($request->input('sender_id')), $regionSender);
+        $hasUnsent = $invoices->contains(fn (Invoice $inv) => $inv->status !== 'sent' || ! $inv->email_sent_at || ! $inv->whatsapp_sent_at);
+        $effectiveResend = $resend || ! $hasUnsent;
+
+        return $this->sendInvoices($invoices, $this->resolveSender($request->input('sender_id')), $regionSender, resend: $effectiveResend);
     }
 
     /**
@@ -631,7 +678,7 @@ class InvoiceController extends Controller
             ], 422);
         }
 
-        return $this->sendInvoices($invoices, $this->resolveSender($request->input('sender_id')), $regionSender);
+        return $this->sendInvoices($invoices, $this->resolveSender($request->input('sender_id')), $regionSender, resend: false);
     }
 
     /**
@@ -650,16 +697,17 @@ class InvoiceController extends Controller
     /**
      * Email each invoice to its dealer (the draft's Email), and WhatsApp the invoices to telemarketing: the invoices of
      * one region with the same telemarketing number go together as one PDF, one invoice per page. A channel already
-     * sent for an invoice is skipped.
+     * sent for an invoice is skipped unless $resend is true.
      *
      * @param  Collection<int, Invoice>  $invoices
      */
-    private function sendInvoices(Collection $invoices, EmailAccount $sender, InvoiceRegionSender $regionSender): JsonResponse
+    private function sendInvoices(Collection $invoices, EmailAccount $sender, InvoiceRegionSender $regionSender, bool $resend = false): JsonResponse
     {
         $updates = [];
         $emailFailed = [];
 
-        foreach ($invoices->whereNull('email_sent_at') as $invoice) {
+        $emailInvoices = $resend ? $invoices : $invoices->whereNull('email_sent_at');
+        foreach ($emailInvoices as $invoice) {
             $email = $invoice->email ?: $invoice->draft?->email;
 
             if (! $email || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -673,7 +721,8 @@ class InvoiceController extends Controller
             }
         }
 
-        $whatsApp = $regionSender->send($invoices->whereNull('whatsapp_sent_at')->values());
+        $waInvoices = $resend ? $invoices->values() : $invoices->whereNull('whatsapp_sent_at')->values();
+        $whatsApp = $regionSender->send($waInvoices);
 
         foreach (array_keys($whatsApp['sent']) as $invoiceId) {
             $updates[$invoiceId] = [...($updates[$invoiceId] ?? []), 'whatsapp_sent_at' => now()];
@@ -686,9 +735,10 @@ class InvoiceController extends Controller
         $files = collect($whatsApp['files']);
         $emailed = count(array_filter($updates, fn (array $update) => isset($update['email_sent_at'])));
 
+        $statusWord = $resend ? 'terkirim / dikirim ulang' : 'terkirim';
         $message = array_filter([
-            'Pengiriman selesai: '.count($updates)." dari {$invoices->count()} invoice terkirim.",
-            $emailed > 0 ? "Email ke dealer: {$emailed} terkirim." : null,
+            'Pengiriman selesai: '.count($updates)." dari {$invoices->count()} invoice {$statusWord}.",
+            $emailed > 0 ? "Email ke dealer: {$emailed} {$statusWord}." : null,
             $emailFailed ? 'Email gagal: '.$this->invoiceNumberList($emailFailed).'.' : null,
             $files->where('success', true)->isNotEmpty()
                 ? 'WhatsApp ke telemarketing: '.$files->where('success', true)->map(fn (array $file) => "Region {$file['region']} ({$file['count']} invoice, 1 PDF)")->implode(', ').'.'
@@ -706,6 +756,131 @@ class InvoiceController extends Controller
             'failed' => $invoices->count() - count($updates),
             'whatsapp_files' => $whatsApp['files'],
         ], $updates !== [] ? 200 : 422);
+    }
+
+    /**
+     * Send WhatsApp upload reminder to telemarketing for a single invoice.
+     */
+    public function remindUpload(Request $request, $id): JsonResponse
+    {
+        $invoice = Invoice::with('draft')->findOrFail($id);
+
+        $result = $this->whatsAppService->sendInvoiceUploadReminderToTelemarketing($invoice, $request->input('phone'));
+
+        if (! $result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => "Pengingat upload dokumen untuk invoice {$invoice->invoice_number} berhasil dikirim ke WhatsApp Telemarketing.",
+            'provider_id' => $result['provider_id'] ?? null,
+        ]);
+    }
+
+    /**
+     * Send batch WhatsApp upload reminder to telemarketing per region for selected invoices.
+     */
+    public function remindUploadBatch(Request $request): JsonResponse
+    {
+        $ids = $request->input('ids', []);
+        if (empty($ids) || ! is_array($ids)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pilih setidaknya satu invoice untuk diingatkan.',
+            ], 422);
+        }
+
+        $invoices = Invoice::with('draft')->whereIn('id', $ids)->get();
+        if ($invoices->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invoice tidak ditemukan.',
+            ], 422);
+        }
+
+        $groups = [];
+        $withoutPhone = [];
+
+        foreach ($invoices as $invoice) {
+            $dealer = $invoice->dealer();
+            $phone = $this->whatsAppService->formatPhone($dealer?->telemarketing_phone);
+
+            if (! $phone) {
+                $withoutPhone[] = $invoice->invoice_number;
+
+                continue;
+            }
+
+            $region = strtoupper(trim((string) ($invoice->draft?->region ?: $dealer->region))) ?: 'TANPA REGION';
+            $key = "{$region}|{$phone}";
+            $groups[$key] ??= [
+                'region' => $region,
+                'phone' => $phone,
+                'name' => trim((string) $dealer->telemarketing) ?: null,
+                'invoices' => collect(),
+            ];
+            $groups[$key]['invoices']->push($invoice);
+        }
+
+        $sentCount = 0;
+        $failedCount = 0;
+        $fileResults = [];
+
+        foreach ($groups as $group) {
+            $uploadUrl = $group['invoices']->first()->documentUploadUrl();
+            $text = $this->whatsAppService->buildRegionUploadReminderMessage($group['region'], $group['name'], $group['invoices'], $uploadUrl);
+            $clientRef = 'REMIND-UP-REG-'.Str::slug($group['region']).'-'.now()->format('His');
+
+            $res = $this->whatsAppService->sendTextMessage($group['phone'], $text, $clientRef);
+
+            foreach ($group['invoices'] as $inv) {
+                WhatsAppLog::create([
+                    'invoice_id' => $inv->id,
+                    'invoice_number' => $inv->invoice_number,
+                    'recipient_phone' => $group['phone'],
+                    'status' => $res['success'] ? 'sent' : 'failed',
+                    'provider_message_id' => $res['provider_id'] ?? null,
+                    'error_message' => $res['success'] ? null : $res['message'],
+                ]);
+            }
+
+            if ($res['success']) {
+                $sentCount += $group['invoices']->count();
+            } else {
+                $failedCount += $group['invoices']->count();
+            }
+
+            $fileResults[] = [
+                'region' => $group['region'],
+                'phone' => $group['phone'],
+                'count' => $group['invoices']->count(),
+                'success' => $res['success'],
+                'message' => $res['message'],
+            ];
+        }
+
+        $parts = [];
+        if ($sentCount > 0) {
+            $parts[] = "Pengingat berhasil dikirim untuk {$sentCount} invoice.";
+        }
+        if ($failedCount > 0) {
+            $parts[] = "Gagal mengirim pengingat untuk {$failedCount} invoice.";
+        }
+        if (! empty($withoutPhone)) {
+            $parts[] = 'Nomor WA telemarketing belum ada di Master Dealer untuk: '.implode(', ', array_slice($withoutPhone, 0, 5)).(count($withoutPhone) > 5 ? '…' : '').'.';
+        }
+
+        return response()->json([
+            'success' => $sentCount > 0,
+            'message' => implode(' ', $parts),
+            'sent' => $sentCount,
+            'failed' => $failedCount,
+            'results' => $fileResults,
+        ], $sentCount > 0 ? 200 : 422);
     }
 
     /**
