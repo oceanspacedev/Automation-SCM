@@ -107,4 +107,44 @@ class MasterDataFeatureTest extends TestCase
             'data',
         ]);
     }
+
+    public function test_can_update_dealer_email(): void
+    {
+        $dealer = Dealer::create([
+            'kode_bt' => 'BT09901',
+            'dealer_name' => 'Toko Update Email',
+            'email' => 'lama@toko.com',
+            'is_active' => true,
+        ]);
+
+        $response = $this->putJson("/api/dealers/{$dealer->id}", [
+            'kode_bt' => $dealer->kode_bt,
+            'dealer_name' => $dealer->dealer_name,
+            'email' => 'baru@toko.com',
+            'is_active' => true,
+        ]);
+
+        $response->assertOk();
+        $dealer->refresh();
+        $this->assertSame('baru@toko.com', $dealer->email);
+    }
+
+    public function test_dealer_email_validation_rejects_invalid_format(): void
+    {
+        $dealer = Dealer::create([
+            'kode_bt' => 'BT09902',
+            'dealer_name' => 'Toko Invalid Email',
+            'is_active' => true,
+        ]);
+
+        $response = $this->putJson("/api/dealers/{$dealer->id}", [
+            'kode_bt' => $dealer->kode_bt,
+            'dealer_name' => $dealer->dealer_name,
+            'email' => 'bukan-email-valid',
+            'is_active' => true,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['email']);
+    }
 }

@@ -645,6 +645,24 @@
                 class="w-full h-9 px-3 rounded-lg border border-gray-300 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-900"
               />
             </div>
+            <div>
+              <label class="block font-medium text-gray-900 mb-1">Email Toko</label>
+              <input
+                type="text"
+                v-model="formData.email"
+                placeholder="cth: toko@gmail.com"
+                class="w-full h-9 px-3 rounded-lg border border-gray-300 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-900 lowercase"
+              />
+            </div>
+            <div>
+              <label class="block font-medium text-gray-900 mb-1">Nama PIC Toko</label>
+              <input
+                type="text"
+                v-model="formData.pic_name"
+                placeholder="Nama PIC toko"
+                class="w-full h-9 px-3 rounded-lg border border-gray-300 text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-900"
+              />
+            </div>
           </div>
 
           <!-- Alamat -->

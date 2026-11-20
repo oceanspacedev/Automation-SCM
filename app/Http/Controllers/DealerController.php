@@ -425,7 +425,19 @@ class DealerController extends Controller
             'telemarketing_phone' => ['nullable', 'string', 'max:50'],
             'sales_person' => ['nullable', 'string', 'max:255'],
             'whatsapp' => ['nullable', 'string', 'max:50'],
-            'email' => ['nullable', 'string', 'email', 'max:255'],
+            'email' => [
+                'nullable',
+                'string',
+                'max:255',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $parts = preg_split('/[,;\s]+/', trim((string) $value), -1, PREG_SPLIT_NO_EMPTY);
+                    foreach ($parts as $part) {
+                        if (filter_var($part, FILTER_VALIDATE_EMAIL) === false) {
+                            $fail("Format email '{$part}' tidak valid.");
+                        }
+                    }
+                },
+            ],
             'pic_name' => ['nullable', 'string', 'max:150'],
             'agreement_url' => ['nullable', 'url', 'max:1000'],
             'is_active' => ['boolean'],
@@ -448,6 +460,9 @@ class DealerController extends Controller
             if (array_key_exists($field, $validated)) {
                 $validated[$field] = $validated[$field] ? strtoupper(trim($validated[$field])) : null;
             }
+        }
+        if (array_key_exists('email', $validated)) {
+            $validated['email'] = $validated['email'] ? strtolower(trim((string) $validated['email'])) : null;
         }
 
         return $validated;
