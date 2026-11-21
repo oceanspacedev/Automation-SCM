@@ -70,6 +70,12 @@ Schedule::command('invoices:remind-telemarketing-upload')
     ->withoutOverlapping()
     ->runInBackground();
 
+// Perbarui otomatis Lama Pending (selisih hari ini - Tgl Share CN) & Keterangan aging setiap hari pukul 00:01 WIB
+Schedule::command('program:update-pending')
+    ->dailyAt('00:01')
+    ->withoutOverlapping()
+    ->runInBackground();
+
 Artisan::command('program:refresh-completeness', function () {
     $this->info('Memperbarui status kelengkapan dokumen Non-PKP...');
     $reconciler = app(ProgramReconciliationService::class);

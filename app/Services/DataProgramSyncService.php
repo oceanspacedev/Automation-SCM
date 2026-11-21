@@ -1018,9 +1018,11 @@ class DataProgramSyncService
             'no_po_sj' => trim((string) ($row[25] ?? '')) ?: null,
             'no_transaksi' => trim((string) ($row[26] ?? '')) ?: null,
             'tgl_input' => trim((string) ($row[27] ?? '')) ?: null,
-            'tgl_share_cn' => trim((string) ($row[28] ?? '')) ?: null,
-            'lama_pending' => trim((string) ($row[29] ?? '')) ?: null,
-            'keterangan' => trim((string) ($row[30] ?? '')) ?: null,
+            'tgl_share_cn' => $tglShareCn = trim((string) ($row[28] ?? '')) ?: null,
+            'lama_pending' => ($daysSince = DataProgram::daysSince($tglShareCn)) !== null ? (string) $daysSince : (trim((string) ($row[29] ?? '')) ?: null),
+            'keterangan' => ($rawKet = trim((string) ($row[30] ?? '')) ?: null) && ! in_array($rawKet, ['LEBIH DARI 30 HARI', 'KURANG DARI 30 HARI'], true)
+                ? $rawKet
+                : ($daysSince !== null ? DataProgram::agingKeterangan($daysSince) : $rawKet),
             'cek_dokumen' => trim((string) ($row[31] ?? '')) ?: null,
             'status_potong_purchase' => trim((string) ($row[32] ?? '')) ?: null,
             'status_potong_ar' => trim((string) ($row[33] ?? '')) ?: null,

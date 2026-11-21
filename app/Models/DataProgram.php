@@ -124,7 +124,41 @@ class DataProgram extends Model
             return null;
         }
 
-        return checkdate($month, $day, $year) ? max(0, (int) Carbon::create($year, $month, $day)->diffInDays(now())) : null;
+        return checkdate($month, $day, $year) ? max(0, (int) Carbon::create($year, $month, $day)->startOfDay()->diffInDays(now()->startOfDay())) : null;
+    }
+
+    /**
+     * Lama Pending is the difference in calendar days: Today() - Tgl Share CN.
+     * Equivalent to Excel formula: =DAYS(TODAY(), [Tgl Share CN]).
+     */
+    public function getLamaPendingAttribute($value): ?string
+    {
+        if (filled($this->tgl_share_cn)) {
+            $days = self::daysSince($this->tgl_share_cn);
+            if ($days !== null) {
+                return (string) $days;
+            }
+        }
+
+        return $value !== null && $value !== '' ? (string) $value : null;
+    }
+
+    /**
+     * Keterangan aging text (LEBIH DARI 30 HARI / KURANG DARI 30 HARI).
+     * Kept automatically in sync when empty or set to default aging status.
+     */
+    public function getKeteranganAttribute($value): ?string
+    {
+        if (empty($value) || in_array($value, ['LEBIH DARI 30 HARI', 'KURANG DARI 30 HARI'], true)) {
+            if (filled($this->tgl_share_cn)) {
+                $days = self::daysSince($this->tgl_share_cn);
+                if ($days !== null) {
+                    return self::agingKeterangan($days);
+                }
+            }
+        }
+
+        return $value;
     }
 
     /**

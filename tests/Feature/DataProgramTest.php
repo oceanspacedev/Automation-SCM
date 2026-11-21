@@ -1678,4 +1678,52 @@ class DataProgramTest extends TestCase
         $this->assertSame('row_5', $mapped['row_hash']);
         $this->assertSame('CV OLIVIA', $mapped['dealer_name']);
     }
+
+    public function test_lama_pending_and_keterangan_are_automatically_calculated_from_tgl_share_cn(): void
+    {
+        $this->travelTo('2026-11-21 10:00:00');
+
+        $dp1 = DataProgram::create([
+            'row_hash' => 'hash_pending_1',
+            'dealer_name' => 'DEALER PENDING 10 HARI',
+            'tgl_share_cn' => '2026-11-11',
+            'lama_pending' => null,
+            'keterangan' => null,
+        ]);
+
+        $this->assertSame('10', $dp1->lama_pending);
+        $this->assertSame('KURANG DARI 30 HARI', $dp1->keterangan);
+
+        $dp2 = DataProgram::create([
+            'row_hash' => 'hash_pending_2',
+            'dealer_name' => 'DEALER PENDING 35 HARI',
+            'tgl_share_cn' => '17/10/2026', // Format d/m/Y (17 Oktober ke 21 November = 35 hari)
+            'lama_pending' => '0',
+            'keterangan' => 'KURANG DARI 30 HARI',
+        ]);
+
+        $this->assertSame('35', $dp2->lama_pending);
+        $this->assertSame('LEBIH DARI 30 HARI', $dp2->keterangan);
+    }
+
+    public function test_command_program_update_pending_recalculates_and_persists_pending_days(): void
+    {
+        $this->travelTo('2026-11-21 10:00:00');
+
+        $dp = DataProgram::create([
+            'row_hash' => 'hash_pending_cmd',
+            'dealer_name' => 'DEALER CMD',
+            'tgl_share_cn' => '2026-11-01',
+            'lama_pending' => '0',
+            'keterangan' => 'KURANG DARI 30 HARI',
+        ]);
+
+        $this->artisan('program:update-pending')->assertSuccessful();
+
+        $this->assertDatabaseHas('data_programs', [
+            'id' => $dp->id,
+            'lama_pending' => '20',
+            'keterangan' => 'KURANG DARI 30 HARI',
+        ]);
+    }
 }

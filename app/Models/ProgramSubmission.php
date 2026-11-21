@@ -57,4 +57,38 @@ class ProgramSubmission extends Model
     {
         return $this->whatsapp ?: config('services.wag.ar_phone', '081224290502');
     }
+
+    /**
+     * Lama Pending is the difference in calendar days: Today() - Tgl Share CN.
+     * Equivalent to Excel formula: =DAYS(TODAY(), [Tgl Share CN]).
+     */
+    public function getLamaPendingAttribute($value): ?string
+    {
+        if (filled($this->tgl_share_cn)) {
+            $days = DataProgram::daysSince($this->tgl_share_cn);
+            if ($days !== null) {
+                return (string) $days;
+            }
+        }
+
+        return $value !== null && $value !== '' ? (string) $value : null;
+    }
+
+    /**
+     * Keterangan aging text (LEBIH DARI 30 HARI / KURANG DARI 30 HARI).
+     * Kept automatically in sync when empty or set to default aging status.
+     */
+    public function getKeteranganAttribute($value): ?string
+    {
+        if (empty($value) || in_array($value, ['LEBIH DARI 30 HARI', 'KURANG DARI 30 HARI'], true)) {
+            if (filled($this->tgl_share_cn)) {
+                $days = DataProgram::daysSince($this->tgl_share_cn);
+                if ($days !== null) {
+                    return DataProgram::agingKeterangan($days);
+                }
+            }
+        }
+
+        return $value;
+    }
 }

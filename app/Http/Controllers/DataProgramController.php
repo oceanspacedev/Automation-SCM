@@ -1029,14 +1029,12 @@ class DataProgramController extends Controller
      */
     private function withAging(DataProgram $dp, array $attributes): array
     {
-        $days = DataProgram::daysSince($attributes['tgl_share_cn'] ?? null);
+        $days = DataProgram::daysSince($attributes['tgl_share_cn'] ?? $dp->tgl_share_cn);
         if ($days === null) {
             return $attributes;
         }
 
-        if (! isset($attributes['lama_pending']) || $attributes['lama_pending'] === '') {
-            $attributes['lama_pending'] = (string) $days;
-        }
+        $attributes['lama_pending'] = (string) $days;
 
         $keterangan = array_key_exists('keterangan', $attributes) ? $attributes['keterangan'] : $dp->keterangan;
         if (empty($keterangan) || in_array($keterangan, ['LEBIH DARI 30 HARI', 'KURANG DARI 30 HARI'], true)) {
