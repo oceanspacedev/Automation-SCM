@@ -270,6 +270,7 @@ class DataProgramTest extends TestCase
 
     public function test_can_sync_from_google_apps_script_web_app_url(): void
     {
+        config(['services.google_sheets.enabled' => true]);
         Http::fake([
             'script.google.com/macros/s/*' => Http::response([
                 'success' => true,
@@ -519,6 +520,7 @@ class DataProgramTest extends TestCase
 
     public function test_bulk_update_fills_one_column_of_several_rows_and_pushes_them_in_one_request(): void
     {
+        config(['services.google_sheets.enabled' => true]);
         Http::fake(['script.google.com/macros/s/*' => Http::response(['success' => true, 'updated_count' => 2])]);
 
         $first = DataProgram::create(['row_hash' => 'row_5', 'dealer_name' => 'CV OLIVIA']);
@@ -543,6 +545,7 @@ class DataProgramTest extends TestCase
 
     public function test_no_transaksi_can_be_filled_in_the_table_like_no_po(): void
     {
+        config(['services.google_sheets.enabled' => true]);
         Http::fake(['script.google.com/macros/s/*' => Http::response(['success' => true, 'updated_count' => 1])]);
         $dp = DataProgram::create(['row_hash' => 'row_5', 'dealer_name' => 'CV OLIVIA']);
 
@@ -1396,6 +1399,7 @@ class DataProgramTest extends TestCase
 
     public function test_ar_can_confirm_potong_and_update_spreadsheet(): void
     {
+        config(['services.google_sheets.enabled' => true]);
         Cache::put(DataProgramSyncService::CACHE_KEY_SPREADSHEET_URL, 'https://script.google.com/macros/s/test_token/exec');
 
         Http::fake([
@@ -1584,6 +1588,8 @@ class DataProgramTest extends TestCase
             'dealer_name' => 'OLD TAIL DEALER',
             'program_name' => 'PROGRAM 3',
         ]);
+
+        config(['services.google_sheets.enabled' => true]);
 
         Http::fake([
             'script.google.com/macros/s/*' => Http::response([

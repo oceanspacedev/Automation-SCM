@@ -232,6 +232,10 @@ class DataProgramPoImportService
      */
     private function pushToSpreadsheet(Collection $dataPrograms): array
     {
+        if (! DataProgramSyncService::isGoogleSheetsEnabled()) {
+            return [];
+        }
+
         $overwriteWarning = 'Nomor bisa tertimpa kosong lagi saat sinkron dari spreadsheet.';
         $results = [];
 

@@ -22,6 +22,15 @@ class DataProgramSyncService
     public const DEFAULT_SPREADSHEET_URL = 'https://docs.google.com/spreadsheets/d/1AFEAxjycq50heaxJeAH9YjpVWFs3GeprplJDOJMzjSU/export?format=csv&gid=241795572';
 
     /**
+     * Whether outbound Google Spreadsheet / Apps Script integration is enabled.
+     * Disabled by default because the application runs fully on the web (Gmail OAuth is unaffected).
+     */
+    public static function isGoogleSheetsEnabled(): bool
+    {
+        return (bool) config('services.google_sheets.enabled', false);
+    }
+
+    /**
      * Get configured Google Sheet CSV URL of a brand & area (defaults to the brand & area selected for the request).
      * Only Realme Jawa Barat has a built-in default spreadsheet; others must be configured first.
      */
@@ -169,6 +178,16 @@ class DataProgramSyncService
      */
     public function sync(?string $customUrl = null, int $limit = 0): array
     {
+        if (! self::isGoogleSheetsEnabled()) {
+            return [
+                'total_rows' => 0,
+                'synced_count' => 0,
+                'new_count' => 0,
+                'updated_count' => 0,
+                'message' => 'Integrasi Google Spreadsheet dinonaktifkan.',
+            ];
+        }
+
         $area = $this->currentArea();
         $url = trim((string) ($customUrl ?: ($this->getSpreadsheetUrl($area) ?: $this->getWebAppUrl($area))));
 
@@ -284,6 +303,14 @@ class DataProgramSyncService
      */
     public function pushUpdatesToSpreadsheet(array $rowsToUpdate, ?string $customUrl = null, ?Area $area = null, ?string $brand = null): array
     {
+        if (! self::isGoogleSheetsEnabled()) {
+            return [
+                'success' => true,
+                'updated_count' => 0,
+                'message' => 'Integrasi Google Spreadsheet dinonaktifkan (perubahan tersimpan di aplikasi web).',
+            ];
+        }
+
         $url = trim((string) ($customUrl ?: $this->getWebAppUrl($area, $brand)));
 
         if (empty($url) || ! str_contains($url, 'script.google.com/macros/s/')) {
@@ -682,6 +709,14 @@ class DataProgramSyncService
      */
     public function pushDraftsToSpreadsheet(array $dataPrograms, ?string $customUrl = null): array
     {
+        if (! self::isGoogleSheetsEnabled()) {
+            return [
+                'success' => true,
+                'count' => 0,
+                'message' => 'Integrasi Google Spreadsheet dinonaktifkan (draft tersimpan di aplikasi web).',
+            ];
+        }
+
         // Kirim tiap brand & area ke spreadsheet masing-masing
         $groups = collect($dataPrograms)
             ->filter(fn ($dp) => $dp instanceof DataProgram)

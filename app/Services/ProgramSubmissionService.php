@@ -122,6 +122,13 @@ class ProgramSubmissionService
      */
     public function appendSubmissionToSpreadsheet(ProgramSubmission $submission, ?string $customUrl = null): array
     {
+        if (! DataProgramSyncService::isGoogleSheetsEnabled()) {
+            return [
+                'success' => true,
+                'message' => 'Integrasi Google Spreadsheet dinonaktifkan (pengajuan tersimpan di aplikasi web).',
+            ];
+        }
+
         $url = trim((string) ($customUrl ?: $this->getWebAppUrl($submission->areaEnum(), $submission->brand)));
 
         if (empty($url) || ! str_contains($url, 'script.google.com/macros/s/')) {
@@ -212,6 +219,16 @@ class ProgramSubmissionService
      */
     public function syncFromWebAppUrl(?string $customUrl = null, int $limit = 0): array
     {
+        if (! DataProgramSyncService::isGoogleSheetsEnabled()) {
+            return [
+                'total_rows' => 0,
+                'synced_count' => 0,
+                'new_count' => 0,
+                'updated_count' => 0,
+                'message' => 'Integrasi Google Spreadsheet dinonaktifkan.',
+            ];
+        }
+
         $url = trim((string) ($customUrl ?: $this->getWebAppUrl()));
 
         if (empty($url)) {

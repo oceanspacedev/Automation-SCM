@@ -49,6 +49,12 @@ return [
         'url' => env('PROGRAM_FORM_URL', 'https://scm-customer.oceanspace.co.id'),
     ],
 
+    // Integrasi Google Spreadsheet & Apps Script (push/sync data ke sheet).
+    // Default NONAKTIF karena operasional sudah penuh di web; tidak memengaruhi Google OAuth / Gmail untuk kirim email invoice.
+    'google_sheets' => [
+        'enabled' => (bool) env('GOOGLE_SHEETS_ENABLED', false),
+    ],
+
     // Sinkron terjadwal Data Program dari Google Spreadsheet (tiap menit, sheet dianggap sumber utama): mati kecuali
     // ENABLE_AUTO_SYNC_SCHEDULE=true, karena Data Program sudah dikelola di aplikasi
     'data_program' => [

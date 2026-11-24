@@ -246,6 +246,7 @@ class AreaSeparationTest extends TestCase
 
     public function test_draft_of_an_area_is_sent_to_that_area_data_program_and_spreadsheet(): void
     {
+        config(['services.google_sheets.enabled' => true]);
         Http::fake();
         Cache::forever(Area::Jateng->settingKey(DataProgramSyncService::CACHE_KEY_WEBAPP_URL), 'https://script.google.com/macros/s/JATENG_APP/exec');
 

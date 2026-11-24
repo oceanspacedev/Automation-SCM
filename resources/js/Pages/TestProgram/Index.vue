@@ -694,7 +694,6 @@ const pagination = reactive({
 
 onMounted(() => {
   fetchSubmissions();
-  loadSheetUrl();
 });
 
 // Pengajuan baru dari form publik muncul sendiri; berhenti selama modal terbuka

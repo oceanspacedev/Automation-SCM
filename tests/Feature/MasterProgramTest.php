@@ -210,6 +210,7 @@ class MasterProgramTest extends TestCase
 
     public function test_a_saved_program_fills_its_code_into_data_program_rows_and_drafts_without_one(): void
     {
+        config(['services.google_sheets.enabled' => true]);
         Cache::put(DataProgramSyncService::CACHE_KEY_SPREADSHEET_URL, 'https://script.google.com/macros/s/test_token/exec');
         Http::fake(['https://script.google.com/macros/s/*' => Http::response(['success' => true, 'updated_count' => 1], 200)]);
         MasterProgram::create(['code' => 'PROGRAM 345', 'name' => 'PROGRAM DSA JANUARI 2026']);

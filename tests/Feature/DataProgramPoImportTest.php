@@ -6,6 +6,7 @@ use App\Area;
 use App\Models\DataProgram;
 use App\Models\User;
 use App\Services\DataProgramSyncService;
+use App\Services\ProgramSubmissionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
@@ -29,6 +30,7 @@ class DataProgramPoImportTest extends TestCase
 
     public function test_import_fills_no_po_sj_and_no_transaksi_by_kode_bt_and_program_name(): void
     {
+        config(['services.google_sheets.enabled' => true]);
         Http::preventStrayRequests();
         Http::fake(['script.google.com/*' => Http::response(['updated_count' => 1])]);
         Cache::forever(Area::Jateng->settingKey(DataProgramSyncService::CACHE_KEY_WEBAPP_URL), 'https://script.google.com/macros/s/JATENG_APP/exec');
@@ -149,6 +151,7 @@ class DataProgramPoImportTest extends TestCase
 
     public function test_import_into_an_area_without_a_spreadsheet_only_saves_the_numbers_in_the_app(): void
     {
+        config(['services.google_sheets.enabled' => true]);
         Http::preventStrayRequests();
         $dataProgram = $this->dataProgram('jateng', 'BTO5165', 'PROGRAM PEAKSEASON SEPTEMBER 2026');
 
@@ -176,6 +179,37 @@ class DataProgramPoImportTest extends TestCase
         ])])
             ->assertStatus(422)
             ->assertJsonPath('message', 'Kolom Kode BT, Nama Program, dan No PO/SJ atau No. Trs tidak ditemukan di file.');
+    }
+
+    public function test_google_sheets_and_apps_script_requests_are_skipped_by_default(): void
+    {
+        $this->assertFalse(DataProgramSyncService::isGoogleSheetsEnabled());
+        Http::preventStrayRequests();
+
+        $dp = $this->dataProgram('jabar', 'BT05165', 'PROGRAM PEAKSEASON SEPTEMBER 2026');
+
+        // Edit Data Program, bulk edit, import PO, sync & push submission tidak boleh mengirim HTTP ke Apps Script
+        $this->putJson("/api/data-program/{$dp->id}", ['no_po' => 'PO-WEB-001', 'push_to_sheet' => true])
+            ->assertOk();
+        $this->assertSame('PO-WEB-001', $dp->fresh()->no_po);
+
+        $this->postJson('/api/data-program/import-po', ['file' => $this->excel([
+            ['Kode BT', 'NAMA PROGRAM', 'NO PO/SJ', 'No. Trs'],
+            ['BT05165', 'PROGRAM PEAKSEASON SEPTEMBER 2026', 2610000373, null],
+        ])], ['X-Area' => 'jabar'])
+            ->assertOk()
+            ->assertJsonPath('data.updated', 1)
+            ->assertJsonPath('data.sheet_push', []);
+
+        $this->assertSame('2610000373', $dp->fresh()->no_po_sj);
+
+        $syncResult = app(DataProgramSyncService::class)->sync();
+        $this->assertSame(0, $syncResult['synced_count']);
+
+        $subSyncResult = app(ProgramSubmissionService::class)->syncFromWebAppUrl();
+        $this->assertSame(0, $subSyncResult['synced_count']);
+
+        Http::assertNothingSent();
     }
 
     /**

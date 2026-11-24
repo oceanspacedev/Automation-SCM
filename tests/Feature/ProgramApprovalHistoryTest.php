@@ -89,6 +89,7 @@ class ProgramApprovalHistoryTest extends TestCase
 
     public function test_each_step_from_the_whatsapp_to_telemarketing_until_the_tax_check_is_recorded(): void
     {
+        config(['services.google_sheets.enabled' => true]);
         Cache::put(DataProgramSyncService::CACHE_KEY_SPREADSHEET_URL, 'https://script.google.com/macros/s/test_token/exec');
         ArContact::factory()->create(['area' => 'jabar', 'name' => 'SITI AMINAH', 'whatsapp' => '081300000002']);
         $this->postJson('/api/team-contacts', ['team' => 'tax', 'name' => 'TIM PAJAK JABAR', 'whatsapp' => '081300000009'], self::HEADERS)->assertCreated();

@@ -31,9 +31,9 @@ Schedule::call(static function (): void {
     ->name('scheduler-heartbeat')
     ->everyMinute();
 
-// Sinkron Data Program dari Google Spreadsheet hanya bila dinyalakan (ENABLE_AUTO_SYNC_SCHEDULE=true): sheet menimpa isi
+// Sinkron Data Program dari Google Spreadsheet hanya bila dinyalakan (GOOGLE_SHEETS_ENABLED=true & ENABLE_AUTO_SYNC_SCHEDULE=true): sheet menimpa isi
 // Data Program, termasuk tanggal & nomor yang sudah dikelola di aplikasi
-if (config('services.data_program.auto_sync')) {
+if (config('services.data_program.auto_sync') && DataProgramSyncService::isGoogleSheetsEnabled()) {
     Schedule::command('data-program:sync')
         ->everyMinute()
         ->withoutOverlapping(10)

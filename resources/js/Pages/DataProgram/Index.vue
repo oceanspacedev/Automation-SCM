@@ -17,20 +17,18 @@
         <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Data Program {{ area.label }}</h1>
       </div>
 
-      <!-- Menu Spreadsheet: sinkron, buka, atur link, export -->
+      <!-- Menu Export / Import -->
       <div class="flex items-center gap-2">
-        <!-- Dropdown Spreadsheet -->
+        <!-- Dropdown Export / Import -->
         <div class="relative" ref="spreadsheetDropdownRef">
           <button
             type="button"
             @click="showSpreadsheetDropdown = !showSpreadsheetDropdown"
             class="h-9 px-3 sm:px-3.5 inline-flex items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50 transition shadow-2xs cursor-pointer whitespace-nowrap"
-            title="Menu aksi Spreadsheet & Export"
+            title="Menu Export & Import Data Program"
           >
-            <RefreshCwIcon v-if="isSyncing" class="w-3.5 h-3.5 animate-spin text-emerald-600" />
-            <FileSpreadsheetIcon v-else class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
-            <span class="sm:hidden">{{ isSyncing ? 'Sinkron...' : 'Spreadsheet' }}</span>
-            <span class="hidden sm:inline">{{ isSyncing ? 'Menyinkronkan...' : 'Spreadsheet' }}</span>
+            <FileSpreadsheetIcon class="hidden sm:block w-3.5 h-3.5 text-gray-500" />
+            <span>Export / Import</span>
             <ChevronDownIcon class="w-3.5 h-3.5 text-gray-400 ml-0.5 transition-transform duration-150" :class="showSpreadsheetDropdown && 'rotate-180'" />
           </button>
 
@@ -1744,16 +1742,8 @@ const handleConfirmSendTelemarketing = async ({ phone, telemarketing_name, targe
   }
 };
 
-onMounted(async () => {
+onMounted(() => {
   fetchData(1);
-  try {
-    const res = await axios.get('/api/data-program/url');
-    if (res.data?.url) {
-      googleSheetUrl.value = res.data.url;
-    }
-  } catch {
-    // Keep default URL on error
-  }
   document.addEventListener('click', handleClickOutsideSpreadsheetDropdown);
 });
 

@@ -1950,6 +1950,7 @@ class ProgramSubmissionTest extends TestCase
 
     public function test_push_single_submission_to_spreadsheet(): void
     {
+        config(['services.google_sheets.enabled' => true]);
         $this->actingAs(User::factory()->create(['role' => 'admin']));
 
         Http::fake([
