@@ -46,6 +46,7 @@ class RemindTelemarketingUploadCommand extends Command
                     });
             })
             ->where('upload_reminder_count', '<', $maxReminders)
+            ->whereNotUploadedToForm()
             ->orderBy('id')
             ->limit($limit)
             ->get()

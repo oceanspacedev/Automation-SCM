@@ -24,6 +24,7 @@ import TeamContactsIndex from '../Pages/TeamContacts/Index.vue';
 import ProfileIndex from '../Pages/Profile/Index.vue';
 import BrandsIndex from '../Pages/Brands/Index.vue';
 import SchedulesIndex from '../Pages/Schedules/Index.vue';
+import LaravelLogsIndex from '../Pages/LaravelLogs/Index.vue';
 import DataResetIndex from '../Pages/DataReset/Index.vue';
 import { useAuth } from '../composables/useAuth';
 import { canOpenRoute, HOME_PATH } from '../lib/access';
@@ -97,6 +98,7 @@ const routes = [
   { path: '/role-permissions', name: 'role-permissions.index', component: RolePermissionsIndex, meta: { requiresAuth: true, adminOnly: true } },
   { path: '/users', name: 'users.index', component: UsersIndex, meta: { requiresAuth: true, permission: 'master_user' } },
   { path: '/jadwal-otomatis', name: 'schedules.index', component: SchedulesIndex, meta: { requiresAuth: true, permission: 'master_user' } },
+  { path: '/laravel-logs', name: 'laravel-logs.index', component: LaravelLogsIndex, meta: { requiresAuth: true, adminOnly: true } },
   { path: '/reset-data', name: 'data-reset.index', component: DataResetIndex, meta: { requiresAuth: true, adminOnly: true } },
   { path: '/profile', name: 'profile', component: ProfileIndex, meta: { requiresAuth: true } },
 ];

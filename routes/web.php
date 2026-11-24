@@ -13,6 +13,7 @@ use App\Http\Controllers\DraftController;
 use App\Http\Controllers\DraftImportController;
 use App\Http\Controllers\GoogleAuthController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\LaravelLogController;
 use App\Http\Controllers\MasterProgramController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ProgramApprovalController;
@@ -71,6 +72,11 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
         Route::get('/automation-schedules', [AutomationScheduleController::class, 'index']);
         Route::put('/automation-schedules/{key}', [AutomationScheduleController::class, 'update']);
         Route::post('/automation-schedules/{key}/run', [AutomationScheduleController::class, 'run']);
+
+        // Laravel Logs (storage/logs/*.log); khusus Admin
+        Route::get('/laravel-logs', [LaravelLogController::class, 'index']);
+        Route::get('/laravel-logs/download', [LaravelLogController::class, 'download']);
+        Route::delete('/laravel-logs', [LaravelLogController::class, 'clear']);
 
         // Reset data transaksi (Draft, Invoice, Data Program, Form Program); khusus Admin, dengan password reset
         Route::get('/data-reset', [DataResetController::class, 'index']);

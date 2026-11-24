@@ -4,11 +4,16 @@ namespace Tests\Feature;
 
 use App\Models\AutomationSchedule;
 use App\Models\DataProgram;
+use App\Models\Dealer;
+use App\Models\Draft;
+use App\Models\Invoice;
+use App\Models\ProgramSubmission;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -214,5 +219,152 @@ class AutomationScheduleTest extends TestCase
         $schedule = AutomationSchedule::forKey(AutomationSchedule::INVOICE_REMIND_UPLOAD);
         $this->assertNotNull($schedule->last_run_at);
         $this->assertNotNull($schedule->last_result);
+    }
+
+    public function test_scheduled_commands_use_short_overlap_locks_instead_of_24_hour_default(): void
+    {
+        $events = collect(app(Schedule::class)->events())
+            ->filter(fn (Event $event) => $event->withoutOverlapping);
+
+        $this->assertNotEmpty($events);
+
+        foreach ($events as $event) {
+            $this->assertGreaterThan(0, $event->expiresAt, "Overlap lock for {$event->command} must be positive.");
+            $this->assertLessThan(1440, $event->expiresAt, "Overlap lock for {$event->command} must not use 24h default.");
+        }
+    }
+
+    public function test_idle_queue_and_ai_commands_skip_spawning_when_there_is_no_work(): void
+    {
+        $events = collect(app(Schedule::class)->events());
+        $queueWorker = $events->first(fn (Event $event) => str_contains((string) $event->command, 'queue:work'));
+        $autoAi = $events->first(fn (Event $event) => str_contains((string) $event->command, 'program:auto-analyze-ai'));
+
+        $this->assertNotNull($queueWorker);
+        $this->assertNotNull($autoAi);
+
+        config(['queue.default' => 'sync']);
+        $this->assertFalse($queueWorker->filtersPass($this->app));
+
+        config(['queue.default' => 'database']);
+        $this->assertFalse($queueWorker->filtersPass($this->app));
+
+        DB::table('jobs')->insert([
+            'queue' => 'default',
+            'payload' => json_encode(['displayName' => 'TestJob']),
+            'attempts' => 0,
+            'reserved_at' => null,
+            'available_at' => now()->subSecond()->timestamp,
+            'created_at' => now()->timestamp,
+        ]);
+        $this->assertTrue($queueWorker->filtersPass($this->app));
+
+        $this->assertFalse($autoAi->filtersPass($this->app));
+
+        ProgramSubmission::create([
+            'row_hash' => 'sub_needs_ai_2026',
+            'submission_timestamp' => '2026-11-24 10:00:00',
+            'id_real' => 'BT01234',
+            'dealer_name' => 'TOKO TEST AI',
+            'program_name' => 'PROGRAM DSA NOV 2026',
+            'cek_dokumen' => null,
+            'status_potong_purchase' => null,
+        ]);
+        $this->assertTrue($autoAi->filtersPass($this->app));
+    }
+
+    public function test_remind_telemarketing_upload_filters_uploaded_invoices_in_sql_before_limit(): void
+    {
+        config([
+            'services.wag.token' => 'fake_token',
+            'services.wag.url' => 'https://waghub.mekayastudio.com',
+        ]);
+        Http::fake(['https://waghub.mekayastudio.com/api/v1/messages' => Http::response(['success' => true, 'data' => ['id' => 'msg_up_2']], 200)]);
+
+        Dealer::create([
+            'kode_bt' => 'BT09001',
+            'id_realme' => 'DL09001',
+            'dealer_name' => 'TOKO SUDAH UPLOAD',
+            'region' => 'BIG BANDUNG',
+            'telemarketing' => 'Rina',
+            'telemarketing_phone' => '081200000011',
+            'is_active' => true,
+        ]);
+        Dealer::create([
+            'kode_bt' => 'BT09002',
+            'id_realme' => 'DL09002',
+            'dealer_name' => 'TOKO BELUM UPLOAD',
+            'region' => 'BIG BANDUNG',
+            'telemarketing' => 'Rina',
+            'telemarketing_phone' => '081200000011',
+            'is_active' => true,
+        ]);
+
+        $draftUploaded = Draft::create([
+            'cn_number' => 'CN-UP-001',
+            'dealer_code' => 'BT09001',
+            'kode_bt' => 'BT09001',
+            'dealer_name' => 'TOKO SUDAH UPLOAD',
+            'region' => 'BIG BANDUNG',
+            'program_name' => 'PROGRAM DSA NOV 2026',
+            'support_amount' => 100000,
+            'dpp' => 100000,
+            'netpay' => 100000,
+        ]);
+        $uploadedInvoice = Invoice::create([
+            'draft_id' => $draftUploaded->id,
+            'invoice_number' => 'INV-UP-001',
+            'invoice_type' => 'DSA',
+            'dealer_code' => 'BT09001',
+            'dealer_name' => 'TOKO SUDAH UPLOAD',
+            'program_name' => 'PROGRAM DSA NOV 2026',
+            'status' => 'generated',
+            'support_amount' => 100000,
+            'dpp' => 100000,
+            'netpay' => 100000,
+        ]);
+        Invoice::where('id', $uploadedInvoice->id)->update(['created_at' => now()->subDays(10)]);
+
+        ProgramSubmission::create([
+            'row_hash' => 'sub_uploaded_inv_001',
+            'id_real' => 'BT09001',
+            'dealer_name' => 'TOKO SUDAH UPLOAD',
+            'program_name' => 'PROGRAM DSA NOV 2026',
+            'credit_note_url' => 'https://example.com/cn.pdf',
+        ]);
+
+        $draftPending = Draft::create([
+            'cn_number' => 'CN-UP-002',
+            'dealer_code' => 'BT09002',
+            'kode_bt' => 'BT09002',
+            'dealer_name' => 'TOKO BELUM UPLOAD',
+            'region' => 'BIG BANDUNG',
+            'program_name' => 'PROGRAM DSA NOV 2026',
+            'support_amount' => 200000,
+            'dpp' => 200000,
+            'netpay' => 200000,
+        ]);
+        $pendingInvoice = Invoice::create([
+            'draft_id' => $draftPending->id,
+            'invoice_number' => 'INV-UP-002',
+            'invoice_type' => 'DSA',
+            'dealer_code' => 'BT09002',
+            'dealer_name' => 'TOKO BELUM UPLOAD',
+            'program_name' => 'PROGRAM DSA NOV 2026',
+            'status' => 'generated',
+            'support_amount' => 200000,
+            'dpp' => 200000,
+            'netpay' => 200000,
+        ]);
+        Invoice::where('id', $pendingInvoice->id)->update(['created_at' => now()->subDays(10)]);
+
+        // Meski limit=1 dan invoice pertama sudah di-upload, invoice kedua yang belum di-upload tetap ditemukan & diingatkan
+        $this->artisan('invoices:remind-telemarketing-upload', ['--days' => 1, '--limit' => 1])
+            ->assertSuccessful();
+
+        $this->assertNull($uploadedInvoice->fresh()->upload_reminded_at);
+        $this->assertNotNull($pendingInvoice->fresh()->upload_reminded_at);
+        $this->assertSame(1, (int) $pendingInvoice->fresh()->upload_reminder_count);
+        Http::assertSentCount(1);
     }
 }

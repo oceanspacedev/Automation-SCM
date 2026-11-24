@@ -536,7 +536,8 @@ const masterColumns = computed(() => [
     canAccess('master_user') && { label: 'User', to: '/users' },
     user.value?.role === 'admin' && { label: 'Role Permission', to: '/role-permissions' },
     canAccess('master_user') && { label: 'Jadwal Otomatis', to: '/jadwal-otomatis' },
-    // Reset data transaksi khusus Admin
+    // Log aplikasi & reset data khusus Admin
+    user.value?.role === 'admin' && { label: 'Laravel Logs', to: '/laravel-logs' },
     user.value?.role === 'admin' && { label: 'Reset Data', to: '/reset-data' },
   ],
 ].map((column) => column.filter(Boolean)).filter((column) => column.length > 0));

@@ -79,7 +79,11 @@ class AutomationSchedule extends Model
      */
     public static function recordSchedulerHeartbeat(): void
     {
-        Cache::forever(self::SCHEDULER_HEARTBEAT_KEY, now()->toIso8601String());
+        try {
+            Cache::forever(self::SCHEDULER_HEARTBEAT_KEY, now()->toIso8601String());
+        } catch (\Throwable $e) {
+            Log::warning("Gagal mencatat heartbeat scheduler: {$e->getMessage()}");
+        }
     }
 
     /**
@@ -87,9 +91,15 @@ class AutomationSchedule extends Model
      */
     public static function schedulerLastSeen(): ?CarbonInterface
     {
-        $lastSeen = Cache::get(self::SCHEDULER_HEARTBEAT_KEY);
+        try {
+            $lastSeen = Cache::get(self::SCHEDULER_HEARTBEAT_KEY);
 
-        return $lastSeen ? Carbon::parse($lastSeen) : null;
+            return $lastSeen ? Carbon::parse($lastSeen) : null;
+        } catch (\Throwable $e) {
+            Log::warning("Gagal membaca heartbeat scheduler: {$e->getMessage()}");
+
+            return null;
+        }
     }
 
     /**

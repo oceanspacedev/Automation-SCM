@@ -4,9 +4,9 @@ namespace App\Console\Commands;
 
 use App\Models\ProgramSubmission;
 use App\Services\DocumentAnalysisService;
-use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
+use Throwable;
 
 class AutoAnalyzeProgramAiCommand extends Command
 {
@@ -134,7 +134,7 @@ class AutoAnalyzeProgramAiCommand extends Command
                     } else {
                         $belumBisaPotongCount++;
                     }
-                } catch (Exception $e) {
+                } catch (Throwable $e) {
                     $errorCount++;
                     $this->newLine();
                     $this->error("ID {$sub->id} ({$sub->dealer_name}): ".$e->getMessage());

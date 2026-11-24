@@ -6,6 +6,8 @@ use App\Services\DataProgramSyncService;
 use App\Services\ProgramReconciliationService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
@@ -23,7 +25,9 @@ Artisan::command('data-program:sync {--limit=0}', function (DataProgramSyncServi
     }
 })->purpose('Sinkronisasi data master Data Program (56 kolom) dari Google Spreadsheet');
 
-Schedule::call(fn () => AutomationSchedule::recordSchedulerHeartbeat())
+Schedule::call(static function (): void {
+    AutomationSchedule::recordSchedulerHeartbeat();
+})
     ->name('scheduler-heartbeat')
     ->everyMinute();
 
@@ -32,49 +36,115 @@ Schedule::call(fn () => AutomationSchedule::recordSchedulerHeartbeat())
 if (config('services.data_program.auto_sync')) {
     Schedule::command('data-program:sync')
         ->everyMinute()
-        ->withoutOverlapping()
-        ->runInBackground();
+        ->withoutOverlapping(10)
+        ->runInBackground()
+        ->onFailure(static function (): void {
+            Log::warning('Scheduled command data-program:sync gagal dijalankan.');
+        });
 }
 
-// Nonaktifkan auto-analyze AI terjadwal di lingkungan local agar tidak otomatis berjalan
+// Nonaktifkan auto-analyze AI terjadwal di lingkungan local agar tidak otomatis berjalan.
+// Hanya spawn proses child jika memang ada submission 2026 yang belum dianalisis agar RAM/CPU tidak melonjak tiap menit.
 if (! app()->environment('local') || env('ENABLE_AUTO_AI_SCHEDULE', false)) {
     Schedule::command('program:auto-analyze-ai --year=2026 --limit=15 --sleep=0.2')
         ->everyMinute()
-        ->withoutOverlapping()
-        ->runInBackground();
+        ->when(static function (): bool {
+            try {
+                return ProgramSubmission::withoutGlobalScopes(['area', 'brand'])
+                    ->where('submission_timestamp', 'like', '2026%')
+                    ->where(static function ($q): void {
+                        $q->whereNull('cek_dokumen')
+                            ->orWhere('cek_dokumen', '')
+                            ->orWhereNull('status_potong_purchase')
+                            ->orWhere('status_potong_purchase', '');
+                    })
+                    ->exists();
+            } catch (Throwable $e) {
+                Log::warning("Gagal cek antrean AI di scheduler: {$e->getMessage()}");
+
+                return false;
+            }
+        })
+        ->withoutOverlapping(15)
+        ->runInBackground()
+        ->onFailure(static function (): void {
+            Log::warning('Scheduled command program:auto-analyze-ai gagal dijalankan.');
+        });
 }
 
 // Cocokkan otomatis Data Program ↔ Form Program setiap menit (tanpa WhatsApp).
 Schedule::command('program:auto-match')
     ->everyMinute()
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->withoutOverlapping(10)
+    ->runInBackground()
+    ->onFailure(static function (): void {
+        Log::warning('Scheduled command program:auto-match gagal dijalankan.');
+    });
 
 // Jalankan antrean (mis. import Master Dealer dari web) di server yang hanya memasang cron scheduler, tanpa queue worker sendiri.
-Schedule::command('queue:work --stop-when-empty --tries=1 --timeout=3600')
+// Hanya spawn proses queue:work ketika ada job siap dijalankan agar tidak membuka proses PHP sia-sia tiap menit.
+Schedule::command('queue:work --stop-when-empty --tries=1 --timeout=3600 --memory=256')
     ->everyMinute()
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->when(static function (): bool {
+        try {
+            $connection = (string) config('queue.default', 'database');
+            $driver = config("queue.connections.{$connection}.driver");
+
+            if ($driver === 'sync' || $driver === 'null') {
+                return false;
+            }
+
+            if ($driver !== 'database') {
+                return true;
+            }
+
+            $dbConnection = config("queue.connections.{$connection}.connection");
+            $table = (string) config("queue.connections.{$connection}.table", 'jobs');
+
+            return DB::connection($dbConnection)
+                ->table($table)
+                ->where('available_at', '<=', now()->timestamp)
+                ->exists();
+        } catch (Throwable $e) {
+            Log::warning("Gagal cek antrean queue di scheduler: {$e->getMessage()}");
+
+            return false;
+        }
+    })
+    ->withoutOverlapping(65)
+    ->runInBackground()
+    ->onFailure(static function (): void {
+        Log::warning('Scheduled command queue:work gagal dijalankan.');
+    });
 
 // WhatsApp ke telemarketing untuk baris yang BISA DI POTONG; jamnya diatur di Master → Jadwal Otomatis (dicek tiap menit).
 Schedule::command('program:notify-telemarketing')
     ->everyMinute()
-    ->when(fn () => AutomationSchedule::isDueNow(AutomationSchedule::TELEMARKETING_WA))
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->when(static fn (): bool => AutomationSchedule::isDueNow(AutomationSchedule::TELEMARKETING_WA))
+    ->withoutOverlapping(15)
+    ->runInBackground()
+    ->onFailure(static function (): void {
+        Log::warning('Scheduled command program:notify-telemarketing gagal dijalankan.');
+    });
 
 // WhatsApp pengingat ke telemarketing untuk invoice yang belum di-upload ke Form Program; jamnya diatur di Master → Jadwal Otomatis.
 Schedule::command('invoices:remind-telemarketing-upload')
     ->everyMinute()
-    ->when(fn () => AutomationSchedule::isDueNow(AutomationSchedule::INVOICE_REMIND_UPLOAD))
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->when(static fn (): bool => AutomationSchedule::isDueNow(AutomationSchedule::INVOICE_REMIND_UPLOAD))
+    ->withoutOverlapping(15)
+    ->runInBackground()
+    ->onFailure(static function (): void {
+        Log::warning('Scheduled command invoices:remind-telemarketing-upload gagal dijalankan.');
+    });
 
 // Perbarui otomatis Lama Pending (selisih hari ini - Tgl Share CN) & Keterangan aging setiap hari pukul 00:01 WIB
 Schedule::command('program:update-pending')
     ->dailyAt('00:01')
-    ->withoutOverlapping()
-    ->runInBackground();
+    ->withoutOverlapping(30)
+    ->runInBackground()
+    ->onFailure(static function (): void {
+        Log::warning('Scheduled command program:update-pending gagal dijalankan.');
+    });
 
 Artisan::command('program:refresh-completeness', function () {
     $this->info('Memperbarui status kelengkapan dokumen Non-PKP...');

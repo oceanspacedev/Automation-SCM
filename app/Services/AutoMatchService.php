@@ -55,10 +55,28 @@ class AutoMatchService
         $summary = ['evaluated' => 0, 'matched' => 0, 'can_cut' => 0, 'skipped_unchanged' => 0];
         $batchId = (string) Str::uuid();
 
+        // Cek dulu brand mana yang punya Data Program pending agar tidak memuat seluruh Form Program saat idle.
+        $pendingBrands = DataProgram::query()
+            ->where(fn ($q) => $q->whereNull('status_potong_purchase')
+                ->orWhereNotIn('status_potong_purchase', self::SETTLED_PURCHASE_STATUSES))
+            ->where(fn ($q) => $q->whereNull('status_potong_purchase')
+                ->orWhere('status_potong_purchase', 'not like', '%DONE%'))
+            ->distinct()
+            ->pluck('brand');
+
+        if ($pendingBrands->isEmpty()) {
+            return $summary;
+        }
+
         // Muat pengajuan Form Program per scope (brand|area) sekali saja supaya seluruh baris pending
         // bisa dipindai tanpa batas 200 baris terbaru dan tanpa query N+1.
-        $submissionsByScope = ProgramSubmission::query()
-            ->orderByDesc('id')
+        $submissionQuery = ProgramSubmission::query()->orderByDesc('id');
+        $nonEmptyBrands = $pendingBrands->filter(static fn ($brand): bool => is_string($brand) && $brand !== '')->values();
+        if ($nonEmptyBrands->count() === $pendingBrands->count()) {
+            $submissionQuery->whereIn('brand', $nonEmptyBrands->all());
+        }
+
+        $submissionsByScope = $submissionQuery
             ->get()
             ->groupBy(fn (ProgramSubmission $sub) => $sub->brand.'|'.$sub->areaEnum()->value);
 
@@ -88,11 +106,8 @@ class AutoMatchService
 
             $lastId = $rows->last()->id;
 
+            $candidates = [];
             foreach ($rows as $dataProgram) {
-                if ($summary['evaluated'] >= $limit) {
-                    break;
-                }
-
                 $scopeKey = $dataProgram->brand.'|'.$dataProgram->areaEnum()->value;
                 $scopeSubmissions = $submissionsByScope->get($scopeKey);
                 if (! $scopeSubmissions || $scopeSubmissions->isEmpty()) {
@@ -104,10 +119,35 @@ class AutoMatchService
                     continue;
                 }
 
-                if ($this->unchangedSinceLastCheck($dataProgram, $submission)) {
-                    $summary['skipped_unchanged']++;
+                $candidates[] = ['data_program' => $dataProgram, 'submission' => $submission];
+            }
 
-                    continue;
+            if ($candidates === []) {
+                continue;
+            }
+
+            $lastCheckedMap = $this->loadLastCheckedTimestamps(
+                array_map(static fn (array $pair): int => (int) $pair['data_program']->id, $candidates)
+            );
+
+            foreach ($candidates as $pair) {
+                if ($summary['evaluated'] >= $limit) {
+                    break;
+                }
+
+                /** @var DataProgram $dataProgram */
+                $dataProgram = $pair['data_program'];
+                /** @var ProgramSubmission $submission */
+                $submission = $pair['submission'];
+
+                $pairKey = "{$dataProgram->id}:{$submission->id}";
+                if (isset($lastCheckedMap[$pairKey])) {
+                    $latestChange = max($dataProgram->updated_at?->getTimestamp() ?? 0, $submission->updated_at?->getTimestamp() ?? 0);
+                    if ($lastCheckedMap[$pairKey] >= $latestChange) {
+                        $summary['skipped_unchanged']++;
+
+                        continue;
+                    }
                 }
 
                 $summary['evaluated']++;
@@ -133,22 +173,33 @@ class AutoMatchService
     }
 
     /**
-     * Whether this row and submission were already compared and neither changed since.
+     * Load the latest reconciliation timestamp per (data_program_id, program_submission_id) pair in a single query.
+     *
+     * @param  list<int>  $dataProgramIds
+     * @return array<string, int>
      */
-    private function unchangedSinceLastCheck(DataProgram $dataProgram, ProgramSubmission $submission): bool
+    private function loadLastCheckedTimestamps(array $dataProgramIds): array
     {
-        $lastCheckedAt = ProgramReconciliationLog::withoutGlobalScopes(['area', 'brand'])
-            ->where('data_program_id', $dataProgram->id)
-            ->where('program_submission_id', $submission->id)
-            ->max('created_at');
-
-        if (! $lastCheckedAt) {
-            return false;
+        if ($dataProgramIds === []) {
+            return [];
         }
 
-        $latestChange = max($dataProgram->updated_at?->getTimestamp() ?? 0, $submission->updated_at?->getTimestamp() ?? 0);
+        $rows = ProgramReconciliationLog::withoutGlobalScopes(['area', 'brand'])
+            ->whereIn('data_program_id', array_values(array_unique($dataProgramIds)))
+            ->whereNotNull('program_submission_id')
+            ->selectRaw('data_program_id, program_submission_id, MAX(created_at) as last_checked_at')
+            ->groupBy('data_program_id', 'program_submission_id')
+            ->get();
 
-        return strtotime((string) $lastCheckedAt) >= $latestChange;
+        $map = [];
+        foreach ($rows as $row) {
+            $timestamp = strtotime((string) $row->last_checked_at);
+            if ($timestamp !== false) {
+                $map["{$row->data_program_id}:{$row->program_submission_id}"] = $timestamp;
+            }
+        }
+
+        return $map;
     }
 
     /**
