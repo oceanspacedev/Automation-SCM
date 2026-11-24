@@ -420,7 +420,23 @@ class ProgramReconciliationService
             return null;
         }
 
-        return in_array($cleanReal, $dataProgramCodes, true);
+        if (in_array($cleanReal, $dataProgramCodes, true)) {
+            return true;
+        }
+
+        // Beberapa data master memakai akhiran tipe program seperti BT05864DSA / DLBA7221DSA,
+        // sementara di Form Program kadang tertulis kode dasarnya (BT05864 / DLBA7221) atau sebaliknya.
+        $stripSuffix = fn (string $code): string => (string) preg_replace('/(DSA|NPSFL|NPS)$/', '', $code);
+        $baseReal = $stripSuffix($cleanReal);
+        if (strlen($baseReal) >= 5) {
+            foreach ($dataProgramCodes as $dpCode) {
+                if ($stripSuffix($dpCode) === $baseReal) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -1034,21 +1050,33 @@ class ProgramReconciliationService
 
         $allDocsPresent = count($missingDocs) === 0;
 
+        // Jika pengajuan Form Program sendiri sudah dinyatakan BISA DI POTONG / SUDAH POTONG / DONE TRANSFER
+        // dengan cek_dokumen LENGKAP/OK dan CN tidak berstatus invalid (mis. sudah lolos verifikasi / diedit manual / dianalisis ulang),
+        // jangan sampai flag has_signature lama di raw_data menurunkan status Data Program kembali menjadi BELUM BISA POTONG.
+        $subStatusUpper = strtoupper(trim((string) $submission->status_potong_purchase));
+        $subCekUpper = strtoupper(trim((string) $submission->cek_dokumen));
+        $subCnInvalid = ($submission->doc_validation['cn']['status'] ?? '') === 'invalid';
+        $submissionAlreadyApproved = in_array($subStatusUpper, ['BISA DI POTONG', 'SUDAH POTONG', 'DONE TRANSFER'], true)
+            && in_array($subCekUpper, ['LENGKAP', 'OK'], true)
+            && ! $subCnInvalid;
+
         // Check if submission document has valid signature
         $hasSignature = true;
-        $submissionRaw = is_array($submission->raw_data) ? $submission->raw_data : [];
-        if (isset($submissionRaw['has_signature'])) {
-            $hasSignature = (bool) $submissionRaw['has_signature'];
-        } elseif (isset($submissionRaw['audit']['has_signature'])) {
-            $hasSignature = (bool) $submissionRaw['audit']['has_signature'];
-        } elseif (isset($submissionRaw['inspection']['audit']['has_signature'])) {
-            $hasSignature = (bool) $submissionRaw['inspection']['audit']['has_signature'];
-        } elseif (! empty($submission->note_pph) && str_contains(strtoupper((string) $submission->note_pph), 'TTD')) {
-            $hasSignature = false;
-        } elseif (! empty($submission->cek_dokumen) && str_contains(strtoupper((string) $submission->cek_dokumen), 'TTD')) {
-            $hasSignature = false;
-        } elseif (! empty($submission->doc_validation['cn']['status']) && $submission->doc_validation['cn']['status'] === 'invalid' && str_contains(strtolower((string) ($submission->doc_validation['cn']['message'] ?? '')), 'tanda tangan')) {
-            $hasSignature = false;
+        if (! $submissionAlreadyApproved) {
+            $submissionRaw = is_array($submission->raw_data) ? $submission->raw_data : [];
+            if (isset($submissionRaw['has_signature'])) {
+                $hasSignature = (bool) $submissionRaw['has_signature'];
+            } elseif (isset($submissionRaw['audit']['has_signature'])) {
+                $hasSignature = (bool) $submissionRaw['audit']['has_signature'];
+            } elseif (isset($submissionRaw['inspection']['audit']['has_signature'])) {
+                $hasSignature = (bool) $submissionRaw['inspection']['audit']['has_signature'];
+            } elseif (! empty($submission->note_pph) && str_contains(strtoupper((string) $submission->note_pph), 'TTD')) {
+                $hasSignature = false;
+            } elseif (! empty($submission->cek_dokumen) && str_contains(strtoupper((string) $submission->cek_dokumen), 'TTD')) {
+                $hasSignature = false;
+            } elseif ($subCnInvalid && str_contains(strtolower((string) ($submission->doc_validation['cn']['message'] ?? '')), 'tanda tangan')) {
+                $hasSignature = false;
+            }
         }
 
         // 5. Determine Status Potong Purchase & Cek Dokumen
@@ -1399,10 +1427,6 @@ class ProgramReconciliationService
      */
     public function reconcileFromSubmission(ProgramSubmission $submission): ?DataProgram
     {
-        if (($submission->raw_data['source'] ?? '') === 'web_form') {
-            return null;
-        }
-
         $subDealerNorm = $this->normalizeDealerName($submission->dealer_name);
         $subProgNorm = $this->normalizeProgramName($submission->program_name);
 
@@ -1419,6 +1443,15 @@ class ProgramReconciliationService
         $query->where(function ($q) use ($idReal, $submission, $tokens) {
             if (! empty($idReal) && $idReal !== '-') {
                 $q->where('kode_bt', $idReal)->orWhere('id_gs', $idReal);
+                $normalizedId = Dealer::normalizeKodeBt($idReal);
+                if ($normalizedId && $normalizedId !== $idReal) {
+                    $q->orWhere('kode_bt', $normalizedId)->orWhere('id_gs', $normalizedId);
+                }
+                $baseId = preg_replace('/(DSA|NPSFL|NPS)$/i', '', (string) ($normalizedId ?: $idReal));
+                if (is_string($baseId) && strlen($baseId) >= 5) {
+                    $q->orWhere('kode_bt', 'like', "{$baseId}%")
+                        ->orWhere('id_gs', 'like', "{$baseId}%");
+                }
             }
             $q->orWhere('dealer_name', 'like', "%{$submission->dealer_name}%");
             foreach ($tokens as $token) {
@@ -1448,12 +1481,22 @@ class ProgramReconciliationService
 
         $bestDp = null;
         $bestScore = 0;
+        $bestIsPending = false;
 
         foreach ($candidates as $dp) {
             $score = $this->evaluateMatchScore($dp, $submission);
-            if ($score !== null && $score > $bestScore) {
+            if ($score === null) {
+                continue;
+            }
+
+            $statusUpper = strtoupper(trim((string) $dp->status_potong_purchase));
+            $isPending = ! in_array($statusUpper, ['BISA DI POTONG', 'SUDAH POTONG', 'DONE TRANSFER'], true)
+                && ! str_contains($statusUpper, 'DONE');
+
+            if ($bestDp === null || $score > $bestScore || ($score === $bestScore && $isPending && ! $bestIsPending)) {
                 $bestScore = $score;
                 $bestDp = $dp;
+                $bestIsPending = $isPending;
             }
         }
 

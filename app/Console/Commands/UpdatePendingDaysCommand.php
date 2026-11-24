@@ -25,13 +25,23 @@ class UpdatePendingDaysCommand extends Command
                         continue;
                     }
 
-                    $updates = ['lama_pending' => (string) $days];
-                    if (empty($row->getRawOriginal('keterangan')) || in_array($row->getRawOriginal('keterangan'), ['LEBIH DARI 30 HARI', 'KURANG DARI 30 HARI'], true)) {
-                        $updates['keterangan'] = DataProgram::agingKeterangan($days);
+                    $updates = [];
+                    if ($row->getRawOriginal('lama_pending') !== (string) $days) {
+                        $updates['lama_pending'] = (string) $days;
+                    }
+                    $rawKeterangan = $row->getRawOriginal('keterangan');
+                    if (empty($rawKeterangan) || in_array($rawKeterangan, ['LEBIH DARI 30 HARI', 'KURANG DARI 30 HARI'], true)) {
+                        $aging = DataProgram::agingKeterangan($days);
+                        if ($rawKeterangan !== $aging) {
+                            $updates['keterangan'] = $aging;
+                        }
                     }
 
-                    $row->updateQuietly($updates);
-                    $dpUpdated++;
+                    if ($updates !== []) {
+                        $row->timestamps = false;
+                        $row->forceFill($updates)->saveQuietly();
+                        $dpUpdated++;
+                    }
                 }
             });
 
@@ -46,13 +56,23 @@ class UpdatePendingDaysCommand extends Command
                         continue;
                     }
 
-                    $updates = ['lama_pending' => (string) $days];
-                    if (empty($row->getRawOriginal('keterangan')) || in_array($row->getRawOriginal('keterangan'), ['LEBIH DARI 30 HARI', 'KURANG DARI 30 HARI'], true)) {
-                        $updates['keterangan'] = DataProgram::agingKeterangan($days);
+                    $updates = [];
+                    if ($row->getRawOriginal('lama_pending') !== (string) $days) {
+                        $updates['lama_pending'] = (string) $days;
+                    }
+                    $rawKeterangan = $row->getRawOriginal('keterangan');
+                    if (empty($rawKeterangan) || in_array($rawKeterangan, ['LEBIH DARI 30 HARI', 'KURANG DARI 30 HARI'], true)) {
+                        $aging = DataProgram::agingKeterangan($days);
+                        if ($rawKeterangan !== $aging) {
+                            $updates['keterangan'] = $aging;
+                        }
                     }
 
-                    $row->updateQuietly($updates);
-                    $subUpdated++;
+                    if ($updates !== []) {
+                        $row->timestamps = false;
+                        $row->forceFill($updates)->saveQuietly();
+                        $subUpdated++;
+                    }
                 }
             });
 

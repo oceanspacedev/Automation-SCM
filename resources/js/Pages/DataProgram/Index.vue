@@ -296,7 +296,7 @@
                   <span>Edit</span>
                 </button>
                 <button
-                  v-if="canEdit && row.status_potong_purchase === 'BISA DI POTONG'"
+                  v-if="canEdit && canSendWaRow(row)"
                   type="button"
                   @click="sendWaToTelemarketing(row)"
                   :disabled="sendingWaId === row.id"
@@ -870,7 +870,7 @@
 
                   <!-- 4. Kirim WA ke Telemarketing (jika BISA DI POTONG) -->
                   <button
-                    v-if="canEdit && row.status_potong_purchase === 'BISA DI POTONG'"
+                    v-if="canEdit && canSendWaRow(row)"
                     type="button"
                     @click.stop="sendWaToTelemarketing(row)"
                     :disabled="sendingWaId === row.id"
@@ -1026,6 +1026,18 @@
               <p v-if="testRow?.match_note" class="text-gray-500 leading-relaxed break-words">
                 <span class="text-gray-900">Hasil cocok:</span> {{ testRow.match_note }}
               </p>
+
+              <p
+                v-if="canEdit && testResult?.matched && testModalStatus !== 'BISA DI POTONG'"
+                class="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200"
+              >
+                <template v-if="testModalStatus.includes('SUDAH') || testModalStatus.includes('DONE')">
+                  Status klaim ini sudah <strong>{{ testModalStatus }}</strong>, sehingga tidak perlu kirim WA penawaran potong lagi.
+                </template>
+                <template v-else>
+                  Tombol <strong>Kirim WA</strong> belum tampil karena status potong saat ini <strong>{{ testModalStatus || 'BELUM BISA POTONG' }}</strong> ({{ testResult?.details?.cek_dokumen || testRow?.cek_dokumen || 'periksa kelengkapan dokumen / nominal' }}). Klik <strong>Uji Ulang</strong> jika dokumen sudah diperbaiki.
+                </template>
+              </p>
             </div>
 
             <!-- Footer -->
@@ -1059,12 +1071,14 @@
                   Tutup
                 </button>
                 <button
-                  v-if="canEdit && testRow?.status_potong_purchase === 'BISA DI POTONG'"
+                  v-if="canEdit && testModalStatus === 'BISA DI POTONG'"
                   type="button"
                   @click="sendWaToTelemarketing(testRow)"
                   :disabled="sendingWaId === testRow?.id"
-                  class="h-8 px-4 rounded-lg bg-gray-900 hover:bg-gray-800 text-white font-medium transition cursor-pointer disabled:opacity-50"
+                  class="h-8 px-4 inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition cursor-pointer disabled:opacity-50"
                 >
+                  <RefreshCwIcon v-if="sendingWaId === testRow?.id" class="w-3.5 h-3.5 animate-spin" />
+                  <WhatsAppIcon v-else class="w-3.5 h-3.5 text-white" />
                   <span class="sm:hidden">{{ sendingWaId === testRow?.id ? 'Mengirim...' : 'Kirim WA' }}</span>
                   <span class="hidden sm:inline">{{ sendingWaId === testRow?.id ? 'Mengirim...' : 'Kirim ke WA Telemarketing' }}</span>
                 </button>
@@ -1653,6 +1667,12 @@ const testResultClass = (result) => {
   return 'text-gray-400';
 };
 
+const normalizePurchaseStatus = (status) => String(status || '').trim().toUpperCase();
+const canSendWaRow = (row) => normalizePurchaseStatus(row?.status_potong_purchase) === 'BISA DI POTONG';
+const testModalStatus = computed(() =>
+  normalizePurchaseStatus(testRow.value?.status_potong_purchase || testResult.value?.details?.status_potong_purchase)
+);
+
 const testMatchSingleRow = async (row, force = false) => {
   if (!canEdit.value) return;
   reconcilingRowId.value = row.id;
@@ -1664,11 +1684,13 @@ const testMatchSingleRow = async (row, force = false) => {
     });
     testResult.value = res.data;
     if (res.data.data) {
-      // update row in items array
+      // update row in items array and always keep testRow synced with latest server status
       const idx = items.value.findIndex((item) => item.id === row.id);
       if (idx !== -1) {
         items.value[idx] = { ...items.value[idx], ...res.data.data };
         testRow.value = items.value[idx];
+      } else {
+        testRow.value = { ...row, ...res.data.data };
       }
     }
     showTestModal.value = true;

@@ -1466,6 +1466,13 @@ class ProgramSubmissionController extends Controller
         // Email toko mengisi Master Dealer hanya bila toko itu belum punya email
         $masterDealer?->rememberEmail($submission->email);
 
+        // Langsung cocokkan dengan Data Program agar status & tombol WA langsung tersedia tanpa menunggu cron / klik Lihat
+        try {
+            app(ProgramReconciliationService::class)->reconcileFromSubmission($submission);
+        } catch (\Throwable $e) {
+            Log::warning("Auto-reconcile on submitForm failed for submission #{$submission->id}: ".$e->getMessage());
+        }
+
         // Otomatis push data pengajuan ke Google Spreadsheet
         $sheetResult = null;
         try {

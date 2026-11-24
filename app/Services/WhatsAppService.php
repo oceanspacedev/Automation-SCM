@@ -1457,7 +1457,9 @@ class WhatsAppService
         $cekDokumen = $dp->cek_dokumen ?: 'LENGKAP';
         $netPayFormatted = 'Rp '.number_format((float) ($dp->net_pay ?? 0), 0, ',', '.');
 
-        $isNotUploaded = $dp->status_potong_purchase !== 'BISA DI POTONG' || in_array(strtoupper(trim((string) $dp->cek_dokumen)), ['BELUM MATCH TEST', 'TIDAK LENGKAP', ''], true);
+        $cekDokumenUpper = strtoupper(trim((string) $dp->cek_dokumen));
+        $isNotUploaded = $dp->status_potong_purchase !== 'BISA DI POTONG'
+            || in_array($cekDokumenUpper, ['BELUM MATCH TEST', 'TIDAK LENGKAP'], true);
 
         if ($isNotUploaded) {
             $uploadUrl = Brand::documentUploadUrl($dp->brand, $dp->areaEnum());

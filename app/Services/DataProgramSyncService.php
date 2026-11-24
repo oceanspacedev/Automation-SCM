@@ -457,6 +457,21 @@ class DataProgramSyncService
             ]));
         }
 
+        // Jika Form Program untuk baris ini sudah lebih dulu diunggah sebelum draft/invoice masuk ke Data Program, langsung cocokkan
+        $currentStatus = strtoupper(trim((string) $dp->status_potong_purchase));
+        if (! in_array($currentStatus, ['BISA DI POTONG', 'SUDAH POTONG', 'DONE TRANSFER'], true) && ! str_contains($currentStatus, 'DONE')) {
+            try {
+                $reconciler = app(ProgramReconciliationService::class);
+                $matchedSub = $reconciler->findMatchingSubmission($dp);
+                if ($matchedSub) {
+                    $reconciler->reconcileSingle($dp, $matchedSub, false, null, 'auto_draft_sync');
+                    $dp->refresh();
+                }
+            } catch (\Throwable $e) {
+                Log::warning("Auto-reconcile after syncDraftToDataProgram failed for DP #{$dp->id}: ".$e->getMessage());
+            }
+        }
+
         $sheetPushResult = null;
         if ($pushToSpreadsheet) {
             try {

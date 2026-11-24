@@ -55,41 +55,76 @@ class AutoMatchService
         $summary = ['evaluated' => 0, 'matched' => 0, 'can_cut' => 0, 'skipped_unchanged' => 0];
         $batchId = (string) Str::uuid();
 
-        $rows = DataProgram::query()
-            ->where(fn ($q) => $q->whereNull('status_potong_purchase')
-                ->orWhereNotIn('status_potong_purchase', self::SETTLED_PURCHASE_STATUSES))
-            ->where(fn ($q) => $q->whereNull('status_potong_purchase')
-                ->orWhere('status_potong_purchase', 'not like', '%DONE%'))
+        // Muat pengajuan Form Program per scope (brand|area) sekali saja supaya seluruh baris pending
+        // bisa dipindai tanpa batas 200 baris terbaru dan tanpa query N+1.
+        $submissionsByScope = ProgramSubmission::query()
             ->orderByDesc('id')
-            ->limit($limit)
-            ->get();
+            ->get()
+            ->groupBy(fn (ProgramSubmission $sub) => $sub->brand.'|'.$sub->areaEnum()->value);
 
-        foreach ($rows as $dataProgram) {
-            $submission = $this->reconciler->findMatchingSubmission($dataProgram);
-            if (! $submission) {
-                continue;
+        if ($submissionsByScope->isEmpty()) {
+            return $summary;
+        }
+
+        $lastId = null;
+
+        while ($summary['evaluated'] < $limit) {
+            $query = DataProgram::query()
+                ->where(fn ($q) => $q->whereNull('status_potong_purchase')
+                    ->orWhereNotIn('status_potong_purchase', self::SETTLED_PURCHASE_STATUSES))
+                ->where(fn ($q) => $q->whereNull('status_potong_purchase')
+                    ->orWhere('status_potong_purchase', 'not like', '%DONE%'))
+                ->orderByDesc('id')
+                ->limit(200);
+
+            if ($lastId !== null) {
+                $query->where('id', '<', $lastId);
             }
 
-            if ($this->unchangedSinceLastCheck($dataProgram, $submission)) {
-                $summary['skipped_unchanged']++;
-
-                continue;
+            $rows = $query->get();
+            if ($rows->isEmpty()) {
+                break;
             }
 
-            $summary['evaluated']++;
+            $lastId = $rows->last()->id;
 
-            try {
-                $result = $this->reconciler->reconcileSingle($dataProgram, $submission, false, $batchId, self::TRIGGERED_BY);
-            } catch (\Throwable $e) {
-                Log::warning("Auto-match Data Program #{$dataProgram->id} gagal: {$e->getMessage()}");
+            foreach ($rows as $dataProgram) {
+                if ($summary['evaluated'] >= $limit) {
+                    break;
+                }
 
-                continue;
-            }
+                $scopeKey = $dataProgram->brand.'|'.$dataProgram->areaEnum()->value;
+                $scopeSubmissions = $submissionsByScope->get($scopeKey);
+                if (! $scopeSubmissions || $scopeSubmissions->isEmpty()) {
+                    continue;
+                }
 
-            if ($result['success']) {
-                $summary['matched']++;
-                if ($result['status'] === 'BISA DI POTONG') {
-                    $summary['can_cut']++;
+                $submission = $this->reconciler->findMatchingSubmission($dataProgram, $scopeSubmissions);
+                if (! $submission) {
+                    continue;
+                }
+
+                if ($this->unchangedSinceLastCheck($dataProgram, $submission)) {
+                    $summary['skipped_unchanged']++;
+
+                    continue;
+                }
+
+                $summary['evaluated']++;
+
+                try {
+                    $result = $this->reconciler->reconcileSingle($dataProgram, $submission, false, $batchId, self::TRIGGERED_BY);
+                } catch (\Throwable $e) {
+                    Log::warning("Auto-match Data Program #{$dataProgram->id} gagal: {$e->getMessage()}");
+
+                    continue;
+                }
+
+                if ($result['success']) {
+                    $summary['matched']++;
+                    if ($result['status'] === 'BISA DI POTONG') {
+                        $summary['can_cut']++;
+                    }
                 }
             }
         }

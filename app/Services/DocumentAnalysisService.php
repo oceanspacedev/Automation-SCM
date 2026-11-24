@@ -2214,19 +2214,36 @@ PROMPT;
             $financialData['dealer_name'] = $res['dealer_name'];
         }
 
+        $rawData = is_array($submission->raw_data) ? $submission->raw_data : [];
+        $hasSignature = (bool) ($res['audit']['has_signature'] ?? true);
+        if (array_key_exists('has_signature', $rawData)) {
+            $rawData['has_signature'] = $hasSignature;
+        }
+        if (isset($rawData['audit']) && is_array($rawData['audit'])) {
+            $rawData['audit']['has_signature'] = $hasSignature;
+            $rawData['audit']['note_pph'] = $financialData['note_pph'];
+        }
+        if (isset($rawData['inspection']) && is_array($rawData['inspection'])) {
+            $rawData['inspection']['audit'] = array_merge(
+                is_array($rawData['inspection']['audit'] ?? null) ? $rawData['inspection']['audit'] : [],
+                $res['audit'] ?? ['has_signature' => $hasSignature],
+            );
+            $rawData['inspection']['status_potong_purchase'] = $res['status_potong_purchase'];
+            $rawData['inspection']['cek_dokumen'] = $res['cek_dokumen'];
+        }
+
         $updatePayload = array_merge([
             'cek_dokumen' => $res['cek_dokumen'],
             'status_potong_purchase' => $res['status_potong_purchase'],
+            'raw_data' => $rawData,
         ], $financialData);
 
         $submission->update($updatePayload);
 
-        if (($submission->raw_data['source'] ?? '') !== 'web_form') {
-            try {
-                app(ProgramReconciliationService::class)->reconcileFromSubmission($submission->fresh());
-            } catch (\Throwable $e) {
-                Log::warning('Auto-reconciliation after AI analysis failed: '.$e->getMessage());
-            }
+        try {
+            app(ProgramReconciliationService::class)->reconcileFromSubmission($submission->fresh());
+        } catch (\Throwable $e) {
+            Log::warning('Auto-reconciliation after AI analysis failed: '.$e->getMessage());
         }
 
         return [

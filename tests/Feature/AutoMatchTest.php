@@ -9,6 +9,7 @@ use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
 use App\Models\User;
 use App\Services\AutoMatchService;
+use App\Services\ProgramReconciliationService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
@@ -215,6 +216,108 @@ class AutoMatchTest extends TestCase
         // Notify telemarketing cron should NOT notify rows that are BELUM BISA POTONG
         $this->artisan('program:notify-telemarketing')->assertSuccessful();
         Http::assertNothingSent();
+    }
+
+    public function test_web_form_submission_auto_matches_data_program_including_dsa_suffix_codes(): void
+    {
+        $dataProgram = $this->dataProgram([
+            'row_hash' => 'dp_web_form_dsa',
+            'dealer_name' => 'RAJA PONSEL - CV BINTANG USAHA BERSAMA',
+            'kode_bt' => 'BT05864DSA',
+            'id_gs' => 'DLBA7221DSA',
+            'program_name' => 'PROGRAM DSA OKTOBER 2026',
+            'region' => 'BIG BANDUNG',
+        ]);
+
+        $submission = $this->submission([
+            'row_hash' => 'sub_web_form_dsa',
+            'dealer_name' => 'RAJA PONSEL',
+            'id_real' => 'DLBA7221',
+            'program_name' => 'PROGRAM DSA OKTOBER 2026',
+            'region' => 'BIG BANDUNG',
+            'status_potong_purchase' => 'BISA DI POTONG',
+            'cek_dokumen' => 'LENGKAP',
+            'raw_data' => ['source' => 'web_form'],
+        ]);
+
+        $matched = app(ProgramReconciliationService::class)->reconcileFromSubmission($submission);
+
+        $this->assertNotNull($matched);
+        $this->assertSame($dataProgram->id, $matched->id);
+        $this->assertSame('BISA DI POTONG', $dataProgram->fresh()->status_potong_purchase);
+        $this->assertSame('LENGKAP', $dataProgram->fresh()->cek_dokumen);
+    }
+
+    public function test_approved_submission_with_stale_has_signature_false_still_matches_as_bisa_di_potong(): void
+    {
+        $dataProgram = $this->dataProgram([
+            'row_hash' => 'dp_stale_sig',
+            'dealer_name' => 'SINAR LAMPU CELL',
+            'kode_bt' => 'BTO5599',
+            'id_gs' => 'DLJE0098',
+            'program_name' => 'PROGRAM DSA OKTOBER 2026',
+            'region' => 'BIG TASIK',
+        ]);
+
+        $this->submission([
+            'row_hash' => 'sub_stale_sig',
+            'dealer_name' => 'SINAR LAMPU CELL',
+            'id_real' => 'DLJE0098',
+            'program_name' => 'PROGRAM DSA OKTOBER 2026',
+            'region' => 'BIG TASIK',
+            'status_potong_purchase' => 'BISA DI POTONG',
+            'cek_dokumen' => 'LENGKAP',
+            'note_pph' => 'CAP? TTD?',
+            'doc_validation' => [
+                'cn' => ['status' => 'valid', 'actual_type' => 'cn', 'message' => 'Dokumen valid'],
+            ],
+            'raw_data' => [
+                'source' => 'web_form',
+                'inspection' => [
+                    'audit' => ['has_signature' => false],
+                ],
+            ],
+        ]);
+
+        $this->artisan('program:auto-match')->assertSuccessful();
+
+        $dataProgram->refresh();
+        $this->assertSame('BISA DI POTONG', $dataProgram->status_potong_purchase);
+        $this->assertSame('LENGKAP', $dataProgram->cek_dokumen);
+    }
+
+    public function test_auto_match_reaches_older_pending_rows_beyond_200_unmatched_newer_rows(): void
+    {
+        $olderDataProgram = $this->dataProgram([
+            'row_hash' => 'dp_older_target',
+            'kode_bt' => 'BT07777',
+            'dealer_name' => 'CV SINAR MAKMUR',
+        ]);
+
+        $bulkRows = [];
+        $now = now();
+        for ($i = 1; $i <= 205; $i++) {
+            $bulkRows[] = [
+                'area' => 'jabar',
+                'brand' => 'realme',
+                'row_hash' => "dp_newer_unmatched_{$i}",
+                'dealer_name' => "TOKO BARU {$i}",
+                'kode_bt' => sprintf('BT9%04d', $i),
+                'program_name' => 'PROGRAM DSA OKTOBER 2026',
+                'region' => 'BIG BANDUNG',
+                'status_potong_purchase' => 'BELUM BISA POTONG',
+                'status_potong_ar' => 'BELUM POTONG',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+        DataProgram::insert($bulkRows);
+
+        $this->submission();
+
+        $this->artisan('program:auto-match')->assertSuccessful();
+
+        $this->assertSame('BISA DI POTONG', $olderDataProgram->fresh()->status_potong_purchase);
     }
 
     /**
