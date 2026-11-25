@@ -131,7 +131,7 @@ class CustomerLookupService
             // fallback to static
         }
 
-        return array_values(self::$billToOptions);
+        return app(CompanyContext::class)->isLegacy() ? array_values(self::$billToOptions) : [];
     }
 
     /**
@@ -163,6 +163,10 @@ class CustomerLookupService
             }
         } catch (\Throwable) {
             // fallback to static
+        }
+
+        if (! app(CompanyContext::class)->isLegacy()) {
+            return null;
         }
 
         if (isset(self::$billToOptions[$normalized])) {
@@ -209,6 +213,10 @@ class CustomerLookupService
             }
         } catch (\Throwable) {
             // fallback
+        }
+
+        if (! app(CompanyContext::class)->isLegacy()) {
+            return ['name' => $customerName ?: '-', 'address' => '-', 'npwp' => '-'];
         }
 
         foreach (self::$customers as $key => $info) {

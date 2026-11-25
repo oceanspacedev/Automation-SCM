@@ -3,9 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Models\ProgramSubmission;
+use App\Services\CompanyCache as Cache;
 use App\Services\DocumentAnalysisService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 class AutoAnalyzeProgramAiCommand extends Command

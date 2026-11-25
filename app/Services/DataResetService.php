@@ -114,7 +114,7 @@ class DataResetService
         // Yang dilaporkan: baris yang tampil di aplikasi (sama dengan jumlah sebelum reset)
         $purge = function (string $dataset) use ($area, $brand, $rows): int {
             $visible = $this->query($dataset, $area, $brand)->count();
-            $rows($dataset)->forceDelete();
+            $rows($dataset)->toBase()->delete();
 
             return $visible;
         };

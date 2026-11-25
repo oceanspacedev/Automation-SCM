@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Area;
+use App\Services\CompanyCache as Cache;
+use App\Services\CompanyContext;
 use App\Services\DealerAgreementImportService;
 use App\Services\DealerImportService;
 use Exception;
@@ -11,7 +13,6 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Throwable;
@@ -53,6 +54,8 @@ class ImportDealerFile implements ShouldQueue
      */
     private const SECONDS_PER_JOB = 1800;
 
+    public int $companyId = 1;
+
     public int $tries = 1;
 
     public int $timeout = 3600;
@@ -61,7 +64,10 @@ class ImportDealerFile implements ShouldQueue
      * @param  int|null  $offset  a continued agreement import: $storedPath is then its links file and this many stores are done
      * @param  string|null  $token  the import's current job; a job replaced by a newer one (e.g. after a resume) does nothing
      */
-    public function __construct(public string $storedPath, public bool $replaceExisting, public ?string $type = null, public ?int $offset = null, public ?string $token = null) {}
+    public function __construct(public string $storedPath, public bool $replaceExisting, public ?string $type = null, public ?int $offset = null, public ?string $token = null)
+    {
+        $this->companyId = app(CompanyContext::class)->id();
+    }
 
     /**
      * Store the upload and queue its import; false while another import is still waiting or running.
@@ -143,6 +149,11 @@ class ImportDealerFile implements ShouldQueue
     }
 
     public function handle(DealerImportService $dealers, DealerAgreementImportService $agreements): void
+    {
+        app(CompanyContext::class)->run($this->companyId, fn () => $this->importForCompany($dealers, $agreements));
+    }
+
+    private function importForCompany(DealerImportService $dealers, DealerAgreementImportService $agreements): void
     {
         if (! $this->isCurrent()) {
             return;
@@ -258,6 +269,11 @@ class ImportDealerFile implements ShouldQueue
      * be continued from its last saved batch.
      */
     public function failed(?Throwable $exception): void
+    {
+        app(CompanyContext::class)->run($this->companyId, fn () => $this->failedForCompany($exception));
+    }
+
+    private function failedForCompany(?Throwable $exception): void
     {
         if (! $this->isCurrent()) {
             return;

@@ -36,7 +36,7 @@
               <div class="pt-2 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between gap-2">
                 <a
                   v-if="canEdit"
-                  href="/auth/google/redirect"
+                  :href="companyUrl('/auth/google/redirect')"
                   class="px-2.5 py-1 text-[11px] font-medium text-gray-700 dark:text-slate-200 bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-md transition cursor-pointer border border-gray-200 dark:border-slate-700"
                   title="Ganti akun Google Workspace"
                 >
@@ -57,7 +57,7 @@
           </Popover>
           <a
             v-else-if="canEdit"
-            href="/auth/google/redirect"
+            :href="companyUrl('/auth/google/redirect')"
             class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-normal bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 transition cursor-pointer"
             title="Klik untuk menghubungkan akun Google Workspace (Gmail API)"
           >
@@ -402,7 +402,7 @@
                       Lihat
                     </router-link>
                     <a
-                      :href="`/invoices/${inv.id}/pdf`"
+                      :href="companyUrl(`/invoices/${inv.id}/pdf`)"
                       target="_blank"
                       class="h-8 px-2.5 inline-flex items-center rounded-lg border border-gray-300 bg-white text-gray-700 font-medium"
                     >
@@ -620,7 +620,7 @@
 
                   <!-- 2. PDF Link Button -->
                   <a
-                    :href="`/invoices/${inv.id}/pdf`"
+                    :href="companyUrl(`/invoices/${inv.id}/pdf`)"
                     target="_blank"
                     class="h-7 w-7.5 inline-flex items-center justify-center text-gray-500 hover:text-gray-900 hover:bg-gray-50 transition cursor-pointer"
                     title="Unduh PDF"
@@ -726,6 +726,7 @@
 </template>
 
 <script setup>
+import { companyUrl } from '../../composables/useCompany';
 import { ref, reactive, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { CalendarDate, parseDate } from '@internationalized/date';

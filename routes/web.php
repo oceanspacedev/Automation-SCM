@@ -4,6 +4,7 @@ use App\Http\Controllers\ArContactController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AutomationScheduleController;
 use App\Http\Controllers\BrandController;
+use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DataProgramController;
@@ -25,24 +26,25 @@ use App\Http\Controllers\UserController;
 use App\Http\Middleware\EnsureUserCanEdit;
 use App\Http\Middleware\SetAreaContext;
 use App\Http\Middleware\SetBrandContext;
+use App\Http\Middleware\SetCompanyContext;
 use Illuminate\Support\Facades\Route;
 
 // Google OAuth Authentication
-Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])->name('google.redirect');
-Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])->name('google.callback');
+Route::get('/auth/google/redirect', [GoogleAuthController::class, 'redirect'])->middleware(SetCompanyContext::class)->name('google.redirect');
+Route::get('/auth/google/callback', [GoogleAuthController::class, 'callback'])->middleware(SetCompanyContext::class)->name('google.callback');
 
 // Invoice preview & PDF download
-Route::get('/invoices/{id}/preview', [InvoiceController::class, 'preview'])->name('invoices.preview');
-Route::get('/invoices/{id}/pdf', [InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
+Route::get('/invoices/{id}/preview', [InvoiceController::class, 'preview'])->middleware(SetCompanyContext::class)->name('invoices.preview');
+Route::get('/invoices/{id}/pdf', [InvoiceController::class, 'downloadPdf'])->middleware(SetCompanyContext::class)->name('invoices.pdf');
 
 // Program Claim Confirmation Action Link (Landing Page on GET, Form Submit on POST)
-Route::match(['get', 'post'], '/p/confirm/{id}', [ProgramClaimConfirmationController::class, 'confirm'])->name('program-submissions.confirm');
-Route::match(['get', 'post'], '/dp/confirm/{id}', [ProgramClaimConfirmationController::class, 'confirmDataProgram'])->name('data-programs.confirm');
+Route::match(['get', 'post'], '/p/confirm/{id}', [ProgramClaimConfirmationController::class, 'confirm'])->middleware(SetCompanyContext::class)->name('program-submissions.confirm');
+Route::match(['get', 'post'], '/dp/confirm/{id}', [ProgramClaimConfirmationController::class, 'confirmDataProgram'])->middleware(SetCompanyContext::class)->name('data-programs.confirm');
 
 // API Endpoints
 // Area (Jabar/Jateng) dipilih lewat header X-Area atau parameter ?area=, default Jabar;
 // brand (Realme, Oppo, ...) lewat header X-Brand atau parameter ?brand=, default Realme
-Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class])->group(function () {
+Route::prefix('api')->middleware([SetCompanyContext::class, SetAreaContext::class, SetBrandContext::class])->group(function () {
     // ===================== PUBLIK (tanpa login) =====================
 
     // Masuk, daftar & cek sesi
@@ -68,6 +70,8 @@ Route::prefix('api')->middleware([SetAreaContext::class, SetBrandContext::class]
     // ===================== BUTUH LOGIN =====================
     // Hanya Admin & SCM yang bisa mengubah data; AR & Telemarketing hanya melihat (kecuali profil sendiri)
     Route::middleware(['auth', EnsureUserCanEdit::class])->group(function () {
+        Route::get('/companies', [CompanyController::class, 'index']);
+
         // Master Jadwal Otomatis (cron)
         Route::get('/automation-schedules', [AutomationScheduleController::class, 'index']);
         Route::put('/automation-schedules/{key}', [AutomationScheduleController::class, 'update']);

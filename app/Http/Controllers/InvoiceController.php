@@ -11,6 +11,7 @@ use App\Models\GoogleToken;
 use App\Models\Invoice;
 use App\Models\ProgramSubmission;
 use App\Models\WhatsAppLog;
+use App\Services\CompanyContext;
 use App\Services\CustomerLookupService;
 use App\Services\DataProgramSyncService;
 use App\Services\GoogleMailService;
@@ -29,6 +30,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class InvoiceController extends Controller
 {
@@ -47,7 +49,7 @@ class InvoiceController extends Controller
         $record = Invoice::findOrFail($id);
         DB::transaction(function () use ($record): void {
             if ($record->draft_id) {
-                DataProgram::withoutGlobalScopes()
+                DataProgram::withoutGlobalScopes(['area', 'brand'])
                     ->where(function ($q) use ($record) {
                         $q->where('draft_id', $record->draft_id)
                             ->orWhere('row_hash', sprintf('draft_%d', $record->draft_id));
@@ -57,7 +59,7 @@ class InvoiceController extends Controller
                     })
                     ->delete();
             } elseif (! empty($record->invoice_number)) {
-                DataProgram::withoutGlobalScopes()->where('cn', $record->invoice_number)->delete();
+                DataProgram::withoutGlobalScopes(['area', 'brand'])->where('cn', $record->invoice_number)->delete();
             }
 
             $record->draft?->update(['status' => 'ready']);
@@ -74,7 +76,7 @@ class InvoiceController extends Controller
     {
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
-            'ids.*' => ['integer', 'exists:invoices,id'],
+            'ids.*' => ['integer', Rule::exists('invoices', 'id')->where('company_id', app(CompanyContext::class)->id())],
         ]);
 
         $count = count($validated['ids']);
@@ -96,7 +98,7 @@ class InvoiceController extends Controller
             }
 
             if (! empty($draftIds) || ! empty($cnNumbers)) {
-                DataProgram::withoutGlobalScopes()
+                DataProgram::withoutGlobalScopes(['area', 'brand'])
                     ->where(function ($q) use ($draftIds, $rowHashes, $cnNumbers) {
                         $hasCondition = false;
                         if (! empty($draftIds)) {
@@ -115,7 +117,7 @@ class InvoiceController extends Controller
             }
 
             if (! empty($draftIds)) {
-                Draft::withoutGlobalScopes()->whereIn('id', $draftIds)->update(['status' => 'ready']);
+                Draft::withoutGlobalScopes(['area', 'brand'])->whereIn('id', $draftIds)->update(['status' => 'ready']);
             }
 
             Invoice::whereIn('id', $validated['ids'])->delete();
@@ -230,7 +232,7 @@ class InvoiceController extends Controller
      */
     public function emailAccounts(): JsonResponse
     {
-        $defaultList = [
+        $defaultList = app(CompanyContext::class)->isLegacy() ? [
             [
                 'name' => 'Rebate. MSI',
                 'email' => 'ade@mediaselulerindonesia.com',
@@ -261,7 +263,7 @@ class InvoiceController extends Controller
                 'is_default' => false,
                 'is_active' => true,
             ],
-        ];
+        ] : [];
 
         try {
             if (Schema::hasTable('email_accounts')) {

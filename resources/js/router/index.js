@@ -1,7 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router';
+import { companySlug } from '../composables/useCompany';
 import Login from '../Pages/Auth/Login.vue';
 import Register from '../Pages/Auth/Register.vue';
 import Dashboard from '../Pages/Dashboard/Index.vue';
+import CompaniesIndex from '../Pages/Companies/Index.vue';
 import DraftsIndex from '../Pages/Drafts/Index.vue';
 import DraftDetail from '../Pages/Drafts/Detail.vue';
 import InvoicesIndex from '../Pages/Invoices/Index.vue';
@@ -58,6 +60,8 @@ const routes = [
   { path: '/login', name: 'login', component: Login, meta: { guestOnly: true } },
   { path: '/register', name: 'register', component: Register, meta: { guestOnly: true } },
   { path: '/', redirect: '/dashboard' },
+  { path: '/company-preview', redirect: '/companies' },
+  { path: '/companies', name: 'companies.index', component: CompaniesIndex, meta: { requiresAuth: true, companySelection: true } },
   { path: '/dashboard', name: 'dashboard', component: Dashboard, meta: { requiresAuth: true } },
   ...brandAreaRoutes('/drafts', 'drafts.index', DraftsIndex, 'drafts'),
   { path: '/drafts/:id', name: 'drafts.detail', component: DraftDetail, props: true, meta: { requiresAuth: true, permission: 'drafts' } },
@@ -109,6 +113,7 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to, from, next) => {
+  if (to.meta.requiresAuth && !to.query.company) return next({ ...to, query: { ...to.query, company: companySlug }, replace: true });
   // Public standalone routes (like customer/sales form) must proceed immediately without auth checks
   if (to.meta.requiresAuth === false && !to.meta.guestOnly) {
     return next();
@@ -125,6 +130,16 @@ router.beforeEach(async (to, from, next) => {
   }
 
   if (to.meta.guestOnly && isAuthenticated.value) {
+    return next(HOME_PATH);
+  }
+
+  if (companySlug === 'msi' && to.meta.requiresAuth && !['admin', 'scm'].includes(user.value?.role)) {
+    sessionStorage.setItem('scm-company', 'top');
+    window.location.replace('/dashboard?company=top');
+    return;
+  }
+
+  if (to.meta.companySelection && !['admin', 'scm'].includes(user.value?.role)) {
     return next(HOME_PATH);
   }
 

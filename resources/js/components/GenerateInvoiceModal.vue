@@ -53,6 +53,7 @@
               </select>
             </div>
 
+            <p v-if="!billToOptions.length" class="text-xs text-gray-500">Tambahkan badan usaha perusahaan ini di Master Badan Usaha terlebih dahulu.</p>
             <!-- Clean Neutral Preview Box -->
             <div v-if="currentSelected" class="p-3 bg-gray-50 rounded-lg border border-gray-200 text-xs space-y-1">
               <div class="font-semibold text-gray-900">
@@ -103,6 +104,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import axios from 'axios';
+import { companySlug } from '../composables/useCompany';
 import { X as XIcon } from '@lucide/vue';
 
 const props = defineProps({
@@ -118,7 +120,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'confirm', 'cancel']);
 
-const defaultOptions = [
+const defaultOptions = companySlug === 'msi' ? [] : [
   {
     code: 'CV TOP',
     name: 'CV TOP SELULAR',
@@ -140,13 +142,14 @@ const defaultOptions = [
 ];
 
 const billToOptions = ref([...defaultOptions]);
-const selectedKey = ref(props.defaultBillTo || 'CV TOP');
+const selectedKey = ref(companySlug === 'msi' ? '' : (props.defaultBillTo || 'CV TOP'));
 
 const fetchOptions = async () => {
   try {
     const res = await axios.get('/api/bill-to-options');
-    if (Array.isArray(res.data) && res.data.length > 0) {
+    if (Array.isArray(res.data)) {
       billToOptions.value = res.data;
+      if (!res.data.some(o => o.code === selectedKey.value)) selectedKey.value = res.data[0]?.code || '';
     }
   } catch {
     // Keep fallback options
@@ -156,7 +159,7 @@ const fetchOptions = async () => {
 watch(() => props.modelValue, (isOpen) => {
   if (isOpen) {
     if (!selectedKey.value) {
-      selectedKey.value = props.defaultBillTo || billToOptions.value[0]?.code || 'CV TOP';
+      selectedKey.value = billToOptions.value.find(o => o.code === props.defaultBillTo)?.code || billToOptions.value[0]?.code || '';
     }
     fetchOptions();
   }

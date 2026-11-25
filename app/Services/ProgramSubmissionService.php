@@ -5,9 +5,9 @@ namespace App\Services;
 use App\Area;
 use App\Models\Brand;
 use App\Models\ProgramSubmission;
+use App\Services\CompanyCache as Cache;
 use Closure;
 use Exception;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -478,7 +478,7 @@ class ProgramSubmissionService
         $rowHash = sha1($hashString);
 
         if (isset($payload['action']) && $payload['action'] === 'delete') {
-            ProgramSubmission::where('row_hash', $rowHash)->forceDelete();
+            ProgramSubmission::withTrashed()->where('row_hash', $rowHash)->toBase()->delete();
 
             return new ProgramSubmission(['row_hash' => $rowHash]);
         }

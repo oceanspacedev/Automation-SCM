@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Area;
 use App\Models\Concerns\BelongsToArea;
 use App\Models\Concerns\BelongsToBrand;
+use App\Models\Concerns\BelongsToCompany;
 use App\Services\AreaContext;
 use App\Services\BrandContext;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ProgramReconciliationLog extends Model
 {
     use BelongsToArea, BelongsToBrand;
+    use BelongsToCompany;
 
     public const STATUS_MATCHED = 'MATCHED';
 

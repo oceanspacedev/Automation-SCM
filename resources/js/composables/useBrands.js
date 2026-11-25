@@ -1,9 +1,10 @@
 import { computed, ref } from 'vue';
+import { companySlug } from './useCompany';
 import { useRoute } from 'vue-router';
 import axios from 'axios';
 
 // Brand data lama, link lama, dan webhook tanpa brand (harus sama dengan Brand::DEFAULT_SLUG di backend)
-export const DEFAULT_BRAND = 'realme';
+export const DEFAULT_BRAND = companySlug === 'msi' ? 'itel' : 'realme';
 
 // Slug brand di URL, mis. /form-program/realme/jabar
 export const BRAND_ROUTE_PATTERN = '[a-z0-9-]+';

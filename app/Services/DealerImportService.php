@@ -179,23 +179,23 @@ class DealerImportService
             // Agreement & email toko tidak ada di file CV TOP: saat "Ganti semua", simpan dulu lalu pasang lagi ke kode BT yang sama
             $kept = collect();
             if ($replaceExisting) {
-                $kept = Dealer::withoutGlobalScopes()
+                $kept = Dealer::withoutGlobalScopes(['area', 'brand'])
                     ->where(fn ($q) => $q->whereNotNull('agreement_url')->orWhereNotNull('email'))
                     ->get(['kode_bt', 'agreement_url', 'agreement_updated_at', 'email']);
-                Dealer::withoutGlobalScopes()->delete();
+                Dealer::withoutGlobalScopes(['area', 'brand'])->delete();
             }
 
             $now = now();
             foreach (array_chunk(array_values($dealers), 500) as $chunk) {
-                Dealer::withoutGlobalScopes()->upsert(
-                    array_map(fn (array $dealer) => $dealer + ['created_at' => $now, 'updated_at' => $now], $chunk),
-                    ['kode_bt'],
+                Dealer::withoutGlobalScopes(['area', 'brand'])->upsert(
+                    array_map(fn (array $dealer) => $dealer + ['company_id' => app(CompanyContext::class)->id(), 'created_at' => $now, 'updated_at' => $now], $chunk),
+                    ['company_id', 'kode_bt'],
                     [...array_diff(array_keys($chunk[0]), ['kode_bt']), 'updated_at']
                 );
             }
 
             foreach ($kept as $dealer) {
-                Dealer::withoutGlobalScopes()->where('kode_bt', $dealer->kode_bt)->update([
+                Dealer::withoutGlobalScopes(['area', 'brand'])->where('kode_bt', $dealer->kode_bt)->update([
                     'agreement_url' => $dealer->agreement_url,
                     'agreement_updated_at' => $dealer->agreement_updated_at,
                     'email' => $dealer->email,
@@ -203,7 +203,7 @@ class DealerImportService
             }
 
             foreach (collect($dealers)->filter(fn (array $dealer) => $dealer['region'] !== null)->map(fn (array $dealer) => [$dealer['area'], $dealer['region']])->unique() as [$area, $region]) {
-                $created = Region::withoutGlobalScopes()->firstOrCreate(['area' => $area, 'name' => $region], ['is_active' => true]);
+                $created = Region::withoutGlobalScopes(['area', 'brand'])->firstOrCreate(['area' => $area, 'name' => $region], ['is_active' => true]);
                 if ($created->wasRecentlyCreated) {
                     $regionsCreated[] = Area::from($area)->label().': '.$region;
                 }
@@ -211,10 +211,10 @@ class DealerImportService
 
             // Region yang sudah digabung (mis. BIG CPS → BIG KCPS): toko yang belum ada di file ikut pindah, region lamanya dinonaktifkan
             foreach (Region::RENAMED as $oldName => $newName) {
-                Dealer::withoutGlobalScopes()->where('region', $oldName)->update(['region' => $newName]);
+                Dealer::withoutGlobalScopes(['area', 'brand'])->where('region', $oldName)->update(['region' => $newName]);
             }
-            foreach (Region::withoutGlobalScopes()->whereIn('name', array_keys(Region::RENAMED))->where('is_active', true)->get() as $oldRegion) {
-                $newRegion = Region::withoutGlobalScopes()->updateOrCreate(['area' => $oldRegion->area, 'name' => Region::RENAMED[$oldRegion->name]], ['is_active' => true]);
+            foreach (Region::withoutGlobalScopes(['area', 'brand'])->whereIn('name', array_keys(Region::RENAMED))->where('is_active', true)->get() as $oldRegion) {
+                $newRegion = Region::withoutGlobalScopes(['area', 'brand'])->updateOrCreate(['area' => $oldRegion->area, 'name' => Region::RENAMED[$oldRegion->name]], ['is_active' => true]);
                 if ($newRegion->wasRecentlyCreated) {
                     $regionsCreated[] = Area::from($oldRegion->area)->label().': '.$newRegion->name;
                 }
@@ -239,7 +239,7 @@ class DealerImportService
      */
     public function skippedRowsPath(): string
     {
-        return storage_path('app/dealer-import/dealer-belum-diimport.xlsx');
+        return storage_path('app/dealer-import/'.app(CompanyContext::class)->id().'-dealer-belum-diimport.xlsx');
     }
 
     /**

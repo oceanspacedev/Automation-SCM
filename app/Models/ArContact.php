@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Area;
 use App\Models\Concerns\BelongsToArea;
+use App\Models\Concerns\BelongsToCompany;
 use Database\Factories\ArContactFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +16,8 @@ class ArContact extends Model
 {
     /** @use HasFactory<ArContactFactory> */
     use BelongsToArea, HasFactory;
+
+    use BelongsToCompany;
 
     protected $guarded = ['id'];
 

@@ -25,6 +25,9 @@ class SetBrandContext
             ?? Brand::slugFromInput($request->query('brand'))
             ?? Brand::slugFromInput($request->input('brand'));
 
+        if (($request->header('X-Brand') || $request->input('brand')) && $request->input('brand') !== 'all') {
+            abort_if($brand === null, 422, 'Brand tidak tersedia di perusahaan ini.');
+        }
         app(BrandContext::class)->set($brand);
 
         return $next($request);

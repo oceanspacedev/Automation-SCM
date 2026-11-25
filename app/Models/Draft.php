@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToArea;
 use App\Models\Concerns\BelongsToBrand;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class Draft extends Model
 {
     use BelongsToArea, BelongsToBrand, HasFactory;
+    use BelongsToCompany;
 
     protected $guarded = ['id'];
 

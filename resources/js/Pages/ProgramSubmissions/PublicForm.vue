@@ -1,6 +1,7 @@
 <template>
   <div class="min-h-screen bg-[#f0f4f9] py-6 sm:py-10 px-3 sm:px-6 font-sans text-gray-900 selection:bg-blue-100 selection:text-blue-900">
     <div class="max-w-2xl mx-auto space-y-4">
+      <p class="text-sm font-medium text-gray-600">{{ companyName }}</p>
       
       <!-- ================= SUCCESS SCREEN (GOOGLE FORM STYLE) ================= -->
       <div v-if="isSubmitted" class="space-y-4 animate-in fade-in duration-200">
@@ -43,17 +44,17 @@
           </div>
         </div>
 
-        <!-- CARD 1: ID REALME (diisi pertama: toko yang dipilih mengisi nama dealer, region, WA & agreement) -->
+        <!-- CARD 1: ID toko (diisi pertama: toko yang dipilih mengisi nama dealer, region, WA & agreement) -->
         <div
           class="bg-white rounded-xl shadow-xs border p-6 space-y-3 transition relative"
           :class="validationErrors.id_real ? 'border-rose-300 ring-1 ring-rose-100' : 'border-gray-200'"
         >
           <label class="block text-sm sm:text-base font-medium text-gray-900">
-            ID REALME <span class="text-rose-500">*</span>
+            {{ companySlug === 'msi' ? 'ID DEALER' : 'ID REALME' }} <span class="text-rose-500">*</span>
           </label>
 
           <p class="text-xs text-gray-500">
-            Pilih toko dari Master Dealer, cari pakai kode BT, ID Realme, atau nama toko. Nama dealer dan region terisi otomatis.
+            Pilih toko dari Master Dealer, cari pakai kode BT, ID dealer, atau nama toko. Nama dealer dan region terisi otomatis.
           </p>
 
           <!-- Toko hanya bisa dipilih dari Master Dealer (tidak bisa diketik manual) -->
@@ -100,7 +101,7 @@
                   type="text"
                   v-model="dealerSearchQuery"
                   @input="handleDealerSearchQueryInput"
-                  placeholder="Cari kode BT, ID Realme, atau nama toko"
+                  placeholder="Cari kode BT, ID dealer, atau nama toko"
                   :class="pickerSearchClass"
                 />
                 <button
@@ -834,6 +835,8 @@
 </template>
 
 <script setup>
+import { useCompany } from '../../composables/useCompany';
+const { companyName, companySlug } = useCompany();
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import axios from 'axios';
 import { notify, confirmAction } from '@/composables/useNotify';
@@ -1422,7 +1425,7 @@ function validateField(field) {
     if (!val) {
       validationErrors.id_real = 'Pertanyaan ini wajib diisi';
     } else if (val === '-' || /^[-_\s]+$/.test(val)) {
-      validationErrors.id_real = 'ID REALME wajib diisi dan tidak boleh hanya berisi tanda hubung (-)';
+      validationErrors.id_real = 'ID dealer wajib diisi dan tidak boleh hanya berisi tanda hubung (-)';
     } else {
       validationErrors.id_real = '';
     }
@@ -1459,7 +1462,7 @@ function validateAllFields() {
     validationErrors.id_real = 'Pertanyaan ini wajib diisi';
     isValid = false;
   } else if (idVal === '-' || /^[-_\s]+$/.test(idVal)) {
-    validationErrors.id_real = 'ID REALME wajib diisi dan tidak boleh hanya berisi tanda hubung (-)';
+    validationErrors.id_real = 'ID dealer wajib diisi dan tidak boleh hanya berisi tanda hubung (-)';
     isValid = false;
   } else {
     validationErrors.id_real = '';

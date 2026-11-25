@@ -6,6 +6,7 @@ use App\Area;
 use App\Models\Draft;
 use App\Models\MasterProgram;
 use App\Services\AreaContext;
+use App\Services\CompanyContext;
 use App\Services\DataProgramSyncService;
 use App\Services\InvoiceCalculator;
 use Illuminate\Http\JsonResponse;
@@ -150,7 +151,7 @@ class DraftController extends Controller
             'program_code' => ['nullable', 'string', 'max:100'],
             'program_period' => ['nullable', 'string', 'max:100'],
             // No CN dipakai sebagai nomor invoice
-            'cn_number' => ['required', 'string', 'max:100', Rule::unique('drafts', 'cn_number'), Rule::unique('invoices', 'invoice_number')],
+            'cn_number' => ['required', 'string', 'max:100', Rule::unique('drafts', 'cn_number')->where('company_id', app(CompanyContext::class)->id()), Rule::unique('invoices', 'invoice_number')->where('company_id', app(CompanyContext::class)->id())],
             'invoice_date' => ['nullable', 'date'],
             'invoice_type' => ['nullable', 'string', 'max:50'],
             'dpp' => ['nullable', 'numeric'],
@@ -290,7 +291,7 @@ class DraftController extends Controller
     {
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
-            'ids.*' => ['integer', 'exists:drafts,id'],
+            'ids.*' => ['integer', Rule::exists('drafts', 'id')->where('company_id', app(CompanyContext::class)->id())],
         ]);
 
         $drafts = Draft::whereIn('id', $validated['ids'])->where('status', 'invoiced')->get();

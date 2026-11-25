@@ -3,9 +3,9 @@
 namespace App\Services;
 
 use App\Models\ProgramSubmission;
+use App\Services\CompanyCache as Cache;
 use Exception;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 

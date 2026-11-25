@@ -68,6 +68,9 @@ class InvoiceGenerator
             }
 
             // Customer lookup for Bill To information
+            if (! app(CompanyContext::class)->isLegacy() && ! CustomerLookupService::getBillTo($billTo)) {
+                throw new Exception('Pilih Bill To dari Master Badan Usaha perusahaan ini terlebih dahulu.');
+            }
             if (! empty($billTo) && ($selectedBillTo = CustomerLookupService::getBillTo($billTo))) {
                 $customerName = $selectedBillTo['name'];
                 $customerAddress = ! empty($selectedBillTo['address']) && $selectedBillTo['address'] !== '-'
@@ -150,7 +153,7 @@ class InvoiceGenerator
      */
     public function renderAndSavePdf(Invoice $invoice): string
     {
-        $filename = "invoices/{$invoice->invoice_number}.pdf";
+        $filename = "invoices/{$invoice->company_id}/{$invoice->id}.pdf";
         Storage::disk('public')->put($filename, $this->renderPdf($invoice));
 
         return $filename;

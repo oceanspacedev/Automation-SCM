@@ -1,7 +1,9 @@
 <?php
 
 use App\Models\AutomationSchedule;
+use App\Models\DataProgram;
 use App\Models\ProgramSubmission;
+use App\Services\CompanyContext;
 use App\Services\DataProgramSyncService;
 use App\Services\ProgramReconciliationService;
 use Illuminate\Foundation\Inspiring;
@@ -207,3 +209,12 @@ Artisan::command('program:refresh-completeness', function () {
 
     $this->info("Selesai! Sebanyak {$updated} pengajuan Non-PKP diperbarui menjadi BISA DI POTONG.");
 })->purpose('Refresh status potong purchase untuk pengajuan Non-PKP yang memiliki CN dan Agreement');
+
+// MSI jobs keep separate overlap locks and resolve their own data and schedules.
+Schedule::command('company:run msi match')->when(fn (): bool => app(CompanyContext::class)->run(2, fn (): bool => DataProgram::query()->exists()))->everyMinute()->withoutOverlapping(10)->runInBackground();
+Schedule::command('company:run msi notify --due=telemarketing_wa')->when(fn (): bool => app(CompanyContext::class)->run(2, fn (): bool => AutomationSchedule::isDueNow(AutomationSchedule::TELEMARKETING_WA)))->everyMinute()->withoutOverlapping(15)->runInBackground();
+Schedule::command('company:run msi remind --due=invoice_remind_upload')->when(fn (): bool => app(CompanyContext::class)->run(2, fn (): bool => AutomationSchedule::isDueNow(AutomationSchedule::INVOICE_REMIND_UPLOAD)))->everyMinute()->withoutOverlapping(15)->runInBackground();
+Schedule::command('company:run msi pending')->dailyAt('00:01')->withoutOverlapping(30)->runInBackground();
+if (! app()->environment('local') || env('ENABLE_AUTO_AI_SCHEDULE', false)) {
+    Schedule::command('company:run msi analyze')->everyMinute()->withoutOverlapping(15)->runInBackground();
+}

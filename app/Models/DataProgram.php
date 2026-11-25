@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToArea;
 use App\Models\Concerns\BelongsToBrand;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -12,6 +13,7 @@ use Illuminate\Support\Carbon;
 class DataProgram extends Model
 {
     use BelongsToArea, BelongsToBrand;
+    use BelongsToCompany;
 
     /**
      * AR status after the dealer agreed (through telemarketing) to be paid by bank transfer instead of a cut: the SCM

@@ -445,7 +445,7 @@ class ProgramReconciliationService
      */
     private function isDocumentOfAnotherSubmission(string $url, ProgramSubmission $submission): bool
     {
-        return ProgramSubmission::withoutGlobalScopes()
+        return ProgramSubmission::withoutGlobalScopes(['area', 'brand'])
             ->whereKeyNot($submission->getKey())
             ->where(fn ($query) => $query->where('credit_note_url', $url)->orWhere('agreement_url', $url)->orWhere('tax_invoice_url', $url))
             ->exists();
@@ -610,7 +610,7 @@ class ProgramReconciliationService
     public function evaluateMatchScore(DataProgram $dataProgram, ProgramSubmission $sub): ?int
     {
         // 0. Data Program & Form Program dari area (Jabar/Jateng) atau brand berbeda tidak boleh saling dicocokkan
-        if ($dataProgram->areaEnum() !== $sub->areaEnum() || $dataProgram->brand !== $sub->brand) {
+        if ($dataProgram->company_id !== $sub->company_id || $dataProgram->areaEnum() !== $sub->areaEnum() || $dataProgram->brand !== $sub->brand) {
             return null;
         }
 
@@ -881,7 +881,7 @@ class ProgramReconciliationService
                 foreach (['cn', 'agrement', 'cek_fp'] as $col) {
                     $url = trim((string) $dataProgram->{$col});
                     if ($url !== '' && $url !== '-') {
-                        $isForeign = ProgramSubmission::withoutGlobalScopes()
+                        $isForeign = ProgramSubmission::withoutGlobalScopes(['area', 'brand'])
                             ->where(fn ($q) => $q->where('credit_note_url', $url)->orWhere('agreement_url', $url)->orWhere('tax_invoice_url', $url))
                             ->get()
                             ->contains(fn ($ps) => ! $this->isProgramMatch($ps->program_name, $dataProgram->program_name, $dataProgram->periode, $dataProgram->program));

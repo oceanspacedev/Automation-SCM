@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\MasterProgram;
 use App\Services\BrandContext;
+use App\Services\CompanyContext;
 use App\Services\DataProgramSyncService;
 use App\Services\SpreadsheetExport;
 use Illuminate\Database\Eloquent\Builder;
@@ -147,8 +148,8 @@ class MasterProgramController extends Controller
         $brand = app(BrandContext::class)->resolve();
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255', Rule::unique('master_programs', 'name')->where('brand', $brand)],
-            'code' => ['required', 'string', 'max:100', Rule::unique('master_programs', 'code')->where('brand', $brand)],
+            'name' => ['required', 'string', 'max:255', Rule::unique('master_programs', 'name')->where('company_id', app(CompanyContext::class)->id())->where('brand', $brand)],
+            'code' => ['required', 'string', 'max:100', Rule::unique('master_programs', 'code')->where('company_id', app(CompanyContext::class)->id())->where('brand', $brand)],
             'category' => ['nullable', 'string', 'max:100'],
             'period' => ['nullable', 'string', 'max:100'],
             'description' => ['nullable', 'string'],
@@ -187,8 +188,8 @@ class MasterProgramController extends Controller
         $request->merge(['code' => MasterProgram::normalizeCode($request->input('code'))]);
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255', Rule::unique('master_programs', 'name')->where('brand', $program->brand)->ignore($program->id)],
-            'code' => ['nullable', 'string', 'max:100', Rule::unique('master_programs', 'code')->where('brand', $program->brand)->ignore($program->id)],
+            'name' => ['required', 'string', 'max:255', Rule::unique('master_programs', 'name')->where('company_id', app(CompanyContext::class)->id())->where('brand', $program->brand)->ignore($program->id)],
+            'code' => ['nullable', 'string', 'max:100', Rule::unique('master_programs', 'code')->where('company_id', app(CompanyContext::class)->id())->where('brand', $program->brand)->ignore($program->id)],
             'category' => ['nullable', 'string', 'max:100'],
             'period' => ['nullable', 'string', 'max:100'],
             'description' => ['nullable', 'string'],

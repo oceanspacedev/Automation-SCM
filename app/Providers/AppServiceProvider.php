@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Services\AreaContext;
 use App\Services\BrandContext;
+use App\Services\CompanyContext;
 use Illuminate\Foundation\DevCommands;
 use Illuminate\Support\ServiceProvider;
 
@@ -14,6 +15,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->scoped(CompanyContext::class);
         $this->app->scoped(AreaContext::class);
         $this->app->scoped(BrandContext::class);
     }

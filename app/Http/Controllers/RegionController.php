@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Region;
 use App\Services\AreaContext;
+use App\Services\CompanyContext;
 use App\Services\SpreadsheetExport;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -81,7 +82,7 @@ class RegionController extends Controller
         $request->merge(['name' => strtoupper(trim((string) $request->input('name')))]);
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100', Rule::unique('regions', 'name')->where('area', $area)],
+            'name' => ['required', 'string', 'max:100', Rule::unique('regions', 'name')->where('company_id', app(CompanyContext::class)->id())->where('area', $area)],
             'is_active' => ['boolean'],
         ]);
 
@@ -104,7 +105,7 @@ class RegionController extends Controller
         $request->merge(['name' => strtoupper(trim((string) $request->input('name')))]);
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100', Rule::unique('regions', 'name')->where('area', $region->area)->ignore($region->id)],
+            'name' => ['required', 'string', 'max:100', Rule::unique('regions', 'name')->where('company_id', app(CompanyContext::class)->id())->where('area', $region->area)->ignore($region->id)],
             'is_active' => ['boolean'],
         ]);
 

@@ -6,7 +6,7 @@ use App\Models\DataProgram;
 use App\Models\ProgramApprovalLog;
 use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
-use Illuminate\Support\Facades\Cache;
+use App\Services\CompanyCache as Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 

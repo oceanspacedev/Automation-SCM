@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Company;
 use App\Models\EmailAccount;
+use App\Services\CompanyContext;
 use App\Services\GoogleMailService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 
 class GoogleAuthController extends Controller
 {
@@ -26,7 +29,10 @@ class GoogleAuthController extends Controller
         }
 
         try {
-            $url = $this->googleMailService->getAuthUrl();
+            $state = Str::random(40);
+            $company = Company::findOrFail(app(CompanyContext::class)->id());
+            $request->session()->put('oauth_company.'.$state, ['slug' => $company->slug, 'user_id' => $request->user()->id, 'expires' => now()->addMinutes(10)->timestamp]);
+            $url = $this->googleMailService->getAuthUrl().'&state='.$state;
 
             return redirect()->away($url);
         } catch (Exception $e) {
@@ -68,7 +74,7 @@ class GoogleAuthController extends Controller
                 );
             }
 
-            return redirect('/invoices?google_connected=1&account='.urlencode((string) $token->account_email));
+            return redirect('/invoices?company='.Company::findOrFail(app(CompanyContext::class)->id())->slug.'&google_connected=1&account='.urlencode((string) $token->account_email));
         } catch (Exception $e) {
             return redirect('/invoices?google_error='.urlencode($e->getMessage()));
         }

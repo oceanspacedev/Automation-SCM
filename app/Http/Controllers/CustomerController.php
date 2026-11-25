@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Services\CompanyContext;
 use App\Services\SpreadsheetExport;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -100,7 +101,7 @@ class CustomerController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:100', 'unique:customers,code'],
+            'code' => ['required', 'string', 'max:100', Rule::unique('customers', 'code')->where('company_id', app(CompanyContext::class)->id())],
             'name' => ['required', 'string', 'max:255'],
             'npwp' => ['nullable', 'string', 'max:100'],
             'npwp_name' => ['nullable', 'string', 'max:255'],
@@ -129,7 +130,7 @@ class CustomerController extends Controller
         $customer = Customer::findOrFail($id);
 
         $validated = $request->validate([
-            'code' => ['required', 'string', 'max:100', Rule::unique('customers', 'code')->ignore($customer->id)],
+            'code' => ['required', 'string', 'max:100', Rule::unique('customers', 'code')->where('company_id', app(CompanyContext::class)->id())->ignore($customer->id)],
             'name' => ['required', 'string', 'max:255'],
             'npwp' => ['nullable', 'string', 'max:100'],
             'npwp_name' => ['nullable', 'string', 'max:255'],

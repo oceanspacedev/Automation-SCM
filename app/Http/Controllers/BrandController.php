@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Brand;
+use App\Services\CompanyContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -101,7 +102,7 @@ class BrandController extends Controller
         $request->merge(['name' => trim((string) $request->input('name'))]);
 
         return $request->validate([
-            'name' => ['required', 'string', 'max:100', Rule::unique('brands', 'name')->ignore($ignoreId)],
+            'name' => ['required', 'string', 'max:100', Rule::unique('brands', 'name')->where('company_id', app(CompanyContext::class)->id())->ignore($ignoreId)],
             'sort_order' => ['sometimes', 'integer', 'min:0'],
             'is_active' => ['boolean'],
         ], [

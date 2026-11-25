@@ -553,6 +553,7 @@
 </template>
 
 <script setup>
+import { companyUrl, companySlug } from '../../composables/useCompany';
 import { ref, reactive, onMounted } from 'vue';
 import axios from 'axios';
 import { notify } from '@/composables/useNotify';
@@ -582,7 +583,7 @@ const { brand } = useBrands();
 const { canEdit } = useAuth();
 const isDefaultArea = area.value.value === DEFAULT_AREA;
 // Form publik per brand & area: /form/realme/jabar, /form/realme/jateng (link lama /form/jabar diarahkan ke Realme)
-const publicFormUrl = `/form/${brand.value.slug}/${area.value.value}`;
+const publicFormUrl = companyUrl(`/form/${brand.value.slug}/${area.value.value}`);
 
 // ===== FINANCIAL COLUMNS & MODAL =====
 const showFinancialColumns = ref(false);
@@ -797,7 +798,7 @@ const appsScriptTemplate = `/**
  */
 
 // Domain Web SCM Automation untuk Webhook 2 Arah
-var SCM_WEBHOOK_URL = "https://scm-customer.oceanspace.co.id/api/webhooks/form-program?area=${area.value.value}";
+var SCM_WEBHOOK_URL = "https://scm-customer.oceanspace.co.id/api/webhooks/form-program?area=${area.value.value}&brand=${brand.value.slug}&company=${companySlug}";
 
 function formatHyperlink(val, label) {
   if (!val || typeof val !== "string") return "-";

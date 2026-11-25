@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Carbon\CarbonInterface;
 use Database\Factories\AutomationScheduleFactory;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -17,6 +18,8 @@ use Illuminate\Support\Facades\Log;
  */
 class AutomationSchedule extends Model
 {
+    use BelongsToCompany;
+
     /** @use HasFactory<AutomationScheduleFactory> */
     use HasFactory;
 

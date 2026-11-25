@@ -123,7 +123,7 @@ class GoogleMailService
      */
     public function disconnect(): void
     {
-        GoogleToken::truncate();
+        GoogleToken::query()->delete();
     }
 
     /**

@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Area;
+use App\Models\Concerns\BelongsToCompany;
+use App\Services\CompanyContext;
 use Database\Factories\BrandFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,6 +17,8 @@ use Illuminate\Support\Str;
  */
 class Brand extends Model
 {
+    use BelongsToCompany;
+
     /** @use HasFactory<BrandFactory> */
     use HasFactory;
 
@@ -50,7 +54,7 @@ class Brand extends Model
     {
         $slug ??= self::DEFAULT_SLUG;
 
-        return rtrim((string) config('services.program_form.url'), '/')."/form/{$slug}/{$area->value}";
+        return rtrim((string) config('services.program_form.url'), '/')."/form/{$slug}/{$area->value}".(app(CompanyContext::class)->isLegacy() ? '' : '?company='.Company::findOrFail(app(CompanyContext::class)->id())->slug);
     }
 
     protected $casts = [
@@ -82,7 +86,7 @@ class Brand extends Model
      */
     public static function isDefaultScope(Area $area, string $brand): bool
     {
-        return $area === Area::default() && $brand === self::DEFAULT_SLUG;
+        return app(CompanyContext::class)->isLegacy() && $area === Area::default() && $brand === self::DEFAULT_SLUG;
     }
 
     /**
@@ -120,7 +124,7 @@ class Brand extends Model
     public function hasData(): bool
     {
         foreach (self::DATA_TABLES as $table) {
-            if (DB::table($table)->where('brand', $this->slug)->exists()) {
+            if (DB::table($table)->where('company_id', $this->company_id)->where('brand', $this->slug)->exists()) {
                 return true;
             }
         }

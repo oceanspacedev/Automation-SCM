@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ArContact;
 use App\Models\Brand;
+use App\Models\Company;
 use App\Models\DataProgram;
 use App\Models\Dealer;
 use App\Models\Invoice;
@@ -300,7 +301,7 @@ class WhatsAppService
         // 1. If base URL is public (e.g. staging IP, domain, tunnel), use it
         $baseUrl = $this->resolveBaseUrl();
         if ($this->isPublicUrl($baseUrl)) {
-            return "{$baseUrl}/invoices/{$invoice->id}/pdf";
+            return "{$baseUrl}/invoices/{$invoice->id}/pdf?company=".Company::findOrFail($invoice->company_id)->slug;
         }
 
         // 2. For local development, mirror the PDF to a temporary public host so WAGHub can fetch the direct binary
@@ -309,7 +310,7 @@ class WhatsAppService
             return $mirrorUrl;
         }
 
-        return url("/invoices/{$invoice->id}/pdf");
+        return url("/invoices/{$invoice->id}/pdf").'?company='.Company::findOrFail($invoice->company_id)->slug;
     }
 
     /**
@@ -693,7 +694,7 @@ class WhatsAppService
         $confirmUrl = URL::temporarySignedRoute(
             'program-submissions.confirm',
             now()->addDays(self::CONFIRM_LINK_DAYS),
-            ['id' => $submission->id, 'role' => 'telemarketing']
+            ['company' => Company::findOrFail(app(CompanyContext::class)->id())->slug, 'id' => $submission->id, 'role' => 'telemarketing']
         );
 
         $messageText = $this->buildProgramClaimTelemarketingMessage($submission, $confirmUrl);
@@ -800,7 +801,7 @@ class WhatsAppService
         $confirmUrl = URL::temporarySignedRoute(
             'program-submissions.confirm',
             now()->addDays(self::CONFIRM_LINK_DAYS),
-            ['id' => $submission->id, 'role' => 'ar']
+            ['company' => Company::findOrFail(app(CompanyContext::class)->id())->slug, 'id' => $submission->id, 'role' => 'ar']
         );
 
         $messageText = $this->buildProgramClaimMessage($submission, $confirmUrl, $arContact?->name);
@@ -985,7 +986,7 @@ class WhatsAppService
         $confirmUrl = URL::temporarySignedRoute(
             'data-programs.confirm',
             now()->addDays(self::CONFIRM_LINK_DAYS),
-            ['id' => $dp->id, 'role' => 'telemarketing']
+            ['company' => Company::findOrFail(app(CompanyContext::class)->id())->slug, 'id' => $dp->id, 'role' => 'telemarketing']
         );
 
         $messageText = $this->buildDataProgramClaimTelemarketingMessage($dp, $confirmUrl, $reminderNumber);
@@ -1091,7 +1092,7 @@ class WhatsAppService
         $confirmUrl = URL::temporarySignedRoute(
             'data-programs.confirm',
             now()->addDays(self::CONFIRM_LINK_DAYS),
-            ['id' => $dp->id, 'role' => 'ar']
+            ['company' => Company::findOrFail(app(CompanyContext::class)->id())->slug, 'id' => $dp->id, 'role' => 'ar']
         );
 
         $messageText = $this->buildDataProgramClaimArMessage($dp, $confirmUrl, $arContact?->name);
@@ -1174,7 +1175,7 @@ class WhatsAppService
         $confirmUrl = URL::temporarySignedRoute(
             'data-programs.confirm',
             now()->addDays(self::CONFIRM_LINK_DAYS),
-            ['id' => $dp->id, 'role' => 'pajak']
+            ['company' => Company::findOrFail(app(CompanyContext::class)->id())->slug, 'id' => $dp->id, 'role' => 'pajak']
         );
 
         return $this->sendToTeam($dp, TeamContact::TAX, 'Tim Pajak', $overridePhone, "DP-TAX-CHECK-{$dp->id}",
@@ -1198,7 +1199,7 @@ class WhatsAppService
         $confirmUrl = URL::temporarySignedRoute(
             'data-programs.confirm',
             now()->addDays(self::CONFIRM_LINK_DAYS),
-            ['id' => $dp->id, 'role' => 'scm']
+            ['company' => Company::findOrFail(app(CompanyContext::class)->id())->slug, 'id' => $dp->id, 'role' => 'scm']
         );
 
         return $this->sendToTeam($dp, TeamContact::SCM, 'Tim SCM', $overridePhone, "DP-SCM-TRANSFER-{$dp->id}",

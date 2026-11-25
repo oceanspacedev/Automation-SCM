@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCompany;
 use Database\Factories\TeamContactFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class TeamContact extends Model
 {
+    use BelongsToCompany;
+
     /** @use HasFactory<TeamContactFactory> */
     use HasFactory;
 

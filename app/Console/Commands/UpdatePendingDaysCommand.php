@@ -15,7 +15,7 @@ class UpdatePendingDaysCommand extends Command
     public function handle(): int
     {
         $dpUpdated = 0;
-        DataProgram::withoutGlobalScopes()
+        DataProgram::withoutGlobalScopes(['area', 'brand'])
             ->whereNotNull('tgl_share_cn')
             ->where('tgl_share_cn', '!=', '')
             ->chunkById(200, function ($rows) use (&$dpUpdated) {
@@ -46,7 +46,7 @@ class UpdatePendingDaysCommand extends Command
             });
 
         $subUpdated = 0;
-        ProgramSubmission::withoutGlobalScopes()
+        ProgramSubmission::withoutGlobalScopes(['area', 'brand'])
             ->whereNotNull('tgl_share_cn')
             ->where('tgl_share_cn', '!=', '')
             ->chunkById(200, function ($rows) use (&$subUpdated) {

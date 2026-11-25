@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Area;
 use App\Models\ArContact;
+use App\Services\CompanyContext;
 use App\Services\SpreadsheetExport;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -122,7 +123,7 @@ class ArContactController extends Controller
         ]);
 
         return $request->validate([
-            'area' => ['required', Rule::enum(Area::class), Rule::unique('ar_contacts', 'area')->ignore($ignoreId)],
+            'area' => ['required', Rule::enum(Area::class), Rule::unique('ar_contacts', 'area')->where('company_id', app(CompanyContext::class)->id())->ignore($ignoreId)],
             'name' => ['required', 'string', 'max:255'],
             'whatsapp' => ['required', 'string', 'max:30', 'regex:/^\+?[\d\s\-]{8,}$/'],
             'is_active' => ['boolean'],

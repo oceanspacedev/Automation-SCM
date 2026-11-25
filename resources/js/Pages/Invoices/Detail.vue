@@ -99,14 +99,14 @@
         </button>
 
         <a
-          :href="`/invoices/${invoice.id}/preview`"
+          :href="companyUrl(`/invoices/${invoice.id}/preview`)"
           target="_blank"
           class="h-8 px-2 sm:px-3 flex-1 sm:flex-initial border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center justify-center shadow-2xs whitespace-nowrap"
         >
           <span class="sm:hidden">Preview</span><span class="hidden sm:inline">Preview Invoice</span>
         </a>
         <a
-          :href="`/invoices/${invoice.id}/pdf`"
+          :href="companyUrl(`/invoices/${invoice.id}/pdf`)"
           class="h-8 px-2 sm:px-3 flex-1 sm:flex-initial border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 text-xs font-medium rounded-lg transition inline-flex items-center justify-center shadow-2xs whitespace-nowrap"
         >
           <span class="sm:hidden">PDF</span><span class="hidden sm:inline">Download PDF</span>
@@ -307,6 +307,7 @@
 </template>
 
 <script setup>
+import { companyUrl } from '../../composables/useCompany';
 import { ref, onMounted, watch } from 'vue';
 import axios from 'axios';
 import { Send as SendIcon, CheckCircle as CheckCircleIcon, AlertCircle as AlertCircleIcon } from '@lucide/vue';

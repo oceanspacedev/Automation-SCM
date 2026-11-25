@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToArea;
+use App\Models\Concerns\BelongsToCompany;
 use Database\Factories\RegionFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,8 @@ class Region extends Model
 {
     /** @use HasFactory<RegionFactory> */
     use BelongsToArea, HasFactory;
+
+    use BelongsToCompany;
 
     /**
      * Regions merged into another: old name → the region it is now.

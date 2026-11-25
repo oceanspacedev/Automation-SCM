@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToArea;
 use App\Models\Concerns\BelongsToBrand;
+use App\Models\Concerns\BelongsToCompany;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Invoice extends Model
 {
     use BelongsToArea, BelongsToBrand, HasFactory;
+    use BelongsToCompany;
 
     protected $guarded = ['id'];
 
@@ -114,12 +116,12 @@ class Invoice extends Model
     {
         return $query->where(function (Builder $outer) {
             $outer->whereExists(function ($sub) {
-                $sub->selectRaw(1)->from('program_submissions')
+                $sub->selectRaw(1)->from('program_submissions')->whereColumn('program_submissions.company_id', 'invoices.company_id')
                     ->whereColumn('program_submissions.id_real', 'invoices.dealer_code')
                     ->whereColumn('program_submissions.program_name', 'invoices.program_name')
                     ->where(fn ($q) => $q->whereNotNull('program_submissions.credit_note_url')->orWhereNotNull('program_submissions.agreement_url'));
             })->orWhereExists(function ($dp) {
-                $dp->selectRaw(1)->from('data_programs')
+                $dp->selectRaw(1)->from('data_programs')->whereColumn('data_programs.company_id', 'invoices.company_id')
                     ->where(function ($q) {
                         $q->whereColumn('data_programs.cn', 'invoices.invoice_number')
                             ->orWhere(function ($dq) {
@@ -143,12 +145,12 @@ class Invoice extends Model
     {
         return $query->whereNot(function (Builder $outer) {
             $outer->whereExists(function ($sub) {
-                $sub->selectRaw(1)->from('program_submissions')
+                $sub->selectRaw(1)->from('program_submissions')->whereColumn('program_submissions.company_id', 'invoices.company_id')
                     ->whereColumn('program_submissions.id_real', 'invoices.dealer_code')
                     ->whereColumn('program_submissions.program_name', 'invoices.program_name')
                     ->where(fn ($q) => $q->whereNotNull('program_submissions.credit_note_url')->orWhereNotNull('program_submissions.agreement_url'));
             })->orWhereExists(function ($dp) {
-                $dp->selectRaw(1)->from('data_programs')
+                $dp->selectRaw(1)->from('data_programs')->whereColumn('data_programs.company_id', 'invoices.company_id')
                     ->where(function ($q) {
                         $q->whereColumn('data_programs.cn', 'invoices.invoice_number')
                             ->orWhere(function ($dq) {

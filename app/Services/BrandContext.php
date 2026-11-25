@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Brand;
+use App\Models\Company;
 use Closure;
 
 /**
@@ -26,7 +27,7 @@ class BrandContext
      */
     public function resolve(): string
     {
-        return $this->brand ?? Brand::DEFAULT_SLUG;
+        return $this->brand ?? (app(CompanyContext::class)->isLegacy() ? Brand::DEFAULT_SLUG : (Company::findOrFail(app(CompanyContext::class)->id())->default_brand));
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Jobs\ImportDealerFile;
 use App\Models\Dealer;
 use App\Services\AreaContext;
+use App\Services\CompanyContext;
 use App\Services\DealerEmailImportService;
 use App\Services\DealerImportService;
 use App\Services\SpreadsheetExport;
@@ -410,7 +411,7 @@ class DealerController extends Controller
         $request->merge(['kode_bt' => Dealer::normalizeKodeBt($request->input('kode_bt'))]);
 
         $validated = $request->validate([
-            'kode_bt' => ['required', 'string', 'max:100', Rule::unique('dealers', 'kode_bt')->ignore($dealer?->id)],
+            'kode_bt' => ['required', 'string', 'max:100', Rule::unique('dealers', 'kode_bt')->where('company_id', app(CompanyContext::class)->id())->ignore($dealer?->id)],
             'dealer_name' => ['required', 'string', 'max:255'],
             'alias' => ['nullable', 'string', 'max:255'],
             'id_realme' => ['nullable', 'string', 'max:100'],

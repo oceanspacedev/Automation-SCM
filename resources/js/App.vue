@@ -1,5 +1,14 @@
 <template>
   <div class="min-h-screen bg-white dark:bg-[#0B1120] text-gray-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
+    <div v-if="!isStandalonePage" class="flex items-center justify-between gap-3 border-b border-gray-100 bg-gray-50 px-4 py-2 text-xs dark:border-slate-800 dark:bg-slate-950 sm:px-6">
+      <span class="font-medium text-gray-700 dark:text-slate-200">{{ companyName }}</span>
+      <label v-if="['admin', 'scm'].includes(user?.role)" class="flex items-center gap-2 text-gray-500">
+        Perusahaan
+        <select :value="companySlug" @change="switchCompany($event.target.value)" class="rounded-md border border-gray-200 bg-white px-2 py-1 text-gray-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" aria-label="Pilih perusahaan">
+          <option value="top">CV TOP SELULAR</option><option value="msi">PT MSI</option>
+        </select>
+      </label>
+    </div>
     <!-- Header (Hidden on Login Page & Standalone Public Pages) -->
     <header
       v-if="!isStandalonePage"
@@ -447,6 +456,8 @@
 </template>
 
 <script setup>
+import { useCompany } from './composables/useCompany';
+const { companySlug, companyName, switchCompany } = useCompany();
 import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
@@ -533,6 +544,7 @@ const masterColumns = computed(() => [
   [
     canAccess('master_dealer') && { label: 'Dealer', to: '/dealers' },
     canAccess('master_customer') && { label: 'Badan Usaha', to: '/badan-usaha' },
+    ['admin', 'scm'].includes(user.value?.role) && { label: 'Perusahaan', to: '/companies' },
     canAccess('master_user') && { label: 'User', to: '/users' },
     user.value?.role === 'admin' && { label: 'Role Permission', to: '/role-permissions' },
     canAccess('master_user') && { label: 'Jadwal Otomatis', to: '/jadwal-otomatis' },

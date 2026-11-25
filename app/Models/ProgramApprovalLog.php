@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToArea;
 use App\Models\Concerns\BelongsToBrand;
+use App\Models\Concerns\BelongsToCompany;
 use Database\Factories\ProgramApprovalLogFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -21,6 +22,8 @@ class ProgramApprovalLog extends Model
 {
     /** @use HasFactory<ProgramApprovalLogFactory> */
     use BelongsToArea, BelongsToBrand, HasFactory;
+
+    use BelongsToCompany;
 
     public const TELEMARKETING_NOTIFIED = 'telemarketing_notified';
 

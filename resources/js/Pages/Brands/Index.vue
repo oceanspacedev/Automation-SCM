@@ -42,7 +42,7 @@
             <div class="flex items-start justify-between gap-3">
               <div class="min-w-0">
                 <p class="text-sm font-medium text-gray-900 break-words">{{ b.name }}</p>
-                <p class="text-gray-500 mt-0.5">/form/{{ b.slug }}/jabar</p>
+                <p class="text-gray-500 mt-0.5">{{ companyUrl(`/form/${b.slug}/jabar`) }}</p>
               </div>
               <button
                 v-if="canEdit"
@@ -96,7 +96,7 @@
               <td class="py-2 px-3 text-center text-gray-500 border-r border-gray-200">{{ index + 1 }}</td>
               <td class="py-2 px-3 font-medium text-gray-900 border-r border-gray-200 whitespace-nowrap">{{ b.name }}</td>
               <td class="py-2 px-3 text-gray-700 border-r border-gray-200 whitespace-nowrap">{{ b.slug }}</td>
-              <td class="py-2 px-3 text-gray-700 border-r border-gray-200 whitespace-nowrap">/form/{{ b.slug }}/jabar · /form/{{ b.slug }}/jateng</td>
+              <td class="py-2 px-3 text-gray-700 border-r border-gray-200 whitespace-nowrap">{{ companyUrl(`/form/${b.slug}/jabar`) }} · {{ companyUrl(`/form/${b.slug}/jateng`) }}</td>
               <td class="py-2 px-3 text-center text-gray-700 border-r border-gray-200">{{ b.sort_order }}</td>
               <td class="py-2 px-3 text-center border-r border-gray-200 whitespace-nowrap">
                 <button
@@ -243,6 +243,7 @@
 </template>
 
 <script setup>
+import { companyUrl } from '../../composables/useCompany';
 import { ref, reactive, onMounted } from 'vue';
 import axios from 'axios';
 import { loadBrands } from '@/composables/useBrands';

@@ -8,9 +8,9 @@ use App\Models\DataProgram;
 use App\Models\Dealer;
 use App\Models\Draft;
 use App\Models\MasterProgram;
+use App\Services\CompanyCache as Cache;
 use Closure;
 use Exception;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -674,13 +674,13 @@ class DataProgramSyncService
         $withoutCode = fn (string $column) => fn ($query) => $query->whereNull($column)->orWhereIn($column, $replaceable);
 
         // Draft ikut diisi, supaya sinkron ulang draft ke Data Program tidak mengosongkan kodenya lagi
-        Draft::withoutGlobalScopes()
+        Draft::withoutGlobalScopes(['area', 'brand'])
             ->where('brand', $program->brand)
             ->where('program_name', $name)
             ->where($withoutCode('program_code'))
             ->update(['program_code' => $code]);
 
-        $rows = DataProgram::withoutGlobalScopes()
+        $rows = DataProgram::withoutGlobalScopes(['area', 'brand'])
             ->where('brand', $program->brand)
             ->where('program_name', $name)
             ->where($withoutCode('program'))
@@ -1286,6 +1286,7 @@ class DataProgramSyncService
             'updated_at',
         ];
 
-        DataProgram::upsert($batch, ['brand', 'area', 'row_hash'], $updateColumns);
+        $batch = array_map(fn (array $row): array => [...$row, 'company_id' => app(CompanyContext::class)->id()], $batch);
+        DataProgram::upsert($batch, ['company_id', 'brand', 'area', 'row_hash'], $updateColumns);
     }
 }
