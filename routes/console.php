@@ -45,8 +45,9 @@ if (config('services.data_program.auto_sync') && DataProgramSyncService::isGoogl
 
 // Nonaktifkan auto-analyze AI terjadwal di lingkungan local agar tidak otomatis berjalan.
 // Hanya spawn proses child jika memang ada submission 2026 yang belum dianalisis agar RAM/CPU tidak melonjak tiap menit.
+// Batch dibatasi 5 per putaran supaya penggunaan RAM untuk PDF/gambar tetap rendah dan tidak memicu OOM di VPS.
 if (! app()->environment('local') || env('ENABLE_AUTO_AI_SCHEDULE', false)) {
-    Schedule::command('program:auto-analyze-ai --year=2026 --limit=15 --sleep=0.2')
+    Schedule::command('program:auto-analyze-ai --year=2026 --limit=5 --sleep=0.3')
         ->everyMinute()
         ->when(static function (): bool {
             try {
@@ -118,7 +119,7 @@ Schedule::command('queue:work --stop-when-empty --tries=1 --timeout=3600 --memor
     });
 
 // WhatsApp ke telemarketing untuk baris yang BISA DI POTONG; jamnya diatur di Master → Jadwal Otomatis (dicek tiap menit).
-Schedule::command('program:notify-telemarketing')
+Schedule::command('program:notify-telemarketing --limit=50')
     ->everyMinute()
     ->when(static fn (): bool => AutomationSchedule::isDueNow(AutomationSchedule::TELEMARKETING_WA))
     ->withoutOverlapping(15)
@@ -128,7 +129,7 @@ Schedule::command('program:notify-telemarketing')
     });
 
 // WhatsApp pengingat ke telemarketing untuk invoice yang belum di-upload ke Form Program; jamnya diatur di Master → Jadwal Otomatis.
-Schedule::command('invoices:remind-telemarketing-upload')
+Schedule::command('invoices:remind-telemarketing-upload --limit=50')
     ->everyMinute()
     ->when(static fn (): bool => AutomationSchedule::isDueNow(AutomationSchedule::INVOICE_REMIND_UPLOAD))
     ->withoutOverlapping(15)
@@ -145,6 +146,27 @@ Schedule::command('program:update-pending')
     ->onFailure(static function (): void {
         Log::warning('Scheduled command program:update-pending gagal dijalankan.');
     });
+
+// Bersihkan baris cache & cache_locks kadaluarsa tiap pukul 03:05 WIB agar tabel cache database tidak membengkak.
+Schedule::call(static function (): void {
+    try {
+        if (config('cache.default') !== 'database') {
+            return;
+        }
+
+        $connection = config('cache.stores.database.connection');
+        $cacheTable = (string) config('cache.stores.database.table', 'cache');
+        $lockTable = (string) (config('cache.stores.database.lock_table') ?: 'cache_locks');
+        $now = now()->timestamp;
+
+        DB::connection($connection)->table($cacheTable)->where('expiration', '<=', $now)->delete();
+        DB::connection($connection)->table($lockTable)->where('expiration', '<=', $now)->delete();
+    } catch (Throwable $e) {
+        Log::warning("Gagal membersihkan cache kadaluarsa: {$e->getMessage()}");
+    }
+})
+    ->name('prune-expired-database-cache')
+    ->dailyAt('03:05');
 
 Artisan::command('program:refresh-completeness', function () {
     $this->info('Memperbarui status kelengkapan dokumen Non-PKP...');

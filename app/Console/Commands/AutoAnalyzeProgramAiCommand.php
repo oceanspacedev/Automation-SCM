@@ -157,6 +157,14 @@ class AutoAnalyzeProgramAiCommand extends Command
                 if ($sleepSeconds > 0) {
                     usleep((int) ($sleepSeconds * 1000000));
                 }
+
+                // Bebaskan memori buffer PDF/gambar antar dokumen dan berhenti aman bila RAM mendekati 200 MB.
+                gc_collect_cycles();
+                if (memory_get_usage(true) > 200 * 1024 * 1024) {
+                    $this->warn('Batas aman memori (200 MB) tercapai; sisa antrean dilanjutkan pada putaran berikutnya.');
+
+                    break;
+                }
             }
         } finally {
             Cache::put($cacheKey, [

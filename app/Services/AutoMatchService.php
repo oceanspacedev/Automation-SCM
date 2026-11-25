@@ -6,6 +6,7 @@ use App\Models\DataProgram;
 use App\Models\ProgramApprovalLog;
 use App\Models\ProgramReconciliationLog;
 use App\Models\ProgramSubmission;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -17,6 +18,11 @@ use Illuminate\Support\Str;
 class AutoMatchService
 {
     public const TRIGGERED_BY = 'auto_cron';
+
+    /**
+     * Cache key storing the latest DB state fingerprint after a full idle scan so cron skips redundant full scans.
+     */
+    public const CACHE_KEY_LAST_FINGERPRINT = 'auto_match:last_fingerprint';
 
     /**
      * Purchase statuses that are already decided; such rows are not matched again.
@@ -55,6 +61,12 @@ class AutoMatchService
         $summary = ['evaluated' => 0, 'matched' => 0, 'can_cut' => 0, 'skipped_unchanged' => 0];
         $batchId = (string) Str::uuid();
 
+        // Lewati pemindaian penuh bila tidak ada perubahan pada Data Program & Form Program sejak putaran penuh terakhir.
+        $fingerprint = $this->currentDataFingerprint();
+        if ($fingerprint !== null && Cache::get(self::CACHE_KEY_LAST_FINGERPRINT) === $fingerprint) {
+            return $summary;
+        }
+
         // Cek dulu brand mana yang punya Data Program pending agar tidak memuat seluruh Form Program saat idle.
         $pendingBrands = DataProgram::query()
             ->where(fn ($q) => $q->whereNull('status_potong_purchase')
@@ -65,6 +77,8 @@ class AutoMatchService
             ->pluck('brand');
 
         if ($pendingBrands->isEmpty()) {
+            $this->rememberFingerprint($fingerprint);
+
             return $summary;
         }
 
@@ -81,6 +95,8 @@ class AutoMatchService
             ->groupBy(fn (ProgramSubmission $sub) => $sub->brand.'|'.$sub->areaEnum()->value);
 
         if ($submissionsByScope->isEmpty()) {
+            $this->rememberFingerprint($fingerprint);
+
             return $summary;
         }
 
@@ -123,6 +139,8 @@ class AutoMatchService
             }
 
             if ($candidates === []) {
+                unset($rows);
+
                 continue;
             }
 
@@ -167,9 +185,58 @@ class AutoMatchService
                     }
                 }
             }
+
+            unset($rows, $candidates, $lastCheckedMap);
+            gc_collect_cycles();
+        }
+
+        // Simpan fingerprint baru hanya jika seluruh baris pending selesai dipindai (tidak terpotong limit).
+        if ($summary['evaluated'] < $limit) {
+            $this->rememberFingerprint($this->currentDataFingerprint());
         }
 
         return $summary;
+    }
+
+    /**
+     * Lightweight fingerprint of current Data Program & Form Program state (2 tiny aggregate SQL queries).
+     */
+    private function currentDataFingerprint(): ?string
+    {
+        try {
+            $dp = DataProgram::query()
+                ->selectRaw('COUNT(*) as cnt, MAX(id) as max_id, MAX(updated_at) as max_updated')
+                ->first();
+            $sub = ProgramSubmission::query()
+                ->selectRaw('COUNT(*) as cnt, MAX(id) as max_id, MAX(updated_at) as max_updated')
+                ->first();
+
+            return implode('|', [
+                (int) ($dp?->cnt ?? 0),
+                (int) ($dp?->max_id ?? 0),
+                (string) ($dp?->max_updated ?? ''),
+                (int) ($sub?->cnt ?? 0),
+                (int) ($sub?->max_id ?? 0),
+                (string) ($sub?->max_updated ?? ''),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning("Gagal membaca fingerprint auto-match: {$e->getMessage()}");
+
+            return null;
+        }
+    }
+
+    private function rememberFingerprint(?string $fingerprint): void
+    {
+        if ($fingerprint === null) {
+            return;
+        }
+
+        try {
+            Cache::put(self::CACHE_KEY_LAST_FINGERPRINT, $fingerprint, now()->addMinutes(10));
+        } catch (\Throwable $e) {
+            Log::warning("Gagal menyimpan fingerprint auto-match: {$e->getMessage()}");
+        }
     }
 
     /**

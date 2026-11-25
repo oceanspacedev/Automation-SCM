@@ -13,6 +13,7 @@ use App\Services\ProgramReconciliationService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -115,6 +116,27 @@ class AutoMatchTest extends TestCase
         $this->artisan('program:auto-match')->assertSuccessful();
 
         $this->assertSame('BISA DI POTONG', $dataProgram->fresh()->status_potong_purchase);
+    }
+
+    public function test_auto_match_caches_idle_fingerprint_and_rescans_when_new_submission_arrives(): void
+    {
+        $dataProgram = $this->dataProgram();
+
+        // Putaran pertama tanpa submission: menyimpan fingerprint idle di cache
+        $this->artisan('program:auto-match')->assertSuccessful();
+        $firstFingerprint = Cache::get(AutoMatchService::CACHE_KEY_LAST_FINGERPRINT);
+        $this->assertNotNull($firstFingerprint);
+
+        // Putaran kedua tanpa perubahan: langsung skip tanpa evaluasi
+        $summary = app(AutoMatchService::class)->matchPendingRows();
+        $this->assertSame(['evaluated' => 0, 'matched' => 0, 'can_cut' => 0, 'skipped_unchanged' => 0], $summary);
+
+        // Begitu submission baru masuk, fingerprint berubah dan baris langsung dicocokkan
+        $this->submission();
+        $this->artisan('program:auto-match')->assertSuccessful();
+
+        $this->assertSame('BISA DI POTONG', $dataProgram->fresh()->status_potong_purchase);
+        $this->assertNotSame($firstFingerprint, Cache::get(AutoMatchService::CACHE_KEY_LAST_FINGERPRINT));
     }
 
     public function test_manual_whatsapp_marks_the_row_so_the_cron_does_not_resend(): void
