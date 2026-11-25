@@ -33,10 +33,12 @@ class ProgramApprovalController extends Controller
         ProgramApprovalLog::POSTPONED => 'Dealer menunda',
         ProgramApprovalLog::AR_NOTIFIED => 'Notifikasi WhatsApp ke AR',
         ProgramApprovalLog::CUT => 'Dipotong oleh AR',
+        ProgramApprovalLog::SCM_CUT_NOTIFIED => 'Info sudah potong ke Tim SCM',
         ProgramApprovalLog::SCM_TRANSFER_NOTIFIED => 'Notifikasi WhatsApp ke Tim SCM (transfer)',
         ProgramApprovalLog::TRANSFERRED => 'Ditransfer oleh Tim SCM',
         ProgramApprovalLog::TAX_NOTIFIED => 'Notifikasi WhatsApp ke Tim Pajak',
         ProgramApprovalLog::TAX_CHECKED => 'Dicek Tim Pajak',
+        ProgramApprovalLog::AP_NOTIFIED => 'Notifikasi WhatsApp ke Tim AP (hasil cek pajak)',
         ProgramApprovalLog::SCM_NOTIFIED => 'Notifikasi WhatsApp ke Tim SCM (hasil cek pajak)',
         ProgramApprovalLog::ROLLED_BACK => 'Tahap approval dikembalikan',
     ];
@@ -127,9 +129,9 @@ class ProgramApprovalController extends Controller
     }
 
     /**
-     * Names of the active tax and SCM team members in Master Tim Pajak & SCM (the same for every area), read once.
+     * Names of the active tax, SCM, and AP team members in Master Tim Pajak, SCM & AP (the same for every area), read once.
      *
-     * @return Closure(DataProgram): array{tax: ?string, scm: ?string}
+     * @return Closure(DataProgram): array{tax: ?string, scm: ?string, ap: ?string}
      */
     private function teamNamesResolver(): Closure
     {
@@ -139,12 +141,13 @@ class ProgramApprovalController extends Controller
             return $names ??= [
                 'tax' => TeamContact::namesOf(TeamContact::TAX),
                 'scm' => TeamContact::namesOf(TeamContact::SCM),
+                'ap' => TeamContact::namesOf(TeamContact::AP),
             ];
         };
     }
 
     /**
-     * @param  array{tax: ?string, scm: ?string}  $teamNames
+     * @param  array{tax: ?string, scm: ?string, ap: ?string}  $teamNames
      * @return array<string, mixed>
      */
     private function present(DataProgram $row, ?string $arName, array $teamNames): array
@@ -168,7 +171,7 @@ class ProgramApprovalController extends Controller
             'stage_label' => ProgramApprovalFlow::STAGES[$stage],
             // Cara klaim diselesaikan: dipotong di order (AR) atau ditransfer (Tim SCM)
             'settlement' => in_array($stage, ['cut', 'tax_checked'], true) ? ($row->isTransfer() ? 'Done transfer' : 'Sudah potong') : null,
-            'steps' => $this->flow->steps($row, $row->approvalLogs, $arName, $teamNames['tax'], $teamNames['scm']),
+            'steps' => $this->flow->steps($row, $row->approvalLogs, $arName, $teamNames['tax'], $teamNames['scm'], $teamNames['ap']),
         ];
     }
 

@@ -8,8 +8,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A member of the tax team (WhatsApp to check the PPh after AR cuts a claim) or the SCM team (WhatsApp with the result
- * of that check), the same for every area. Every active member of a team gets its WhatsApp.
+ * A member of the tax team (WhatsApp to check the PPh after AR cuts / SCM transfers a claim), the SCM team (WhatsApp
+ * info after AR cuts a claim, or transfer request), or the AP team (WhatsApp with the PPh check result), the same for
+ * every area. Every active member of a team gets its WhatsApp.
  */
 class TeamContact extends Model
 {
@@ -20,10 +21,16 @@ class TeamContact extends Model
 
     public const SCM = 'scm';
 
+    public const AP = 'ap';
+
     /**
      * @var array<string, string>
      */
-    public const LABELS = [self::TAX => 'Tim Pajak', self::SCM => 'Tim SCM'];
+    public const LABELS = [
+        self::TAX => 'Tim Pajak',
+        self::SCM => 'Tim SCM',
+        self::AP => 'Tim AP',
+    ];
 
     protected $guarded = ['id'];
 

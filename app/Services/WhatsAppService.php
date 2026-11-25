@@ -1207,8 +1207,33 @@ class WhatsAppService
     }
 
     /**
+     * Inform the SCM team (Master Tim Pajak, SCM & AP) that AR has cut a claim (informational branch after AR cut).
+     *
+     * @return array{success: bool, message: string, provider_id: ?string}
+     */
+    public function sendDataProgramCutInfoToScm(DataProgram $dp, ?string $overridePhone = null): array
+    {
+        return $this->sendToTeam($dp, TeamContact::SCM, 'Tim SCM', $overridePhone, "DP-SCM-CUT-INFO-{$dp->id}",
+            fn (?string $name) => $this->buildDataProgramCutInfoScmMessage($dp, $name),
+            "Info klaim sudah dipotong {$dp->dealer_name}");
+    }
+
+    /**
+     * Send the result of the tax check of a cut/transferred claim (Cek Pajak, Selisih, Note PPh) to the AP team
+     * (Master Tim Pajak, SCM & AP).
+     *
+     * @return array{success: bool, message: string, provider_id: ?string}
+     */
+    public function sendDataProgramApNotification(DataProgram $dp, ?string $overridePhone = null): array
+    {
+        return $this->sendToTeam($dp, TeamContact::AP, 'Tim AP', $overridePhone, "DP-AP-RESULT-{$dp->id}",
+            fn (?string $name) => $this->buildDataProgramApMessage($dp, $name),
+            "Hasil cek pajak {$dp->dealer_name}");
+    }
+
+    /**
      * Send the result of the tax check of a cut claim (Cek Pajak, Selisih, Note PPh) to the SCM team
-     * (Master Tim Pajak & SCM).
+     * (legacy helper kept for backward compatibility).
      *
      * @return array{success: bool, message: string, provider_id: ?string}
      */
@@ -1220,8 +1245,8 @@ class WhatsAppService
     }
 
     /**
-     * Send a Data Program message to every active member of the tax or SCM team in Master Tim Pajak & SCM (or only to
-     * the given number). It succeeds when at least one member got it.
+     * Send a Data Program message to every active member of the tax, SCM, or AP team in Master Tim Pajak, SCM & AP (or
+     * only to the given number). It succeeds when at least one member got it.
      *
      * @param  \Closure(?string): string  $buildMessage  the message for a member's name
      * @return array{success: bool, message: string, provider_id: ?string}
@@ -1237,7 +1262,7 @@ class WhatsAppService
         if ($recipients->isEmpty()) {
             return [
                 'success' => false,
-                'message' => "Nomor WhatsApp {$teamLabel} belum diisi di Master Tim Pajak & SCM.",
+                'message' => "Nomor WhatsApp {$teamLabel} belum diisi di Master Tim Pajak, SCM & AP.",
                 'provider_id' => null,
             ];
         }
@@ -1373,6 +1398,66 @@ class WhatsAppService
             $confirmUrl,
             '',
             '_(Tautan ini aktif selama '.self::CONFIRM_LINK_DAYS.' hari)_',
+            '_Pesan otomatis dari Sistem SCM_',
+        ];
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Build the informational WhatsApp telling the SCM team that AR has cut a claim.
+     */
+    public function buildDataProgramCutInfoScmMessage(DataProgram $dp, ?string $scmTeamName = null): string
+    {
+        $rupiah = fn ($amount) => 'Rp '.number_format((float) ($amount ?? 0), 0, ',', '.');
+
+        $lines = [
+            '*INFO KLAIM SUDAH DIPOTONG AR (DATA PROGRAM)*',
+            '',
+            'Halo '.($scmTeamName ?: 'Tim SCM').', sebagai informasi, klaim program berikut sudah *DIPOTONG oleh AR* dan saat ini diteruskan ke Tim Pajak untuk cek PPh:',
+            '',
+            '*Kode BT / ID Real:* '.($dp->kode_bt ?: '-'),
+            '*Dealer:* '.($dp->dealer_name ?: '-'),
+            '*Region:* '.($dp->region ?: ($dp->big_region ?: '-')),
+            '*Program:* '.($dp->program_name ?: ($dp->program ?: '-')),
+            '*DPP:* '.$rupiah($dp->dpp),
+            '*PPN:* '.$rupiah($dp->ppn),
+            '*PPh:* '.$rupiah($dp->nilai_pph),
+            '*Net Pay:* '.$rupiah($dp->net_pay),
+            '*Tgl Potong / No. Pembayaran:* '.($dp->tgl_potong_tf ?: '-').' / '.($dp->no_pembayaran ?: '-'),
+            '',
+            '_Pesan otomatis dari Sistem SCM_',
+        ];
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * Build the WhatsApp telling the AP team the result of the tax check of a cut or transferred claim.
+     */
+    public function buildDataProgramApMessage(DataProgram $dp, ?string $apTeamName = null): string
+    {
+        $rupiah = fn ($amount) => 'Rp '.number_format((float) ($amount ?? 0), 0, ',', '.');
+        $transfer = $dp->isTransfer();
+
+        $lines = [
+            '*HASIL CEK PAJAK KLAIM (DATA PROGRAM)*',
+            '',
+            'Halo '.($apTeamName ?: 'Tim AP').', Tim Pajak sudah mengecek PPh klaim yang sudah '.($transfer ? 'ditransfer' : 'dipotong AR').' berikut:',
+            '',
+            '*Kode BT / ID Real:* '.($dp->kode_bt ?: '-'),
+            '*Dealer:* '.($dp->dealer_name ?: '-'),
+            '*Region:* '.($dp->region ?: ($dp->big_region ?: '-')),
+            '*Program:* '.($dp->program_name ?: ($dp->program ?: '-')),
+            '*Net Pay:* '.$rupiah($dp->net_pay),
+            ($transfer ? '*Tgl Transfer / No. Referensi:* ' : '*Tgl Potong / No. Pembayaran:* ').($dp->tgl_potong_tf ?: '-').' / '.($dp->no_pembayaran ?: '-'),
+            '*PPh:* '.$rupiah($dp->nilai_pph),
+            '',
+            '*Cek Pajak:* '.($dp->cek_pajak_tarif ?: '-'),
+            '*Selisih:* '.$rupiah($dp->selisih),
+            '*Note PPh:* '.($dp->note_pph ?: '-'),
+            '*Dicek:* '.($dp->tax_checked_at?->format('d/m/Y H:i') ?? now()->format('d/m/Y H:i')).' WIB',
+            '',
             '_Pesan otomatis dari Sistem SCM_',
         ];
 

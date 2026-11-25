@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * Master Tim Pajak & SCM: members of the tax and SCM teams, one list for every area.
+ * Master Tim Pajak, SCM & AP: members of the tax, SCM, and AP teams, one list for every area.
  */
 class TeamContactController extends Controller
 {
@@ -16,7 +16,10 @@ class TeamContactController extends Controller
     {
         return response()->json([
             'success' => true,
-            'data' => TeamContact::query()->orderByRaw("team = 'scm'")->orderBy('name')->get(),
+            'data' => TeamContact::query()
+                ->orderByRaw("CASE team WHEN 'tax' THEN 1 WHEN 'scm' THEN 2 WHEN 'ap' THEN 3 ELSE 4 END")
+                ->orderBy('name')
+                ->get(),
         ]);
     }
 

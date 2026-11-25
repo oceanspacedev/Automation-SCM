@@ -11,20 +11,32 @@
     [$title, $description, $status] = match ($action) {
         'setuju' => ['Dealer setuju dipotong', 'Pengajuan dicatat dan otomatis diteruskan ke WhatsApp Tim AR untuk proses pemotongan piutang.', ['label' => 'DEALER SETUJU (PROSES AR)', 'tone' => 'blue']],
         'setuju_transfer' => ['Dealer setuju ditransfer', 'Pengajuan dicatat dan otomatis diteruskan ke WhatsApp Tim SCM untuk proses transfer.', ['label' => \App\Models\DataProgram::TRANSFER_APPROVED, 'tone' => 'blue']],
-        'potong' => ['Pemotongan selesai diproses', 'Status klaim menjadi SUDAH POTONG, lalu diteruskan ke Tim Pajak untuk cek PPh.', ['label' => 'SUDAH POTONG', 'tone' => 'emerald']],
+        'potong' => ['Pemotongan selesai diproses', 'Status klaim menjadi SUDAH POTONG, otomatis diinfokan ke Tim SCM dan diteruskan ke Tim Pajak untuk cek PPh.', ['label' => 'SUDAH POTONG', 'tone' => 'emerald']],
         'transfer' => ['Transfer selesai dicatat', 'Status klaim menjadi DONE TRANSFER, lalu diteruskan ke Tim Pajak untuk cek PPh.', ['label' => \App\Models\DataProgram::DONE_TRANSFER, 'tone' => 'emerald']],
-        'cek_pajak' => ['Cek pajak tersimpan', 'Cek Pajak, Selisih, dan Note PPh tersimpan, lalu hasilnya diteruskan ke Tim SCM.', ['label' => 'SUDAH DICEK PAJAK', 'tone' => 'emerald']],
+        'cek_pajak' => ['Cek pajak tersimpan', 'Cek Pajak, Selisih, dan Note PPh tersimpan, lalu hasilnya diteruskan ke Tim AP.', ['label' => 'SUDAH DICEK PAJAK', 'tone' => 'emerald']],
         'kembalikan_ke_ar' => ['Klaim dikembalikan ke Tim AR', 'Status pemotongan telah dibatalkan dan pengajuan dikembalikan ke antrean Tim AR untuk ditinjau ulang.', ['label' => 'DIKEMBALIKAN KE AR', 'tone' => 'amber']],
         default => ['Klaim ditunda', 'Status dicatat sebagai pending. Tawarkan kembali pada pesanan dealer berikutnya.', ['label' => 'PENDING DEALER', 'tone' => 'gray']],
     };
 
-    // [judul berhasil, judul gagal, keterangan bila gagal] per WhatsApp lanjutan
-    [$notification, $sentTitle, $failedTitle, $failedNote] = match ($action) {
-        'setuju' => [$arNotification ?? null, 'WhatsApp terkirim ke Tim AR', 'WhatsApp ke Tim AR gagal terkirim', 'Status di sistem tetap tersimpan.'],
-        'setuju_transfer' => [$scmTransferNotification ?? null, 'WhatsApp terkirim ke Tim SCM', 'WhatsApp ke Tim SCM gagal terkirim', 'Status di sistem tetap tersimpan. Bisa dikirim ulang dari menu Riwayat Approval.'],
-        'potong', 'transfer' => [$taxNotification ?? null, 'WhatsApp terkirim ke Tim Pajak', 'WhatsApp ke Tim Pajak gagal terkirim', ($action === 'transfer' ? 'Status transfer' : 'Status potong').' tetap tersimpan. Bisa dikirim ulang dari menu Riwayat Approval.'],
-        'cek_pajak' => [$scmNotification ?? null, 'Hasil terkirim ke WhatsApp Tim SCM', 'WhatsApp ke Tim SCM gagal terkirim', 'Cek pajak tetap tersimpan. Bisa dikirim ulang dari menu Riwayat Approval.'],
-        default => [null, '', '', ''],
+    // Daftar notifikasi WA lanjutan yang ditampilkan setelah konfirmasi
+    $notifications = match ($action) {
+        'setuju' => [
+            [$arNotification ?? null, 'WhatsApp terkirim ke Tim AR', 'WhatsApp ke Tim AR gagal terkirim', 'Status di sistem tetap tersimpan.'],
+        ],
+        'setuju_transfer' => [
+            [$scmTransferNotification ?? null, 'WhatsApp terkirim ke Tim SCM', 'WhatsApp ke Tim SCM gagal terkirim', 'Status di sistem tetap tersimpan. Bisa dikirim ulang dari menu Riwayat Approval.'],
+        ],
+        'potong' => [
+            [$scmCutNotification ?? null, 'Info potong terkirim ke WhatsApp Tim SCM', 'Info potong ke Tim SCM gagal terkirim', 'Status potong tetap tersimpan. Bisa dikirim ulang dari menu Riwayat Approval.'],
+            [$taxNotification ?? null, 'WhatsApp terkirim ke Tim Pajak', 'WhatsApp ke Tim Pajak gagal terkirim', 'Status potong tetap tersimpan. Bisa dikirim ulang dari menu Riwayat Approval.'],
+        ],
+        'transfer' => [
+            [$taxNotification ?? null, 'WhatsApp terkirim ke Tim Pajak', 'WhatsApp ke Tim Pajak gagal terkirim', 'Status transfer tetap tersimpan. Bisa dikirim ulang dari menu Riwayat Approval.'],
+        ],
+        'cek_pajak' => [
+            [$apNotification ?? null, 'Hasil terkirim ke WhatsApp Tim AP', 'WhatsApp ke Tim AP gagal terkirim', 'Cek pajak tetap tersimpan. Bisa dikirim ulang dari menu Riwayat Approval.'],
+        ],
+        default => [],
     };
 
     $isTransfer = in_array($action, ['setuju_transfer', 'transfer'], true) || $dp->isTransfer();
@@ -57,19 +69,21 @@
         <p class="mt-1 text-sm leading-5 text-gray-500">{{ $description }}</p>
     </div>
 
-    @if($notification)
-        @if($notification['success'] ?? false)
-            <div class="rounded-[10px] px-4 py-3 bg-emerald-50 text-xs leading-5">
-                <p class="font-medium text-emerald-900">{{ $sentTitle }}</p>
-                <p class="mt-1 text-emerald-800">{{ $notification['message'] ?? '' }}</p>
-            </div>
-        @else
-            <div class="rounded-[10px] px-4 py-3 bg-amber-50 text-xs leading-5">
-                <p class="font-medium text-amber-900">{{ $failedTitle }}</p>
-                <p class="mt-1 text-amber-800">{{ $notification['message'] ?? '' }} {{ $failedNote }}</p>
-            </div>
+    @foreach($notifications as [$notification, $sentTitle, $failedTitle, $failedNote])
+        @if($notification)
+            @if($notification['success'] ?? false)
+                <div class="rounded-[10px] px-4 py-3 bg-emerald-50 text-xs leading-5">
+                    <p class="font-medium text-emerald-900">{{ $sentTitle }}</p>
+                    <p class="mt-1 text-emerald-800">{{ $notification['message'] ?? '' }}</p>
+                </div>
+            @else
+                <div class="rounded-[10px] px-4 py-3 bg-amber-50 text-xs leading-5">
+                    <p class="font-medium text-amber-900">{{ $failedTitle }}</p>
+                    <p class="mt-1 text-amber-800">{{ $notification['message'] ?? '' }} {{ $failedNote }}</p>
+                </div>
+            @endif
         @endif
-    @endif
+    @endforeach
 
     @include('data_programs.partials.claim', ['status' => $status, 'rows' => $rows])
 @endsection

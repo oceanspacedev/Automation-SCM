@@ -34,9 +34,13 @@ class ProgramApprovalLog extends Model
 
     public const CUT = 'cut';
 
+    public const SCM_CUT_NOTIFIED = 'scm_cut_notified';
+
     public const TAX_NOTIFIED = 'tax_notified';
 
     public const TAX_CHECKED = 'tax_checked';
+
+    public const AP_NOTIFIED = 'ap_notified';
 
     public const SCM_NOTIFIED = 'scm_notified';
 

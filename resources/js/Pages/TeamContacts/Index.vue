@@ -4,14 +4,14 @@
     <div class="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
       <span>Master Data</span>
       <ChevronRightIcon class="w-3.5 h-3.5 text-gray-400" />
-      <span class="text-gray-800">Tim Pajak & SCM</span>
+      <span class="text-gray-800">Tim Pajak, SCM & AP</span>
     </div>
 
     <!-- Header Page -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
-        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Tim Pajak & SCM</h1>
-        <p class="text-xs text-gray-500 mt-0.5">Penerima WhatsApp cek pajak dan hasilnya, untuk semua area.</p>
+        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-gray-950">Tim Pajak, SCM & AP</h1>
+        <p class="text-xs text-gray-500 mt-0.5">Penerima WhatsApp info potong/transfer, cek pajak PPh, dan hasil cek pajak untuk semua area.</p>
       </div>
 
       <div v-if="canCreate" class="grid grid-cols-1 sm:block">
@@ -305,8 +305,8 @@ import {
   Trash2 as Trash2Icon,
 } from 'lucide-vue-next';
 
-// Tim Pajak menerima WA cek PPh setelah AR memotong klaim; Tim SCM menerima hasil cek pajaknya
-const TEAM_LABELS = { tax: 'Tim Pajak', scm: 'Tim SCM' };
+// Tim Pajak menerima WA cek PPh; Tim SCM menerima info potong AR & permintaan transfer; Tim AP menerima hasil cek PPh
+const TEAM_LABELS = { tax: 'Tim Pajak', scm: 'Tim SCM', ap: 'Tim AP' };
 
 const { canEdit , canCreate, canDelete } = useAuth();
 
@@ -360,7 +360,7 @@ useAutoRefresh(() => fetchData({ silent: true }), {
 
 const openCreateModal = () => {
   if (!canCreate.value) return;
-  Object.assign(formData, { id: null, team: filterTeam.value === 'scm' ? 'scm' : 'tax', name: '', whatsapp: '', is_active: true });
+  Object.assign(formData, { id: null, team: filterTeam.value !== 'all' ? filterTeam.value : 'tax', name: '', whatsapp: '', is_active: true });
   errorMessage.value = '';
   isModalOpen.value = true;
 };
@@ -373,7 +373,7 @@ const openEditModal = (c) => {
 };
 
 const submitForm = async () => {
-  if (!(isEditMode.value ? canEdit.value : canCreate.value)) return;
+  if (!(formData.id ? canEdit.value : canCreate.value)) return;
   isSaving.value = true;
   errorMessage.value = '';
   try {

@@ -1176,9 +1176,42 @@ class DataProgramController extends Controller
     }
 
     /**
-     * Send (again) the result of a row's tax check to the SCM team, e.g. when the automatic WhatsApp failed.
+     * Send (again) the cut info to the SCM team after AR cuts a claim, e.g. when the automatic WhatsApp failed.
      */
     public function sendWaToScm(Request $request, int $id, ProgramApprovalFlow $flow): JsonResponse
+    {
+        $dp = DataProgram::findOrFail($id);
+        $phone = $request->input('phone');
+
+        if (! in_array($flow->stage($dp), ['cut', 'tax_checked'], true) || $dp->isTransfer()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Baris ini belum dipotong AR, jadi belum perlu info potong ke Tim SCM.',
+            ], 422);
+        }
+
+        $result = $this->waService->sendDataProgramCutInfoToScm($dp, $phone);
+        ProgramApprovalLog::record($dp, ProgramApprovalLog::SCM_CUT_NOTIFIED, $result['success'],
+            actor: $request->user()?->email, recipient: ProgramApprovalLog::teamRecipient($dp, TeamContact::SCM, $phone), note: $result['message']);
+
+        if (! $result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+            'provider_id' => $result['provider_id'] ?? null,
+        ]);
+    }
+
+    /**
+     * Send (again) the result of a row's tax check to the AP team, e.g. when the automatic WhatsApp failed.
+     */
+    public function sendWaToAp(Request $request, int $id, ProgramApprovalFlow $flow): JsonResponse
     {
         $dp = DataProgram::findOrFail($id);
         $phone = $request->input('phone');
@@ -1186,13 +1219,13 @@ class DataProgramController extends Controller
         if ($flow->stage($dp) !== 'tax_checked') {
             return response()->json([
                 'success' => false,
-                'message' => 'Baris ini belum dicek Tim Pajak, jadi belum ada hasil untuk Tim SCM.',
+                'message' => 'Baris ini belum dicek Tim Pajak, jadi belum ada hasil untuk Tim AP.',
             ], 422);
         }
 
-        $result = $this->waService->sendDataProgramScmNotification($dp, $phone);
-        ProgramApprovalLog::record($dp, ProgramApprovalLog::SCM_NOTIFIED, $result['success'],
-            actor: $request->user()?->email, recipient: ProgramApprovalLog::teamRecipient($dp, TeamContact::SCM, $phone), note: $result['message']);
+        $result = $this->waService->sendDataProgramApNotification($dp, $phone);
+        ProgramApprovalLog::record($dp, ProgramApprovalLog::AP_NOTIFIED, $result['success'],
+            actor: $request->user()?->email, recipient: ProgramApprovalLog::teamRecipient($dp, TeamContact::AP, $phone), note: $result['message']);
 
         if (! $result['success']) {
             return response()->json([

@@ -93,16 +93,17 @@ class ProgramApprovalHistoryTest extends TestCase
         ArContact::factory()->create(['area' => 'jabar', 'name' => 'SITI AMINAH', 'whatsapp' => '081300000002']);
         $this->postJson('/api/team-contacts', ['team' => 'tax', 'name' => 'TIM PAJAK JABAR', 'whatsapp' => '081300000009'], self::HEADERS)->assertCreated();
         $this->postJson('/api/team-contacts', ['team' => 'scm', 'name' => 'TIM SCM JABAR', 'whatsapp' => '081300000008'], self::HEADERS)->assertCreated();
+        $this->postJson('/api/team-contacts', ['team' => 'ap', 'name' => 'Widiya', 'whatsapp' => '081223430503'], self::HEADERS)->assertCreated();
         $row = $this->dataProgram(['nilai_pph' => 15000]);
 
         $this->postJson("/api/data-program/{$row->id}/send-wa-telemarketing", [], self::HEADERS)->assertOk();
-        // Nama di bawah tiap langkah: telemarketing toko, AR area-nya di Master AR, lalu Tim Pajak
+        // Nama di bawah tiap langkah: telemarketing, AR, cabang info SCM, Tim Pajak, lalu Tim AP
         $this->history()
             ->assertJsonPath('data.0.stage', 'waiting_approval')
             ->assertJsonPath('data.0.steps.1.state', 'done')
             ->assertJsonPath('data.0.steps.1.actor', 'admin@contoh.test')
             ->assertJsonPath('data.0.steps.2.state', 'current')
-            ->assertJsonPath('data.0.steps.*.person', ['Dokumen lengkap', 'SALSABILA', 'SALSABILA', 'SITI AMINAH', 'SITI AMINAH', 'TIM PAJAK JABAR', 'TIM PAJAK JABAR', 'TIM SCM JABAR']);
+            ->assertJsonPath('data.0.steps.*.person', ['Dokumen lengkap', 'SALSABILA', 'SALSABILA', 'SITI AMINAH', 'SITI AMINAH', 'TIM SCM JABAR', 'TIM PAJAK JABAR', 'TIM PAJAK JABAR', 'Widiya']);
 
         // Telemarketing menyetujui lewat link; WA ke AR terkirim otomatis
         $this->confirm($row, 'telemarketing', ['action' => 'setuju'])->assertOk();
@@ -113,29 +114,33 @@ class ProgramApprovalHistoryTest extends TestCase
             ->assertJsonPath('data.0.steps.3.actor', 'Otomatis')
             ->assertJsonPath('data.0.steps.4.state', 'current');
 
-        // AR memotong lewat link; WA ke Tim Pajak terkirim otomatis dengan link cek pajak
+        // AR memotong lewat link; bercabang 2 otomatis: info sudah potong ke Tim SCM + permintaan cek PPh ke Tim Pajak
         $this->confirm($row, 'ar', ['action' => 'potong', 'no_pembayaran' => 'PAY/2026/10/0001'])
             ->assertOk()
+            ->assertSee('Info potong terkirim ke WhatsApp Tim SCM')
             ->assertSee('WhatsApp terkirim ke Tim Pajak');
+        Http::assertSent(fn (Request $request) => ($request['recipient']['value'] ?? null) === '6281300000008'
+            && str_contains($request['message']['text'], 'INFO KLAIM SUDAH DIPOTONG AR')
+            && str_contains($request['message']['text'], 'PAY/2026/10/0001'));
         Http::assertSent(fn (Request $request) => ($request['recipient']['value'] ?? null) === '6281300000009'
             && str_contains($request['message']['text'], 'CEK PAJAK KLAIM SUDAH DIPOTONG')
             && str_contains($request['message']['text'], "/dp/confirm/{$row->id}?")
             && str_contains($request['message']['text'], 'role=pajak'));
         $this->history(['stage' => 'cut'])
             ->assertJsonPath('data.0.stage_label', 'Menunggu Tim Pajak')
-            ->assertJsonPath('data.0.steps.*.state', ['done', 'done', 'done', 'done', 'done', 'done', 'current', 'waiting']);
+            ->assertJsonPath('data.0.steps.*.state', ['done', 'done', 'done', 'done', 'done', 'done', 'done', 'current', 'waiting']);
 
         // Hanya link Tim Pajak yang bisa mengisi cek pajak
         $this->confirm($row, 'ar', ['action' => 'cek_pajak', 'cek_pajak_tarif' => '1'])->assertForbidden();
         $this->get(URL::temporarySignedRoute('data-programs.confirm', now()->addDay(), ['id' => $row->id, 'role' => 'pajak']))
             ->assertOk()
             ->assertSee('Cek pajak klaim yang sudah dipotong');
-        // Tim Pajak menyimpan cek pajak; hasilnya terkirim otomatis ke WA Tim SCM
+        // Tim Pajak menyimpan cek pajak; hasilnya terkirim otomatis ke WA Tim AP (Widiya)
         $this->confirm($row, 'pajak', ['action' => 'cek_pajak', 'cek_pajak_tarif' => '16.500', 'selisih' => '-1.500', 'note_pph' => 'Kurang potong'])
             ->assertOk()
             ->assertSee('Cek pajak tersimpan')
-            ->assertSee('Hasil terkirim ke WhatsApp Tim SCM');
-        Http::assertSent(fn (Request $request) => ($request['recipient']['value'] ?? null) === '6281300000008'
+            ->assertSee('Hasil terkirim ke WhatsApp Tim AP');
+        Http::assertSent(fn (Request $request) => ($request['recipient']['value'] ?? null) === '6281223430503'
             && str_contains($request['message']['text'], 'HASIL CEK PAJAK KLAIM')
             && str_contains($request['message']['text'], '*Note PPh:* Kurang potong')
             && str_contains($request['message']['text'], '*Selisih:* Rp -1.500'));
@@ -151,15 +156,16 @@ class ProgramApprovalHistoryTest extends TestCase
         $this->getJson("/api/data-program/{$row->id}/approval-history", self::HEADERS)
             ->assertOk()
             ->assertJsonPath('data.stage', 'tax_checked')
-            ->assertJsonPath('data.steps.*.state', ['done', 'done', 'done', 'done', 'done', 'done', 'done', 'done'])
+            ->assertJsonPath('data.steps.*.state', ['done', 'done', 'done', 'done', 'done', 'done', 'done', 'done', 'done'])
             ->assertJsonPath('data.steps.4.note', 'No. Pembayaran: PAY/2026/10/0001')
-            ->assertJsonPath('data.steps.6.note', 'Cek Pajak: 16.500 · Selisih: -1.500 · Note PPh: Kurang potong')
-            ->assertJsonPath('data.timeline.*.event', ['telemarketing_notified', 'approved', 'ar_notified', 'cut', 'tax_notified', 'tax_checked', 'scm_notified'])
+            ->assertJsonPath('data.steps.7.note', 'Cek Pajak: 16.500 · Selisih: -1.500 · Note PPh: Kurang potong')
+            ->assertJsonPath('data.timeline.*.event', ['telemarketing_notified', 'approved', 'ar_notified', 'cut', 'scm_cut_notified', 'tax_notified', 'tax_checked', 'ap_notified'])
             ->assertJsonPath('data.timeline.2.recipient', 'SITI AMINAH 081300000002')
             ->assertJsonPath('data.timeline.3.actor', 'AR (link WA)')
-            ->assertJsonPath('data.timeline.4.recipient', 'TIM PAJAK JABAR 081300000009')
-            ->assertJsonPath('data.timeline.5.actor', 'Tim Pajak (link WA)')
-            ->assertJsonPath('data.timeline.6.recipient', 'TIM SCM JABAR 081300000008')
+            ->assertJsonPath('data.timeline.4.recipient', 'TIM SCM JABAR 081300000008')
+            ->assertJsonPath('data.timeline.5.recipient', 'TIM PAJAK JABAR 081300000009')
+            ->assertJsonPath('data.timeline.6.actor', 'Tim Pajak (link WA)')
+            ->assertJsonPath('data.timeline.7.recipient', 'Widiya 081223430503')
             ->assertJsonPath('data.settlement', 'Sudah potong');
     }
 
@@ -168,6 +174,7 @@ class ProgramApprovalHistoryTest extends TestCase
         ArContact::factory()->create(['area' => 'jabar', 'name' => 'SITI AMINAH', 'whatsapp' => '081300000002']);
         $this->postJson('/api/team-contacts', ['team' => 'tax', 'name' => 'TIM PAJAK JABAR', 'whatsapp' => '081300000009'], self::HEADERS)->assertCreated();
         $this->postJson('/api/team-contacts', ['team' => 'scm', 'name' => 'TIM SCM JABAR', 'whatsapp' => '081300000008'], self::HEADERS)->assertCreated();
+        $this->postJson('/api/team-contacts', ['team' => 'ap', 'name' => 'Widiya', 'whatsapp' => '081223430503'], self::HEADERS)->assertCreated();
         $row = $this->dataProgram(['nilai_pph' => 15000, 'telemarketing_notified_at' => now()]);
         $link = fn (string $role) => URL::temporarySignedRoute('data-programs.confirm', now()->addDay(), ['id' => $row->id, 'role' => $role]);
 
@@ -194,7 +201,7 @@ class ProgramApprovalHistoryTest extends TestCase
         $this->assertCount(1, Storage::disk('public')->files('program_documents'));
         $this->history(['stage' => 'awaiting_transfer'])
             ->assertJsonPath('data.0.stage_label', 'Menunggu transfer SCM')
-            ->assertJsonPath('data.0.steps.*.key', ['ready', 'telemarketing', 'approval', 'scm_transfer', 'transferred', 'tax', 'tax_check', 'scm'])
+            ->assertJsonPath('data.0.steps.*.key', ['ready', 'telemarketing', 'approval', 'scm_transfer', 'transferred', 'tax', 'tax_check', 'ap'])
             ->assertJsonPath('data.0.steps.*.state', ['done', 'done', 'done', 'done', 'current', 'waiting', 'waiting', 'waiting'])
             ->assertJsonPath('data.0.steps.4.person', 'TIM SCM JABAR');
 
@@ -220,9 +227,9 @@ class ProgramApprovalHistoryTest extends TestCase
         $this->assertStringContainsString('/storage/program_documents/', (string) $row->program_2);
         $this->get($link('pajak'))->assertOk()->assertSee('Cek pajak klaim yang sudah ditransfer')->assertSee('Bukti transfer')->assertSee($row->program_2, false);
 
-        // Tim Pajak cek, hasilnya tetap ke Tim SCM
+        // Tim Pajak cek, hasilnya langsung ke Tim AP
         $this->confirm($row, 'pajak', ['action' => 'cek_pajak', 'cek_pajak_tarif' => '15.000'])->assertOk();
-        Http::assertSent(fn (Request $request) => ($request['recipient']['value'] ?? null) === '6281300000008'
+        Http::assertSent(fn (Request $request) => ($request['recipient']['value'] ?? null) === '6281223430503'
             && str_contains($request['message']['text'], 'HASIL CEK PAJAK KLAIM')
             && str_contains($request['message']['text'], 'klaim yang sudah ditransfer berikut'));
 
@@ -231,7 +238,7 @@ class ProgramApprovalHistoryTest extends TestCase
             ->assertJsonPath('data.stage', 'tax_checked')
             ->assertJsonPath('data.steps.*.state', ['done', 'done', 'done', 'done', 'done', 'done', 'done', 'done'])
             ->assertJsonPath('data.steps.4.note', 'No. Referensi: TRF/2026/11/0001')
-            ->assertJsonPath('data.timeline.*.event', ['transfer_approved', 'scm_transfer_notified', 'transferred', 'tax_notified', 'tax_checked', 'scm_notified'])
+            ->assertJsonPath('data.timeline.*.event', ['transfer_approved', 'scm_transfer_notified', 'transferred', 'tax_notified', 'tax_checked', 'ap_notified'])
             ->assertJsonPath('data.timeline.2.actor', 'Tim SCM (link WA)')
             ->assertJsonPath('data.settlement', 'Done transfer');
         $this->history()->assertJsonPath('data.0.settlement', 'Done transfer');
@@ -286,7 +293,7 @@ class ProgramApprovalHistoryTest extends TestCase
         $old = $this->dataProgram(['status_potong_purchase' => DataProgram::DONE_TRANSFER, 'status_potong_ar' => DataProgram::DONE_TRANSFER, 'tgl_potong_tf' => '10/1/2026'], 'row_9');
         $this->getJson("/api/data-program/{$old->id}/approval-history", self::HEADERS)
             ->assertJsonPath('data.stage', 'cut')
-            ->assertJsonPath('data.steps.*.key', ['ready', 'telemarketing', 'approval', 'scm_transfer', 'transferred', 'tax', 'tax_check', 'scm'])
+            ->assertJsonPath('data.steps.*.key', ['ready', 'telemarketing', 'approval', 'scm_transfer', 'transferred', 'tax', 'tax_check', 'ap'])
             ->assertJsonPath('data.steps.4.state', 'done');
         $this->postJson("/api/data-program/{$old->id}/send-wa-scm-transfer", [], self::HEADERS)->assertStatus(422);
 
@@ -326,53 +333,60 @@ class ProgramApprovalHistoryTest extends TestCase
             ->assertDontSee('tidak wajib');
     }
 
-    public function test_a_tax_check_result_the_scm_team_did_not_get_can_be_sent_again_from_riwayat_approval(): void
+    public function test_a_tax_check_result_the_ap_team_did_not_get_can_be_sent_again_from_riwayat_approval(): void
     {
         $this->postJson('/api/team-contacts', ['team' => 'tax', 'name' => 'TIM PAJAK JABAR', 'whatsapp' => '081300000009'], self::HEADERS)->assertCreated();
         $row = $this->dataProgram(['status_potong_purchase' => 'SUDAH POTONG', 'status_potong_ar' => 'DONE', 'tax_notified_at' => now()]);
 
-        // Nomor Tim SCM belum diisi: cek pajak tetap tersimpan, WA ke Tim SCM tercatat gagal
+        // Nomor Tim AP belum diisi: cek pajak tetap tersimpan, WA ke Tim AP tercatat gagal
         $this->confirm($row, 'pajak', ['action' => 'cek_pajak', 'cek_pajak_tarif' => '15.000', 'selisih' => '0', 'note_pph' => 'OK'])
             ->assertOk()
-            ->assertSee('WhatsApp ke Tim SCM gagal terkirim');
-        $this->history(['stage' => 'tax_checked'])->assertJsonPath('data.0.steps.7.state', 'failed');
+            ->assertSee('WhatsApp ke Tim AP gagal terkirim');
+        $this->history(['stage' => 'tax_checked'])->assertJsonPath('data.0.steps.8.state', 'failed');
 
-        $this->postJson('/api/team-contacts', ['team' => 'scm', 'name' => 'Tim SCM', 'whatsapp' => '081300000008'], self::HEADERS)->assertCreated();
-        $this->postJson("/api/data-program/{$row->id}/send-wa-scm", [], self::HEADERS)->assertOk();
+        $this->postJson('/api/team-contacts', ['team' => 'ap', 'name' => 'Widiya', 'whatsapp' => '081223430503'], self::HEADERS)->assertCreated();
+        $this->postJson("/api/data-program/{$row->id}/send-wa-ap", [], self::HEADERS)->assertOk();
         $this->history(['stage' => 'tax_checked'])
-            ->assertJsonPath('data.0.steps.7.state', 'done')
-            ->assertJsonPath('data.0.steps.7.actor', 'admin@contoh.test');
+            ->assertJsonPath('data.0.steps.8.state', 'done')
+            ->assertJsonPath('data.0.steps.8.actor', 'admin@contoh.test');
 
-        // Baris yang belum dicek Tim Pajak belum punya hasil untuk Tim SCM
+        // Baris yang belum dicek Tim Pajak belum punya hasil untuk Tim AP
         $notChecked = $this->dataProgram(['status_potong_purchase' => 'SUDAH POTONG', 'status_potong_ar' => 'DONE'], 'dp_not_checked');
-        $this->postJson("/api/data-program/{$notChecked->id}/send-wa-scm", [], self::HEADERS)->assertStatus(422);
+        $this->postJson("/api/data-program/{$notChecked->id}/send-wa-ap", [], self::HEADERS)->assertStatus(422);
     }
 
     public function test_a_whatsapp_to_the_tax_team_without_a_number_can_be_sent_again_from_riwayat_approval(): void
     {
         $row = $this->dataProgram(['status_potong_ar' => 'DEALER SETUJU (PROSES AR)', 'telemarketing_notified_at' => now()]);
 
-        // Nomor Tim Pajak belum diisi: potong tetap tersimpan, WA ke Tim Pajak tercatat gagal
+        // Nomor Tim SCM & Tim Pajak belum diisi: potong tetap tersimpan, kedua cabang WA tercatat gagal
         $this->confirm($row, 'ar', ['action' => 'potong', 'no_pembayaran' => 'PAY-2'])
             ->assertOk()
+            ->assertSee('Info potong ke Tim SCM gagal terkirim')
             ->assertSee('WhatsApp ke Tim Pajak gagal terkirim');
-        $this->history(['stage' => 'cut'])->assertJsonPath('data.0.steps.*.state', ['done', 'done', 'done', 'done', 'done', 'failed', 'waiting', 'waiting']);
+        $this->history(['stage' => 'cut'])->assertJsonPath('data.0.steps.*.state', ['done', 'done', 'done', 'done', 'done', 'failed', 'failed', 'waiting', 'waiting']);
 
         $this->postJson('/api/team-contacts', ['team' => 'tax', 'name' => 'Tim Pajak', 'whatsapp' => 'bukan nomor'], self::HEADERS)
             ->assertStatus(422)
             ->assertJsonValidationErrors(['whatsapp']);
         $this->postJson('/api/team-contacts', ['team' => 'tax', 'name' => 'Tim Pajak', 'whatsapp' => '081300000009'], self::HEADERS)->assertCreated();
+        $this->postJson('/api/team-contacts', ['team' => 'scm', 'name' => 'Tim SCM', 'whatsapp' => '081300000008'], self::HEADERS)->assertCreated();
         // Satu Tim Pajak untuk semua area
         $this->getJson('/api/team-contacts', ['X-Area' => 'jateng'])->assertJsonPath('data.0.whatsapp', '081300000009');
 
+        // Kirim ulang cabang info potong ke Tim SCM & cabang cek PPh ke Tim Pajak
+        $this->postJson("/api/data-program/{$row->id}/send-wa-scm", [], self::HEADERS)->assertOk();
         $this->postJson("/api/data-program/{$row->id}/send-wa-tax", [], self::HEADERS)->assertOk();
         $this->history(['stage' => 'cut'])
             ->assertJsonPath('data.0.steps.5.state', 'done')
             ->assertJsonPath('data.0.steps.5.actor', 'admin@contoh.test')
-            ->assertJsonPath('data.0.steps.6.state', 'current');
+            ->assertJsonPath('data.0.steps.6.state', 'done')
+            ->assertJsonPath('data.0.steps.6.actor', 'admin@contoh.test')
+            ->assertJsonPath('data.0.steps.7.state', 'current');
 
-        // Baris yang belum dipotong AR belum perlu dicek Tim Pajak
+        // Baris yang belum dipotong AR belum perlu info SCM maupun dicek Tim Pajak
         $notCut = $this->dataProgram([], 'dp_not_cut');
+        $this->postJson("/api/data-program/{$notCut->id}/send-wa-scm", [], self::HEADERS)->assertStatus(422);
         $this->postJson("/api/data-program/{$notCut->id}/send-wa-tax", [], self::HEADERS)->assertStatus(422);
     }
 
@@ -398,18 +412,18 @@ class ProgramApprovalHistoryTest extends TestCase
         $this->history(['stage' => 'approved'])
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.id', $approved->id)
-            ->assertJsonPath('data.0.steps.*.state', ['done', 'done', 'done', 'done', 'current', 'waiting', 'waiting', 'waiting']);
+            ->assertJsonPath('data.0.steps.*.state', ['done', 'done', 'done', 'done', 'current', 'waiting', 'waiting', 'waiting', 'waiting']);
         $this->history(['stage' => 'postponed'])
-            ->assertJsonPath('data.0.steps.*.state', ['done', 'done', 'postponed', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting'])
+            ->assertJsonPath('data.0.steps.*.state', ['done', 'done', 'postponed', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting'])
             // Region tanpa AR di Master AR: WA ke nomor AR default
             ->assertJsonPath('data.0.steps.3.person', 'Nomor AR default');
-        $this->history(['stage' => 'waiting_telemarketing'])->assertJsonPath('data.0.steps.*.state', ['done', 'current', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting']);
+        $this->history(['stage' => 'waiting_telemarketing'])->assertJsonPath('data.0.steps.*.state', ['done', 'current', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting']);
         $cutRow = collect($this->history(['stage' => 'cut'])->assertJsonCount(2, 'data')->json('data'))->firstWhere('id', $cut->id);
         $this->assertSame('10/20/2026', $cutRow['steps'][4]['date']);
         $this->assertSame('No. Pembayaran: PAY-1', $cutRow['steps'][4]['note']);
-        $this->assertSame('current', $cutRow['steps'][5]['state']);
-        // Dicek di spreadsheet (bukan lewat link Tim Pajak): tidak ada WA hasil ke SCM yang ditunggu
-        $this->history(['stage' => 'tax_checked'])->assertJsonPath('data.0.steps.*.state', ['done', 'done', 'done', 'done', 'done', 'done', 'done', 'done']);
+        $this->assertSame('current', $cutRow['steps'][6]['state']);
+        // Dicek di spreadsheet (bukan lewat link Tim Pajak): tidak ada WA hasil ke AP yang ditunggu
+        $this->history(['stage' => 'tax_checked'])->assertJsonPath('data.0.steps.*.state', ['done', 'done', 'done', 'done', 'done', 'done', 'done', 'done', 'done']);
         $this->history(['search' => 'tidak ada'])->assertJsonCount(0, 'data');
     }
 
@@ -420,7 +434,7 @@ class ProgramApprovalHistoryTest extends TestCase
 
         $this->confirm($row, 'telemarketing', ['action' => 'setuju'])->assertOk();
         $this->history(['stage' => 'approved'])
-            ->assertJsonPath('data.0.steps.*.state', ['done', 'done', 'done', 'failed', 'waiting', 'waiting', 'waiting', 'waiting'])
+            ->assertJsonPath('data.0.steps.*.state', ['done', 'done', 'done', 'failed', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting'])
             ->assertJsonPath('data.0.steps.3.actor', 'Otomatis');
 
         // Dikirim ulang manual dari halaman Data Program
@@ -463,7 +477,7 @@ class ProgramApprovalHistoryTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.stage', 'approved')
-            ->assertJsonPath('data.steps.*.state', ['done', 'done', 'done', 'done', 'current', 'waiting', 'waiting', 'waiting']);
+            ->assertJsonPath('data.steps.*.state', ['done', 'done', 'done', 'done', 'current', 'waiting', 'waiting', 'waiting', 'waiting']);
 
         $row->refresh();
         $this->assertSame('BISA DI POTONG', $row->status_potong_purchase);
@@ -536,7 +550,7 @@ class ProgramApprovalHistoryTest extends TestCase
         ], self::HEADERS)
             ->assertOk()
             ->assertJsonPath('data.stage', 'waiting_telemarketing')
-            ->assertJsonPath('data.steps.*.state', ['done', 'current', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting']);
+            ->assertJsonPath('data.steps.*.state', ['done', 'current', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting', 'waiting']);
 
         $row->refresh();
         $this->assertSame('BELUM POTONG', $row->status_potong_ar);

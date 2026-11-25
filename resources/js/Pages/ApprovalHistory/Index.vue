@@ -82,9 +82,11 @@
               <button type="button" @click="openDetail(row)" :class="[detailButtonClass, 'lg:hidden']">Detail</button>
             </div>
 
-            <!-- Alur langkah (layar sedang & lebar): label singkat dan nama penanggung jawab; waktu di tooltip dan Detail -->
-            <!-- Titik, label, dan nama berbagi baris (subgrid): label yang turun dua baris tidak menggeser nama di kolom lain -->
-            <ol class="hidden md:grid grid-rows-[auto_auto_auto] w-full max-w-4xl xl:max-w-5xl lg:flex-1" :style="{ gridTemplateColumns: `repeat(${row.steps.length}, minmax(0, 1fr))` }">
+            <!-- Alur langkah (layar sedang & lebar): satu baris sejajar, tinggi seragam -->
+            <ol
+              class="hidden md:grid grid-rows-[auto_auto_auto] w-full max-w-4xl xl:max-w-5xl lg:flex-1"
+              :style="{ gridTemplateColumns: `repeat(${row.steps.length}, minmax(0, 1fr))` }"
+            >
               <li v-for="(step, index) in row.steps" :key="step.key" :title="stepTooltip(step)" class="relative row-span-3 grid grid-rows-subgrid justify-items-center content-start text-center px-0.5 min-w-0 cursor-default">
                 <!-- Garis dari langkah sebelumnya: hijau penuh bila sudah lewat, hijau berjalan menuju langkah sekarang -->
                 <span v-if="index > 0" :class="['absolute top-2 right-1/2 w-full h-0.5 rounded-full overflow-hidden', connectorClass(step.state)]">
@@ -206,7 +208,10 @@
                 <StepDot :state="step.state" class="relative z-10 shrink-0 mt-0.5" />
                 <div class="min-w-0 flex-1 pt-px">
                   <div class="flex items-center justify-between gap-2">
-                    <span :class="['font-medium text-xs', stepLabelClass(step.state)]">{{ step.label }}</span>
+                    <span :class="['font-medium text-xs', stepLabelClass(step.state)]">
+                      {{ step.label }}
+                      <span v-if="step.key === 'scm_cut'" class="ml-1.5 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-slate-800 text-[10px] font-normal text-gray-500 dark:text-slate-400">Cabang info</span>
+                    </span>
                     <span :class="['text-[10px] px-2 py-0.5 rounded-full font-medium', stepBadgeClass(step.state)]">
                       {{ stepStateLabel(step) }}
                     </span>
@@ -231,10 +236,17 @@
               </li>
             </ol>
 
-            <!-- Kirim (ulang) WA ke Tim Pajak (sudah dipotong, belum dicek) atau hasil cek pajak ke Tim SCM, mis. bila WA otomatis gagal -->
-            <div v-if="canEdit && (resendAction || waMessage)" class="pt-3 border-t border-gray-100 dark:border-slate-800 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <button v-if="resendAction" type="button" @click="resendWhatsApp" :disabled="sendingWa" :class="[detailButtonClass, 'inline-flex disabled:opacity-50']">
-                {{ sendingWa ? 'Mengirim...' : resendAction.label }}
+            <!-- Kirim (ulang) WA lanjutan (transfer SCM, info potong SCM, cek pajak, atau hasil cek pajak ke Tim AP) -->
+            <div v-if="canEdit && (resendActions.length || waMessage)" class="pt-3 border-t border-gray-100 dark:border-slate-800 flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+              <button
+                v-for="action in resendActions"
+                :key="action.endpoint"
+                type="button"
+                @click="resendWhatsApp(action)"
+                :disabled="sendingWa"
+                :class="[detailButtonClass, 'inline-flex disabled:opacity-50']"
+              >
+                {{ sendingWa ? 'Mengirim...' : action.label }}
               </button>
               <span v-if="waMessage" :class="['break-words text-xs', waMessage.error ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400']">{{ waMessage.text }}</span>
             </div>
@@ -508,14 +520,25 @@ const availableRollbackTargets = computed(() => {
 
 const canRollback = computed(() => availableRollbackTargets.value.length > 0);
 
-// WA yang bisa dikirim (ulang) dari Detail: permintaan transfer ke Tim SCM, ke Tim Pajak selama belum dicek, lalu
-// hasilnya ke Tim SCM bila belum terkirim
-const resendAction = computed(() => {
-  if (detail.value?.stage === 'awaiting_transfer') return { endpoint: 'send-wa-scm-transfer', label: 'Kirim WA transfer ke Tim SCM' };
-  if (detail.value?.stage === 'cut') return { endpoint: 'send-wa-tax', label: 'Kirim WA ke Tim Pajak' };
-  const scmStep = detail.value?.steps?.find((step) => step.key === 'scm');
-  if (detail.value?.stage === 'tax_checked' && scmStep && scmStep.state !== 'done') return { endpoint: 'send-wa-scm', label: 'Kirim hasil ke WA Tim SCM' };
-  return null;
+// WA yang bisa dikirim (ulang) dari Detail: permintaan transfer ke Tim SCM, info potong ke Tim SCM, cek PPh ke Tim Pajak,
+// dan hasil cek PPh ke Tim AP bila belum terkirim
+const resendActions = computed(() => {
+  const actions = [];
+  if (detail.value?.stage === 'awaiting_transfer') {
+    actions.push({ endpoint: 'send-wa-scm-transfer', label: 'Kirim WA transfer ke Tim SCM' });
+  }
+  const scmCutStep = detail.value?.steps?.find((step) => step.key === 'scm_cut');
+  if (['cut', 'tax_checked'].includes(detail.value?.stage) && scmCutStep && scmCutStep.state !== 'done') {
+    actions.push({ endpoint: 'send-wa-scm', label: 'Kirim info potong ke Tim SCM' });
+  }
+  if (detail.value?.stage === 'cut') {
+    actions.push({ endpoint: 'send-wa-tax', label: 'Kirim WA ke Tim Pajak' });
+  }
+  const apStep = detail.value?.steps?.find((step) => step.key === 'ap');
+  if (detail.value?.stage === 'tax_checked' && apStep && apStep.state !== 'done') {
+    actions.push({ endpoint: 'send-wa-ap', label: 'Kirim hasil ke WA Tim AP' });
+  }
+  return actions;
 });
 const pagination = reactive({ current_page: 1, last_page: 1, per_page: 25, total: 0 });
 let debounceTimer = null;
@@ -557,10 +580,12 @@ const STEP_SHORT_LABELS = {
   approval: 'Dealer setuju',
   ar: 'Dikirim ke AR',
   cut: 'Dipotong AR',
+  scm_cut: 'Info ke SCM',
   scm_transfer: 'Dikirim ke SCM',
   transferred: 'Ditransfer SCM',
   tax: 'Dikirim ke Pajak',
   tax_check: 'Dicek Pajak',
+  ap: 'Info ke AP',
   scm: 'Hasil ke SCM',
 };
 const shortLabel = (step) => (step.state === 'postponed' ? 'Ditunda dealer' : STEP_SHORT_LABELS[step.key] || step.label);
@@ -712,9 +737,8 @@ async function submitRollback() {
   }
 }
 
-async function resendWhatsApp() {
-  if (!canEdit.value) return;
-  const action = resendAction.value;
+async function resendWhatsApp(action) {
+  if (!canEdit.value || !action) return;
   sendingWa.value = true;
   waMessage.value = null;
   try {
