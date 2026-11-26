@@ -35,8 +35,8 @@ class TeamContactTest extends TestCase
         $this->postJson('/api/team-contacts', ['team' => 'keuangan', 'name' => 'Budi', 'whatsapp' => '081300000002'])
             ->assertJsonValidationErrors(['team']);
 
-        $this->putJson("/api/team-contacts/{$id}", ['team' => 'scm', 'name' => 'Rina', 'whatsapp' => '081300000003'])->assertOk();
-        $this->assertDatabaseHas('team_contacts', ['id' => $id, 'team' => 'scm', 'whatsapp' => '081300000003', 'is_active' => true]);
+        $this->putJson("/api/team-contacts/{$id}", ['team' => 'ap', 'name' => 'Widiya', 'whatsapp' => '081223430503'])->assertOk();
+        $this->assertDatabaseHas('team_contacts', ['id' => $id, 'team' => 'ap', 'name' => 'Widiya', 'whatsapp' => '081223430503', 'is_active' => true]);
 
         $this->patchJson("/api/team-contacts/{$id}/toggle-status")->assertOk()->assertJsonPath('data.is_active', false);
 
@@ -80,7 +80,7 @@ class TeamContactTest extends TestCase
 
         $result = app(WhatsAppService::class)->sendDataProgramScmNotification($row);
 
-        $this->assertSame(['success' => false, 'message' => 'Nomor WhatsApp Tim SCM belum diisi di Master Tim Pajak & SCM.', 'provider_id' => null], $result);
+        $this->assertSame(['success' => false, 'message' => 'Nomor WhatsApp Tim SCM belum diisi di Master Tim Pajak, SCM & AP.', 'provider_id' => null], $result);
         Http::assertNothingSent();
     }
 }

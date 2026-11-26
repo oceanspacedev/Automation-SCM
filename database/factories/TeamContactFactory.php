@@ -30,6 +30,11 @@ class TeamContactFactory extends Factory
         return $this->state(fn () => ['team' => TeamContact::SCM]);
     }
 
+    public function ap(): static
+    {
+        return $this->state(fn () => ['team' => TeamContact::AP]);
+    }
+
     public function inactive(): static
     {
         return $this->state(fn () => ['is_active' => false]);

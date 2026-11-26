@@ -539,7 +539,7 @@ const masterColumns = computed(() => [
     canAccess('master_program') && { label: 'Program', to: '/programs' },
     canAccess('master_program') && { label: 'Region', to: '/regions' },
     canAccess('master_program') && { label: 'AR', to: '/ar' },
-    canAccess('master_program') && { label: 'Tim Pajak & SCM', to: '/tim-pajak-scm' },
+    canAccess('master_program') && { label: 'Tim Pajak, SCM & AP', to: '/tim-pajak-scm' },
   ],
   [
     canAccess('master_dealer') && { label: 'Dealer', to: '/dealers' },

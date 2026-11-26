@@ -121,19 +121,18 @@ class ProgramApprovalFlow
     }
 
     /**
-     * The eight steps of the row, each done, current, waiting, failed (a WhatsApp that didn't go out) or postponed,
-     * with the person in charge: the row's telemarketing for the WhatsApp to telemarketing and the dealer's answer
-     * (given through the telemarketing's link), the area's AR for the WhatsApp to AR and the cut (the SCM team for the
-     * WhatsApp and the transfer of a transfer claim), the tax team for the WhatsApp to the tax team and the tax check,
-     * and the SCM team for the result's WhatsApp.
+     * The steps of the row, each done, current, waiting, failed (a WhatsApp that didn't go out) or postponed, with the
+     * person in charge. After AR cuts a claim, it branches: an informational WhatsApp to the SCM team and a PPh check
+     * request to the tax team; after the tax team finishes checking PPh, the result goes to the AP team.
      *
      * @param  Collection<int, ProgramApprovalLog>  $logs  the row's recorded steps
      * @param  string|null  $arName  the AR of the row's area in Master AR (null: the default AR number)
-     * @param  string|null  $taxName  the tax team in Master Tim Pajak & SCM (null: not named yet)
-     * @param  string|null  $scmName  the SCM team in Master Tim Pajak & SCM (null: not named yet)
+     * @param  string|null  $taxName  the tax team in Master Tim Pajak, SCM & AP (null: not named yet)
+     * @param  string|null  $scmName  the SCM team in Master Tim Pajak, SCM & AP (null: not named yet)
+     * @param  string|null  $apName  the AP team in Master Tim Pajak, SCM & AP (null: not named yet)
      * @return list<array{key: string, label: string, state: string, at: ?string, date: ?string, person: ?string, role: ?string, actor: ?string, recipient: ?string, note: ?string}>
      */
-    public function steps(DataProgram $row, Collection $logs, ?string $arName = null, ?string $taxName = null, ?string $scmName = null): array
+    public function steps(DataProgram $row, Collection $logs, ?string $arName = null, ?string $taxName = null, ?string $scmName = null, ?string $apName = null): array
     {
         $stage = $this->stage($row);
         $isCut = in_array($stage, ['cut', 'tax_checked'], true);
@@ -147,18 +146,24 @@ class ProgramApprovalFlow
         $telemarketing = $latest(ProgramApprovalLog::TELEMARKETING_NOTIFIED, true);
         $telemarketingFailed = $latest(ProgramApprovalLog::TELEMARKETING_NOTIFIED);
         $answer = $logs->filter(fn (ProgramApprovalLog $log) => in_array($log->event, [ProgramApprovalLog::APPROVED, ProgramApprovalLog::TRANSFER_APPROVED, ProgramApprovalLog::POSTPONED], true))->sortByDesc('id')->first();
+        $scmCut = $latest(ProgramApprovalLog::SCM_CUT_NOTIFIED, true);
+        $scmCutAttempt = $latest(ProgramApprovalLog::SCM_CUT_NOTIFIED);
         $tax = $latest(ProgramApprovalLog::TAX_NOTIFIED, true);
         $taxAttempt = $latest(ProgramApprovalLog::TAX_NOTIFIED);
         $taxCheck = $latest(ProgramApprovalLog::TAX_CHECKED);
-        $scm = $latest(ProgramApprovalLog::SCM_NOTIFIED, true);
-        $scmAttempt = $latest(ProgramApprovalLog::SCM_NOTIFIED);
-        // Dicek lewat link Tim Pajak (bukan Cek Pajak yang sudah terisi di spreadsheet): hasilnya dikirim ke SCM
+        $ap = $latest(ProgramApprovalLog::AP_NOTIFIED, true);
+        $apAttempt = $latest(ProgramApprovalLog::AP_NOTIFIED);
+        $legacyScm = $latest(ProgramApprovalLog::SCM_NOTIFIED, true);
+        // Dicek lewat link Tim Pajak (bukan Cek Pajak yang sudah terisi di spreadsheet): hasilnya dikirim ke Tim AP
         $checkedThroughLink = $taxChecked && $row->tax_checked_at !== null;
 
         $telemarketingName = trim((string) $row->telemarketing) ?: null;
         $arName = trim((string) $arName) ?: 'Nomor AR default';
         $taxName = trim((string) $taxName) ?: 'Tim Pajak';
         $scmName = trim((string) $scmName) ?: 'Tim SCM';
+        $apName = trim((string) $apName) ?: 'Tim AP';
+
+        $isTransfer = $row->isTransfer();
 
         $steps = [
             $this->step('ready', 'Klaim bisa dipotong', true, note: $row->cek_dokumen ? "Cek dokumen: {$row->cek_dokumen}" : null,
@@ -171,9 +176,16 @@ class ProgramApprovalFlow
             $this->step('approval', $stage === 'postponed' ? 'Ditunda dealer' : 'Persetujuan dealer', $isCut || in_array($stage, ['approved', 'awaiting_transfer'], true),
                 log: $answer, postponed: $stage === 'postponed', person: $telemarketingName, role: 'Telemarketing',
                 note: $row->telemarketing_reminder_count > 0 ? "{$row->telemarketing_reminder_count} pengingat terkirim ke telemarketing" : null),
-            ...($row->isTransfer()
+            ...($isTransfer
                 ? $this->transferSteps($row, $latest, $stage, $isCut, $scmName)
                 : $this->cutSteps($row, $latest, $stage, $isCut, $arName)),
+            // Cabang info ke Tim SCM setelah AR memotong (paralel dengan permintaan cek PPh ke Tim Pajak)
+            ...(! $isTransfer ? [
+                $this->step('scm_cut', 'Info sudah potong ke Tim SCM', $isCut && ($scmCut !== null || $scmCutAttempt === null),
+                    log: $isCut ? ($scmCut ?? ($scmCutAttempt?->success === false ? $scmCutAttempt : null)) : null,
+                    failed: $isCut && $scmCut === null && $scmCutAttempt?->success === false,
+                    person: $scmName, role: 'SCM'),
+            ] : []),
             // WA ke Tim Pajak terkirim otomatis saat AR memotong / SCM mentransfer; bisa dikirim ulang dari Riwayat Approval
             $this->step('tax', 'Notifikasi WhatsApp ke Tim Pajak', $isCut && ($tax !== null || $row->tax_notified_at !== null || $taxChecked),
                 log: $isCut ? ($tax ?? ($taxAttempt?->success === false ? $taxAttempt : null)) : null,
@@ -184,19 +196,24 @@ class ProgramApprovalFlow
                 note: $taxChecked ? 'Cek Pajak: '.($row->cek_pajak_tarif ?: '-').' · Selisih: '.number_format((float) $row->selisih, 0, ',', '.').($row->note_pph ? " · Note PPh: {$row->note_pph}" : '') : null,
                 at: $taxCheck?->created_at?->toIso8601String() ?? $row->tax_checked_at?->toIso8601String(),
                 person: $taxName, role: 'Pajak'),
-            // Hasil cek pajak dikirim otomatis ke Tim SCM; baris yang dicek di spreadsheet dianggap sudah selesai
-            $this->step('scm', 'Notifikasi WhatsApp ke Tim SCM', $taxChecked && ($scm !== null || ! $checkedThroughLink),
-                log: $taxChecked ? ($scm ?? ($scmAttempt?->success === false ? $scmAttempt : null)) : null,
-                failed: $scm === null && $checkedThroughLink && $scmAttempt?->success === false,
-                person: $scmName, role: 'SCM'),
+            // Hasil cek pajak dikirim otomatis ke Tim AP; baris lama (sudah ke SCM atau dari spreadsheet) tetap dianggap selesai
+            $this->step('ap', 'Notifikasi WhatsApp ke Tim AP', $taxChecked && ($ap !== null || $legacyScm !== null || ! $checkedThroughLink),
+                log: $taxChecked ? ($ap ?? ($apAttempt?->success === false ? $apAttempt : $legacyScm)) : null,
+                failed: $ap === null && $legacyScm === null && $checkedThroughLink && $apAttempt?->success === false,
+                person: $apName, role: 'AP'),
         ];
 
-        // Langkah pertama yang belum selesai adalah posisi baris saat ini
+        // Langkah pertama yang belum selesai adalah posisi baris saat ini.
+        // Cabang info potong ke SCM berjalan paralel setelah AR memotong sehingga kegagalannya tidak menghalangi langkah Tim Pajak.
         $halt = false;
         foreach ($steps as $index => $step) {
             if ($halt) {
                 $steps[$index]['state'] = 'waiting';
 
+                continue;
+            }
+
+            if ($step['key'] === 'scm_cut') {
                 continue;
             }
 

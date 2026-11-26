@@ -75,6 +75,7 @@ class ProgramClaimConfirmationController extends Controller
         if ($request->isMethod('post')) {
             $action = $request->input('action') ?? $request->query('action', 'setuju');
             $arNotification = null;
+            $scmCutNotification = null;
             $taxNotification = null;
 
             if ($action === 'setuju') {
@@ -135,6 +136,7 @@ class ProgramClaimConfirmationController extends Controller
                     $this->pushDpToSpreadsheet($matchingDp);
                 }
                 ProgramApprovalLog::record($matchingDp, ProgramApprovalLog::CUT, actor: $this->linkActor($role), submission: $submission);
+                $scmCutNotification = $matchingDp ? $this->notifyScmCut($matchingDp) : null;
                 $taxNotification = $matchingDp ? $this->notifyTaxTeam($matchingDp) : null;
             } elseif ($action === 'tunda') {
                 $submission->update([
@@ -154,6 +156,7 @@ class ProgramClaimConfirmationController extends Controller
                 'action' => $action,
                 'role' => $role,
                 'arNotification' => $arNotification,
+                'scmCutNotification' => $scmCutNotification,
                 'taxNotification' => $taxNotification,
             ]);
         }
@@ -189,7 +192,9 @@ class ProgramClaimConfirmationController extends Controller
         if ($request->isMethod('post')) {
             $action = $request->input('action') ?? $request->query('action', 'setuju');
             $arNotification = null;
+            $scmCutNotification = null;
             $taxNotification = null;
+            $apNotification = null;
             $scmNotification = null;
             $scmTransferNotification = null;
 
@@ -321,7 +326,9 @@ class ProgramClaimConfirmationController extends Controller
                 // Kirim status SUDAH POTONG ke Google Spreadsheet
                 $this->pushDpToSpreadsheet($dp);
 
-                // Estafet Otomatis: Tim Pajak mengecek PPh klaim yang sudah dipotong
+                // Estafet Bercabang Otomatis setelah AR memotong:
+                // 1) Info sudah potong ke Tim SCM, 2) Permintaan cek PPh ke Tim Pajak
+                $scmCutNotification = $this->notifyScmCut($dp);
                 $taxNotification = $this->notifyTaxTeam($dp);
             } elseif ($action === 'tunda') {
                 $dp->update([
@@ -355,8 +362,8 @@ class ProgramClaimConfirmationController extends Controller
                 // Kirim Cek Pajak, Selisih & Note PPh ke Google Spreadsheet
                 $this->pushDpToSpreadsheet($dp, withTaxCheck: true);
 
-                // Estafet Otomatis: hasil cek pajak dikirim ke WA Tim SCM
-                $scmNotification = $this->notifyScm($dp);
+                // Estafet Otomatis: hasil cek pajak dikirim ke WA Tim AP
+                $apNotification = $this->notifyApTeam($dp);
             } elseif ($action === 'kembalikan_ke_ar') {
                 $validated = $request->validate([
                     'alasan_kembali' => ['required', 'string', 'max:500'],
@@ -395,7 +402,9 @@ class ProgramClaimConfirmationController extends Controller
                 'role' => $role,
                 'alasan' => $alasan ?? null,
                 'arNotification' => $arNotification,
+                'scmCutNotification' => $scmCutNotification,
                 'taxNotification' => $taxNotification,
+                'apNotification' => $apNotification,
                 'scmNotification' => $scmNotification,
                 'scmTransferNotification' => $scmTransferNotification,
             ]);
@@ -486,6 +495,54 @@ class ProgramClaimConfirmationController extends Controller
 
         ProgramApprovalLog::record($dp, ProgramApprovalLog::SCM_TRANSFER_NOTIFIED, $result['success'],
             actor: ProgramApprovalLog::AUTOMATIC, recipient: ProgramApprovalLog::teamRecipient($dp, TeamContact::SCM), note: $result['message']);
+
+        return $result;
+    }
+
+    /**
+     * After AR cuts a claim, inform the SCM team that the claim has been cut; a failed WhatsApp is recorded and can be
+     * sent again from Riwayat Approval.
+     *
+     * @return array{success: bool, message: string}
+     */
+    protected function notifyScmCut(DataProgram $dp): array
+    {
+        try {
+            $result = $this->waService->sendDataProgramCutInfoToScm($dp);
+        } catch (\Throwable $e) {
+            $result = ['success' => false, 'message' => $e->getMessage()];
+        }
+
+        if (! $result['success']) {
+            Log::warning("Gagal kirim WA info potong ke SCM untuk DataProgram ID {$dp->id}: {$result['message']}");
+        }
+
+        ProgramApprovalLog::record($dp, ProgramApprovalLog::SCM_CUT_NOTIFIED, $result['success'],
+            actor: ProgramApprovalLog::AUTOMATIC, recipient: ProgramApprovalLog::teamRecipient($dp, TeamContact::SCM), note: $result['message']);
+
+        return $result;
+    }
+
+    /**
+     * After the tax team saves their check, send its result to the AP team; a failed WhatsApp is recorded and can be
+     * sent again from Riwayat Approval.
+     *
+     * @return array{success: bool, message: string}
+     */
+    protected function notifyApTeam(DataProgram $dp): array
+    {
+        try {
+            $result = $this->waService->sendDataProgramApNotification($dp);
+        } catch (\Throwable $e) {
+            $result = ['success' => false, 'message' => $e->getMessage()];
+        }
+
+        if (! $result['success']) {
+            Log::warning("Gagal kirim WA hasil cek pajak ke AP untuk DataProgram ID {$dp->id}: {$result['message']}");
+        }
+
+        ProgramApprovalLog::record($dp, ProgramApprovalLog::AP_NOTIFIED, $result['success'],
+            actor: ProgramApprovalLog::AUTOMATIC, recipient: ProgramApprovalLog::teamRecipient($dp, TeamContact::AP), note: $result['message']);
 
         return $result;
     }

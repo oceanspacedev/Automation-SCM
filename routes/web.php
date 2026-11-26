@@ -245,6 +245,7 @@ Route::prefix('api')->middleware([SetCompanyContext::class, SetAreaContext::clas
         Route::post('/data-program/{id}/send-wa-ar', [DataProgramController::class, 'sendWaToAr']);
         Route::post('/data-program/{id}/send-wa-tax', [DataProgramController::class, 'sendWaToTax']);
         Route::post('/data-program/{id}/send-wa-scm', [DataProgramController::class, 'sendWaToScm']);
+        Route::post('/data-program/{id}/send-wa-ap', [DataProgramController::class, 'sendWaToAp']);
         Route::post('/data-program/{id}/send-wa-scm-transfer', [DataProgramController::class, 'sendWaToScmTransfer']);
         Route::get('/data-program/reconcile-stats', [DataProgramController::class, 'reconcileStats']);
         Route::get('/data-program/reconciliation-logs', [DataProgramController::class, 'reconciliationLogs']);
