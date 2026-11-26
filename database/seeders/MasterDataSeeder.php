@@ -30,9 +30,9 @@ class MasterDataSeeder extends Seeder
             ],
             [
                 'code' => 'PT MSI',
-                'name' => 'PT MEDIA SELULER INDONESIA',
+                'name' => 'PT MEDIA SELULAR INDONESIA',
                 'npwp' => '01.555.666.7-011.000',
-                'npwp_name' => 'PT MEDIA SELULER INDONESIA',
+                'npwp_name' => 'PT MEDIA SELULAR INDONESIA',
                 'address' => 'Jl. Raya Cirebon - Bandung No.109, Kertawinangun, Kec. Kedawung, Kabupaten Cirebon, Jawa Barat 45153',
             ],
             [

@@ -19,7 +19,7 @@ export function switchCompany(slug) {
 export function useCompany() {
   return {
     companySlug,
-    companyName: computed(() => companySlug === 'msi' ? 'PT MSI' : 'CV TOP SELULAR'),
+    companyName: computed(() => companySlug === 'msi' ? 'PT MEDIA SELULAR INDONESIA' : 'CV TOP SELULAR'),
     switchCompany,
   };
 }

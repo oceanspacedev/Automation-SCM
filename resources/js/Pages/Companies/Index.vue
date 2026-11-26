@@ -16,7 +16,7 @@
         <p class="mt-3 text-sm leading-6 text-gray-500">Dealer, brand, program, dan invoice dikelola terpisah.</p>
       </button>
     </div>
-    <p class="mt-5 text-xs text-gray-500">PT MSI memakai layout invoice CV TOP SELULAR. Isi badan usaha di Master Badan Usaha sebelum membuat invoice MSI.</p>
+    <p class="mt-5 text-xs text-gray-500">PT MEDIA SELULAR INDONESIA memakai layout invoice CV TOP SELULAR. Isi badan usaha di Master Badan Usaha sebelum membuat invoice PT MEDIA SELULAR INDONESIA.</p>
   </section>
 </template>
 

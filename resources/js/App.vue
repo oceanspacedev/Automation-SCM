@@ -5,7 +5,7 @@
       <label v-if="['admin', 'scm'].includes(user?.role)" class="flex items-center gap-2 text-gray-500">
         Perusahaan
         <select :value="companySlug" @change="switchCompany($event.target.value)" class="rounded-md border border-gray-200 bg-white px-2 py-1 text-gray-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" aria-label="Pilih perusahaan">
-          <option value="top">CV TOP SELULAR</option><option value="msi">PT MSI</option>
+          <option value="top">CV TOP SELULAR</option><option value="msi">PT MEDIA SELULAR INDONESIA</option>
         </select>
       </label>
     </div>

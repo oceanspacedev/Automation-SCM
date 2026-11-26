@@ -24,7 +24,7 @@ class CustomerLookupService
         ],
         'PT MSI' => [
             'code' => 'PT MSI',
-            'name' => 'PT MEDIA SELULER INDONESIA',
+            'name' => 'PT MEDIA SELULAR INDONESIA',
             'address' => 'Jl. Raya Cirebon - Bandung No.109, Kertawinangun, Kec. Kedawung, Kabupaten Cirebon, Jawa Barat 45153',
             'npwp' => '01.555.666.7-011.000',
         ],
@@ -55,12 +55,17 @@ class CustomerLookupService
             'npwp' => '61.186.183.2-044.000',
         ],
         'PT MSI' => [
-            'name' => 'PT MEDIA SELULER INDONESIA',
+            'name' => 'PT MEDIA SELULAR INDONESIA',
+            'address' => 'Jl. Raya Cirebon - Bandung No.109, Kertawinangun, Kec. Kedawung, Kabupaten Cirebon, Jawa Barat 45153',
+            'npwp' => '01.555.666.7-011.000',
+        ],
+        'PT MEDIA SELULAR INDONESIA' => [
+            'name' => 'PT MEDIA SELULAR INDONESIA',
             'address' => 'Jl. Raya Cirebon - Bandung No.109, Kertawinangun, Kec. Kedawung, Kabupaten Cirebon, Jawa Barat 45153',
             'npwp' => '01.555.666.7-011.000',
         ],
         'PT MEDIA SELULER INDONESIA' => [
-            'name' => 'PT MEDIA SELULER INDONESIA',
+            'name' => 'PT MEDIA SELULAR INDONESIA',
             'address' => 'Jl. Raya Cirebon - Bandung No.109, Kertawinangun, Kec. Kedawung, Kabupaten Cirebon, Jawa Barat 45153',
             'npwp' => '01.555.666.7-011.000',
         ],
@@ -70,7 +75,7 @@ class CustomerLookupService
             'npwp' => '02.456.789.1-426.000',
         ],
         'PT MITRA TELEKOMUNIKASI SELULAR' => [
-            'name' => 'PT MEDIA SELULER INDONESIA',
+            'name' => 'PT MEDIA SELULAR INDONESIA',
             'address' => 'Jl. Raya Cirebon - Bandung No.109, Kertawinangun, Kec. Kedawung, Kabupaten Cirebon, Jawa Barat 45153',
             'npwp' => '01.555.666.7-011.000',
         ],

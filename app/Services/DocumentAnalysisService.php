@@ -684,7 +684,7 @@ PROMPT;
             return null;
         }
 
-        foreach (CustomerLookupService::billToNames() as $billTo) {
+        foreach ([...CustomerLookupService::billToNames(), 'PT MEDIA SELULER INDONESIA'] as $billTo) {
             $billToNormalized = $this->normalizeCompanyName($billTo);
             if ($normalized === $billToNormalized || str_contains($billToNormalized, $normalized) || str_contains($normalized, $billToNormalized)) {
                 return null;
@@ -2444,7 +2444,7 @@ Ketentuan Penentuan Output:
    - Validasi Nama Dealer:
      * Selalu ekstrak nama dealer yang tertera pada lembar Credit Note ke field "dealer_name". Contoh: "NEWCO CELL", "CV GRACE MANDIRI UTAMA", dsb.
      * Dealer adalah pihak yang MENERBITKAN Credit Note / Invoice: nama di kop/judul paling atas, nama pemilik rekening ("A/n ..."), atau nama di tanda tangan / stempel.
-     * CV TOP SELULAR, PT MEDIA SELULER INDONESIA, dan PT RETAIL INDONESIA SELALU MAJU adalah distributor yang DITAGIH (biasanya tertulis setelah "Attention", "Kepada", "Bill To", atau "Ditujukan kepada"). Nama-nama itu BUKAN dealer: JANGAN PERNAH mengisi "dealer_name" dengan nama tersebut.
+     * CV TOP SELULAR, PT MEDIA SELULAR INDONESIA, dan PT RETAIL INDONESIA SELALU MAJU adalah distributor yang DITAGIH (biasanya tertulis setelah "Attention", "Kepada", "Bill To", atau "Ditujukan kepada"). Nama-nama itu BUKAN dealer: JANGAN PERNAH mengisi "dealer_name" dengan nama tersebut.
      * Pengecualian: Jika nama dealer di form diisi "-", ini berarti customer meminta sistem membaca nama dealer otomatis dari dokumen CN. Dalam kondisi ini, JANGAN tandai sebagai invalid, dan isi field "dealer_name" dengan nama dealer yang tertera di dokumen CN.
      * TOLERANSI TYPO / BEDA DIKIT (SANGAT PENTING):
        - Jika nama dealer di formulir dan dokumen intinya SAMA meski ada sedikit perbedaan ketik / typo kecil (contoh: "NEWCOO CELL" vs "NEWCO CELL" yang cuma kurang/lebih huruf O, "NEWCO CELLULAR" vs "NEWCO CELL", selisih 1-2 huruf, spasi, atau singkatan PT/CV/CELL), MAKA WAJIB DIANGGAP SAMA & VALID! JANGAN anggap mismatch dan JANGAN tandai slot CN sebagai invalid!

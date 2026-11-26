@@ -364,7 +364,7 @@ class InvoiceGeneratorTest extends TestCase
 
         $invoice = $this->generator->generate($draft, 'PT MSI');
 
-        $this->assertEquals('PT MEDIA SELULER INDONESIA', $invoice->customer_name);
+        $this->assertEquals('PT MEDIA SELULAR INDONESIA', $invoice->customer_name);
         $this->assertStringContainsString('Kedawung', $invoice->customer_address);
         $this->assertEquals('01.555.666.7-011.000', $invoice->customer_npwp);
     }

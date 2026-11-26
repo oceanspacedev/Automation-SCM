@@ -1448,7 +1448,7 @@ class ProgramSubmissionTest extends TestCase
     {
         $service = app(DocumentAnalysisService::class);
 
-        foreach (['CV. TOP SELULAR', 'TOP SELULAR', 'cv top selular', 'PT MEDIA SELULER INDONESIA', 'PT RETAIL INDONESIA SELALU MAJU', '-', ''] as $notADealer) {
+        foreach (['CV. TOP SELULAR', 'TOP SELULAR', 'cv top selular', 'PT MEDIA SELULAR INDONESIA', 'PT MEDIA SELULER INDONESIA', 'PT RETAIL INDONESIA SELALU MAJU', '-', ''] as $notADealer) {
             $this->assertNull($service->dealerNameOrNull($notADealer), $notADealer);
         }
         $this->assertSame('CV. Grace Mandiri Utama', $service->dealerNameOrNull(' CV. Grace Mandiri Utama '));

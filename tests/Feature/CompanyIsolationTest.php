@@ -36,7 +36,8 @@ class CompanyIsolationTest extends TestCase
     {
         foreach (['admin', 'scm'] as $role) {
             $this->actingAs(User::factory()->create(['role' => $role]));
-            $this->getJson('/api/companies', ['X-Company' => 'msi'])->assertOk()->assertJsonCount(2, 'data');
+            $this->getJson('/api/companies', ['X-Company' => 'msi'])->assertOk()->assertJsonCount(2, 'data')
+                ->assertJsonFragment(['slug' => 'msi', 'name' => 'PT MEDIA SELULAR INDONESIA']);
             $this->getJson('/api/drafts', ['X-Company' => 'msi'])->assertOk();
         }
         $this->actingAs(User::factory()->create(['role' => 'ar']));

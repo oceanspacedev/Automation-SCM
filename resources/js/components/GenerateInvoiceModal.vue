@@ -135,7 +135,7 @@ const defaultOptions = companySlug === 'msi' ? [] : [
   },
   {
     code: 'PT MSI',
-    name: 'PT MEDIA SELULER INDONESIA',
+    name: 'PT MEDIA SELULAR INDONESIA',
     address: 'Jl. Raya Cirebon - Bandung No.109, Kertawinangun, Kec. Kedawung, Kabupaten Cirebon, Jawa Barat 45153',
     npwp: '01.555.666.7-011.000',
   },
