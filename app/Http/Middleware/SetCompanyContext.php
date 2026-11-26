@@ -29,7 +29,8 @@ class SetCompanyContext
             || $request->is('api/program-submissions/pre-validate',
                 'api/program-submissions/submit-form', 'api/webhooks/*', 'p/confirm/*', 'dp/confirm/*',
                 'invoices/*/pdf', 'invoices/*/preview');
-        if ($company->id !== 1 && ! $public) {
+        $identityRoute = $request->is('api/login', 'api/logout', 'api/user', 'api/auth/*', 'api/companies', 'api/profile', 'api/profile/*');
+        if (! $public && ! $identityRoute && ($request->user() !== null || $company->id !== 1)) {
             abort_unless($company->canBeAccessedBy($request->user()), 403, 'Anda tidak memiliki akses ke perusahaan ini.');
         }
 

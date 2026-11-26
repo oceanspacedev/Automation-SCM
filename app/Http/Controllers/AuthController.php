@@ -8,55 +8,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
 
 class AuthController extends Controller
 {
-    /**
-     * Registrasi pengguna baru mandiri (status default: nonaktif / menunggu ACC admin).
-     */
-    public function register(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'whatsapp' => ['nullable', 'string', 'max:25'],
-            'role' => ['required', Rule::in(['scm', 'ar', 'telemarketing', 'pajak'])],
-            'password' => ['required', ...User::passwordRules(), 'confirmed'],
-        ], [
-            'email.unique' => 'Email ini sudah terdaftar di sistem.',
-            'password.confirmed' => 'Konfirmasi password tidak cocok.',
-            ...User::passwordMessages(),
-        ]);
-
-        $normalizedWa = ! empty($validated['whatsapp']) ? $this->normalizePhone($validated['whatsapp']) : null;
-        $role = $validated['role'];
-        $defaultPermissions = User::getDefaultPermissionsForRole($role);
-
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
-            'whatsapp' => $normalizedWa,
-            'role' => $role,
-            'permissions' => $defaultPermissions,
-            'password' => Hash::make($validated['password']),
-            'is_active' => false, // Menunggu persetujuan (ACC) Admin
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Registrasi berhasil. Akun Anda sedang menunggu persetujuan (ACC) dari Administrator sebelum dapat digunakan untuk login.',
-            'data' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'role' => $user->role,
-                'is_active' => $user->is_active,
-            ],
-        ], 201);
-    }
-
     public function login(Request $request): JsonResponse
     {
         $request->validate([

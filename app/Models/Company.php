@@ -13,7 +13,6 @@ class Company extends Model
 
     public function canBeAccessedBy(?User $user): bool
     {
-        return $user !== null && $user->is_active !== false
-            && ($this->id === 1 || in_array($user->role, ['admin', 'scm'], true));
+        return $user !== null && $user->canAccessCompanySlug($this->slug);
     }
 }

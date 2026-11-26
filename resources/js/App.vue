@@ -1,19 +1,19 @@
 <template>
   <div class="min-h-screen bg-white dark:bg-[#0B1120] text-gray-900 dark:text-slate-100 flex flex-col font-sans transition-colors">
-    <div v-if="!isStandalonePage" class="flex items-center justify-between gap-3 border-b border-gray-100 bg-gray-50 px-4 py-2 text-xs dark:border-slate-800 dark:bg-slate-950 sm:px-6">
-      <span class="font-medium text-gray-700 dark:text-slate-200">{{ companyName }}</span>
-      <label v-if="['admin', 'scm'].includes(user?.role)" class="flex items-center gap-2 text-gray-500">
-        Perusahaan
-        <select :value="companySlug" @change="switchCompany($event.target.value)" class="rounded-md border border-gray-200 bg-white px-2 py-1 text-gray-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200" aria-label="Pilih perusahaan">
-          <option value="top">CV TOP SELULAR</option><option value="msi">PT MEDIA SELULAR INDONESIA</option>
-        </select>
-      </label>
-    </div>
-    <!-- Header (Hidden on Login Page & Standalone Public Pages) -->
+    <!-- Header & Active Company Bar (Hidden on Login Page & Standalone Public Pages) -->
     <header
       v-if="!isStandalonePage"
       class="border-b border-gray-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md sticky top-0 z-30 transition-colors"
     >
+      <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-gray-100 bg-gray-50 px-4 py-1.5 text-xs dark:border-slate-800 dark:bg-slate-950 sm:px-6">
+        <span class="font-semibold text-gray-800 dark:text-slate-100 truncate">{{ companyName }}</span>
+        <label v-if="canSwitchCompany" class="flex items-center gap-2 text-gray-500 dark:text-slate-400 shrink-0 ml-auto">
+          <span class="hidden sm:inline">Perusahaan</span>
+          <select :value="companySlug" @change="switchCompany($event.target.value)" class="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 cursor-pointer" aria-label="Pilih perusahaan">
+            <option v-for="company in companyOptions" :key="company.slug" :value="company.slug">{{ company.name }}</option>
+          </select>
+        </label>
+      </div>
       <div class="w-full mx-auto px-4 sm:px-6">
         <div class="flex justify-between items-center h-16">
           <!-- Layar kecil: tombol menu + nama halaman yang sedang dibuka -->
@@ -150,7 +150,7 @@
                 </NavigationMenuItem>
 
                 <!-- 6. Dropdown Master Data -->
-                <NavigationMenuItem v-if="canAccess('master')">
+                <NavigationMenuItem v-if="masterColumns.length > 0">
                   <Popover v-model:open="isMasterOpen">
                     <PopoverTrigger as-child>
                       <button
@@ -186,6 +186,49 @@
                           </router-link>
                         </div>
                       </div>
+                    </PopoverContent>
+                  </Popover>
+                </NavigationMenuItem>
+
+                <!-- 7. Dropdown Pengaturan & Sistem -->
+                <NavigationMenuItem v-if="pengaturanLinks.length > 0">
+                  <Popover v-model:open="isPengaturanOpen">
+                    <PopoverTrigger as-child>
+                      <button
+                        type="button"
+                        :class="[
+                          navigationMenuTriggerStyle(),
+                          pengaturanLinks.some((link) => isActive(link.to)) && 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold',
+                          'gap-1.5 dark:text-slate-200 dark:hover:bg-slate-800'
+                        ]"
+                      >
+                        <span>Pengaturan</span>
+                        <ChevronDownIcon
+                          class="w-3.5 h-3.5 text-gray-500 dark:text-slate-400 transition-transform duration-200"
+                          :class="isPengaturanOpen && 'rotate-180'"
+                        />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" class="w-48 p-1.5 rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl text-xs space-y-0.5">
+                      <template v-for="(link, index) in pengaturanLinks" :key="link.to">
+                        <div v-if="link.danger && index > 0" class="my-1 border-t border-gray-100 dark:border-slate-800"></div>
+                        <router-link
+                          :to="link.to"
+                          @click="isPengaturanOpen = false"
+                          :class="[
+                            'block px-3 py-2 rounded-lg transition-colors text-xs font-medium',
+                            link.danger
+                              ? isActive(link.to)
+                                ? 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 font-semibold'
+                                : 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30'
+                              : isActive(link.to)
+                                ? 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-white font-semibold'
+                                : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-white'
+                          ]"
+                        >
+                          {{ link.label }}
+                        </router-link>
+                      </template>
                     </PopoverContent>
                   </Popover>
                 </NavigationMenuItem>
@@ -493,6 +536,7 @@ const { isDark, toggleDarkMode, initTheme } = useTheme();
 
 const isRiwayatOpen = ref(false);
 const isMasterOpen = ref(false);
+const isPengaturanOpen = ref(false);
 
 // Menu yang datanya dipisah per area: dropdown Jawa Barat / Jawa Tengah
 const areaMenus = computed(() => [
@@ -513,12 +557,23 @@ const activeBrandName = computed(() => brandName(route.params.brand));
 // Huruf pertama nama akun untuk tombol menu profil
 const userInitial = computed(() => (user.value?.name || user.value?.email || 'A').trim().charAt(0).toUpperCase());
 
+const COMPANY_LABELS = {
+  top: 'CV TOP SELULAR',
+  msi: 'PT MEDIA SELULAR INDONESIA',
+};
+const companyOptions = computed(() => {
+  const slugs = Array.isArray(user.value?.accessible_companies) && user.value.accessible_companies.length
+    ? user.value.accessible_companies
+    : [companySlug];
+  return slugs.map((slug) => ({ slug, name: COMPANY_LABELS[slug] || slug.toUpperCase() }));
+});
+const canSwitchCompany = computed(() => companyOptions.value.length > 1);
+
 const isLoginPage = computed(() => route.path === '/login');
 const isStandalonePage = computed(() => {
   return (
     route.meta?.isStandalone === true ||
-    route.path === '/login' ||
-    route.path === '/register'
+    route.path === '/login'
   );
 });
 
@@ -532,27 +587,30 @@ const isActive = (path) => {
 // Role & Permission Access Control (sama dengan yang dipakai router)
 const canAccess = (feature) => canAccessFeature(user.value, feature);
 
-// Menu Master dibagi dua kolom: program & wilayah, lalu toko, badan usaha & akun
+// Menu Master hanya berisi data referensi bisnis, seimbang 2 kolom
 const masterColumns = computed(() => [
   [
     canAccess('master_program') && { label: 'Brand', to: '/brands' },
     canAccess('master_program') && { label: 'Program', to: '/programs' },
     canAccess('master_program') && { label: 'Region', to: '/regions' },
     canAccess('master_program') && { label: 'AR', to: '/ar' },
-    canAccess('master_program') && { label: 'Tim Pajak, SCM & AP', to: '/tim-pajak-scm' },
   ],
   [
     canAccess('master_dealer') && { label: 'Dealer', to: '/dealers' },
     canAccess('master_customer') && { label: 'Badan Usaha', to: '/badan-usaha' },
-    ['admin', 'scm'].includes(user.value?.role) && { label: 'Perusahaan', to: '/companies' },
-    canAccess('master_user') && { label: 'User', to: '/users' },
-    user.value?.role === 'admin' && { label: 'Role Permission', to: '/role-permissions' },
-    canAccess('master_user') && { label: 'Jadwal Otomatis', to: '/jadwal-otomatis' },
-    // Log aplikasi & reset data khusus Admin
-    user.value?.role === 'admin' && { label: 'Laravel Logs', to: '/laravel-logs' },
-    user.value?.role === 'admin' && { label: 'Reset Data', to: '/reset-data' },
+    canSwitchCompany.value && { label: 'Perusahaan', to: '/companies' },
+    canAccess('master_program') && { label: 'Tim Pajak, SCM & AP', to: '/tim-pajak-scm' },
   ],
 ].map((column) => column.filter(Boolean)).filter((column) => column.length > 0));
+
+// Menu Pengaturan khusus pengelolaan akun, hak akses, jadwal, dan pemeliharaan sistem
+const pengaturanLinks = computed(() => [
+  canAccess('master_user') && { label: 'User', to: '/users' },
+  user.value?.role === 'admin' && { label: 'Role Permission', to: '/role-permissions' },
+  canAccess('master_user') && { label: 'Jadwal Otomatis', to: '/jadwal-otomatis' },
+  user.value?.role === 'admin' && { label: 'Laravel Logs', to: '/laravel-logs' },
+  user.value?.role === 'admin' && { label: 'Reset Data', to: '/reset-data', danger: true },
+].filter(Boolean));
 
 // Menu layar kecil: semua menu navigasi atas, dikelompokkan seperti dropdown desktop
 const isMobileNavOpen = ref(false);
@@ -574,7 +632,8 @@ const mobileNavGroups = computed(() => {
         canAccess('email_logs') && { label: 'Riwayat Email', to: '/email-logs' },
       ],
     },
-    canAccess('master') && { title: 'Master', links: masterColumns.value.flat() },
+    masterColumns.value.length > 0 && { title: 'Master', links: masterColumns.value.flat() },
+    pengaturanLinks.value.length > 0 && { title: 'Pengaturan', links: pengaturanLinks.value },
   ]
     .filter(Boolean)
     .map((group) => ({ ...group, links: group.links.filter(Boolean) }))

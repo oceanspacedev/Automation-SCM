@@ -51,6 +51,19 @@
           <p class="mt-1 text-gray-500">Untuk baris tanpa kolom Peran.</p>
         </div>
 
+        <div v-if="availableCompanies.length">
+          <label for="import-company-mode" class="block font-medium text-gray-900 mb-1">Akses Perusahaan</label>
+          <select
+            id="import-company-mode"
+            v-model="selectedCompanyMode"
+            :disabled="companyModeOptions.length <= 1"
+            class="w-full h-9 px-3 rounded-lg border border-gray-300 bg-white text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 cursor-pointer disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
+          >
+            <option v-for="opt in companyModeOptions" :key="opt.key" :value="opt.key">{{ opt.label }}</option>
+          </select>
+          <p class="mt-1 text-gray-500">Untuk baris tanpa kolom Perusahaan.</p>
+        </div>
+
         <div>
           <label for="import-password" class="block font-medium text-gray-900 mb-1">Password awal <span class="font-normal text-gray-500">(opsional)</span></label>
           <input
@@ -64,7 +77,7 @@
           <p class="mt-1 text-gray-500">Kosongkan untuk login lewat WhatsApp saja.</p>
         </div>
 
-        <p class="text-gray-500">Kolom: Nama, No WA, Email, Peran. File CV TOP juga bisa.</p>
+        <p class="text-gray-500">Kolom: Nama, No WA, Email, Peran, Perusahaan. File CV TOP juga bisa.</p>
 
         <p v-if="errorMessage" class="text-rose-600">{{ errorMessage }}</p>
       </div>
@@ -172,10 +185,11 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import axios from 'axios';
 import { notify } from '@/composables/useNotify';
 import { useAuth } from '@/composables/useAuth';
+import { companySlug } from '@/composables/useCompany';
 import {
   X as XIcon,
   UploadCloud as UploadCloudIcon,
@@ -186,6 +200,10 @@ const props = defineProps({
   isOpen: Boolean,
   // Hanya Admin yang boleh membuat akun Admin
   canCreateAdmin: Boolean,
+  availableCompanies: {
+    type: Array,
+    default: () => [],
+  },
 });
 
 const emit = defineEmits(['close', 'imported']);
@@ -200,16 +218,54 @@ const roleOptions = computed(() =>
     .map(([value, label]) => ({ value, label })),
 );
 
+const companyModeOptions = computed(() => {
+  const list = props.availableCompanies || [];
+  if (list.length <= 1) {
+    return list.map((c) => ({ key: c.slug, label: c.name, slugs: [c.slug] }));
+  }
+  return [
+    ...list.map((c) => ({ key: c.slug, label: c.name, slugs: [c.slug] })),
+    { key: 'both', label: 'Keduanya', slugs: list.map((c) => c.slug) },
+  ];
+});
+
 const roleLabel = (value) => ROLE_LABELS[value] || value;
 
 const fileInput = ref(null);
 const selectedFile = ref(null);
 const isDragging = ref(false);
 const role = ref('telemarketing');
+const companySlugs = ref([companySlug]);
 const password = ref('');
 const uploading = ref(false);
 const errorMessage = ref('');
 const result = ref(null);
+
+const selectedCompanyMode = computed({
+  get() {
+    const matched = companyModeOptions.value.find(
+      (opt) => opt.slugs.length === companySlugs.value.length && opt.slugs.every((s) => companySlugs.value.includes(s))
+    );
+    return matched ? matched.key : (companyModeOptions.value[0]?.key || 'top');
+  },
+  set(modeKey) {
+    const matched = companyModeOptions.value.find((opt) => opt.key === modeKey);
+    if (matched) {
+      companySlugs.value = [...matched.slugs];
+    }
+  },
+});
+
+watch(() => props.isOpen, (open) => {
+  if (open) {
+    const allowed = (props.availableCompanies || []).map((c) => c.slug);
+    if (allowed.includes(companySlug)) {
+      companySlugs.value = [companySlug];
+    } else if (allowed.length) {
+      companySlugs.value = [allowed[0]];
+    }
+  }
+});
 
 const stats = computed(() => [
   { label: 'Nomor di file', value: result.value.total_numbers, class: 'text-gray-950' },
@@ -239,6 +295,7 @@ const upload = async () => {
   const formData = new FormData();
   formData.append('file', selectedFile.value);
   formData.append('role', role.value);
+  companySlugs.value.forEach((slug) => formData.append('company_slugs[]', slug));
   if (password.value) formData.append('password', password.value);
 
   try {

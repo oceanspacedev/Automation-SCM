@@ -2,7 +2,7 @@
   <div class="space-y-4">
     <!-- Breadcrumbs -->
     <div class="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-      <span>Master Data</span>
+      <span>Pengaturan</span>
       <ChevronRightIcon class="w-3.5 h-3.5 text-gray-400" />
       <span class="text-gray-800">Reset Data</span>
     </div>

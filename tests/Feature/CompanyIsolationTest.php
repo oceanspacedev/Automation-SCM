@@ -32,19 +32,33 @@ class CompanyIsolationTest extends TestCase
         return app(CompanyContext::class)->run(2, $callback(...));
     }
 
-    public function test_admin_and_scm_can_select_msi_but_other_roles_cannot(): void
+    public function test_users_only_open_the_companies_assigned_to_them(): void
     {
-        foreach (['admin', 'scm'] as $role) {
-            $this->actingAs(User::factory()->create(['role' => $role]));
-            $this->getJson('/api/companies', ['X-Company' => 'msi'])->assertOk()->assertJsonCount(2, 'data')
-                ->assertJsonFragment(['slug' => 'msi', 'name' => 'PT MEDIA SELULAR INDONESIA']);
-            $this->getJson('/api/drafts', ['X-Company' => 'msi'])->assertOk();
-        }
-        $this->actingAs(User::factory()->create(['role' => 'ar']));
-        $this->getJson('/api/companies')->assertOk()->assertJsonCount(1, 'data');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $this->actingAs($admin);
+        $this->getJson('/api/companies', ['X-Company' => 'msi'])->assertOk()->assertJsonCount(2, 'data')
+            ->assertJsonFragment(['slug' => 'msi', 'name' => 'PT MEDIA SELULAR INDONESIA']);
+        $this->getJson('/api/drafts', ['X-Company' => 'msi'])->assertOk();
+        $this->getJson('/api/drafts')->assertOk();
+
+        $topOnly = User::factory()->create(['role' => 'scm', 'company_slugs' => ['top']]);
+        $this->actingAs($topOnly);
+        $this->getJson('/api/companies')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.slug', 'top');
         $this->getJson('/api/drafts', ['X-Company' => 'msi'])->assertForbidden();
         $this->getJson('/api/drafts', ['X-Company' => 'unknown'])->assertNotFound();
         $this->getJson('/api/drafts')->assertOk();
+
+        $msiOnly = User::factory()->create(['role' => 'ar', 'company_slugs' => ['msi']]);
+        $this->actingAs($msiOnly);
+        $this->getJson('/api/companies', ['X-Company' => 'top'])->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.slug', 'msi');
+        $this->getJson('/api/drafts', ['X-Company' => 'top'])->assertForbidden();
+        $this->getJson('/api/drafts', ['X-Company' => 'msi'])->assertOk();
+
+        $both = User::factory()->create(['role' => 'pajak', 'company_slugs' => ['top', 'msi']]);
+        $this->actingAs($both);
+        $this->getJson('/api/companies')->assertOk()->assertJsonCount(2, 'data');
+        $this->getJson('/api/data-program', ['X-Company' => 'top'])->assertOk();
+        $this->getJson('/api/data-program', ['X-Company' => 'msi'])->assertOk();
     }
 
     public function test_brand_lists_and_public_lookup_follow_the_requested_company(): void
@@ -53,7 +67,7 @@ class CompanyIsolationTest extends TestCase
         $brands = $this->getJson('/api/brands?company=msi')->assertOk()->json('data');
         $this->assertEqualsCanonicalizing(['itel', 'tecno', 'villaon', 'motorola', 'motopad'], array_column($brands, 'slug'));
 
-        $this->actingAs(User::factory()->create(['role' => 'scm']));
+        $this->actingAs(User::factory()->create(['role' => 'scm', 'company_slugs' => ['top', 'msi']]));
         $this->getJson('/api/drafts', ['X-Company' => 'msi', 'X-Brand' => 'realme'])->assertUnprocessable();
         $this->getJson('/api/drafts', ['X-Company' => 'top', 'X-Brand' => 'itel'])->assertUnprocessable();
     }
@@ -77,7 +91,7 @@ class CompanyIsolationTest extends TestCase
     {
         Http::fake();
         Storage::fake('public');
-        $this->actingAs(User::factory()->create(['role' => 'scm']));
+        $this->actingAs(User::factory()->create(['role' => 'scm', 'company_slugs' => ['top', 'msi']]));
         $payload = ['cn_number' => 'CN-100', 'dealer_name' => 'Dealer', 'support_amount' => 1000000, 'program_name' => 'Program', 'invoice_type' => 'DSA'];
         $top = $this->postJson('/api/drafts', $payload)->assertCreated()->json('data.id');
         $msi = $this->postJson('/api/drafts', $payload, ['X-Company' => 'msi'])->assertCreated()->json('data.id');

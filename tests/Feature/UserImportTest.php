@@ -90,6 +90,26 @@ class UserImportTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_import_assigns_selected_or_row_company_access(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+
+        $this->postJson('/api/users/import', [
+            'file' => $this->excel([
+                ['Nama', 'No WA', 'Perusahaan'],
+                ['Msi Staff', '081300000021', null],
+                ['Dual Staff', '081300000022', 'Keduanya'],
+                ['Top Staff', '081300000023', 'CV TOP'],
+            ]),
+            'company_slugs' => ['msi'],
+        ])->assertOk()
+            ->assertJsonCount(3, 'data.created');
+
+        $this->assertSame(['msi'], User::where('name', 'Msi Staff')->firstOrFail()->company_slugs);
+        $this->assertSame(['top', 'msi'], User::where('name', 'Dual Staff')->firstOrFail()->company_slugs);
+        $this->assertSame(['top'], User::where('name', 'Top Staff')->firstOrFail()->company_slugs);
+    }
+
     public function test_import_needs_the_name_and_number_columns_and_master_user_access(): void
     {
         $this->actingAs(User::factory()->create(['role' => 'admin']));

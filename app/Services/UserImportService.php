@@ -25,6 +25,7 @@ class UserImportService
         'whatsapp' => ['no wa', 'no whatsapp', 'whatsapp', 'nomor wa', 'nomor whatsapp', 'no wa telemarketing', 'no telemarketing', 'wa telemarketing', 'no hp telemarketing', 'no hp', 'no telp', 'no'],
         'email' => ['email', 'email pengguna', 'email telemarketing', 'email tele'],
         'role' => ['peran', 'role'],
+        'companies' => ['perusahaan', 'company', 'akses perusahaan'],
     ];
 
     /** Columns of a store file (CV TOP / Master Dealer), whose "Email" column holds the store's email, not the person's. */
@@ -48,19 +49,28 @@ class UserImportService
     /**
      * @param  string  $defaultRole  role of the rows without a Peran value
      * @param  bool  $canCreateAdmin  whether rows with the Admin role may be created (only an Admin may)
+     * @param  list<string>  $defaultCompanySlugs  companies assigned to rows without a Perusahaan column
+     * @param  list<string>|null  $allowedCompanySlugs  when non-null, restrict rows to these company slugs
      * @return array{
      *     total_numbers: int,
-     *     created: list<array{name: string, whatsapp: string, email: ?string, role: string}>,
+     *     created: list<array{name: string, whatsapp: string, email: ?string, role: string, company_slugs: list<string>}>,
      *     existing: list<array{name: string, whatsapp: string, account: string}>,
      *     skipped: list<array{row: int, name: string, whatsapp: string, reason: string}>
      * }
      */
-    public function import(string $path, ?string $password = null, string $defaultRole = 'telemarketing', bool $canCreateAdmin = false): array
-    {
+    public function import(
+        string $path,
+        ?string $password = null,
+        string $defaultRole = 'telemarketing',
+        bool $canCreateAdmin = false,
+        array $defaultCompanySlugs = ['top'],
+        ?array $allowedCompanySlugs = null,
+    ): array {
         $reader = IOFactory::createReaderForFile($path);
         $reader->setReadDataOnly(true);
         $rows = $reader->load($path)->getActiveSheet()->toArray(null, true, false, false);
         [$headerIndex, $columns] = $this->findHeader($rows);
+        $defaultCompanies = $this->normalizeCompanies($defaultCompanySlugs) ?? ['top'];
 
         $people = [];
         $skipped = [];
@@ -76,12 +86,17 @@ class UserImportService
             $phone = User::normalizeWhatsapp($rawPhone);
             $rawRole = isset($columns['role']) ? strtolower(trim((string) ($row[$columns['role']] ?? ''))) : '';
             $role = $rawRole === '' ? $defaultRole : (self::ROLE_VALUES[$rawRole] ?? null);
+            $rawCompanies = isset($columns['companies']) ? trim((string) ($row[$columns['companies']] ?? '')) : '';
+            $companySlugs = $rawCompanies === '' ? $defaultCompanies : $this->parseCompaniesCell($rawCompanies);
+
             $reason = match (true) {
                 $name === '' => 'Nama kosong.',
                 $rawPhone === '' => 'Nomor WhatsApp kosong.',
                 ! preg_match('/^628\d{7,12}$/', (string) $phone) => 'Nomor WhatsApp tidak valid.',
                 $role === null => 'Peran tidak dikenal (Admin, SCM, AR, atau Telemarketing).',
                 $role === 'admin' && ! $canCreateAdmin => 'Hanya Admin yang bisa membuat akun Admin.',
+                $companySlugs === null => 'Perusahaan tidak dikenal (CV TOP, PT MSI, atau Keduanya).',
+                $allowedCompanySlugs !== null && array_diff($companySlugs, $allowedCompanySlugs) !== [] => 'Tidak memiliki akses ke perusahaan tersebut.',
                 default => null,
             };
 
@@ -93,7 +108,7 @@ class UserImportService
             }
 
             $email = isset($columns['email']) ? strtolower(trim((string) ($row[$columns['email']] ?? ''))) : '';
-            $people[$phone] ??= ['row' => $index + 1, 'name' => $name, 'role' => $role, 'email' => filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null];
+            $people[$phone] ??= ['row' => $index + 1, 'name' => $name, 'role' => $role, 'email' => filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null, 'company_slugs' => $companySlugs];
         }
 
         $users = User::all(['id', 'name', 'email', 'whatsapp']);
@@ -127,6 +142,7 @@ class UserImportService
                 'whatsapp' => $phone,
                 'role' => $person['role'],
                 'permissions' => $person['role'] === 'admin' ? null : User::getDefaultPermissionsForRole($person['role']),
+                'company_slugs' => $person['company_slugs'],
                 // Tanpa password awal akun masuk lewat OTP WhatsApp; password acak ini tidak pernah ditampilkan
                 'password' => $password ?: Str::random(40),
                 'is_active' => true,
@@ -136,7 +152,7 @@ class UserImportService
             if ($email !== null) {
                 $takenEmails[$email] = true;
             }
-            $created[] = ['name' => $person['name'], 'whatsapp' => $phone, 'email' => $email, 'role' => $person['role']];
+            $created[] = ['name' => $person['name'], 'whatsapp' => $phone, 'email' => $email, 'role' => $person['role'], 'company_slugs' => $person['company_slugs']];
         }
 
         return [
@@ -145,6 +161,47 @@ class UserImportService
             'existing' => $existing,
             'skipped' => array_values($skipped),
         ];
+    }
+
+    /**
+     * Parse a Perusahaan cell such as "CV TOP", "PT MSI", "PT MEDIA SELULAR INDONESIA", or "Keduanya".
+     *
+     * @return list<string>|null
+     */
+    private function parseCompaniesCell(string $raw): ?array
+    {
+        $normalized = strtolower(trim(preg_replace('/\s+/', ' ', $raw)));
+        if (in_array($normalized, ['keduanya', 'semua', 'both', 'all', 'top & msi', 'top, msi'], true)) {
+            return ['top', 'msi'];
+        }
+
+        $slugs = [];
+        foreach (preg_split('/[,;&+|\/]+/', $normalized) ?: [] as $part) {
+            $token = trim($part);
+            if ($token === '') {
+                continue;
+            }
+            if (str_contains($token, 'top')) {
+                $slugs[] = 'top';
+            } elseif (str_contains($token, 'msi') || str_contains($token, 'media selul')) {
+                $slugs[] = 'msi';
+            } else {
+                return null;
+            }
+        }
+
+        return $this->normalizeCompanies($slugs);
+    }
+
+    /**
+     * @param  list<string>  $slugs
+     * @return list<string>|null
+     */
+    private function normalizeCompanies(array $slugs): ?array
+    {
+        $ordered = array_values(array_intersect(['top', 'msi'], $slugs));
+
+        return $ordered !== [] ? $ordered : null;
     }
 
     /**

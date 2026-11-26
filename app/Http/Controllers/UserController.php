@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\AppSetting;
+use App\Models\Company;
 use App\Models\User;
+use App\Services\CompanyContext;
 use App\Services\UserImportService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +23,10 @@ class UserController extends Controller
     public function index(Request $request): JsonResponse
     {
         $this->authorizeUserManagement($request);
+
+        /** @var User $actor */
+        $actor = $request->user();
+        $actorCompanies = $actor->companyAccessSlugs();
 
         $query = User::query();
 
@@ -47,6 +53,11 @@ class UserController extends Controller
         }
 
         $users = $query->orderBy('created_at', 'desc')->get();
+        if (! $actor->isAdmin()) {
+            $users = $users
+                ->filter(fn (User $u): bool => array_intersect($u->companyAccessSlugs(), $actorCompanies) !== [])
+                ->values();
+        }
 
         // Hitung statistik untuk summary card
         $stats = [
@@ -61,10 +72,17 @@ class UserController extends Controller
             'pending' => User::where('is_active', false)->count(),
         ];
 
+        $companies = Company::query()
+            ->orderBy('id')
+            ->get(['id', 'slug', 'name'])
+            ->filter(fn (Company $company): bool => $company->canBeAccessedBy($actor))
+            ->values();
+
         return response()->json([
             'success' => true,
             'data' => $users,
             'stats' => $stats,
+            'companies' => $companies,
             'available_permissions' => User::AVAILABLE_PERMISSIONS,
             'default_permissions' => [
                 'admin' => User::getDefaultPermissionsForRole('admin'),
@@ -102,8 +120,6 @@ class UserController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $this->authorizeUserManagement($request, newRole: (string) $request->input('role'));
-
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'string', 'email', 'max:255', 'unique:users,email'],
@@ -111,9 +127,17 @@ class UserController extends Controller
             'role' => ['required', Rule::in(['admin', 'scm', 'ar', 'telemarketing', 'pajak'])],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', Rule::in(array_keys(User::AVAILABLE_PERMISSIONS))],
+            'company_slugs' => ['sometimes', 'array', 'min:1'],
+            'company_slugs.*' => ['string', 'distinct', Rule::exists('companies', 'slug')],
             'password' => ['required', ...User::passwordRules()],
             'is_active' => ['boolean'],
-        ], User::passwordMessages());
+        ], [
+            ...User::passwordMessages(),
+            'company_slugs.min' => 'Pilih minimal satu perusahaan.',
+        ]);
+
+        $companySlugs = $this->resolveCompanySlugs($validated['company_slugs'] ?? null, $validated['role']);
+        $this->authorizeUserManagement($request, newRole: $validated['role'], newCompanySlugs: $companySlugs);
 
         $cleanWa = User::normalizeWhatsapp($validated['whatsapp'] ?? null);
 
@@ -126,6 +150,7 @@ class UserController extends Controller
             'whatsapp' => $cleanWa,
             'role' => $validated['role'],
             'permissions' => $permissions,
+            'company_slugs' => $companySlugs,
             'password' => Hash::make($validated['password']),
             'is_active' => $validated['is_active'] ?? true,
         ]);
@@ -144,25 +169,36 @@ class UserController extends Controller
     public function import(Request $request, UserImportService $importService): JsonResponse
     {
         $role = (string) $request->input('role', 'telemarketing');
-        $this->authorizeUserManagement($request, newRole: $role);
 
         $validated = $request->validate([
             'file' => ['required', 'file', 'extensions:xlsx,xls,csv', 'max:51200'],
             'password' => ['nullable', ...User::passwordRules()],
             'role' => ['nullable', Rule::in(['admin', 'scm', 'ar', 'telemarketing', 'pajak'])],
+            'company_slugs' => ['nullable', 'array', 'min:1'],
+            'company_slugs.*' => ['string', 'distinct', Rule::exists('companies', 'slug')],
         ], [
             'file.required' => 'Pilih file Excel terlebih dahulu.',
             'file.extensions' => 'File harus berformat .xlsx, .xls, atau .csv.',
             'file.max' => 'Ukuran file maksimal 50 MB.',
+            'company_slugs.min' => 'Pilih minimal satu perusahaan.',
             ...User::passwordMessages(label: 'Password awal'),
         ]);
+
+        $defaultCompanies = $this->resolveCompanySlugs($validated['company_slugs'] ?? null, $role);
+        $this->authorizeUserManagement($request, newRole: $role, newCompanySlugs: $defaultCompanies);
+
+        /** @var User $actor */
+        $actor = $request->user();
+        $allowedCompanies = $actor->isAdmin() ? null : $actor->companyAccessSlugs();
 
         try {
             $result = $importService->import(
                 $request->file('file')->getRealPath(),
                 $validated['password'] ?? null,
                 $validated['role'] ?? 'telemarketing',
-                canCreateAdmin: (bool) $request->user()?->isAdmin(),
+                canCreateAdmin: $actor->isAdmin(),
+                defaultCompanySlugs: $defaultCompanies,
+                allowedCompanySlugs: $allowedCompanies,
             );
         } catch (RuntimeException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
@@ -183,7 +219,6 @@ class UserController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $user = User::findOrFail($id);
-        $this->authorizeUserManagement($request, $user, (string) $request->input('role'));
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -192,26 +227,30 @@ class UserController extends Controller
             'role' => ['required', Rule::in(['admin', 'scm', 'ar', 'telemarketing', 'pajak'])],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', Rule::in(array_keys(User::AVAILABLE_PERMISSIONS))],
+            'company_slugs' => ['sometimes', 'array', 'min:1'],
+            'company_slugs.*' => ['string', 'distinct', Rule::exists('companies', 'slug')],
             'password' => ['nullable', ...User::passwordRules()],
             'is_active' => ['boolean'],
-        ], User::passwordMessages());
+        ], [
+            ...User::passwordMessages(),
+            'company_slugs.min' => 'Pilih minimal satu perusahaan.',
+        ]);
 
-        // Proteksi: jangan izinkan admin terakhir mengubah role-nya sendiri atau dinonaktifkan
+        $targetCompanySlugs = array_key_exists('company_slugs', $validated)
+            ? $this->resolveCompanySlugs($validated['company_slugs'], $validated['role'])
+            : $user->companyAccessSlugs();
+
+        $this->authorizeUserManagement($request, $user, (string) $validated['role'], $targetCompanySlugs);
+
+        // Proteksi: jangan izinkan admin terakhir mengubah role-nya sendiri, dinonaktifkan, atau kehilangan akses perusahaan
         $targetActive = $validated['is_active'] ?? $user->is_active;
         $targetRole = $validated['role'];
 
-        if ($user->role === 'admin' && ($targetRole !== 'admin' || ! $targetActive)) {
-            $otherAdminCount = User::where('role', 'admin')
-                ->where('is_active', true)
-                ->where('id', '!=', $user->id)
-                ->count();
-
-            if ($otherAdminCount === 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Tidak dapat mengubah role atau menonaktifkan satu-satunya akun Admin aktif di sistem.',
-                ], 422);
-            }
+        if ($message = $this->leavesCompanyWithoutActiveAdmin($user, $targetRole === 'admin' && $targetActive ? $targetCompanySlugs : [])) {
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+            ], 422);
         }
 
         $user->name = $validated['name'];
@@ -221,6 +260,7 @@ class UserController extends Controller
             $user->permissions = null;
         }
         $user->role = $validated['role'];
+        $user->company_slugs = $targetCompanySlugs;
         $user->is_active = $targetActive;
 
         if (array_key_exists('permissions', $validated) && $validated['role'] !== 'admin') {
@@ -256,18 +296,11 @@ class UserController extends Controller
             ], 422);
         }
 
-        // Jangan izinkan hapus jika admin terakhir
-        if ($user->role === 'admin') {
-            $otherAdminCount = User::where('role', 'admin')
-                ->where('id', '!=', $user->id)
-                ->count();
-
-            if ($otherAdminCount === 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Tidak dapat menghapus satu-satunya akun Admin yang tersisa.',
-                ], 422);
-            }
+        if ($message = $this->leavesCompanyWithoutActiveAdmin($user)) {
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+            ], 422);
         }
 
         $user->delete();
@@ -293,18 +326,11 @@ class UserController extends Controller
             ], 422);
         }
 
-        if ($user->role === 'admin' && $user->is_active) {
-            $otherAdminCount = User::where('role', 'admin')
-                ->where('is_active', true)
-                ->where('id', '!=', $user->id)
-                ->count();
-
-            if ($otherAdminCount === 0) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Tidak dapat menonaktifkan satu-satunya Admin aktif yang tersisa.',
-                ], 422);
-            }
+        if ($message = $this->leavesCompanyWithoutActiveAdmin($user)) {
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+            ], 422);
         }
 
         $user->is_active = ! $user->is_active;
@@ -335,28 +361,111 @@ class UserController extends Controller
     }
 
     /**
-     * Managing accounts needs the Master User access, and only an Admin may create, change or remove an Admin account;
-     * otherwise anyone with Master User access could make themselves Admin.
+     * Check whether removing active Admin access from $user (or limiting it to $nextSlugs) would leave any company
+     * without an active Admin account.
+     *
+     * @param  list<string>  $nextSlugs
      */
-    private function authorizeUserManagement(Request $request, ?User $target = null, ?string $newRole = null): void
+    private function leavesCompanyWithoutActiveAdmin(User $user, array $nextSlugs = []): ?string
     {
+        if ($user->role !== 'admin' || ! $user->is_active) {
+            return null;
+        }
+
+        $otherActiveAdmins = User::where('role', 'admin')
+            ->where('is_active', true)
+            ->where('id', '!=', $user->id)
+            ->get();
+
+        if ($otherActiveAdmins->isEmpty() && $nextSlugs === []) {
+            return 'Satu-satunya akun Admin aktif di sistem tidak dapat dinonaktifkan, diubah perannya, atau dihapus.';
+        }
+
+        $covered = array_unique([
+            ...$otherActiveAdmins->flatMap(fn (User $admin): array => $admin->companyAccessSlugs())->all(),
+            ...$nextSlugs,
+        ]);
+
+        if (array_diff($user->companyAccessSlugs(), $covered) !== []) {
+            return 'Harus ada minimal satu akun Admin aktif yang dapat mengakses setiap perusahaan.';
+        }
+
+        return null;
+    }
+
+    /**
+     * Managing accounts needs the Master User access, and only an Admin may create, change or remove an Admin account;
+     * non-admins can also only manage accounts and assign access within their own allowed companies.
+     *
+     * @param  list<string>|null  $newCompanySlugs
+     */
+    private function authorizeUserManagement(
+        Request $request,
+        ?User $target = null,
+        ?string $newRole = null,
+        ?array $newCompanySlugs = null,
+    ): void {
         $actor = $request->user();
 
         abort_unless($actor?->isAdmin() || $actor?->hasPermission('master_user'), 403, 'Anda tidak punya akses ke Master User.');
         abort_if(($target?->role === 'admin' || $newRole === 'admin') && ! $actor->isAdmin(), 403, 'Hanya Admin yang bisa membuat atau mengubah akun Admin.');
+
+        if (! $actor->isAdmin()) {
+            $actorCompanies = $actor->companyAccessSlugs();
+            if ($target !== null && array_diff($target->companyAccessSlugs(), $actorCompanies) !== []) {
+                abort(403, 'Anda tidak dapat mengelola akun di luar perusahaan Anda.');
+            }
+            if ($newCompanySlugs !== null && array_diff($newCompanySlugs, $actorCompanies) !== []) {
+                abort(403, 'Anda hanya dapat memberikan akses ke perusahaan yang Anda akses.');
+            }
+        }
     }
 
     /**
-     * Ambil daftar kontak tim telemarketing aktif untuk dropdown kirim WA.
+     * Normalize requested company slugs in company table order, defaulting to both companies for Admin and the active
+     * company otherwise.
+     *
+     * @param  list<string>|null  $requested
+     * @return list<string>
+     */
+    private function resolveCompanySlugs(?array $requested, string $role): array
+    {
+        $available = Company::query()->orderBy('id')->pluck('slug')->all();
+
+        if ($requested !== null) {
+            $ordered = array_values(array_intersect($available, $requested));
+            if ($ordered !== []) {
+                return $ordered;
+            }
+        }
+
+        if ($role === 'admin' && $available !== []) {
+            return $available;
+        }
+
+        return [Company::findOrFail(app(CompanyContext::class)->id())->slug];
+    }
+
+    /**
+     * Ambil daftar kontak tim telemarketing aktif pada perusahaan aktif untuk dropdown kirim WA.
      */
     public function telemarketingContacts(): JsonResponse
     {
+        $companySlug = Company::findOrFail(app(CompanyContext::class)->id())->slug;
         $contacts = User::where('role', 'telemarketing')
             ->where('is_active', true)
             ->whereNotNull('whatsapp')
             ->where('whatsapp', '!=', '')
             ->orderBy('name', 'asc')
-            ->get(['id', 'name', 'email', 'whatsapp']);
+            ->get(['id', 'name', 'email', 'whatsapp', 'role', 'company_slugs', 'is_active'])
+            ->filter(fn (User $user): bool => $user->canAccessCompanySlug($companySlug))
+            ->map(fn (User $user): array => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'whatsapp' => $user->whatsapp,
+            ])
+            ->values();
 
         $defaultPhone = config('services.wag.telemarketing_phone') ?: config('services.wag.ar_phone', '081224290502');
 

@@ -1,6 +1,6 @@
 <template>
   <div class="mx-auto w-full max-w-[1040px] space-y-5">
-    <div class="flex items-center gap-1.5 text-xs font-medium text-gray-500"><span>Master Data</span><ChevronRightIcon class="size-3.5" /><span class="text-gray-800">Role Permission</span></div>
+    <div class="flex items-center gap-1.5 text-xs font-medium text-gray-500"><span>Pengaturan</span><ChevronRightIcon class="size-3.5" /><span class="text-gray-800">Role Permission</span></div>
     <div><h1 class="text-xl font-semibold tracking-tight text-gray-950">Role Permission</h1><p class="mt-1 text-xs text-gray-500">Pilih role, lalu tentukan akses modulnya.</p></div>
     <div v-if="loadError" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{{ loadError }} <button type="button" class="ml-2 underline" @click="loadPermissions">Coba lagi</button></div>
     <div v-else-if="loading" class="rounded-xl border border-gray-200 bg-white p-10 text-center text-sm text-gray-500">Memuat hak akses...</div>

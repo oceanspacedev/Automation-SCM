@@ -217,4 +217,91 @@ class UserManagementTest extends TestCase
             ->assertJsonPath('contacts.0.name', 'Siti Telemarketing')
             ->assertJsonPath('contacts.0.whatsapp', '6281234567890');
     }
+
+    public function test_admin_can_assign_top_only_msi_only_or_both_companies_to_users(): void
+    {
+        $msiOnly = $this->postJson('/api/users', [
+            'name' => 'Staff MSI',
+            'email' => 'msi@scm.test',
+            'whatsapp' => '081200000011',
+            'role' => 'telemarketing',
+            'company_slugs' => ['msi'],
+            'password' => 'rahasia2026',
+            'is_active' => true,
+        ])->assertCreated();
+
+        $msiOnly->assertJsonPath('data.company_slugs', ['msi'])
+            ->assertJsonPath('data.accessible_companies', ['msi']);
+
+        $msiUser = User::where('email', 'msi@scm.test')->firstOrFail();
+        $this->assertFalse($msiUser->canAccessCompanySlug('top'));
+        $this->assertTrue($msiUser->canAccessCompanySlug('msi'));
+
+        // Telemarketing contacts are scoped to the active company
+        User::factory()->create([
+            'name' => 'Staff TOP',
+            'role' => 'telemarketing',
+            'whatsapp' => '628120000012',
+            'company_slugs' => ['top'],
+            'is_active' => true,
+        ]);
+
+        $this->getJson('/api/telemarketing-contacts', ['X-Company' => 'top'])
+            ->assertOk()
+            ->assertJsonCount(1, 'contacts')
+            ->assertJsonPath('contacts.0.name', 'Staff TOP');
+
+        $this->getJson('/api/telemarketing-contacts', ['X-Company' => 'msi'])
+            ->assertOk()
+            ->assertJsonCount(1, 'contacts')
+            ->assertJsonPath('contacts.0.name', 'Staff MSI');
+
+        // Updating to both companies grants access to both
+        $this->putJson("/api/users/{$msiUser->id}", [
+            'name' => 'Staff Dual',
+            'email' => 'msi@scm.test',
+            'role' => 'ar',
+            'company_slugs' => ['top', 'msi'],
+            'is_active' => true,
+        ])->assertOk()
+            ->assertJsonPath('data.company_slugs', ['top', 'msi'])
+            ->assertJsonPath('data.accessible_companies', ['top', 'msi']);
+
+        // Reject empty company list
+        $this->putJson("/api/users/{$msiUser->id}", [
+            'name' => 'Staff Dual',
+            'email' => 'msi@scm.test',
+            'role' => 'ar',
+            'company_slugs' => [],
+            'is_active' => true,
+        ])->assertStatus(422);
+    }
+
+    public function test_non_admin_user_manager_cannot_assign_or_touch_outside_companies(): void
+    {
+        $msiScm = User::factory()->create([
+            'role' => 'scm',
+            'company_slugs' => ['msi'],
+            'permissions' => User::getDefaultPermissionsForRole('scm'),
+            'is_active' => true,
+        ]);
+        $topUser = User::factory()->create(['role' => 'ar', 'company_slugs' => ['top']]);
+
+        $this->actingAs($msiScm)
+            ->postJson('/api/users', [
+                'name' => 'Cross Company',
+                'role' => 'ar',
+                'company_slugs' => ['top'],
+                'password' => 'rahasia2026',
+            ], ['X-Company' => 'msi'])
+            ->assertForbidden();
+
+        $this->actingAs($msiScm)
+            ->putJson("/api/users/{$topUser->id}", [
+                'name' => 'Hijack',
+                'role' => 'ar',
+                'company_slugs' => ['msi'],
+            ], ['X-Company' => 'msi'])
+            ->assertForbidden();
+    }
 }

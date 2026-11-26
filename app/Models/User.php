@@ -13,9 +13,9 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['name', 'email', 'whatsapp', 'avatar_path', 'role', 'permissions', 'is_active', 'password'])]
+#[Fillable(['name', 'email', 'whatsapp', 'avatar_path', 'role', 'permissions', 'company_slugs', 'is_active', 'password'])]
 #[Hidden(['password', 'remember_token', 'avatar_path'])]
-#[Appends(['avatar_url', 'effective_permissions'])]
+#[Appends(['avatar_url', 'effective_permissions', 'accessible_companies'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -96,6 +96,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'permissions' => 'array',
+            'company_slugs' => 'array',
             'is_active' => 'boolean',
         ];
     }
@@ -247,6 +248,41 @@ class User extends Authenticatable
             }
 
             return $this->permissions ?? self::getDefaultPermissionsForRole($role);
+        });
+    }
+
+    /**
+     * Slugs of companies configured for this user (Admin defaults to both companies, others to CV TOP SELULAR).
+     *
+     * @return list<string>
+     */
+    public function companyAccessSlugs(): array
+    {
+        if (is_array($this->company_slugs) && $this->company_slugs !== []) {
+            return array_values(array_unique(array_filter(array_map('strval', $this->company_slugs))));
+        }
+
+        return $this->role === 'admin' ? ['top', 'msi'] : ['top'];
+    }
+
+    public function canAccessCompanySlug(string $slug): bool
+    {
+        if ($this->is_active === false) {
+            return false;
+        }
+
+        return in_array($slug, $this->companyAccessSlugs(), true);
+    }
+
+    /** @return Attribute<list<string>, never> */
+    protected function accessibleCompanies(): Attribute
+    {
+        return Attribute::get(function (): array {
+            if ($this->is_active === false) {
+                return [];
+            }
+
+            return $this->companyAccessSlugs();
         });
     }
 

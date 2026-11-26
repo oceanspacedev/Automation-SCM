@@ -206,11 +206,6 @@
           </form>
         </div>
       </div>
-
-      <p class="text-center text-sm text-gray-500 dark:text-slate-400">
-        Belum punya akun?
-        <router-link to="/register" class="font-medium text-[#1769e0] dark:text-[#4a8df0] hover:underline">Daftar</router-link>
-      </p>
     </div>
   </div>
 </template>
@@ -219,6 +214,7 @@
 import { ref, reactive, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuth } from '@/composables/useAuth';
+import { companySlug } from '@/composables/useCompany';
 import { HOME_PATH } from '@/lib/access';
 import { useTheme } from '@/composables/useTheme';
 import WhatsAppIcon from '@/components/WhatsAppIcon.vue';
@@ -291,15 +287,31 @@ async function triggerSuccessRedirect() {
   errorMessage.value = '';
   successMessage.value = '';
 
+  let loggedUser = null;
   try {
-    await checkAuth();
+    loggedUser = await checkAuth();
   } catch (e) {
     // proceed anyway
   }
 
   isLoginSuccess.value = true;
+  const allowedCompanies = Array.isArray(loggedUser?.accessible_companies) && loggedUser.accessible_companies.length
+    ? loggedUser.accessible_companies
+    : ['top'];
+
   const redirect = route.query.redirect;
   const target = typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : HOME_PATH;
+
+  if (!allowedCompanies.includes(companySlug)) {
+    const nextCompany = allowedCompanies[0];
+    sessionStorage.setItem('scm-company', nextCompany);
+    const nextUrl = new URL(target, window.location.origin);
+    nextUrl.searchParams.set('company', nextCompany);
+    setTimeout(() => {
+      window.location.replace(nextUrl.pathname + nextUrl.search + nextUrl.hash);
+    }, 200);
+    return;
+  }
 
   setTimeout(() => {
     router.replace(target);

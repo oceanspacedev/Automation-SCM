@@ -11,69 +11,22 @@ class UserRegistrationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_user_can_register_and_defaults_to_inactive_pending_acc(): void
+    public function test_self_registration_endpoint_is_disabled(): void
     {
-        $payload = [
+        $response = $this->postJson('/api/register', [
             'name' => 'Calon User',
             'email' => 'calon@scm.test',
             'whatsapp' => '08123456789',
             'role' => 'ar',
             'password' => 'secret123',
             'password_confirmation' => 'secret123',
-        ];
-
-        $response = $this->postJson('/api/register', $payload);
-
-        $response->assertCreated()
-            ->assertJsonPath('success', true)
-            ->assertJsonPath('data.name', 'Calon User')
-            ->assertJsonPath('data.email', 'calon@scm.test')
-            ->assertJsonPath('data.role', 'ar')
-            ->assertJsonPath('data.is_active', false);
-
-        $this->assertDatabaseHas('users', [
-            'email' => 'calon@scm.test',
-            'role' => 'ar',
-            'is_active' => false,
         ]);
 
-        $user = User::where('email', 'calon@scm.test')->first();
-        $this->assertFalse($user->is_active);
-        // Default permissions for AR are assigned
-        $this->assertTrue($user->hasPermission('invoices') || in_array('invoices', $user->permissions));
+        $this->assertTrue(in_array($response->status(), [404, 405], true));
+        $this->assertDatabaseMissing('users', ['email' => 'calon@scm.test']);
     }
 
-    public function test_user_can_register_with_role_pajak(): void
-    {
-        $payload = [
-            'name' => 'Tim Pajak',
-            'email' => 'pajak@scm.test',
-            'whatsapp' => '08123456780',
-            'role' => 'pajak',
-            'password' => 'secret123',
-            'password_confirmation' => 'secret123',
-        ];
-
-        $response = $this->postJson('/api/register', $payload);
-
-        $response->assertCreated()
-            ->assertJsonPath('success', true)
-            ->assertJsonPath('data.role', 'pajak')
-            ->assertJsonPath('data.is_active', false);
-
-        $this->assertDatabaseHas('users', [
-            'email' => 'pajak@scm.test',
-            'role' => 'pajak',
-            'is_active' => false,
-        ]);
-
-        $user = User::where('email', 'pajak@scm.test')->first();
-        $this->assertTrue($user->isPajak());
-        $this->assertTrue(in_array('data_program', $user->permissions, true));
-        $this->assertTrue(in_array('data_program_edit', $user->permissions, true));
-    }
-
-    public function test_inactive_user_cannot_login_until_approved(): void
+    public function test_inactive_user_cannot_login(): void
     {
         User::factory()->create([
             'email' => 'pending@scm.test',
@@ -96,7 +49,7 @@ class UserRegistrationTest extends TestCase
         $this->assertGuest();
     }
 
-    public function test_admin_can_approve_pending_user_and_then_user_can_login(): void
+    public function test_admin_can_activate_inactive_user_and_user_can_login(): void
     {
         $user = User::factory()->create([
             'email' => 'waiting@scm.test',
@@ -105,7 +58,6 @@ class UserRegistrationTest extends TestCase
             'role' => 'scm',
         ]);
 
-        // Admin ACCs the user
         $approveResponse = $this->actingAs(User::factory()->create(['role' => 'admin']))
             ->patchJson("/api/users/{$user->id}/approve");
 
@@ -118,7 +70,6 @@ class UserRegistrationTest extends TestCase
             'is_active' => true,
         ]);
 
-        // Now user can log in
         $loginResponse = $this->postJson('/api/login', [
             'email' => 'waiting@scm.test',
             'password' => 'password123',
@@ -130,55 +81,20 @@ class UserRegistrationTest extends TestCase
         $this->assertAuthenticatedAs($user);
     }
 
-    public function test_registration_validation_fails_on_duplicate_email_or_password_mismatch(): void
-    {
-        User::factory()->create(['email' => 'existing@scm.test']);
-
-        // Duplicate email
-        $res1 = $this->postJson('/api/register', [
-            'name' => 'Duplikat',
-            'email' => 'existing@scm.test',
-            'role' => 'scm',
-            'password' => 'secret123',
-            'password_confirmation' => 'secret123',
-        ]);
-
-        $res1->assertStatus(422)
-            ->assertJsonValidationErrors(['email']);
-
-        // Mismatched confirmation
-        $res2 = $this->postJson('/api/register', [
-            'name' => 'Salah Pass',
-            'email' => 'salah@scm.test',
-            'role' => 'scm',
-            'password' => 'secret123',
-            'password_confirmation' => 'berbeda456',
-        ]);
-
-        $res2->assertStatus(422)
-            ->assertJsonValidationErrors(['password']);
-    }
-
     public function test_a_new_password_needs_8_characters_with_letters_and_numbers(): void
     {
-        $register = fn (string $password) => $this->postJson('/api/register', [
-            'name' => 'Toko Baru',
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $create = fn (string $password) => $this->actingAs($admin)->postJson('/api/users', [
+            'name' => 'Akun Baru',
             'email' => 'baru@scm.test',
             'role' => 'scm',
             'password' => $password,
-            'password_confirmation' => $password,
         ]);
 
-        $register('abc123')->assertStatus(422)->assertJsonPath('errors.password.0', 'Password minimal 8 karakter.');
-        $register('hanyahuruf')->assertStatus(422)->assertJsonPath('errors.password.0', 'Password harus berisi huruf dan angka.');
-        $register('12345678')->assertStatus(422)->assertJsonPath('errors.password.0', 'Password harus berisi huruf dan angka.');
-        $register('rahasia2026')->assertCreated();
-
-        // Master User memakai aturan yang sama
-        $this->actingAs(User::factory()->create(['role' => 'admin', 'is_active' => true]))
-            ->postJson('/api/users', ['name' => 'User Lemah', 'role' => 'scm', 'password' => 'password'])
-            ->assertStatus(422)
-            ->assertJsonPath('errors.password.0', 'Password harus berisi huruf dan angka.');
+        $create('abc123')->assertStatus(422)->assertJsonPath('errors.password.0', 'Password minimal 8 karakter.');
+        $create('hanyahuruf')->assertStatus(422)->assertJsonPath('errors.password.0', 'Password harus berisi huruf dan angka.');
+        $create('12345678')->assertStatus(422)->assertJsonPath('errors.password.0', 'Password harus berisi huruf dan angka.');
+        $create('rahasia2026')->assertCreated();
     }
 
     public function test_user_can_verify_wa_otp(): void
@@ -194,7 +110,6 @@ class UserRegistrationTest extends TestCase
             'attempts' => 0,
         ], now()->addMinutes(15));
 
-        // Test with 08xxx input
         $res = $this->postJson('/api/auth/wa-otp/verify', [
             'whatsapp' => '081224290502',
             'otp' => '123456',

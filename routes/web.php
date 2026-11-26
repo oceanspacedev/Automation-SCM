@@ -47,8 +47,7 @@ Route::match(['get', 'post'], '/dp/confirm/{id}', [ProgramClaimConfirmationContr
 Route::prefix('api')->middleware([SetCompanyContext::class, SetAreaContext::class, SetBrandContext::class])->group(function () {
     // ===================== PUBLIK (tanpa login) =====================
 
-    // Masuk, daftar & cek sesi
-    Route::post('/register', [AuthController::class, 'register']);
+    // Masuk & cek sesi (pendaftaran akun baru hanya lewat Master User oleh Admin)
     Route::post('/login', [AuthController::class, 'login']);
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);

@@ -2,7 +2,7 @@
   <div class="space-y-4">
     <!-- Breadcrumbs -->
     <div class="flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-      <span>Master Data</span>
+      <span>Pengaturan</span>
       <ChevronRightIcon class="w-3.5 h-3.5 text-gray-400" />
       <span class="text-gray-800">Master User</span>
     </div>
@@ -35,24 +35,6 @@
       </div>
     </div>
 
-    <!-- Pending Approval Banner (Clean & Subtle); di layar kecil tombol filter turun ke baris kedua -->
-    <div
-      v-if="pendingCount > 0"
-      class="rounded-lg border border-amber-200 bg-amber-50/70 p-2.5 px-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 sm:gap-0 text-xs text-amber-900"
-    >
-      <div class="flex items-center gap-2">
-        <span class="inline-block w-2 h-2 shrink-0 rounded-full bg-amber-500 animate-pulse"></span>
-        <span>Terdapat <strong>{{ pendingCount }}</strong> akun pendaftar baru menunggu persetujuan (ACC).</span>
-      </div>
-      <button
-        type="button"
-        @click="filterStatus = filterStatus === 'inactive' ? 'all' : 'inactive'"
-        class="text-xs font-semibold text-amber-900 underline hover:text-black cursor-pointer"
-      >
-        {{ filterStatus === 'inactive' ? 'Tampilkan Semua' : 'Filter Menunggu ACC' }}
-      </button>
-    </div>
-
     <!-- Table Card (Clean spreadsheet aesthetic) -->
     <div class="rounded-xl border border-gray-200 bg-white shadow-xs overflow-hidden">
       <!-- Toolbar -->
@@ -61,8 +43,22 @@
           <span>Total: {{ filteredUsers.length }} data</span>
         </div>
 
-        <!-- Filter & Cari; di layar kecil cari di atas, peran & status berdampingan -->
+        <!-- Filter & Cari; di layar kecil cari di atas, filter berdampingan -->
         <div class="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:flex-nowrap">
+          <!-- Company Filter -->
+          <div class="relative sm:min-w-[175px]">
+            <select
+              v-model="filterCompany"
+              class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 pr-8 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-900 cursor-pointer appearance-none shadow-2xs"
+            >
+              <option value="all">Semua Perusahaan</option>
+              <option value="top">CV TOP SELULAR</option>
+              <option value="msi">PT MEDIA SELULAR INDONESIA</option>
+              <option value="both">Keduanya</option>
+            </select>
+            <ChevronDownIcon class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+          </div>
+
           <!-- Role Filter -->
           <div class="relative sm:min-w-[130px]">
             <select
@@ -87,7 +83,7 @@
             >
               <option value="all">Semua Status</option>
               <option value="active">Aktif</option>
-              <option value="inactive">Menunggu ACC / Nonaktif</option>
+              <option value="inactive">Nonaktif</option>
             </select>
             <ChevronDownIcon class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
           </div>
@@ -133,24 +129,24 @@
                 :disabled="currentUser?.id === user.id && user.is_active"
                 class="inline-flex items-center gap-1.5 shrink-0 font-medium cursor-pointer disabled:cursor-not-allowed"
                 :class="user.is_active ? 'text-gray-900' : 'text-amber-700'"
-                :title="user.is_active ? 'Klik untuk nonaktifkan' : 'Klik untuk aktifkan / ACC'"
+                :title="user.is_active ? 'Klik untuk nonaktifkan' : 'Klik untuk aktifkan'"
               >
-                <span class="w-1.5 h-1.5 rounded-full" :class="user.is_active ? 'bg-emerald-500' : 'bg-amber-500'"></span>
-                {{ user.is_active ? 'Aktif' : 'Menunggu ACC' }}
+                <span class="w-1.5 h-1.5 rounded-full" :class="user.is_active ? 'bg-emerald-500' : 'bg-gray-400'"></span>
+                {{ user.is_active ? 'Aktif' : 'Nonaktif' }}
               </button>
               <span
                 v-else
                 class="inline-flex items-center gap-1.5 shrink-0 font-medium"
-                :class="user.is_active ? 'text-gray-900' : 'text-amber-700'"
+                :class="user.is_active ? 'text-gray-900' : 'text-gray-500'"
               >
-                <span class="w-1.5 h-1.5 rounded-full" :class="user.is_active ? 'bg-emerald-500' : 'bg-amber-500'"></span>
-                {{ user.is_active ? 'Aktif' : 'Menunggu ACC' }}
+                <span class="w-1.5 h-1.5 rounded-full" :class="user.is_active ? 'bg-emerald-500' : 'bg-gray-400'"></span>
+                {{ user.is_active ? 'Aktif' : 'Nonaktif' }}
               </span>
             </div>
 
             <div class="flex items-end justify-between gap-3">
               <p class="min-w-0 text-gray-500 break-words">
-                {{ formatRole(user.role) }} · {{ user.whatsapp ? `+${user.whatsapp}` : '-' }}
+                {{ formatRole(user.role) }} · {{ formatCompanies(user) }} · {{ user.whatsapp ? `+${user.whatsapp}` : '-' }}
               </p>
               <div v-if="canEdit || canDelete" class="flex items-center gap-1.5 shrink-0">
                 <button
@@ -191,6 +187,7 @@
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Nama</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Email</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Peran</th>
+              <th scope="col" class="py-2.5 px-3 border-r border-gray-200">Perusahaan</th>
               <th scope="col" class="py-2.5 px-3 border-r border-gray-200">No. WhatsApp</th>
               <th scope="col" class="py-2.5 px-3 text-center border-r border-gray-200">Status</th>
               <th v-if="canEdit || canDelete" scope="col" class="py-2.5 px-3 text-center w-28">Aksi</th>
@@ -198,14 +195,14 @@
           </thead>
           <tbody class="divide-y divide-gray-100">
             <tr v-if="isLoading" class="text-center">
-              <td :colspan="(canEdit || canDelete) ? 7 : 6" class="py-10 text-gray-500">
+              <td :colspan="(canEdit || canDelete) ? 8 : 7" class="py-10 text-gray-500">
                 <RefreshCwIcon class="w-4 h-4 animate-spin mx-auto mb-1 text-gray-400" />
                 <span>Memuat data...</span>
               </td>
             </tr>
 
             <tr v-else-if="filteredUsers.length === 0" class="text-center">
-              <td :colspan="(canEdit || canDelete) ? 7 : 6" class="py-10 text-gray-500">
+              <td :colspan="(canEdit || canDelete) ? 8 : 7" class="py-10 text-gray-500">
                 <span>Tidak ada data pengguna.</span>
               </td>
             </tr>
@@ -237,7 +234,12 @@
                 {{ formatRole(user.role) }}
               </td>
 
-              <!-- 5. No. WhatsApp -->
+              <!-- 5. Akses Perusahaan -->
+              <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
+                {{ formatCompanies(user) }}
+              </td>
+
+              <!-- 6. No. WhatsApp -->
               <td class="py-2.5 px-3 border-r border-gray-100 whitespace-nowrap text-gray-700">
                 <span v-if="user.whatsapp">+{{ user.whatsapp }}</span>
                 <span v-else class="text-gray-400">-</span>
@@ -251,13 +253,13 @@
                   @click="handleToggleStatus(user)"
                   :disabled="currentUser?.id === user.id && user.is_active"
                   class="cursor-pointer text-xs transition disabled:cursor-not-allowed hover:underline"
-                  :class="user.is_active ? 'text-gray-900 font-medium' : 'text-amber-700 font-medium'"
-                  :title="user.is_active ? 'Klik untuk nonaktifkan' : 'Klik untuk aktifkan / ACC'"
+                  :class="user.is_active ? 'text-gray-900 font-medium' : 'text-gray-500 font-medium'"
+                  :title="user.is_active ? 'Klik untuk nonaktifkan' : 'Klik untuk aktifkan'"
                 >
-                  {{ user.is_active ? 'Aktif' : 'Menunggu ACC' }}
+                  {{ user.is_active ? 'Aktif' : 'Nonaktif' }}
                 </button>
-                <span v-else class="text-xs font-medium" :class="user.is_active ? 'text-gray-900' : 'text-amber-700'">
-                  {{ user.is_active ? 'Aktif' : 'Menunggu ACC' }}
+                <span v-else class="text-xs font-medium" :class="user.is_active ? 'text-gray-900' : 'text-gray-500'">
+                  {{ user.is_active ? 'Aktif' : 'Nonaktif' }}
                 </span>
               </td>
 
@@ -387,9 +389,25 @@
             </div>
           </div>
 
-          <p class="text-xs text-gray-500">Hak akses mengikuti role. Pengaturannya tersedia di menu Role Permission.</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <!-- Akses Perusahaan -->
+            <div>
+              <label class="block font-medium text-gray-700 mb-1">Akses Perusahaan</label>
+              <div class="relative">
+                <select
+                  v-model="selectedCompanyMode"
+                  :disabled="companyModeOptions.length <= 1"
+                  required
+                  class="w-full h-8 px-2.5 pr-7 rounded-lg border border-gray-300 bg-white text-xs text-gray-800 focus:outline-none focus:ring-1 focus:ring-gray-900 appearance-none cursor-pointer disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
+                >
+                  <option v-for="opt in companyModeOptions" :key="opt.key" :value="opt.key">
+                    {{ opt.label }}
+                  </option>
+                </select>
+                <ChevronDownIcon class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+              </div>
+            </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
             <!-- Password -->
             <div>
               <label class="block font-medium text-gray-700 mb-1">
@@ -403,19 +421,19 @@
                 class="w-full h-8 px-2.5 rounded-lg border border-gray-300 bg-white text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
               />
             </div>
+          </div>
 
-            <!-- Status Aktif / Nonaktif -->
-            <div class="pt-5 flex items-center gap-2">
-              <input
-                id="isActiveCheck"
-                type="checkbox"
-                v-model="userForm.is_active"
-                class="rounded border-gray-300 text-gray-900 focus:ring-gray-900 cursor-pointer"
-              />
-              <label for="isActiveCheck" class="text-xs text-gray-700 font-medium cursor-pointer select-none">
-                {{ userForm.is_active ? 'Status: Aktif (ACC Disetujui)' : 'Status: Menunggu Persetujuan (ACC)' }}
-              </label>
-            </div>
+          <!-- Status Aktif / Nonaktif -->
+          <div class="pt-0.5 flex items-center gap-2">
+            <input
+              id="isActiveCheck"
+              type="checkbox"
+              v-model="userForm.is_active"
+              class="rounded border-gray-300 text-gray-900 focus:ring-gray-900 cursor-pointer"
+            />
+            <label for="isActiveCheck" class="text-xs text-gray-700 font-medium cursor-pointer select-none">
+              {{ userForm.is_active ? 'Status: Aktif' : 'Status: Nonaktif' }}
+            </label>
           </div>
 
           <!-- Actions Button -->
@@ -472,6 +490,7 @@
     <UserImportModal
       :is-open="showUserImport"
       :can-create-admin="currentUser?.role === 'admin'"
+      :available-companies="availableCompanies"
       @close="showUserImport = false"
       @imported="fetchUsers({ silent: true })"
     />
@@ -483,6 +502,7 @@ import { ref, computed, onMounted } from 'vue';
 import axios from 'axios';
 import { notify } from '@/composables/useNotify';
 import { useAuth } from '@/composables/useAuth';
+import { companySlug } from '@/composables/useCompany';
 import { useAutoRefresh } from '@/composables/useAutoRefresh';
 import UserImportModal from '@/components/UserImportModal.vue';
 import {
@@ -522,9 +542,20 @@ const roleDefaults = ref({
 });
 
 // State
+const DEFAULT_COMPANIES = [
+  { slug: 'top', name: 'CV TOP SELULAR' },
+  { slug: 'msi', name: 'PT MEDIA SELULAR INDONESIA' },
+];
+const COMPANY_NAMES = {
+  top: 'CV TOP SELULAR',
+  msi: 'PT MEDIA SELULAR INDONESIA',
+};
+
 const users = ref([]);
+const availableCompanies = ref([...DEFAULT_COMPANIES]);
 const isLoading = ref(false);
 const searchQuery = ref('');
+const filterCompany = ref('all');
 const filterRole = ref('all');
 const filterStatus = ref('all');
 
@@ -540,6 +571,7 @@ const userForm = ref({
   whatsapp: '',
   role: 'scm',
   permissions: [],
+  company_slugs: [companySlug],
   password: '',
   is_active: true,
 });
@@ -548,9 +580,60 @@ const userForm = ref({
 const userToDelete = ref(null);
 const isDeleting = ref(false);
 
+const companyModeOptions = computed(() => {
+  const list = availableCompanies.value.length ? availableCompanies.value : DEFAULT_COMPANIES;
+  if (list.length <= 1) {
+    return list.map((c) => ({ key: c.slug, label: c.name, slugs: [c.slug] }));
+  }
+  return [
+    ...list.map((c) => ({ key: c.slug, label: c.name, slugs: [c.slug] })),
+    { key: 'both', label: 'Keduanya', slugs: list.map((c) => c.slug) },
+  ];
+});
+
+const selectedCompanyMode = computed({
+  get() {
+    const current = userForm.value.company_slugs || [];
+    const matched = companyModeOptions.value.find(
+      (opt) => opt.slugs.length === current.length && opt.slugs.every((s) => current.includes(s))
+    );
+    return matched ? matched.key : (companyModeOptions.value[0]?.key || 'top');
+  },
+  set(modeKey) {
+    const matched = companyModeOptions.value.find((opt) => opt.key === modeKey);
+    if (matched) {
+      userForm.value.company_slugs = [...matched.slugs];
+    }
+  },
+});
+
+const userCompanySlugs = (user) => {
+  if (Array.isArray(user.company_slugs) && user.company_slugs.length) {
+    return user.company_slugs;
+  }
+  if (Array.isArray(user.accessible_companies) && user.accessible_companies.length) {
+    return user.accessible_companies;
+  }
+  return user.role === 'admin' ? ['top', 'msi'] : ['top'];
+};
+
+const formatCompanies = (user) => {
+  const slugs = userCompanySlugs(user);
+  if (slugs.length > 1) return 'Keduanya';
+  return COMPANY_NAMES[slugs[0]] || slugs[0] || '-';
+};
+
 // Filtered Users Computed
 const filteredUsers = computed(() => {
   return users.value.filter((u) => {
+    if (filterCompany.value !== 'all') {
+      const slugs = userCompanySlugs(u);
+      if (filterCompany.value === 'both') {
+        if (slugs.length < 2) return false;
+      } else if (!(slugs.length === 1 && slugs[0] === filterCompany.value)) {
+        return false;
+      }
+    }
     if (filterRole.value !== 'all' && u.role !== filterRole.value) {
       return false;
     }
@@ -571,10 +654,6 @@ const filteredUsers = computed(() => {
   });
 });
 
-const pendingCount = computed(() => {
-  return users.value.filter((u) => !u.is_active).length;
-});
-
 const areAllPermissionsChecked = computed(() => {
   const allKeys = Object.keys(permissionList.value);
   return allKeys.every((k) => userForm.value.permissions.includes(k));
@@ -593,6 +672,12 @@ const handleRoleChange = () => {
   if (defaults) {
     userForm.value.permissions = [...defaults];
   }
+  if (!isEditMode.value && userForm.value.role === 'admin') {
+    const allSlugs = (availableCompanies.value || []).map((c) => c.slug);
+    if (allSlugs.length) {
+      userForm.value.company_slugs = allSlugs;
+    }
+  }
 };
 
 // Fetch Data
@@ -602,6 +687,9 @@ const fetchUsers = async ({ silent = false } = {}) => {
     const res = await axios.get('/api/users');
     if (res.data?.success) {
       users.value = res.data.data || [];
+      if (Array.isArray(res.data.companies) && res.data.companies.length) {
+        availableCompanies.value = res.data.companies;
+      }
       if (res.data.available_permissions) permissionList.value = res.data.available_permissions;
       if (res.data.default_permissions) roleDefaults.value = { ...roleDefaults.value, ...res.data.default_permissions };
     }
@@ -616,8 +704,7 @@ onMounted(() => {
   fetchUsers();
 });
 
-// Pendaftar baru (Menunggu ACC) muncul sendiri; berhenti selama form user terbuka
-// Import akun dari Excel (nama, No WA, email & peran; juga file CV TOP untuk telemarketing)
+// Import akun dari Excel (nama, No WA, email, peran & perusahaan)
 const showUserImport = ref(false);
 
 useAutoRefresh(() => fetchUsers({ silent: true }), {
@@ -630,6 +717,11 @@ const openCreateModal = () => {
   if (!canCreate.value) return;
   isEditMode.value = false;
   formError.value = '';
+  const allowedSlugs = availableCompanies.value.map((c) => c.slug);
+  const defaultSlugs = allowedSlugs.includes(companySlug)
+    ? [companySlug]
+    : [allowedSlugs[0] || 'top'];
+
   userForm.value = {
     id: null,
     name: '',
@@ -637,6 +729,7 @@ const openCreateModal = () => {
     whatsapp: '',
     role: 'scm',
     permissions: [...roleDefaults.value.scm],
+    company_slugs: defaultSlugs,
     password: '',
     is_active: true,
   };
@@ -663,6 +756,7 @@ const openEditModal = (user) => {
     whatsapp: user.whatsapp || '',
     role: user.role || 'scm',
     permissions: perms,
+    company_slugs: [...userCompanySlugs(user)],
     password: '',
     is_active: Boolean(user.is_active),
   };

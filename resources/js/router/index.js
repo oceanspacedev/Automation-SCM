@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { companySlug } from '../composables/useCompany';
 import Login from '../Pages/Auth/Login.vue';
-import Register from '../Pages/Auth/Register.vue';
 import Dashboard from '../Pages/Dashboard/Index.vue';
 import CompaniesIndex from '../Pages/Companies/Index.vue';
 import DraftsIndex from '../Pages/Drafts/Index.vue';
@@ -58,7 +57,7 @@ function brandAreaRoutes(path, name, component, permission) {
 
 const routes = [
   { path: '/login', name: 'login', component: Login, meta: { guestOnly: true } },
-  { path: '/register', name: 'register', component: Register, meta: { guestOnly: true } },
+  { path: '/register', redirect: '/login' },
   { path: '/', redirect: '/dashboard' },
   { path: '/company-preview', redirect: '/companies' },
   { path: '/companies', name: 'companies.index', component: CompaniesIndex, meta: { requiresAuth: true, companySelection: true } },
@@ -133,13 +132,19 @@ router.beforeEach(async (to, from, next) => {
     return next(HOME_PATH);
   }
 
-  if (companySlug === 'msi' && to.meta.requiresAuth && !['admin', 'scm'].includes(user.value?.role)) {
-    sessionStorage.setItem('scm-company', 'top');
-    window.location.replace('/dashboard?company=top');
-    return;
+  if (to.meta.requiresAuth) {
+    const allowedCompanies = Array.isArray(user.value?.accessible_companies) && user.value.accessible_companies.length
+      ? user.value.accessible_companies
+      : ['top'];
+    if (!allowedCompanies.includes(companySlug)) {
+      const nextCompany = allowedCompanies[0];
+      sessionStorage.setItem('scm-company', nextCompany);
+      window.location.replace('/dashboard?company=' + encodeURIComponent(nextCompany));
+      return;
+    }
   }
 
-  if (to.meta.companySelection && !['admin', 'scm'].includes(user.value?.role)) {
+  if (to.meta.companySelection && (user.value?.accessible_companies?.length ?? 0) <= 1) {
     return next(HOME_PATH);
   }
 
