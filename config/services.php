@@ -67,6 +67,11 @@ return [
         'send_whatsapp' => env('AUTO_MATCH_SEND_WA', true),
     ],
 
+    // Batas proses paralel pemeriksaan AI saat import file agreement di Master Dealer (rendah agar aman di VPS RAM terbatas)
+    'dealer_import' => [
+        'agreement_parallel' => max(1, (int) env('DEALER_AGREEMENT_PARALLEL', 2)),
+    ],
+
     'waghub' => [
         'url' => env('WAG_URL', 'https://waghub.mekayastudio.com'),
         'token' => env('WAG_TOKEN'),

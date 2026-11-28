@@ -39,10 +39,16 @@ class DealerAgreementImportService
         $reader->setReadDataOnly(true);
         $reader->setReadFilter($this->readFilter(fn (string $column, int $row) => $row <= self::HEADER_SEARCH_ROWS));
 
-        foreach ($reader->load($path)->getAllSheets() as $worksheet) {
-            if ($this->header($worksheet->toArray(null, false, false, true)) !== null) {
-                return $worksheet->getTitle();
+        $spreadsheet = $reader->load($path);
+        try {
+            foreach ($spreadsheet->getAllSheets() as $worksheet) {
+                if ($this->header($worksheet->toArray(null, false, false, true)) !== null) {
+                    return $worksheet->getTitle();
+                }
             }
+        } finally {
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet, $reader);
         }
 
         return null;
@@ -54,7 +60,7 @@ class DealerAgreementImportService
      *
      * @throws Exception when the sheet or its Kode BT & AGREMENT columns are missing
      */
-    public function import(string $path, string $sheet, int $parallel = 8, ?Closure $onProgress = null): array
+    public function import(string $path, string $sheet, ?int $parallel = null, ?Closure $onProgress = null): array
     {
         return $this->importLinks($this->readLinks($path, $sheet), $parallel, $onProgress);
     }
@@ -76,7 +82,10 @@ class DealerAgreementImportService
         $reader->setLoadSheetsOnly([$sheet]);
 
         $reader->setReadFilter($this->readFilter(fn (string $column, int $row) => $row <= self::HEADER_SEARCH_ROWS));
-        $header = $this->header($reader->load($path)->getSheetByName($sheet)->toArray(null, false, false, true));
+        $headerSpreadsheet = $reader->load($path);
+        $header = $this->header($headerSpreadsheet->getSheetByName($sheet)->toArray(null, false, false, true));
+        $headerSpreadsheet->disconnectWorksheets();
+        unset($headerSpreadsheet);
         if ($header === null) {
             throw new Exception('Kolom "Kode BT" dan "AGREMENT" tidak ditemukan di '.self::HEADER_SEARCH_ROWS." baris teratas sheet \"{$sheet}\".");
         }
@@ -84,10 +93,14 @@ class DealerAgreementImportService
         $firstRow = $headerRow + 1;
 
         $reader->setReadFilter($this->readFilter(fn (string $column) => $column === $kodeBtColumn || $column === $agreementColumn));
-        $worksheet = $reader->load($path)->getSheetByName($sheet);
+        $spreadsheet = $reader->load($path);
+        $worksheet = $spreadsheet->getSheetByName($sheet);
         $lastRow = $worksheet->getHighestDataRow();
         $kodeBts = $worksheet->rangeToArray("{$kodeBtColumn}{$firstRow}:{$kodeBtColumn}{$lastRow}", null, false, false);
         $agreements = $worksheet->rangeToArray("{$agreementColumn}{$firstRow}:{$agreementColumn}{$lastRow}", null, false, false);
+        $spreadsheet->disconnectWorksheets();
+        unset($spreadsheet, $worksheet, $reader);
+        gc_collect_cycles();
 
         // Link agreement tiap kode BT, urut dari yang lama ke yang terbaru
         $links = [];
@@ -110,8 +123,9 @@ class DealerAgreementImportService
      * @param  (Closure(int $done, int $total, int $checked): void)|null  $onProgress  called as documents are checked: stores decided, stores in total, documents checked
      * @return array{filled: int, replaced: int, same: int, removed: int, none: int, kept: int, unchecked: int, not_found: int}
      */
-    public function importLinks(array $links, int $parallel = 8, ?Closure $onProgress = null): array
+    public function importLinks(array $links, ?int $parallel = null, ?Closure $onProgress = null): array
     {
+        $parallel = max(1, $parallel ?? (int) config('services.dealer_import.agreement_parallel', 2));
         $counts = self::NO_COUNTS;
         $dealers = [];
         $candidates = [];
@@ -244,6 +258,9 @@ class DealerAgreementImportService
                 if ($onProgress) {
                     $onProgress(count($accepted), $total, $checked);
                 }
+
+                unset($tasks, $results, $inspections);
+                gc_collect_cycles();
             }
         }
 

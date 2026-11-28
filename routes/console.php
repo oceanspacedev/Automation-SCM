@@ -4,6 +4,7 @@ use App\Models\AutomationSchedule;
 use App\Models\ProgramSubmission;
 use App\Services\DataProgramSyncService;
 use App\Services\ProgramReconciliationService;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -15,13 +16,18 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // Auto-sync Data Program dari Google Spreadsheet setiap 1 menit (jika scheduler aktif)
-Artisan::command('data-program:sync {--limit=0}', function (DataProgramSyncService $syncService) {
+Artisan::command('data-program:sync {--limit=0}', function (DataProgramSyncService $syncService): int {
     $this->info('Memulai sinkronisasi Data Program dari Google Spreadsheet...');
     try {
         $result = $syncService->sync(null, (int) $this->option('limit'));
         $this->info($result['message']);
+
+        return 0;
     } catch (Throwable $e) {
         $this->error('Gagal sinkronisasi: '.$e->getMessage());
+        report($e);
+
+        return 1;
     }
 })->purpose('Sinkronisasi data master Data Program (56 kolom) dari Google Spreadsheet');
 
@@ -45,9 +51,9 @@ if (config('services.data_program.auto_sync') && DataProgramSyncService::isGoogl
 
 // Nonaktifkan auto-analyze AI terjadwal di lingkungan local agar tidak otomatis berjalan.
 // Hanya spawn proses child jika memang ada submission 2026 yang belum dianalisis agar RAM/CPU tidak melonjak tiap menit.
-// Batch dibatasi 5 per putaran supaya penggunaan RAM untuk PDF/gambar tetap rendah dan tidak memicu OOM di VPS.
+// Batch dibatasi 5 data & maksimal 240 detik per putaran supaya penggunaan RAM tetap aman dan tidak menumpuk overlap lock.
 if (! app()->environment('local') || env('ENABLE_AUTO_AI_SCHEDULE', false)) {
-    Schedule::command('program:auto-analyze-ai --year=2026 --limit=5 --sleep=0.3')
+    Schedule::command('program:auto-analyze-ai --year=2026 --limit=5 --sleep=0.3 --max-seconds=240')
         ->everyMinute()
         ->when(static function (): bool {
             try {
@@ -66,7 +72,7 @@ if (! app()->environment('local') || env('ENABLE_AUTO_AI_SCHEDULE', false)) {
                 return false;
             }
         })
-        ->withoutOverlapping(15)
+        ->withoutOverlapping(30)
         ->runInBackground()
         ->onFailure(static function (): void {
             Log::warning('Scheduled command program:auto-analyze-ai gagal dijalankan.');
@@ -83,11 +89,16 @@ Schedule::command('program:auto-match')
     });
 
 // Jalankan antrean (mis. import Master Dealer dari web) di server yang hanya memasang cron scheduler, tanpa queue worker sendiri.
+// Stop mengambil job baru setelah 60 detik; job aktif (timeout 3600 detik) tetap diselesaikan sebelum lock 65 menit habis.
 // Hanya spawn proses queue:work ketika ada job siap dijalankan agar tidak membuka proses PHP sia-sia tiap menit.
-Schedule::command('queue:work --stop-when-empty --tries=1 --timeout=3600 --memory=256')
+Schedule::command('queue:work --stop-when-empty --max-time=60 --tries=1 --timeout=3600 --memory=256')
     ->everyMinute()
     ->when(static function (): bool {
         try {
+            if (! config('queue.scheduler_worker_enabled', true)) {
+                return false;
+            }
+
             $connection = (string) config('queue.default', 'database');
             $driver = config("queue.connections.{$connection}.driver");
 
@@ -101,10 +112,18 @@ Schedule::command('queue:work --stop-when-empty --tries=1 --timeout=3600 --memor
 
             $dbConnection = config("queue.connections.{$connection}.connection");
             $table = (string) config("queue.connections.{$connection}.table", 'jobs');
+            $queue = (string) config("queue.connections.{$connection}.queue", 'default');
+            $now = now()->timestamp;
+            $retryAfter = (int) config("queue.connections.{$connection}.retry_after", 3700);
 
             return DB::connection($dbConnection)
                 ->table($table)
-                ->where('available_at', '<=', now()->timestamp)
+                ->where('queue', $queue)
+                ->where(static function (Builder $query) use ($now, $retryAfter): void {
+                    $query->where(static function (Builder $available) use ($now): void {
+                        $available->whereNull('reserved_at')->where('available_at', '<=', $now);
+                    })->orWhere('reserved_at', '<=', $now - $retryAfter);
+                })
                 ->exists();
         } catch (Throwable $e) {
             Log::warning("Gagal cek antrean queue di scheduler: {$e->getMessage()}");

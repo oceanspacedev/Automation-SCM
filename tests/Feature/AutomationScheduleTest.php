@@ -9,12 +9,14 @@ use App\Models\Draft;
 use App\Models\Invoice;
 use App\Models\ProgramSubmission;
 use App\Models\User;
+use App\Services\DataProgramSyncService;
 use Carbon\Carbon;
 use Illuminate\Console\Scheduling\Event;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class AutomationScheduleTest extends TestCase
@@ -271,6 +273,71 @@ class AutomationScheduleTest extends TestCase
             'status_potong_purchase' => null,
         ]);
         $this->assertTrue($autoAi->filtersPass($this->app));
+    }
+
+    public function test_scheduler_only_starts_workers_for_jobs_the_default_queue_can_reserve(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-25 09:00:00'));
+        config(['queue.default' => 'database', 'queue.connections.database.queue' => 'default', 'queue.connections.database.retry_after' => 3700]);
+        $worker = collect(app(Schedule::class)->events())
+            ->first(fn (Event $event) => str_contains((string) $event->command, 'queue:work'));
+        $id = DB::table('jobs')->insertGetId([
+            'queue' => 'another-queue',
+            'payload' => '{}',
+            'attempts' => 0,
+            'reserved_at' => null,
+            'available_at' => now()->subSecond()->timestamp,
+            'created_at' => now()->timestamp,
+        ]);
+
+        $this->assertFalse($worker->filtersPass($this->app));
+        DB::table('jobs')->where('id', $id)->update(['queue' => 'default', 'reserved_at' => now()->timestamp]);
+        $this->assertFalse($worker->filtersPass($this->app));
+        DB::table('jobs')->where('id', $id)->update(['reserved_at' => now()->subSeconds(3700)->timestamp]);
+        $this->assertTrue($worker->filtersPass($this->app));
+        DB::table('jobs')->where('id', $id)->update(['reserved_at' => null, 'available_at' => now()->addMinute()->timestamp]);
+        $this->assertFalse($worker->filtersPass($this->app));
+        DB::table('jobs')->where('id', $id)->update(['available_at' => now()->timestamp]);
+        $this->assertTrue($worker->filtersPass($this->app));
+
+        config(['queue.scheduler_worker_enabled' => false]);
+        $this->assertFalse($worker->filtersPass($this->app));
+    }
+
+    public function test_fallback_worker_and_ai_batches_have_lifetimes_shorter_than_their_overlap_locks(): void
+    {
+        $events = collect(app(Schedule::class)->events());
+        $worker = $events->first(fn (Event $event) => str_contains((string) $event->command, 'queue:work'));
+        $autoAi = $events->first(fn (Event $event) => str_contains((string) $event->command, 'program:auto-analyze-ai'));
+        $cachePrune = $events->first(fn (Event $event) => $event->description === 'prune-expired-database-cache');
+
+        $this->assertStringContainsString('--max-time=60', (string) $worker->command);
+        $this->assertGreaterThan(3600 + 60, $worker->expiresAt * 60);
+
+        $this->assertStringContainsString('--limit=5', (string) $autoAi->command);
+        $this->assertStringContainsString('--max-seconds=240', (string) $autoAi->command);
+        $this->assertSame(30, $autoAi->expiresAt);
+
+        $this->assertNotNull($cachePrune);
+        $this->assertSame(2, config('services.dealer_import.agreement_parallel'));
+    }
+
+    public function test_data_program_sync_reports_command_failure_when_the_service_throws(): void
+    {
+        $this->mock(DataProgramSyncService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('sync')->once()->with(null, 0)->andThrow(new \RuntimeException('Sync unavailable'));
+        });
+
+        $this->artisan('data-program:sync')->expectsOutput('Gagal sinkronisasi: Sync unavailable')->assertFailed();
+    }
+
+    public function test_data_program_sync_reports_command_success_when_the_service_completes(): void
+    {
+        $this->mock(DataProgramSyncService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('sync')->once()->with(null, 3)->andReturn(['message' => 'Synced']);
+        });
+
+        $this->artisan('data-program:sync', ['--limit' => 3])->expectsOutput('Synced')->assertSuccessful();
     }
 
     public function test_remind_telemarketing_upload_filters_uploaded_invoices_in_sql_before_limit(): void

@@ -22,6 +22,7 @@ class AutoAnalyzeProgramAiCommand extends Command
                             {--limit=50 : Batas jumlah data yang diproses}
                             {--all : Proses seluruh data yang belum dianalisis tanpa batasan}
                             {--sleep=0.5 : Jeda waktu antar pemanggilan AI dalam detik}
+                            {--max-seconds=240 : Batas durasi maksimal satu batch dalam detik (0 = tanpa batas)}
                             {--force : Jalankan meskipun di lingkungan local}';
 
     /**
@@ -45,6 +46,8 @@ class AutoAnalyzeProgramAiCommand extends Command
         $year = (string) $this->option('year');
         $limit = $this->option('all') ? 0 : (int) $this->option('limit');
         $sleepSeconds = (float) $this->option('sleep');
+        $maxSeconds = max(0, (int) $this->option('max-seconds'));
+        $runStartedAt = microtime(true);
 
         $this->info('=== Auto-Analyze Dokumen Program AI di Latar Belakang ===');
         if ($year) {
@@ -158,10 +161,16 @@ class AutoAnalyzeProgramAiCommand extends Command
                     usleep((int) ($sleepSeconds * 1000000));
                 }
 
-                // Bebaskan memori buffer PDF/gambar antar dokumen dan berhenti aman bila RAM mendekati 200 MB.
+                // Bebaskan memori buffer PDF/gambar antar dokumen dan berhenti aman bila RAM/durasi mendekati batas.
                 gc_collect_cycles();
                 if (memory_get_usage(true) > 200 * 1024 * 1024) {
                     $this->warn('Batas aman memori (200 MB) tercapai; sisa antrean dilanjutkan pada putaran berikutnya.');
+
+                    break;
+                }
+
+                if ($maxSeconds > 0 && (microtime(true) - $runStartedAt) >= $maxSeconds) {
+                    $this->warn("Batas aman durasi ({$maxSeconds} detik) tercapai; sisa antrean dilanjutkan pada putaran berikutnya.");
 
                     break;
                 }

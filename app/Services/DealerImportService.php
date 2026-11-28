@@ -94,9 +94,19 @@ class DealerImportService
                 return $row === 1;
             }
         });
-        $this->mapColumns(array_map(fn ($cell) => trim((string) $cell), $reader->load($path)->getActiveSheet()->toArray(null, false, false, false)[0] ?? []));
+        $headerSpreadsheet = $reader->load($path);
+        $headerRow = $headerSpreadsheet->getActiveSheet()->toArray(null, false, false, false)[0] ?? [];
+        $headerSpreadsheet->disconnectWorksheets();
+        unset($headerSpreadsheet, $reader);
+        $this->mapColumns(array_map(fn ($cell) => trim((string) $cell), $headerRow));
 
-        $rows = IOFactory::load($path)->getActiveSheet()->toArray(null, true, true, false);
+        $fullReader = IOFactory::createReaderForFile($path);
+        $fullReader->setReadDataOnly(true);
+        $spreadsheet = $fullReader->load($path);
+        $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
+        $spreadsheet->disconnectWorksheets();
+        unset($spreadsheet, $fullReader);
+        gc_collect_cycles();
         $header = array_map(fn ($cell) => trim((string) $cell), array_shift($rows) ?? []);
         $columns = $this->mapColumns($header);
 

@@ -21,6 +21,11 @@ class DocumentAnalysisService
     public const INSPECTION_CACHE_MINUTES = 30;
 
     /**
+     * Maximum raw document size loaded into memory for AI analysis (20 MB).
+     */
+    private const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
+
+    /**
      * Get active AI Router config (from cache or config/services.php fallback).
      *
      * @return array{base_url: string, api_key: string, model: string}
@@ -189,6 +194,24 @@ class DocumentAnalysisService
      */
     public function fetchDocumentAsDataUri(?string $url): ?string
     {
+        $downloaded = $this->downloadDocumentBytes($url);
+        if ($downloaded === null) {
+            return null;
+        }
+
+        $dataUri = "data:{$downloaded['mime']};base64,".base64_encode($downloaded['bytes']);
+        unset($downloaded);
+
+        return $dataUri;
+    }
+
+    /**
+     * Download remote document bytes and infer its MIME type once to avoid double base64 encode/decode in memory.
+     *
+     * @return array{bytes: string, mime: string}|null
+     */
+    protected function downloadDocumentBytes(?string $url): ?array
+    {
         if (empty($url) || ! str_starts_with(trim($url), 'http')) {
             return null;
         }
@@ -215,7 +238,7 @@ class DocumentAnalysisService
             }
 
             $bytes = $response->body();
-            if (empty($bytes) || strlen($bytes) > 20 * 1024 * 1024) {
+            if (empty($bytes) || strlen($bytes) > self::MAX_DOCUMENT_BYTES) {
                 return null;
             }
 
@@ -239,7 +262,7 @@ class DocumentAnalysisService
                     : 'image/jpeg';
             }
 
-            return "data:{$mime};base64,".base64_encode($bytes);
+            return ['bytes' => $bytes, 'mime' => $mime];
         } catch (\Throwable $e) {
             Log::warning("Gagal mengunduh dokumen dari {$url}: ".$e->getMessage());
 
@@ -573,31 +596,39 @@ PROMPT;
             if (str_starts_with($trimmed, '/storage/') || str_starts_with($trimmed, 'storage/')) {
                 $localPath = public_path(ltrim($trimmed, '/'));
                 if (file_exists($localPath)) {
+                    $fileSize = @filesize($localPath);
+                    if ($fileSize !== false && $fileSize > self::MAX_DOCUMENT_BYTES) {
+                        Log::warning("Melewati dokumen lokal terlalu besar ({$fileSize} bytes): {$trimmed}");
+
+                        return $result;
+                    }
+
                     $bytes = file_get_contents($localPath);
                     if ($bytes) {
                         $result['mime'] = mime_content_type($localPath) ?: 'application/pdf';
                         $result['has_file'] = true;
-                        $result['data_uri'] = "data:{$result['mime']};base64,".base64_encode($bytes);
+                        $result['size'] = strlen($bytes);
                         if (str_contains($result['mime'], 'pdf') || str_ends_with(strtolower($result['name']), '.pdf')) {
                             $result['text'] = $this->extractPdfText($bytes);
                         }
+                        $result['data_uri'] = "data:{$result['mime']};base64,".base64_encode($bytes);
+                        unset($bytes);
 
                         return $result;
                     }
                 }
             }
 
-            $dataUri = $this->fetchDocumentAsDataUri($trimmed);
-            if ($dataUri) {
+            $downloaded = $this->downloadDocumentBytes($trimmed);
+            if ($downloaded !== null) {
                 $result['has_file'] = true;
-                $result['data_uri'] = $dataUri;
-                if (preg_match('/^data:([^;]+);base64,(.*)$/', $dataUri, $m)) {
-                    $result['mime'] = $m[1];
-                    $bytes = base64_decode($m[2]);
-                    if (str_contains($result['mime'], 'pdf')) {
-                        $result['text'] = $this->extractPdfText($bytes);
-                    }
+                $result['mime'] = $downloaded['mime'];
+                $result['size'] = strlen($downloaded['bytes']);
+                if (str_contains($result['mime'], 'pdf')) {
+                    $result['text'] = $this->extractPdfText($downloaded['bytes']);
                 }
+                $result['data_uri'] = "data:{$downloaded['mime']};base64,".base64_encode($downloaded['bytes']);
+                unset($downloaded);
             }
 
             return $result;

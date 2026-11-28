@@ -15,6 +15,9 @@ return [
 
     'default' => env('QUEUE_CONNECTION', 'database'),
 
+    // Disable only after a process manager (e.g. Supervisor) runs the queue worker.
+    'scheduler_worker_enabled' => env('SCHEDULER_QUEUE_WORKER_ENABLED', true),
+
     /*
     |--------------------------------------------------------------------------
     | Queue Connections

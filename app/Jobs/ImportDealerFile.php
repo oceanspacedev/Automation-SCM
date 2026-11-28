@@ -53,6 +53,11 @@ class ImportDealerFile implements ShouldQueue
      */
     private const SECONDS_PER_JOB = 1800;
 
+    /**
+     * Hand off the remaining stores before reaching queue:work's 256 MB memory ceiling.
+     */
+    private const MAX_MEMORY_BYTES = 180 * 1024 * 1024;
+
     public int $tries = 1;
 
     public int $timeout = 3600;
@@ -234,7 +239,9 @@ class ImportDealerFile implements ShouldQueue
                     'resume' => ['links' => $linksPath, 'from' => $offset],
                 ]);
 
-                if ($offset < $total && $startedAt->diffInSeconds(now()) >= self::SECONDS_PER_JOB) {
+                gc_collect_cycles();
+
+                if ($offset < $total && ($startedAt->diffInSeconds(now()) >= self::SECONDS_PER_JOB || memory_get_usage(true) >= self::MAX_MEMORY_BYTES)) {
                     $next = (string) Str::uuid();
                     $this->report(['job' => $next]);
                     self::dispatch($linksPath, false, 'agreements', $offset, $next);

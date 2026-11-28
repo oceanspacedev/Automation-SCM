@@ -25,6 +25,31 @@ class AutoMatchService
     public const CACHE_KEY_LAST_FINGERPRINT = 'auto_match:last_fingerprint';
 
     /**
+     * Lightweight columns needed to score & match a ProgramSubmission before loading full validation JSON.
+     *
+     * @var list<string>
+     */
+    private const SUBMISSION_MATCH_COLUMNS = [
+        'id',
+        'area',
+        'brand',
+        'region',
+        'id_real',
+        'dealer_name',
+        'program_name',
+        'net_pay',
+        'dpp',
+        'ppn',
+        'sales_name',
+        'credit_note_url',
+        'agreement_url',
+        'tax_invoice_url',
+        'no_faktur',
+        'raw_data',
+        'updated_at',
+    ];
+
+    /**
      * Purchase statuses that are already decided; such rows are not matched again.
      *
      * @var list<string>
@@ -82,9 +107,11 @@ class AutoMatchService
             return $summary;
         }
 
-        // Muat pengajuan Form Program per scope (brand|area) sekali saja supaya seluruh baris pending
-        // bisa dipindai tanpa batas 200 baris terbaru dan tanpa query N+1.
-        $submissionQuery = ProgramSubmission::query()->orderByDesc('id');
+        // Muat kolom ringan Form Program per scope (brand|area) agar RAM tetap rendah saat data upload besar;
+        // kolom lengkap (seperti doc_validation) baru dimuat untuk kandidat yang benar-benar direkonsiliasi.
+        $submissionQuery = ProgramSubmission::query()
+            ->select(self::SUBMISSION_MATCH_COLUMNS)
+            ->orderByDesc('id');
         $nonEmptyBrands = $pendingBrands->filter(static fn ($brand): bool => is_string($brand) && $brand !== '')->values();
         if ($nonEmptyBrands->count() === $pendingBrands->count()) {
             $submissionQuery->whereIn('brand', $nonEmptyBrands->all());
@@ -148,8 +175,9 @@ class AutoMatchService
                 array_map(static fn (array $pair): int => (int) $pair['data_program']->id, $candidates)
             );
 
+            $toReconcile = [];
             foreach ($candidates as $pair) {
-                if ($summary['evaluated'] >= $limit) {
+                if ($limit <= $summary['evaluated'] + count($toReconcile)) {
                     break;
                 }
 
@@ -167,6 +195,22 @@ class AutoMatchService
                         continue;
                     }
                 }
+
+                $toReconcile[] = $pair;
+            }
+
+            $fullSubmissions = $toReconcile === []
+                ? collect()
+                : ProgramSubmission::withoutGlobalScopes(['area', 'brand'])
+                    ->whereIn('id', array_values(array_unique(array_map(static fn (array $pair): int => (int) $pair['submission']->id, $toReconcile))))
+                    ->get()
+                    ->keyBy('id');
+
+            foreach ($toReconcile as $pair) {
+                /** @var DataProgram $dataProgram */
+                $dataProgram = $pair['data_program'];
+                /** @var ProgramSubmission $submission */
+                $submission = $fullSubmissions->get($pair['submission']->id) ?? $pair['submission'];
 
                 $summary['evaluated']++;
 
@@ -186,10 +230,11 @@ class AutoMatchService
                 }
             }
 
-            unset($rows, $candidates, $lastCheckedMap);
+            unset($rows, $candidates, $lastCheckedMap, $toReconcile, $fullSubmissions);
             gc_collect_cycles();
         }
 
+        unset($submissionsByScope);
         // Simpan fingerprint baru hanya jika seluruh baris pending selesai dipindai (tidak terpotong limit).
         if ($summary['evaluated'] < $limit) {
             $this->rememberFingerprint($this->currentDataFingerprint());
